@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, Staff, formatVNTime } from '../types';
@@ -27,7 +27,9 @@ import {
   ArrowUpDown,
   Heart,
   Undo2,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 
 interface CathLabSchedulerViewProps {
@@ -196,7 +198,7 @@ export default function CathLabSchedulerView({
   const [adHocErrors, setAdHocErrors] = useState<string[]>([]);
   const [adHocPatientDOB, setAdHocPatientDOB] = useState('2018-01-01');
   const [adHocPatientSex, setAdHocPatientSex] = useState<'Nam' | 'Nữ'>('Nam');
-  const [adHocPatientAddress, setAdHocPatientAddress] = useState('');
+  const [adHocPatientAdress, setAdHocPatientAdress] = useState('');
   const [adHocPatientPhone1, setAdHocPatientPhone1] = useState('');
   const [adHocPatientPhone2, setAdHocPatientPhone2] = useState('');
   const [adHocOutcome, setAdHocOutcome] = useState<'Tử vong' | 'Nặng xin về' | 'Đã mổ' | 'Đã thông' | ''>('');
@@ -577,7 +579,7 @@ export default function CathLabSchedulerView({
         })() : '';
 
         const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
-        const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAdress || ''}` : '';
+        const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAdress || (p as any).PatientAdress || ''}` : '';
         
         const chanDoan = c.DetailDiagnosis || '';
         const keHoach = c.DetailConsultResult || '';
@@ -885,7 +887,7 @@ export default function CathLabSchedulerView({
       })() : '';
 
       const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
-      const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAdress || ''}` : '';
+      const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAdress || (p as any).PatientAdress || ''}` : '';
       
       const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join('\n');
       const chanDoan = c.DetailDiagnosis || '';
@@ -1068,7 +1070,7 @@ export default function CathLabSchedulerView({
     setAdHocOtherPatientName(String(pat.OtherPatientName || ''));
     setAdHocPatientDOB(String(pat.PatientDOB || ''));
     setAdHocPatientSex(pat.PatientSex);
-    setAdHocPatientAddress(String(pat.PatientAddress || (pat as any).PatientAdress || ''));
+    setAdHocPatientAdress(String(pat.PatientAdress || (pat as any).PatientAdress || ''));
     setAdHocPatientPhone1(String(pat.PatientPhone1 || ''));
     setAdHocPatientPhone2(String(pat.PatientPhone2 || ''));
     setAdHocOutcome(String(pat.Outcome || ''));
@@ -1083,7 +1085,7 @@ export default function CathLabSchedulerView({
     setAdHocOtherPatientName('');
     setAdHocPatientDOB('2018-01-01');
     setAdHocPatientSex('Nam');
-    setAdHocPatientAddress('');
+    setAdHocPatientAdress('');
     setAdHocPatientPhone1('');
     setAdHocPatientPhone2('');
     setAdHocOutcome('');
@@ -1197,7 +1199,7 @@ export default function CathLabSchedulerView({
       if (!adHocPatientID1) errors.push('PatientID1');
       if (!adHocPatientName) errors.push('PatientName');
       if (!adHocPatientDOB) errors.push('PatientDOB');
-      if (!adHocPatientAddress) errors.push('PatientAddress');
+      if (!adHocPatientAdress) errors.push('PatientAdress');
       if (!adHocPatientPhone1) errors.push('PatientPhone1');
     }
 
@@ -1229,7 +1231,7 @@ export default function CathLabSchedulerView({
       OtherPatientName: adHocOtherPatientName,
       PatientDOB: adHocPatientDOB,
       PatientSex: adHocPatientSex,
-      PatientAddress: adHocPatientAddress,
+      PatientAdress: adHocPatientAdress,
       PatientPhone1: adHocPatientPhone1,
       PatientPhone2: adHocPatientPhone2,
       PatientCreateBy: adHocRequestBy || 'system',
@@ -1309,7 +1311,7 @@ export default function CathLabSchedulerView({
       setAdHocOtherPatientName('');
       setAdHocPatientDOB('2018-01-01');
       setAdHocPatientSex('Nam');
-      setAdHocPatientAddress('');
+      setAdHocPatientAdress('');
       setAdHocPatientPhone1('');
       setAdHocPatientPhone2('');
       setAdHocOutcome('');
@@ -2233,7 +2235,7 @@ export default function CathLabSchedulerView({
                           </div>
                           <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Địa chỉ:</span>
-                            <span className="font-bold text-slate-800 block truncate">{pat.PatientAddress || (pat as any).PatientAdress || '—'}</span>
+                            <span className="font-bold text-slate-800 block truncate">{pat.PatientAdress || (pat as any).PatientAdress || '—'}</span>
                           </div>
                           <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 1:</span>
@@ -3163,7 +3165,7 @@ export default function CathLabSchedulerView({
               const weightDisplay = selectedConsult?.PatientWeight ? `${selectedConsult.PatientWeight} kg` : '—';
               const heightDisplay = selectedConsult?.PatientHeight ? `${selectedConsult.PatientHeight} cm` : '—';
               const ageDesc = getAgeDescription(pObj.PatientDOB) || '—';
-              const addressDisplay = pObj.PatientAddress || (pObj as any).PatientAdress || '';
+              const addressDisplay = pObj.PatientAdress || (pObj as any).PatientAdress || '';
               const phoneList = [pObj.PatientPhone1, pObj.PatientPhone2].filter(Boolean).join(' | ');
               const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);
               const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : 'Chưa gán';
@@ -3301,7 +3303,7 @@ export default function CathLabSchedulerView({
                         </div>
                         <div className="col-span-1 md:col-span-2">
                           <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Địa chỉ:</span>
-                          <span className="font-bold text-slate-800 block break-words text-[12px]">{pat.PatientAddress || (pat as any).PatientAdress || '—'}</span>
+                          <span className="font-bold text-slate-800 block break-words text-[12px]">{pat.PatientAdress || (pat as any).PatientAdress || '—'}</span>
                         </div>
                         <div className="col-span-1 md:col-span-2">
                           <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Điện thoại:</span>
@@ -3592,7 +3594,7 @@ export default function CathLabSchedulerView({
                                     {adHocPatientID2 && <span className="text-emerald-800"><b className="opacity-60">Mã BN2:</b> <span className="font-bold ml-1 font-mono">{adHocPatientID2}</span></span>}
                                     <span className="text-emerald-800"><b className="opacity-60">Ngày sinh:</b> <span className="font-bold ml-1 font-mono">{adHocPatientDOB ? adHocPatientDOB.split('-').reverse().join('/') : ''}</span></span>
                                     <span className="text-emerald-800"><b className="opacity-60">Giới tính:</b> <span className="font-bold ml-1">{adHocPatientSex}</span></span>
-                                    <span className="text-emerald-800 col-span-2"><b className="opacity-60">Địa chỉ:</b> <span className="font-bold ml-1">{adHocPatientAddress}</span></span>
+                                    <span className="text-emerald-800 col-span-2"><b className="opacity-60">Địa chỉ:</b> <span className="font-bold ml-1">{adHocPatientAdress}</span></span>
                                 </div>
                               </div>
                             </div>
@@ -3707,14 +3709,14 @@ export default function CathLabSchedulerView({
                             <div className="col-span-2">
                               <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
                                 Địa chỉ thường trú *
-                                {adHocErrors.includes('PatientAddress') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
+                                {adHocErrors.includes('PatientAdress') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
                               </label>
                               <input
                                 type="text"
                                 required
                                 placeholder="Nhập địa chỉ của bệnh nhi..."
-                                value={adHocPatientAddress}
-                                onChange={(e) => setAdHocPatientAddress(e.target.value)}
+                                value={adHocPatientAdress}
+                                onChange={(e) => setAdHocPatientAdress(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium"
                               />
                             </div>

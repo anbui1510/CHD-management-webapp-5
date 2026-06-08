@@ -40,6 +40,9 @@ const STAFF_FILE = path.join(DB_DIR, 'staff.json');
 const PATIENTS_FILE = path.join(DB_DIR, 'patients.json');
 const CONSULTS_FILE = path.join(DB_DIR, 'consults.json');
 const CATHLABS_FILE = path.join(DB_DIR, 'cathlabs.json');
+const OPERATIONS_FILE = path.join(DB_DIR, 'operations.json');
+const CMRS_FILE = path.join(DB_DIR, 'cmrs.json');
+const SOURSES_FILE = path.join(DB_DIR, 'sourses.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
 
 // Ensure DB directory exists
@@ -119,7 +122,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
     const data = await response.json() as any;
 
-    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs))) {
+    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sourses))) {
       if (Array.isArray(data.patients)) {
         const uniquePatients = Array.from(new Map(data.patients.map((p: any) => [p.PatientKey, p])).values());
         writeDB(PATIENTS_FILE, uniquePatients);
@@ -142,12 +145,23 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         writeDB(CONSULTS_FILE, uniqueConsults);
       }
       if (Array.isArray(data.cathlabs) && data.cathlabs.length > 0) {
-        const uniqueCathlabs = Array.from(new Map(data.cathlabs.map((c: any) => [c.CathKey, c])).values());
+        const uniqueCathlabs = Array.from(new Map(data.cathlabs.map((c: any, i: number) => [c.CathKey || `cl_${i}`, c])).values());
         writeDB(CATHLABS_FILE, uniqueCathlabs);
       }
+      if (Array.isArray(data.operations) && data.operations.length > 0) {
+        const uniqueOperations = Array.from(new Map(data.operations.map((o: any, i: number) => [o.OpKey || o.SurgKey || `op_${i}`, o])).values());
+        writeDB(OPERATIONS_FILE, uniqueOperations);
+      }
+      if (Array.isArray(data.cmrs) && data.cmrs.length > 0) {
+        const uniqueCMRs = Array.from(new Map(data.cmrs.map((m: any, i: number) => [m.CMRKey || `cmr_${i}`, m])).values());
+        writeDB(CMRS_FILE, uniqueCMRs);
+      }
       if (Array.isArray(data.staff) && data.staff.length > 0) {
-        const uniqueStaff = Array.from(new Map(data.staff.map((s: any) => [s.StaffKey, s])).values());
+        const uniqueStaff = Array.from(new Map(data.staff.map((s: any, i: number) => [s.StaffKey || `st_${i}`, s])).values());
         writeDB(STAFF_FILE, uniqueStaff);
+      }
+      if (Array.isArray(data.sourses) && data.sourses.length > 0) {
+        writeDB(SOURSES_FILE, data.sourses);
       }
       lastSyncTime = Date.now();
       console.log('Successfully pulling synced and updated local database cache!');
@@ -309,7 +323,7 @@ const defaultPatients: Patient[] = [
     OtherPatientName: "Nguyễn Hoàng Nam",
     PatientDOB: "2018-04-12",
     PatientSex: "Nam",
-    PatientAddress: "Hà Nội",
+    PatientAdress: "Hà Nội",
     PatientPhone1: "0912345678",
     PatientPhone2: "0987654321",
     PatientCreateBy: "01378",
@@ -324,7 +338,7 @@ const defaultPatients: Patient[] = [
     OtherPatientName: "Trần Mai Phương",
     PatientDOB: "2020-08-25",
     PatientSex: "Nữ",
-    PatientAddress: "Hải Phòng",
+    PatientAdress: "Hải Phòng",
     PatientPhone1: "0923456789",
     PatientPhone2: "",
     PatientCreateBy: "11111",
@@ -339,7 +353,7 @@ const defaultPatients: Patient[] = [
     OtherPatientName: "Lê Minh Khôi",
     PatientDOB: "2022-11-02",
     PatientSex: "Nam",
-    PatientAddress: "Nghệ An",
+    PatientAdress: "Nghệ An",
     PatientPhone1: "0934567890",
     PatientPhone2: "0911223344",
     PatientCreateBy: "11111",
@@ -569,6 +583,24 @@ app.get('/api/consults', async (req, res) => {
   await syncFromGoogleSheets();
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
   res.json(consults);
+});
+
+app.get('/api/operations', async (req, res) => {
+  await syncFromGoogleSheets();
+  const operations = readDB<any>(OPERATIONS_FILE, []);
+  res.json(operations);
+});
+
+app.get('/api/cmrs', async (req, res) => {
+  await syncFromGoogleSheets();
+  const cmrs = readDB<any>(CMRS_FILE, []);
+  res.json(cmrs);
+});
+
+app.get('/api/sourses', async (req, res) => {
+  await syncFromGoogleSheets();
+  const sourses = readDB<any>(SOURSES_FILE, []);
+  res.json(sourses);
 });
 
 app.post('/api/consults', async (req, res) => {

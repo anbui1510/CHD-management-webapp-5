@@ -11,11 +11,15 @@ interface VirtualSheetsProps {
   patients: Patient[];
   consults: Consult[];
   staff: Staff[];
+  cathlabs?: any[];
+  operations?: any[];
+  cmrs?: any[];
+  sourses?: any[];
   onRefreshData?: () => void;
 }
 
-export default function VirtualSheets({ patients, consults, staff, onRefreshData }: VirtualSheetsProps) {
-  const [activeTab, setActiveTab] = useState<'Patient' | 'Consult' | 'Staff'>('Patient');
+export default function VirtualSheets({ patients, consults, staff, cathlabs = [], operations = [], cmrs = [], sourses = [], onRefreshData }: VirtualSheetsProps) {
+  const [activeTab, setActiveTab] = useState<'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Sourse'>('Patient');
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -168,9 +172,13 @@ export default function VirtualSheets({ patients, consults, staff, onRefreshData
       case 'Patient': return patients;
       case 'Consult': return consults;
       case 'Staff': return staff;
+      case 'CathLab': return cathlabs;
+      case 'Operation': return operations;
+      case 'CMR': return cmrs;
+      case 'Sourse': return sourses;
       default: return [];
     }
-  }, [activeTab, patients, consults, staff]);
+  }, [activeTab, patients, consults, staff, cathlabs, operations, cmrs, sourses]);
   
   const totalPages = Math.ceil(currentData.length / rowsPerPage) || 1;
   
@@ -191,6 +199,24 @@ export default function VirtualSheets({ patients, consults, staff, onRefreshData
     const startIndex = (currentPage - 1) * rowsPerPage;
     return staff.slice(startIndex, startIndex + rowsPerPage);
   }, [activeTab, staff, currentPage]);
+
+  const paginatedCathlabs = useMemo(() => {
+    if (activeTab !== 'CathLab') return [];
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return cathlabs.slice(startIndex, startIndex + rowsPerPage);
+  }, [activeTab, cathlabs, currentPage]);
+
+  const paginatedOperations = useMemo(() => {
+    if (activeTab !== 'Operation') return [];
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return operations.slice(startIndex, startIndex + rowsPerPage);
+  }, [activeTab, operations, currentPage]);
+
+  const paginatedCmrs = useMemo(() => {
+    if (activeTab !== 'CMR') return [];
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return cmrs.slice(startIndex, startIndex + rowsPerPage);
+  }, [activeTab, cmrs, currentPage]);
 
   return (
     <div className="space-y-4 flex flex-col h-full min-h-0 overflow-hidden">
@@ -387,7 +413,7 @@ export default function VirtualSheets({ patients, consults, staff, onRefreshData
             <span className="font-bold text-xs uppercase tracking-wider">Trình xem nhanh Google Sheets Database</span>
           </div>
           <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-            Total records: {patients.length + consults.length} entries
+            Total records: {patients.length + consults.length + staff.length + cathlabs.length + operations.length + cmrs.length + sourses.length} entries
           </span>
         </div>
 
@@ -426,171 +452,86 @@ export default function VirtualSheets({ patients, consults, staff, onRefreshData
             <Users className="w-3.5 h-3.5" />
             Bảng 3: Staff ({staff.length})
           </button>
+          <button
+            onClick={() => setActiveTab('CathLab')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-r border-gray-300 transition-colors ${
+              activeTab === 'CathLab'
+                ? 'bg-white text-emerald-700 border-t-2 border-t-emerald-600'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Table className="w-3.5 h-3.5" />
+            Bảng 4: CathLab ({cathlabs.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('Operation')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-r border-gray-300 transition-colors ${
+              activeTab === 'Operation'
+                ? 'bg-white text-emerald-700 border-t-2 border-t-emerald-600'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Table className="w-3.5 h-3.5" />
+            Bảng 5: Operation ({operations.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('CMR')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-r border-gray-300 transition-colors ${
+              activeTab === 'CMR'
+                ? 'bg-white text-emerald-700 border-t-2 border-t-emerald-600'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Table className="w-3.5 h-3.5" />
+            Bảng 6: CMR ({cmrs.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('Sourse')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-r border-gray-300 transition-colors ${
+              activeTab === 'Sourse'
+                ? 'bg-white text-emerald-700 border-t-2 border-t-emerald-600'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Table className="w-3.5 h-3.5" />
+            Bảng 7: Sourse ({sourses.length})
+          </button>
         </div>
 
         {/* Table Grid details */}
         <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
-          {activeTab === 'Patient' && (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono text-[11px] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 border-r border-gray-200">PatientKey (A)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">PatientID1 (B)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">PatientID2 (C)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">PatientName (D)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">PatientDOB (E)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">PatientSex (F)</th>
-                  <th className="py-2 px-3 border-r border-gray-200 font-sans">PatientAddress (G)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">PatientPhone1 (H)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">CreateBy (K)</th>
-                  <th className="py-2 px-3">Outcome (M)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
-                {paginatedPatients.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="text-center py-8 text-gray-500 bg-gray-50">
-                      Chưa có bệnh nhi nào được đồng bộ. Hãy kết nối hoặc đăng ký mới!
-                    </td>
+          {currentData.length > 0 ? (
+            <div className="min-w-max">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono text-[11px] uppercase tracking-wider">
+                    {Object.keys(currentData[0]).map((key) => (
+                      <th key={key} className="py-2.5 px-3 border-r border-gray-200 whitespace-nowrap">
+                        {key}
+                      </th>
+                    ))}
                   </tr>
-                ) : (
-                  paginatedPatients.map((p, idx) => (
-                    <tr key={p.PatientKey} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                      <td className="py-2 px-3 border-r border-gray-200 font-semibold text-emerald-800">{p.PatientKey}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 text-blue-600 font-bold">{p.PatientID1}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 text-gray-500">{p.PatientID2 || '—'}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 font-sans text-xs text-gray-900 font-medium">{p.PatientName}</td>
-                      <td className="py-2 px-3 border-r border-gray-200">{p.PatientDOB}</td>
-                      <td className="py-2 px-3 border-r border-gray-200">{p.PatientSex}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 font-sans">{p.PatientAddress || (p as any).PatientAdress || ''}</td>
-                      <td className="py-2 px-3 border-r border-gray-200">{p.PatientPhone1}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 text-gray-500">{p.PatientCreateBy}</td>
-                      <td className="py-2 px-3">
-                        {p.Outcome ? (
-                          <span className="bg-teal-50 text-teal-800 px-1.5 py-0.5 rounded border border-teal-200 text-[10px]">
-                            {p.Outcome}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 italic text-[10px]">Chưa chỉ định</span>
-                        )}
-                      </td>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
+                  {currentData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((row: any, idx) => (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                      {Object.keys(currentData[0]).map((key) => {
+                        const val = row[key];
+                        return (
+                          <td key={key} className="py-2 px-3 border-r border-gray-200 whitespace-nowrap">
+                            {typeof val === 'object' ? JSON.stringify(val) : String(val || '')}
+                          </td>
+                        );
+                      })}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {activeTab === 'Consult' && (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono text-[11px] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 border-r border-gray-200 min-w-[100px]">ConsultKey (A)</th>
-                  <th className="py-2 px-3 border-r border-gray-200 min-w-[100px]">PatientKey (B)</th>
-                  <th className="py-2 px-3 border-r border-gray-200 min-w-[90px]">ConsultType (C)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">Weight (D)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">Date (E)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">RequestBy (F)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">DiagnosisID (G)</th>
-                  <th className="py-2 px-3 border-r border-gray-200 min-w-[150px]">DetailDiagnosis (H)</th>
-                  <th className="py-2 px-3 border-r border-gray-200 font-sans">Department (I)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">Result (M)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">Priority (P)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">CheckDevice</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
-                {paginatedConsults.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="text-center py-8 text-gray-500 bg-gray-50">
-                      Chưa có Biên bản Hội chẩn nào được đồng bộ. Hãy tạo mới hội chẩn !
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedConsults.map((c, idx) => (
-                    <tr key={c.ConsultKey} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                      <td className="py-2 px-3 border-r border-gray-200 font-semibold text-emerald-800">{c.ConsultKey}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 text-indigo-600 font-medium">{c.PatientKey}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 font-sans text-xs text-gray-900">{c.ConsultType}</td>
-                      <td className="py-2 px-3 border-r border-gray-200">{c.PatientWeight}</td>
-                      <td className="py-2 px-3 border-r border-gray-200">{c.ConsultDate}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 text-xs font-sans">{c.RequestBy}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 text-red-600 font-bold">{c.DiagnosisID}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 font-sans text-xs text-gray-600 max-w-xs truncate" title={c.DetailDiagnosis}>{c.DetailDiagnosis}</td>
-                      <td className="py-2 px-3 border-r border-gray-200 font-sans text-xs">{c.Department}</td>
-                      <td className="py-2 px-3 border-r border-gray-200">
-                        {c.ConsultResultID ? (
-                          <span className="bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200 text-[10px] font-medium">
-                            {c.ConsultResultID}
-                          </span>
-                        ) : (
-                          <span className="bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 text-[10px] font-bold">
-                            Chờ kết quả
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2 px-3 border-r border-gray-200">
-                        <span className={`px-1 rounded text-[10px] font-bold ${
-                          c.PriorityOrder === 'Cấp cứu' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {c.PriorityOrder}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          c.CheckDevice === 'Đủ' ? 'bg-green-100 text-green-800' : c.CheckDevice === 'Thiếu' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {c.CheckDevice || '—'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {activeTab === 'Staff' && (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-mono text-[11px] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 border-r border-gray-200">StaffKey (A)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">StaffName (B)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">Password (C)</th>
-                  <th className="py-2 px-3 border-r border-gray-200">Role (D)</th>
-                  <th className="py-2 px-3 border-r border-gray-200 font-sans">Email (E)</th>
-                  <th className="py-2">FireDate (F)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
-                {paginatedStaff.map((s, idx) => (
-                  <tr key={s.StaffKey} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                    <td className="py-2 px-3 border-r border-gray-200 font-semibold text-emerald-800">{s.StaffKey}</td>
-                    <td className="py-2 px-3 border-r border-gray-200 font-sans font-medium text-gray-900">{s.StaffName}</td>
-                    <td className="py-2 px-3 border-r border-gray-200 text-gray-400">••••••••</td>
-                    <td className="py-2 px-3 border-r border-gray-200 font-medium">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                        s.Role === 'Admin' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-700'
-                      }`}>
-                        {s.Role}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 border-r border-gray-200 font-sans">{s.Email}</td>
-                    <td className="py-2">
-                      {s.FireDate ? (
-                        <span className="bg-rose-100 text-rose-800 border border-rose-200 px-1 py-0.5 rounded text-[9px] font-bold">
-                          Đã Nghỉ Việc: {s.FireDate}
-                        </span>
-                      ) : (
-                        <span className="text-green-600 flex items-center gap-0.5 text-[10px] font-bold font-sans">
-                          <Check className="w-3.5 h-3.5" /> Có hiệu lực
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-gray-500 font-medium">
+              Chưa có dữ liệu cho bảng này.
+            </div>
           )}
         </div>
 
