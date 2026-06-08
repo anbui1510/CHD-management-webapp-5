@@ -23,7 +23,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `OtherPatientName`| Họ và tên khai sinh | Text | | | |
 | `PatientDOB` | Ngày sinh | Date | | Bắt buộc | Định dạng dd/mm/yyyy |
 | `PatientSex` | Giới tính | Enum | Nam/Nữ | Bắt buộc | |
-| `PatientAddress` | Địa chỉ | Enum | Danh sách tỉnh | Bắt buộc | Lưu ý ghi đúng tên `PatientAdress` |
+| `PatientAddress` | Địa chỉ | Enum | Danh sách tỉnh | Bắt buộc |  |
 | `PatientPhone1` | Số ĐT 1 | Phone | | | |
 | `PatientPhone2` | Số ĐT 2 | Phone | | | |
 | `PatientCreateBy` | Người tạo thông tin BN | Ref | | | Liên kết đến bảng Staff thông qua StaffKey |
