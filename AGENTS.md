@@ -12,7 +12,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 
 ## Cấu trúc dữ liệu chi tiết
 
-### 1. Bảng Patient (Danh sách bệnh nhi)
+### 1. Bảng Patient (Thông tin hành chính bệnh nhi)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -30,7 +30,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `PatientCreateTime`| Ngày tạo thông tin BN | DateTime | | | |
 | `Outcome` | Trạng thái cuối cùng của BN | Enum | Tử vong / Nặng xin về / Đã mổ / Đã thông / Chờ chỉ định | | |
 
-### 2. Bảng Consult (Lịch trình / Biên bản hội chẩn)
+### 2. Bảng Consult (Quá trình hội chẩn - xếp lịch - chuẩn bị dụng cụ)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -71,7 +71,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `Scheduled2ndInterventionist`| PTV phụ 1 dự kiến | Enum | Danh sách bác sĩ | | |
 | `Scheduled3rdInterventionist`| PTV phụ 2 dự kiến | Enum | Danh sách bác sĩ | | |
 
-### 3. Bảng CathLab (Can thiệp tim mạch)
+### 3. Bảng CathLab (Can thiệp)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |
