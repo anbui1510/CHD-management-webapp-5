@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ArrowUpDown, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { formatVNTime } from '../types';
+import { formatVNTime, removeDiacritics } from '../types';
 
 export default function TransferredCathLabView({ consults, patients, onRefreshData, triggerConfirm }: any) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,13 +17,13 @@ export default function TransferredCathLabView({ consults, patients, onRefreshDa
   const filteredAndSorted = useMemo(() => {
     let result = validConsults;
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+      const q = removeDiacritics(searchQuery).toLowerCase().trim();
       result = result.filter((c: any) => {
-        const p = patients.find((pat: any) => pat.PatientKey === c.PatientKey);
+        const p = patients.find((pat: any) => String(pat.PatientKey) === String(c.PatientKey));
         if (!p) return false;
-        return p.PatientName?.toLowerCase().includes(q) || 
-               p.PatientID1?.toLowerCase().includes(q) || 
-               c.DiagnosisID?.toLowerCase().includes(q);
+        return removeDiacritics(String(p.PatientName || '')).toLowerCase().includes(q) || 
+               removeDiacritics(String(p.PatientID1 || '')).toLowerCase().includes(q) || 
+               removeDiacritics(String(c.DiagnosisID || '')).toLowerCase().includes(q);
       });
     }
 
@@ -99,7 +99,7 @@ export default function TransferredCathLabView({ consults, patients, onRefreshDa
              </thead>
              <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700 bg-white">
                {paginatedData.map((c: any, index: number) => {
-                 const pat = patients.find((p: any) => p.PatientKey === c.PatientKey) || {};
+                 const pat = patients.find((p: any) => String(p.PatientKey) === String(c.PatientKey)) || {};
                  return (
                    <tr key={c.ConsultKey} className="hover:bg-cyan-50/30 transition-colors">
                      <td className="p-3 text-center font-black text-slate-400">

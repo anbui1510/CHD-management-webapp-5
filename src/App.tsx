@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Staff, 
   Patient, 
@@ -18,7 +18,9 @@ import {
   Operation,
   CMR,
   Source,
-  formatVNTime
+  formatVNTime,
+  removeDiacritics,
+  findPatientByKey
 } from './types';
 import * as XLSX from 'xlsx';
 import VirtualSheets from './components/VirtualSheets';
@@ -34,6 +36,7 @@ import ArchiveView from './components/ArchiveView';
 import WorkspaceDashboard from './components/WorkspaceDashboard';
 import { StaffMultiSelect } from './components/StaffMultiSelect';
 import { VNDateInput } from './components/VNDateInput';
+import { SOURCE_PROVINCE } from './data/source';
 
 import { 
   Users, 
@@ -73,10 +76,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const ADDRESS_OPTIONS = [
-  "Tuyên Quang", "Cao Bằng", "Lai Châu", "Lào Cai", "Thái Nguyên", "Điện Biên", "Lạng Sơn", "Sơn La", "Phú Thọ", "Bắc Ninh", "Quảng Ninh", "TP Hà Nội", "TP Hải Phòng", "Hưng Yên", "Ninh Bình", "Thanh Hoá", "Nghệ An", "Hà Tĩnh", "Quảng Trị", "TP Huế", "TP Đà Nẵng", "Quảng Ngãi", "Gia Lai", "Đắk Lắk", "Khánh Hoà", "Lâm Đồng", "Đồng Nai", "Tây Ninh", "TP Hồ Chí Minh", "Đồng Tháp", "An Giang", "Vĩnh Long", "TP Cần Thơ", "Cà Mau", "P. Sài Gòn - Tp. HCM", "P. Tân Định - Tp. HCM", "P. Bến Thành - Tp. HCM", "P. Cầu Ông Lãnh - Tp. HCM", "P. Bàn Cờ - Tp. HCM", "P. Xuân Hòa - Tp. HCM", "P. Nhiêu Lộc - Tp. HCM", "P. Xóm Chiếu - Tp. HCM", "P. Khánh Hội - Tp. HCM", "P. Vĩnh Hội - Tp. HCM", "P. Chợ Quán - Tp. HCM", "P. An Đông - Tp. HCM", "P. Chợ Lớn - Tp. HCM", "P. Bình Tây - Tp. HCM", "P. Bình Tiên - Tp. HCM", "P. Bình Phú - Tp. HCM", "P. Phú Lâm - Tp. HCM", "P. Tân Thuận - Tp. HCM", "P. Phú Thuận - Tp. HCM", "P. Tân Mỹ - Tp. HCM", "P. Tân Hưng - Tp. HCM", "P. Chánh Hưng - Tp. HCM", "P. Phú Định - Tp. HCM", "P. Bình Đông - Tp. HCM", "P. Diên Hồng - Tp. HCM", "P. Vườn Lài - Tp. HCM", "P. Hòa Hưng - Tp. HCM", "P. Minh Phụng - Tp. HCM", "P. Bình Thới - Tp. HCM", "P. Hòa Bình - Tp. HCM", "P. Phú Thọ - Tp. HCM", "P. Đông Hưng Thuận - Tp. HCM", "P. Trung Mỹ Tây - Tp. HCM", "P. Tân Thới Hiệp - Tp. HCM", "P. Thới An - Tp. HCM", "P. An Phú Đông - Tp. HCM", "P. An Lạc - Tp. HCM", "P. Bình Tân - Tp. HCM", "P. Tân Tạo - Tp. HCM", "P. Bình Trị Đông - Tp. HCM", "P. Bình Hưng Hòa - Tp. HCM", "P. Gia Định - Tp. HCM", "P. Bình Thạnh - Tp. HCM", "P. Bình Lợi Trung - Tp. HCM", "P. Thạnh Mỹ Tây - Tp. HCM", "P. Bình Quới - Tp. HCM", "P. Hạnh Thông - Tp. HCM", "P. An Nhơn - Tp. HCM", "P. Gò Vấp - Tp. HCM", "P. An Hội Đông - Tp. HCM", "P. Thông Tây Hội - Tp. HCM", "P. An Hội Tây - Tp. HCM", "P. Đức Nhuận - Tp. HCM", "P. Cầu Kiệu - Tp. HCM", "P. Phú Nhuận - Tp. HCM", "P. Tân Sơn Hòa - Tp. HCM", "P. Tân Sơn Nhất - Tp. HCM", "P. Tân Hòa - Tp. HCM", "P. Bảy Hiền - Tp. HCM", "P. Tân Bình - Tp. HCM", "P. Tân Sơn - Tp. HCM", "P. Tây Thạnh - Tp. HCM", "P. Tân Sơn Nhì - Tp. HCM", "P. Phú Thọ Hòa - Tp. HCM", "P. Tân Phú - Tp. HCM", "P. Phú Thạnh - Tp. HCM", "P. Hiệp Bình - Tp. HCM", "P. Thủ Đức - Tp. HCM", "P. Tam Bình - Tp. HCM", "P. Linh Xuân - Tp. HCM", "P. Tăng Nhơn Phú - Tp. HCM", "P. Long Bình - Tp. HCM", "P. Long Phước - Tp. HCM", "P. Long Trường - Tp. HCM", "P. Cát Lái - Tp. HCM", "P. Bình Trưng - Tp. HCM", "P. Phước Long - Tp. HCM", "P. An Khánh - Tp. HCM", "P. Đông Hòa - Tp. HCM", "P. Dĩ An - Tp. HCM", "P. Tân Đông Hiệp - Tp. HCM", "P. An Phú - Tp. HCM", "P. Bình Hòa - Tp. HCM", "P. Lái Thiêu - Tp. HCM", "P. Thuận An - Tp. HCM", "P. Thuận Giao - Tp. HCM", "P. Thủ Dầu Một - Tp. HCM", "P. Phú Lợi - Tp. HCM", "P. Chánh Hiệp - Tp. HCM", "P. Bình Dương - Tp. HCM", "P. Hòa Lợi - Tp. HCM", "P. Phú An - Tp. HCM", "P. Tây Nam - Tp. HCM", "P. Long Nguyên - Tp. HCM", "P. Bến Cát - Tp. HCM", "P. Chánh Phú Hòa - Tp. HCM", "P. Vĩnh Tân - Tp. HCM", "P. Bình Cơ - Tp. HCM", "P. Tân Uyên - Tp. HCM", "P. Tân Hiệp - Tp. HCM", "P. Tân Khánh - Tp. HCM", "P. Vũng Tàu - Tp. HCM", "P. Tam Thắng - Tp. HCM", "P. Rạch Dừa - Tp. HCM", "P. Phước Thắng - Tp. HCM", "P. Long Hương - Tp. HCM", "P. Bà Rịa - Tp. HCM", "P. Tam Long - Tp. HCM", "P. Tân Hải - Tp. HCM", "P. Tân Phước - Tp. HCM", "P. Phú Mỹ - Tp. HCM", "P. Tân Thành - Tp. HCM", "Xã Vĩnh Lộc - Tp. HCM", "Xã Tân Vĩnh Lộc - Tp. HCM", "Xã Bình Lợi - Tp. HCM", "Xã Tân Nhựt - Tp. HCM", "Xã Bình Chánh - Tp. HCM", "Xã Hưng Long - Tp. HCM", "Xã Bình Hưng - Tp. HCM", "Xã Bình Khánh - Tp. HCM", "Xã An Thới Đông - Tp. HCM", "Xã Cần Giờ - Tp. HCM", "Xã Củ Chi - Tp. HCM", "Xã Tân An Hội - Tp. HCM", "Xã Thái Mỹ - Tp. HCM", "Xã An Nhơn Tây - Tp. HCM", "Xã Nhuận Đức - Tp. HCM", "Xã Phú Hòa Đông - Tp. HCM", "Xã Bình Mỹ - Tp. HCM", "Xã Đông Thạnh - Tp. HCM", "Xã Hóc Môn - Tp. HCM", "Xã Xuân Thới Sơn - Tp. HCM", "Xã Bà Điểm - Tp. HCM", "Xã Nhà Bè - Tp. HCM", "Xã Hiệp Phước - Tp. HCM", "Xã Thường Tân - Tp. HCM", "Xã Bắc Tân Uyên - Tp. HCM", "Xã Phú Giáo - Tp. HCM", "Xã Phước Hòa - Tp. HCM", "Xã Phước Thành - Tp. HCM", "Xã An Long - Tp. HCM", "Xã Trừ Văn Thố - Tp. HCM", "Xã Bàu Bàng - Tp. HCM", "Xã Long Hòa - Tp. HCM", "Xã Thanh An - Tp. HCM", "Xã Dầu Tiếng - Tp. HCM", "Xã Minh Thạnh - Tp. HCM", "Xã Châu Pha - Tp. HCM", "Xã Long Hải - Tp. HCM", "Xã Long Điền - Tp. HCM", "Xã Phước Hải - Tp. HCM", "Xã Đất Đỏ - Tp. HCM", "Xã Nghĩa Thành - Tp. HCM", "Xã Ngãi Giao - Tp. HCM", "Xã Kim Long - Tp. HCM", "Xã Châu Đức - Tp. HCM", "Xã Bình Giã - Tp. HCM", "Xã Xuân Sơn - Tp. HCM", "Xã Hồ Tràm - Tp. HCM", "Xã Xuyên Mộc - Tp. HCM", "Xã Hòa Hội - Tp. HCM", "Xã Bàu Lâm - Tp. HCM", "Đặc khu Côn Đảo - Tp. HCM", "Xã Bình Châu - Tp. HCM", "Xã Hòa Hiệp - Tp. HCM", "Xã Long Sơn - Tp. HCM", "Xã Thạnh An - Tp. HCM", "P. Thới Hòa - Tp. HCM"
-];
-
 const DEFAULT_DEPARTMENTS = [
   'Ngoại trú',
   'Tim Mạch',
@@ -101,15 +100,6 @@ const formatDateTime = (dateStr?: string) => {
   } catch (_) {
     return dateStr;
   }
-};
-
-const removeDiacritics = (str: string): string => {
-  if (!str) return '';
-  return str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D');
 };
 
 const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] = []): string => {
@@ -193,6 +183,36 @@ export default function App() {
   const [cmrs, setCmrs] = useState<CMR[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
 
+  // Fast Patients Cache map to optimize O(N*M) lookups down to O(M)
+  const patientsMap = useMemo(() => {
+    const map = new Map<string, Patient>();
+    if (!Array.isArray(patients)) return map;
+    patients.forEach(p => {
+      if (p) {
+        if (p.PatientKey) {
+          const pk = String(p.PatientKey).trim().toLowerCase();
+          map.set(pk, p);
+        }
+        if (p.PatientID1) {
+          const pid = String(p.PatientID1).trim().toLowerCase();
+          map.set(pid, p);
+        }
+      }
+    });
+    return map;
+  }, [patients]);
+
+  const getPatientByKey = (key: any): Patient | undefined => {
+    if (!key) return undefined;
+    const keyStr = String(key).trim().toLowerCase();
+    
+    // Prioritize direct match by PatientKey to prevent collisions with PatientID1 mapping
+    const directMatch = patients.find(p => p && String(p.PatientKey).trim().toLowerCase() === keyStr);
+    if (directMatch) return directMatch;
+    
+    return patientsMap.get(keyStr);
+  };
+
   // Refs for synchronized double scrollbar in consult log list
   const topScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
@@ -267,7 +287,7 @@ export default function App() {
     PatientHeight: '',
     ConsultDate: new Date().toISOString().split('T')[0],
     RequestBy: '',
-    DiagnosisID: 'VSD',
+    DiagnosisID: '',
     DetailDiagnosis: '',
     Department: 'Tim Mạch' as string,
     PriorityOrder: 'Chương trình' as PriorityOrderEnum,
@@ -310,7 +330,7 @@ export default function App() {
     PatientHeight: '',
     ConsultDate: '',
     RequestBy: '',
-    DiagnosisID: 'VSD',
+    DiagnosisID: '',
     DetailDiagnosis: '',
     Department: 'Tim Mạch' as string,
     RiskFactor: '' as string
@@ -507,9 +527,9 @@ export default function App() {
     
     // 1. Strict Warning — Patient ID duplicate check
     const duplicateIdPatient = patients.find(p => 
-      p.PatientKey !== editingPatientKey && (
-        p.PatientID1.trim().toLowerCase() === cleanID1 ||
-        (cleanID2 && p.PatientID2 && p.PatientID2.trim().toLowerCase() === cleanID2)
+      String(p.PatientKey) !== String(editingPatientKey || '') && (
+        String(p.PatientID1 || '').trim().toLowerCase() === cleanID1 ||
+        (cleanID2 && p.PatientID2 && String(p.PatientID2).trim().toLowerCase() === cleanID2)
       )
     );
 
@@ -520,18 +540,18 @@ export default function App() {
 
     // 2. Relative Warning — duplicate Name + DOB check
     const duplicateInfoPatient = patients.find(p =>
-      p.PatientKey !== editingPatientKey &&
-      p.PatientName.trim().toLowerCase() === cleanName &&
+      String(p.PatientKey) !== String(editingPatientKey || '') &&
+      String(p.PatientName || '').trim().toLowerCase() === cleanName &&
       p.PatientDOB === newPatientData.PatientDOB
     );
 
     const proceedSave = () => {
       const payload: Patient = {
         PatientKey: editingPatientKey || `pat_${Date.now()}`,
-        PatientID1: newPatientData.PatientID1,
-        PatientID2: newPatientData.PatientID2,
+        PatientID1: String(newPatientData.PatientID1 || '').trim(),
+        PatientID2: String(newPatientData.PatientID2 || '').trim(),
         PatientName: newPatientData.PatientName,
-        OtherPatientName: newPatientData.OtherPatientName || newPatientData.PatientName,
+        OtherPatientName: newPatientData.OtherPatientName || '',
         PatientDOB: newPatientData.PatientDOB || '2020-01-01',
         PatientSex: newPatientData.PatientSex,
         PatientAddress: newPatientData.PatientAddress,
@@ -707,6 +727,20 @@ export default function App() {
   const makeResultEdit = (c: Consult) => {
     setEditingConsultKey(c.ConsultKey);
     setIsDrawerEditing(false);
+    
+    // Safety check for ConsultMember which might be a comma-separated string or an array
+    let normalizedMembers: string[] = [];
+    if (c.ConsultMember) {
+      if (Array.isArray(c.ConsultMember)) {
+        normalizedMembers = c.ConsultMember;
+      } else if (typeof c.ConsultMember === 'string') {
+        normalizedMembers = (c.ConsultMember as string)
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+      }
+    }
+
     setResultUpdateData({
       ConsultResultID: c.ConsultResultID || '' as ConsultResultEnum,
       DetailConsultResult: c.DetailConsultResult || '',
@@ -720,7 +754,7 @@ export default function App() {
       RequestBy: c.RequestBy || '',
       DiagnosisID: c.DiagnosisID || '',
       DetailDiagnosis: c.DetailDiagnosis || '',
-      ConsultMember: c.ConsultMember || []
+      ConsultMember: normalizedMembers
     });
   };
 
@@ -940,7 +974,7 @@ export default function App() {
 
           // 4. Populate table body database records
           filtered.forEach((item, idx) => {
-            const pat = patients.find(p => p.PatientKey === item.PatientKey);
+            const pat = getPatientByKey(item.PatientKey);
             const stt = idx + 1;
             const maNB = pat ? pat.PatientID1 : 'N/A';
             const hoTen = pat ? pat.PatientName : 'UNKNOWN';
@@ -1053,37 +1087,7 @@ export default function App() {
     }, 1000);
   };
 
-  // Query Filters Handler
-  const getFilteredConsults = () => {
-    const list = consults.filter(c => {
-      const typeMatch = filterType === 'Tất cả' || c.ConsultType === filterType;
-      const dateMatch = !filterDate || c.ConsultDate === filterDate;
-      const notConsultedYet = !c.ConsultResultID; // Ẩn bệnh nhân đã có kết quả hội chẩn (ConsultResultID có giá trị)
-      
-      let searchMatch = true;
-      const q = consultListSearch.toLowerCase().trim();
-      if (q) {
-        const pat = patients.find(p => p.PatientKey === c.PatientKey);
-        if (pat) {
-          searchMatch = (
-            String(pat.PatientName || '').toLowerCase().includes(q) ||
-            String(pat.PatientID1 || '').toLowerCase().includes(q) ||
-            (pat.PatientID2 && String(pat.PatientID2).toLowerCase().includes(q))
-          );
-        } else {
-          searchMatch = false;
-        }
-      }
 
-      return typeMatch && dateMatch && notConsultedYet && searchMatch;
-    });
-
-    return list.sort((a, b) => {
-      const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-      const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-      return consultSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-    });
-  };
 
   // Restore Database Handlers
   const handleResetDatabase = () => {
@@ -1103,6 +1107,81 @@ export default function App() {
     );
   };
 
+  // Query Filters Handler (Relocated to prevent conditional hook errors)
+  const getFilteredConsults = () => {
+    const list = consults.filter(c => {
+      const typeMatch = filterType === 'Tất cả' || c.ConsultType === filterType;
+      const dateMatch = !filterDate || c.ConsultDate === filterDate;
+      const resVal = String(c.ConsultResultID || '').trim().toLowerCase();
+      const notConsultedYet = !c.ConsultResultID || resVal === '' || resVal === 'nodata' || resVal === 'no data' || resVal === '—' || resVal === '-';
+      
+      const pat = getPatientByKey(c.PatientKey);
+      if (!pat) return false; // Ẩn bệnh nhân không tìm thấy hồ sơ (tránh mismatch đếm ca)
+
+      let searchMatch = true;
+      const q = consultListSearch.toLowerCase().trim();
+      if (q) {
+        const qRaw = removeDiacritics(q);
+        const nameRaw = removeDiacritics(String(pat.PatientName || '')).toLowerCase();
+        const id1 = String(pat.PatientID1 || '').toLowerCase();
+        const id2 = pat.PatientID2 ? String(pat.PatientID2).toLowerCase() : '';
+        
+        searchMatch = (
+          nameRaw.includes(qRaw) ||
+          id1.includes(q) ||
+          id2.includes(q)
+        );
+      }
+
+      return typeMatch && dateMatch && notConsultedYet && searchMatch;
+    });
+
+    return list.sort((a, b) => {
+      const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
+      const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
+      return consultSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+    });
+  };
+
+  const filteredPatients = useMemo(() => {
+    return patients.filter(p => {
+      const q = (patientSearch || '').toLowerCase().trim();
+      if (!q) return true;
+      
+      const qRaw = removeDiacritics(q);
+      
+      const name = p.PatientName ? String(p.PatientName).toLowerCase() : '';
+      const nameRaw = removeDiacritics(name);
+      
+      const id1 = p.PatientID1 ? String(p.PatientID1).toLowerCase() : '';
+      const id2 = p.PatientID2 ? String(p.PatientID2).toLowerCase() : '';
+      
+      const addr = (p.PatientAddress || (p as any).PatientAddress) ? String(p.PatientAddress || (p as any).PatientAddress).toLowerCase() : '';
+      const addrRaw = removeDiacritics(addr);
+      
+      return name.includes(q) || nameRaw.includes(qRaw) ||
+             id1.includes(q) || id2.includes(q) ||
+             addr.includes(q) || addrRaw.includes(qRaw);
+    });
+  }, [patients, patientSearch]);
+
+  const PATIENTS_PER_PAGE = 50;
+  const totalPatientPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE) || 1;
+  const displayedPatients = filteredPatients.slice(
+    (patientCurrentPage - 1) * PATIENTS_PER_PAGE,
+    patientCurrentPage * PATIENTS_PER_PAGE
+  );
+
+  const CONSULTS_PER_PAGE = 100;
+  const filteredConsultsList = useMemo(() => {
+    return getFilteredConsults();
+  }, [consults, patientsMap, filterType, filterDate, consultListSearch, consultSortOrder]);
+  const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
+  const displayedConsults = filteredConsultsList.slice(
+    (consultCurrentPage - 1) * CONSULTS_PER_PAGE,
+    consultCurrentPage * CONSULTS_PER_PAGE
+  );
+
   // Return Login screen if not authenticated
   if (!currentStaff) {
     return (
@@ -1116,7 +1195,7 @@ export default function App() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#d2145a]/10 border border-[#d2145a]/20 text-[#d2145a] mb-2.5">
               <Heart className="w-6 h-6 fill-[#d2145a]/10 animate-pulse" />
             </div>
-            <h1 className="text-lg md:text-xl font-black text-white uppercase tracking-tight leading-none pt-1">CHD Management 4.0</h1>
+            <h1 className="text-lg md:text-xl font-black text-white uppercase tracking-tight leading-none pt-1">CHD Management 5.0</h1>
             <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1.5 leading-relaxed">
               HỆ THỐNG QUẢN LÝ TIM BẨM SINH<br />
               KHOA TIM MẠCH - BVNĐTP
@@ -1190,46 +1269,13 @@ export default function App() {
     { id: 'excel-export', label: 'Bảng Filter_Consult', icon: <Download className="w-4 h-4" /> },
   ];
 
-  const filteredPatients = patients.filter(p => {
-    const q = (patientSearch || '').toLowerCase().trim();
-    if (!q) return true;
-    
-    const qRaw = removeDiacritics(q);
-    
-    const name = p.PatientName ? String(p.PatientName).toLowerCase() : '';
-    const nameRaw = removeDiacritics(name);
-    
-    const id1 = p.PatientID1 ? String(p.PatientID1).toLowerCase() : '';
-    const id2 = p.PatientID2 ? String(p.PatientID2).toLowerCase() : '';
-    
-    const addr = (p.PatientAddress || (p as any).PatientAddress) ? String(p.PatientAddress || (p as any).PatientAddress).toLowerCase() : '';
-    const addrRaw = removeDiacritics(addr);
-    
-    return name.includes(q) || nameRaw.includes(qRaw) ||
-           id1.includes(q) || id2.includes(q) ||
-           addr.includes(q) || addrRaw.includes(qRaw);
-  });
 
-  const PATIENTS_PER_PAGE = 50;
-  const totalPatientPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE) || 1;
-  const displayedPatients = filteredPatients.slice(
-    (patientCurrentPage - 1) * PATIENTS_PER_PAGE,
-    patientCurrentPage * PATIENTS_PER_PAGE
-  );
-
-  const CONSULTS_PER_PAGE = 100;
-  const filteredConsultsList = getFilteredConsults();
-  const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
-  const displayedConsults = filteredConsultsList.slice(
-    (consultCurrentPage - 1) * CONSULTS_PER_PAGE,
-    consultCurrentPage * CONSULTS_PER_PAGE
-  );
 
   const getHeaderContent = () => {
     switch (activeMenu) {
       case 'home':
         return {
-          title: "HỆ THỐNG QUẢN LÝ TIM BẨM SINH - KHOA TIM MẠCH - NĐTP",
+          title: "HỆ THỐNG QUẢN LÝ TIM BẨM SINH - KHOA TIM MẠCH - BVNĐTP",
           subtitle: "",
           icon: <Heart className="w-5 h-5 text-pink-200 animate-pulse fill-pink-500/20" />
         };
@@ -1284,7 +1330,7 @@ export default function App() {
         };
       default:
         return {
-          title: "HỆ THỐNG QUẢN LÝ TIM BẨM SINH - KHOA TIM MẠCH - NĐTP",
+          title: "HỆ THỐNG QUẢN LÝ TIM BẨM SINH - KHOA TIM MẠCH - BVNĐTP",
           subtitle: "",
           icon: <Heart className="w-5 h-5 text-pink-200" />
         };
@@ -1326,7 +1372,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Panel: CHD MANAGEMENT V4.0, circular Admin avatar, Log out */}
+          {/* Right Panel: CHD MANAGEMENT V5.0, circular Admin avatar, Log out */}
           <div className="flex items-center gap-2 shrink-0">
             
             {/* Sync trigger icon */}
@@ -1342,10 +1388,10 @@ export default function App() {
               <RefreshCw className="w-3.5 h-3.5 text-white/90" />
             </button>
 
-            {/* Title: CHD MANAGEMENT V4.0 */}
+            {/* Title: CHD MANAGEMENT V5.0 */}
             <div className="hidden md:flex items-center gap-1 text-xs font-black tracking-tight text-white/90">
               <span>CHD MANAGEMENT</span>
-              <span className="bg-white/15 border border-white/25 rounded px-1.5 py-0.5 text-[8px] font-mono leading-none">V4.0</span>
+              <span className="bg-white/15 border border-white/25 rounded px-1.5 py-0.5 text-[8px] font-mono leading-none">V5.0</span>
             </div>
 
             {/* Separator line */}
@@ -1354,7 +1400,11 @@ export default function App() {
             {/* Circle Admin & Text */}
             <div className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-xl px-2 py-0.5 select-none shrink-0">
               <div className="w-5 h-5 rounded-full bg-white text-[#d2145a] font-extrabold text-[10px] flex items-center justify-center uppercase shadow-inner shrink-0">
-                {currentStaff.StaffName.charAt(0)}
+                {(() => {
+                  const parts = currentStaff.StaffName.trim().split(/\s+/);
+                  const lastName = parts[parts.length - 1] || '';
+                  return removeDiacritics(lastName.charAt(0)).toUpperCase();
+                })()}
               </div>
               <span className="font-extrabold text-xs text-white max-w-[80px] truncate">{currentStaff.StaffName}</span>
             </div>
@@ -1414,10 +1464,10 @@ export default function App() {
                   {isSidebarExpanded && (
                     <span className="truncate flex-1 text-left">{menu.label}</span>
                   )}
-                  {menu.id === 'results-staff' && consults.filter(c => !c.ConsultResultID).length > 0 && (
+                  {menu.id === 'results-staff' && consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length > 0 && (
                     isSidebarExpanded ? (
                       <span className="bg-pink-100 text-[#d2145a] text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-auto">
-                        {consults.filter(c => !c.ConsultResultID).length}
+                        {consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
                       </span>
                     ) : (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#d2145a] rounded-full"></span>
@@ -1443,18 +1493,21 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
             <HomeDashboard 
               onNavigate={(menu) => setActiveMenu(menu as any)}
               patientCount={patients.length}
-              pendingConsultCount={consults.filter(c => !c.ConsultResultID).length}
-              completedConsultCount={consults.filter(c => c.ConsultResultID).length}
+              pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
+              completedConsultCount={consults.filter(c => c.ConsultResultID && !['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
               onOpenScheduler={(type) => setActiveScheduler(type)}
               onOpenRules={(type) => setActiveRules(type)}
               currentStaffName={currentStaff?.StaffName}
+              patients={patients}
+              consults={consults}
+              cathlabs={cathlabs}
             />
           )}
 
@@ -1463,7 +1516,7 @@ export default function App() {
             <WorkspaceDashboard 
               onNavigate={(menu) => setActiveMenu(menu as any)}
               patientCount={patients.length}
-              pendingConsultCount={consults.filter(c => c.ConsultResultID).length}
+              pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
             />
           )}
 
@@ -1735,10 +1788,10 @@ export default function App() {
                       {!newConsultData.PatientKey && searchPatientQuery.trim().length > 0 && (
                         <div className="max-h-48 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-sm">
                           {(() => {
-                            const trimmedQuery = removeVietnameseTones(searchPatientQuery).toLowerCase().trim();
+                            const trimmedQuery = removeDiacritics(searchPatientQuery).toLowerCase().trim();
                             const matched = patients.filter(p => {
-                              const nameOk = p.PatientName ? removeVietnameseTones(String(p.PatientName)).toLowerCase().includes(trimmedQuery) : false;
-                              const idOk = p.PatientID1 ? removeVietnameseTones(String(p.PatientID1)).toLowerCase().includes(trimmedQuery) : false;
+                              const nameOk = p.PatientName ? removeDiacritics(String(p.PatientName)).toLowerCase().includes(trimmedQuery) : false;
+                              const idOk = p.PatientID1 ? removeDiacritics(String(p.PatientID1)).toLowerCase().includes(trimmedQuery) : false;
                               return nameOk || idOk;
                             });
 
@@ -1770,7 +1823,7 @@ export default function App() {
 
                       {/* Selected Patient details complex card */}
                       {newConsultData.PatientKey && (() => {
-                        const selectedPat = patients.find(p => p.PatientKey === newConsultData.PatientKey);
+                        const selectedPat = getPatientByKey(newConsultData.PatientKey);
                         if (!selectedPat) return null;
                         return (
                           <div className="bg-pink-50/70 border border-pink-100 rounded-2xl p-4 text-xs text-slate-800 relative shadow-sm">
@@ -1839,8 +1892,8 @@ export default function App() {
                           onChange={(e) => setNewConsultData(prev => ({ ...prev, ConsultType: e.target.value as any }))}
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold focus:outline-none"
                         >
-                          <option value="Staff mổ">Staff mổ (Surgical conference)</option>
-                          <option value="Staff thông">Staff thông (Cathlab conference)</option>
+                          <option value="Staff mổ">Staff mổ</option>
+                          <option value="Staff thông">Staff thông</option>
                         </select>
                       </div>
 
@@ -2087,7 +2140,7 @@ export default function App() {
                           PatientHeight: '',
                           ConsultDate: new Date().toISOString().split('T')[0],
                           RequestBy: '',
-                          DiagnosisID: 'VSD',
+                          DiagnosisID: '',
                           DetailDiagnosis: '',
                           Department: 'Tim Mạch',
                           PriorityOrder: 'Chương trình',
@@ -2154,7 +2207,7 @@ export default function App() {
                         </tr>
                       ) : (
                         displayedConsults.map((item) => {
-                          const pat = patients.find(p => p.PatientKey === item.PatientKey);
+                          const pat = getPatientByKey(item.PatientKey);
                           if (!pat) return null;
 
                           return (
@@ -2599,7 +2652,7 @@ export default function App() {
                 
                 {(() => {
                   const edc = consults.find(c => c.ConsultKey === editingConsultKey);
-                  const edp = edc ? patients.find(p => p.PatientKey === edc.PatientKey) : null;
+                  const edp = edc ? getPatientByKey(edc.PatientKey) : null;
                   if (!edp || !edc) return null;
 
                   const icdCodes = [
@@ -2725,7 +2778,17 @@ export default function App() {
                                 <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(resultUpdateData.ConsultDate)}</span></p>
                                 <p><span className="text-slate-400">Kiểu staff:</span> <span className="font-bold text-[#d2145a]">{resultUpdateData.ConsultType || ''}</span></p>
                                 <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{resultUpdateData.RequestBy || ''}</span></p>
-                                {resultUpdateData.ConsultMember && resultUpdateData.ConsultMember.length > 0 && <p><span className="text-slate-400">Thành viên duyệt HC:</span> <span className="font-bold text-slate-800">{resultUpdateData.ConsultMember.join(', ')}</span></p>}
+                                {resultUpdateData.ConsultMember && (Array.isArray(resultUpdateData.ConsultMember) ? resultUpdateData.ConsultMember : [String(resultUpdateData.ConsultMember)]).length > 0 && (
+                                  <p>
+                                    <span className="text-slate-400">Thành viên duyệt HC:</span>{' '}
+                                    <span className="font-bold text-slate-800">
+                                      {(Array.isArray(resultUpdateData.ConsultMember) 
+                                        ? resultUpdateData.ConsultMember 
+                                        : String(resultUpdateData.ConsultMember).split(',').map(s => s.trim()).filter(Boolean)
+                                      ).join(', ')}
+                                    </span>
+                                  </p>
+                                )}
                               </div>
                             ) : (
                               <div className="space-y-3 pt-1 flex-1">
@@ -2970,12 +3033,12 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Slide-over Registration Edit Drawer (Sửa Đăng ký staff) */}
+      {/* Centered Registration Edit Modal Dialog (Sửa Đăng ký staff) */}
       <AnimatePresence>
         {editingRegConsultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 flex justify-end animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={() => setEditingRegConsultKey(null)}></div>
-            <div className="relative bg-white w-full max-w-lg h-full shadow-2xl flex flex-col z-50 animate-in slide-in-from-right duration-250">
+            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden">
               
               <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
                 <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">
@@ -2983,275 +3046,293 @@ export default function App() {
                 </h3>
                 <button 
                   onClick={() => setEditingRegConsultKey(null)}
-                  className="text-white hover:bg-white/10 p-1 rounded-full transition-colors font-bold"
+                  className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors font-bold cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
               {/* Form Frame */}
-              <form onSubmit={submitConsultRegistrationUpdate} className="flex-1 flex flex-col overflow-hidden min-h-0 text-xs text-slate-700 leading-relaxed font-semibold">
+              <form onSubmit={submitConsultRegistrationUpdate} className="flex flex-col text-xs text-slate-700 leading-relaxed font-semibold">
                 
                 {(() => {
                   const edc = consults.find(c => c.ConsultKey === editingRegConsultKey);
-                  const edp = edc ? patients.find(p => p.PatientKey === edc.PatientKey) : null;
+                  const edp = edc ? getPatientByKey(edc.PatientKey) : null;
                   if (!edp || !edc) return null;
 
                   return (
-                    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                    <div className="flex flex-col">
                       
-                      {/* Scrollable Form Body */}
-                      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-thin">
-                      
-                      {/* Administrative block */}
-                      <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4 space-y-2 relative shadow-sm">
-                        <div className="flex justify-between items-start">
-                          <span className="text-[9px] uppercase tracking-wider font-mono font-black text-rose-500">THÔNG TIN HÀNH CHÍNH</span>
-                          {/* Sửa hành chính button */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingPatientKey(edp.PatientKey);
-                              setNewPatientData({
-                                PatientID1: edp.PatientID1,
-                                PatientID2: edp.PatientID2 || '',
-                                PatientName: edp.PatientName,
-                                OtherPatientName: edp.OtherPatientName || '',
-                                PatientDOB: edp.PatientDOB,
-                                PatientSex: edp.PatientSex,
-                                PatientAddress: edp.PatientAddress || (edp as any).PatientAddress || '',
-                                PatientPhone1: edp.PatientPhone1 || '',
-                                PatientPhone2: edp.PatientPhone2 || '',
-                                Outcome: edp.Outcome || ''
-                              });
-                              setShowAddPatient(true);
-                            }}
-                            className="bg-white hover:bg-slate-100 text-[#d2145a] border border-rose-200 text-[10px] px-2.5 py-1 rounded-xl font-bold uppercase transition shadow-sm cursor-pointer"
-                          >
-                            Sửa hành chính
-                          </button>
+                      {/* Grid Body */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 p-6">
+                        
+                        {/* Left Column: Administrative block */}
+                        <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-3 shadow-sm self-start">
+                          <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+                            <span className="text-[9px] uppercase tracking-wider font-mono font-black text-rose-500">THÔNG TIN HÀNH CHÍNH</span>
+                            
+                            {/* Sửa hành chính button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingPatientKey(edp.PatientKey);
+                                setNewPatientData({
+                                  PatientID1: edp.PatientID1,
+                                  PatientID2: edp.PatientID2 || '',
+                                  PatientName: edp.PatientName,
+                                  OtherPatientName: edp.OtherPatientName || '',
+                                  PatientDOB: edp.PatientDOB,
+                                  PatientSex: edp.PatientSex,
+                                  PatientAddress: edp.PatientAddress || (edp as any).PatientAddress || '',
+                                  PatientPhone1: edp.PatientPhone1 || '',
+                                  PatientPhone2: edp.PatientPhone2 || '',
+                                  Outcome: edp.Outcome || ''
+                                });
+                                setShowAddPatient(true);
+                              }}
+                              className="bg-white hover:bg-slate-100 text-[#d2145a] border border-rose-200 text-[10px] px-2.5 py-1 rounded-xl font-bold uppercase transition shadow-xs cursor-pointer inline-flex items-center gap-1"
+                            >
+                              ✏️ Sửa
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-[11px] text-slate-500 font-bold">
+                            <div className="col-span-2">
+                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Họ và tên:</span>
+                              <span className="text-neutral-950 font-black uppercase text-xs">{edp.PatientName}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Ngày sinh:</span>
+                              <span className="text-slate-800 font-bold font-mono">{formatVNTime(edp.PatientDOB)}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Giới tính:</span>
+                              <span className="text-slate-800 font-bold">{edp.PatientSex}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Mã người bệnh:</span>
+                              <span className="text-slate-850 font-extrabold font-mono text-[10px] bg-slate-200/50 border border-slate-300 rounded px-1.5 py-0.5 w-max block mt-0.5">{edp.PatientID1} {edp.PatientID2 ? `| ${edp.PatientID2}` : ''}</span>
+                            </div>
+                            <div className="col-span-2 border-t border-slate-150 pt-2">
+                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Địa chỉ:</span>
+                              <span className="text-slate-700 font-semibold">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Số ĐT 1:</span>
+                              <span className="text-slate-850 font-mono font-bold text-slate-850">{edp.PatientPhone1 || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Số ĐT 2:</span>
+                              <span className="text-slate-850 font-mono font-bold text-slate-850">{edp.PatientPhone2 || '—'}</span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[11px] text-slate-500 font-bold border-t border-slate-100 pt-2.5">
+                        {/* Right Column: Interactive form fields */}
+                        <div className="md:col-span-7 space-y-4">
+                          
+                          {/* Chẩn đoán Chi tiết (DetailDiagnosis) */}
                           <div>
-                            <span className="text-slate-400 font-medium block text-[9px] uppercase">Họ và tên:</span>
-                            <span className="text-neutral-950 font-black uppercase text-xs">{edp.PatientName}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-medium block text-[9px] uppercase">Ngày sinh:</span>
-                            <span className="text-slate-800 font-bold font-mono">{formatVNTime(edp.PatientDOB)}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-medium block text-[9px] uppercase">Giới tính:</span>
-                            <span className="text-slate-800 font-bold">{edp.PatientSex}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-medium block text-[9px] uppercase">Mã BN1 | Mã BN2:</span>
-                            <span className="text-slate-850 font-extrabold font-mono text-[10px]">{edp.PatientID1} | {edp.PatientID2 || '—'}</span>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-slate-400 font-medium block text-[9px] uppercase">Địa chỉ:</span>
-                            <span className="text-slate-700 font-semibold">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-medium block text-[9px] uppercase">Số ĐT1:</span>
-                            <span className="text-slate-850 font-mono">{edp.PatientPhone1 || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-medium block text-[9px] uppercase">Số ĐT2:</span>
-                            <span className="text-slate-850 font-mono">{edp.PatientPhone2 || '—'}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Chẩn đoán Chi tiết (DetailDiagnosis) */}
-                      <div>
-                        <label className="block text-slate-500 font-black uppercase text-[10px] mb-1">Chẩn đoán Chi tiết *</label>
-                        <textarea
-                          rows={3}
-                          required
-                          placeholder="Nhập chẩn đoán chi tiết..."
-                          value={editConsultData.DetailDiagnosis}
-                          onChange={(e) => setEditConsultData(prev => ({ ...prev, DetailDiagnosis: e.target.value }))}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-medium"
-                        />
-                      </div>
-
-                      {/* Weight and Height Inputs */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Cân nặng (kg) *</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="vd: 12"
-                            value={editConsultData.PatientWeight}
-                            onChange={(e) => setEditConsultData(prev => ({ ...prev, PatientWeight: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Chiều cao (cm)</label>
-                          <input
-                            type="text"
-                            placeholder="vd: 85"
-                            value={editConsultData.PatientHeight}
-                            onChange={(e) => setEditConsultData(prev => ({ ...prev, PatientHeight: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Date and Type Selection */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Kiểu staff *</label>
-                          <select
-                            value={editConsultData.ConsultType}
-                            onChange={(e) => setEditConsultData(prev => ({ ...prev, ConsultType: e.target.value as any }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold focus:outline-none"
-                          >
-                            <option value="Staff mổ">Staff mổ</option>
-                            <option value="Staff thông">Staff thông</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Ngày staff *</label>
-                          <VNDateInput
-                            required
-                            value={editConsultData.ConsultDate}
-                            onChange={(val) => setEditConsultData(prev => ({ ...prev, ConsultDate: val }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* RequestBy Select */}
-                      <div>
-                        <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Người đăng ký *</label>
-                        <select
-                          required={!showEditAddDocInput}
-                          value={showEditAddDocInput ? 'ADD_NEW' : (editConsultData.RequestBy || '')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'ADD_NEW') {
-                              setShowEditAddDocInput(true);
-                              setEditConsultData(prev => ({ ...prev, RequestBy: '' }));
-                            } else {
-                              setShowEditAddDocInput(false);
-                              setEditConsultData(prev => ({ ...prev, RequestBy: val }));
-                            }
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold focus:outline-none text-[#d2145a] font-bold"
-                        >
-                          <option value="">-- Chọn BS --</option>
-                          {staffList.map(s => {
-                            const displayName = getShortStaffName(s.StaffName, staffList);
-                            return (
-                              <option key={s.StaffKey} value={displayName}>
-                                {displayName}
-                              </option>
-                            );
-                          })}
-                          {Array.from(new Set(consults.map(c => String(c.RequestBy || '')))).filter((d: string) => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d)).map((d: string) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                          <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm bác sĩ mới...</option>
-                        </select>
-
-                        {showEditAddDocInput && (
-                          <div className="mt-1.5 flex gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <input
-                              type="text"
+                            <label className="block text-slate-500 font-black uppercase text-[10px] mb-1">Chẩn đoán Chi tiết *</label>
+                            <textarea
+                              rows={2}
                               required
-                              placeholder="Nhập tên bác sĩ..."
-                              value={customEditDocVal}
-                              onChange={(e) => {
-                                setCustomEditDocVal(e.target.value);
-                                setEditConsultData(prev => ({ ...prev, RequestBy: e.target.value }));
-                              }}
-                              className="flex-1 bg-white border border-rose-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none"
+                              placeholder="Nhập chẩn đoán chi tiết..."
+                              value={editConsultData.DetailDiagnosis}
+                              onChange={(e) => setEditConsultData(prev => ({ ...prev, DetailDiagnosis: e.target.value }))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-medium focus:ring-1 focus:ring-pink-500 focus:outline-none"
                             />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowEditAddDocInput(false);
-                                setCustomEditDocVal('');
-                                setEditConsultData(prev => ({ ...prev, RequestBy: '' }));
-                              }}
-                              className="text-slate-400 hover:text-[#d2145a] px-2 text-xs font-bold"
-                              title="Quay lại"
-                            >
-                              Quay lại
-                            </button>
                           </div>
-                        )}
-                      </div>
 
-                      {/* Department */}
-                      <div>
-                        <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Khoa nội trú</label>
-                        <select
-                          value={showEditAddDeptInput ? 'ADD_NEW' : (editConsultData.Department || '')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'ADD_NEW') {
-                              setShowEditAddDeptInput(true);
-                              setEditConsultData(prev => ({ ...prev, Department: '' }));
-                            } else {
-                              setShowEditAddDeptInput(false);
-                              setEditConsultData(prev => ({ ...prev, Department: val as any }));
-                            }
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none text-[#d2145a] font-bold"
-                        >
-                          <option value="">-- Không bắt buộc --</option>
-                          {DEFAULT_DEPARTMENTS.map(d => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                          {Array.from(new Set(consults.map(c => String(c.Department || '')))).filter((d: string) => d && !DEFAULT_DEPARTMENTS.includes(d)).map((d: string) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                          <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm khoa mới...</option>
-                        </select>
+                          {/* Weight and Height Inputs */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Cân nặng (kg) *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="vd: 12"
+                                value={editConsultData.PatientWeight}
+                                onChange={(e) => setEditConsultData(prev => ({ ...prev, PatientWeight: e.target.value }))}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold focus:ring-1 focus:ring-pink-500 focus:outline-none"
+                              />
+                            </div>
 
-                        {showEditAddDeptInput && (
-                          <div className="mt-1.5 flex gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <input
-                              type="text"
-                              placeholder="Nhập tên khoa mới..."
-                              value={customEditDeptVal}
-                              onChange={(e) => {
-                                setCustomEditDeptVal(e.target.value);
-                                setEditConsultData(prev => ({ ...prev, Department: e.target.value }));
-                              }}
-                              className="flex-1 bg-white border border-rose-300 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowEditAddDeptInput(false);
-                                setCustomEditDeptVal('');
-                                setEditConsultData(prev => ({ ...prev, Department: '' }));
-                              }}
-                              className="text-slate-400 hover:text-slate-600 px-2 text-xs font-bold"
-                              title="Quay lại"
-                            >
-                              Quay lại
-                            </button>
+                            <div>
+                              <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Chiều cao (cm)</label>
+                              <input
+                                type="text"
+                                placeholder="vd: 85"
+                                value={editConsultData.PatientHeight}
+                                onChange={(e) => setEditConsultData(prev => ({ ...prev, PatientHeight: e.target.value }))}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold focus:ring-1 focus:ring-pink-500 focus:outline-none"
+                              />
+                            </div>
                           </div>
-                        )}
-                      </div>
+
+                          {/* Date and Type Selection */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Kiểu staff *</label>
+                              <select
+                                value={editConsultData.ConsultType}
+                                onChange={(e) => setEditConsultData(prev => ({ ...prev, ConsultType: e.target.value as any }))}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold focus:ring-1 focus:ring-pink-500 focus:outline-none"
+                              >
+                                <option value="Staff mổ">Staff mổ</option>
+                                <option value="Staff thông">Staff thông</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Ngày staff *</label>
+                              <VNDateInput
+                                required
+                                value={editConsultData.ConsultDate}
+                                onChange={(val) => setEditConsultData(prev => ({ ...prev, ConsultDate: val }))}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:ring-1 focus:ring-pink-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* RequestBy and Department Section */}
+                          <div className="grid grid-cols-2 gap-3">
+                            
+                            {/* RequestBy Select */}
+                            <div>
+                              <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Người đăng ký *</label>
+                              <select
+                                required={!showEditAddDocInput}
+                                value={showEditAddDocInput ? 'ADD_NEW' : (editConsultData.RequestBy || '')}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === 'ADD_NEW') {
+                                    setShowEditAddDocInput(true);
+                                    setEditConsultData(prev => ({ ...prev, RequestBy: '' }));
+                                  } else {
+                                    setShowEditAddDocInput(false);
+                                    setEditConsultData(prev => ({ ...prev, RequestBy: val }));
+                                  }
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold focus:outline-none text-[#d2145a] font-bold"
+                              >
+                                <option value="">-- Chọn BS --</option>
+                                {staffList.map(s => {
+                                  const displayName = getShortStaffName(s.StaffName, staffList);
+                                  return (
+                                    <option key={s.StaffKey} value={displayName}>
+                                      {displayName}
+                                    </option>
+                                  );
+                                })}
+                                {Array.from(new Set(consults.map(c => String(c.RequestBy || '')))).filter((d: string) => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d)).map((d: string) => (
+                                  <option key={d} value={d}>{d}</option>
+                                ))}
+                                <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm bác sĩ mới...</option>
+                              </select>
+
+                              {showEditAddDocInput && (
+                                <div className="mt-1.5 flex gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="Nhập tên bác sĩ..."
+                                    value={customEditDocVal}
+                                    onChange={(e) => {
+                                      setCustomEditDocVal(e.target.value);
+                                      setEditConsultData(prev => ({ ...prev, RequestBy: e.target.value }));
+                                    }}
+                                    className="flex-1 bg-white border border-rose-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowEditAddDocInput(false);
+                                      setCustomEditDocVal('');
+                                      setEditConsultData(prev => ({ ...prev, RequestBy: '' }));
+                                    }}
+                                    className="text-slate-400 hover:text-[#d2145a] px-2 text-xs font-bold"
+                                    title="Quay lại"
+                                  >
+                                    Quay lại
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Department */}
+                            <div>
+                              <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Khoa nội trú</label>
+                              <select
+                                value={showEditAddDeptInput ? 'ADD_NEW' : (editConsultData.Department || '')}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === 'ADD_NEW') {
+                                    setShowEditAddDeptInput(true);
+                                    setEditConsultData(prev => ({ ...prev, Department: '' }));
+                                  } else {
+                                    setShowEditAddDeptInput(false);
+                                    setEditConsultData(prev => ({ ...prev, Department: val as any }));
+                                  }
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none text-[#d2145a] font-bold"
+                              >
+                                <option value="">-- Không bắt buộc --</option>
+                                {DEFAULT_DEPARTMENTS.map(d => (
+                                  <option key={d} value={d}>{d}</option>
+                                ))}
+                                {Array.from(new Set(consults.map(c => String(c.Department || '')))).filter((d: string) => d && !DEFAULT_DEPARTMENTS.includes(d)).map((d: string) => (
+                                  <option key={d} value={d}>{d}</option>
+                                ))}
+                                <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm khoa mới...</option>
+                              </select>
+
+                              {showEditAddDeptInput && (
+                                <div className="mt-1.5 flex gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                                  <input
+                                    type="text"
+                                    placeholder="Nhập tên khoa mới..."
+                                    value={customEditDeptVal}
+                                    onChange={(e) => {
+                                      setCustomEditDeptVal(e.target.value);
+                                      setEditConsultData(prev => ({ ...prev, Department: e.target.value }));
+                                    }}
+                                    className="flex-1 bg-white border border-rose-300 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowEditAddDeptInput(false);
+                                      setCustomEditDeptVal('');
+                                      setEditConsultData(prev => ({ ...prev, Department: '' }));
+                                    }}
+                                    className="text-slate-400 hover:text-slate-600 px-2 text-xs font-bold"
+                                    title="Quay lại"
+                                  >
+                                    Quay lại
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                          </div>
+
+                        </div>
 
                       </div>
 
                       {/* Sticky Fixed Footer */}
-                      <div className="border-t border-slate-150 px-6 py-4 bg-slate-50 flex gap-3 shrink-0 rounded-b-none w-full">
+                      <div className="border-t border-slate-150 p-4 bg-slate-50 flex gap-3 justify-end shrink-0 w-full">
+                        <button
+                          type="button"
+                          onClick={() => setEditingRegConsultKey(null)}
+                          className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold uppercase rounded-xl transition cursor-pointer text-xs"
+                        >
+                          Hủy bỏ
+                        </button>
                         <button
                           type="submit"
-                          className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-xl shadow-md transition cursor-pointer text-xs"
+                          className="px-10 py-2.5 bg-[#d2145a] hover:bg-[#b0104b] text-white font-extrabold uppercase rounded-xl shadow-md transition cursor-pointer text-xs"
                         >
                           ✓ Lưu Đăng ký staff
                         </button>
@@ -3270,7 +3351,7 @@ export default function App() {
       {/* New Patient Registration Overlay Modal Dialog */}
       <AnimatePresence>
         {showAddPatient && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed">
               
               <div className="flex items-center justify-between border-b border-slate-150 pb-2.5 text-[#d2145a]">
@@ -3343,12 +3424,11 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Ngày sinh *</label>
-                    <input
-                      type="date"
+                    <VNDateInput
                       required
                       value={newPatientData.PatientDOB}
-                      onChange={(e) => setNewPatientData(prev => ({ ...prev, PatientDOB: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono"
+                      onChange={(val) => setNewPatientData(prev => ({ ...prev, PatientDOB: val }))}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
                     />
                   </div>
                   <div>
@@ -3366,10 +3446,9 @@ export default function App() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Số điện thoại 1 *</label>
+                    <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Số điện thoại 1</label>
                     <input
                       type="tel"
-                      required
                       placeholder="vd: 0912345678"
                       value={newPatientData.PatientPhone1}
                       onChange={(e) => setNewPatientData(prev => ({ ...prev, PatientPhone1: e.target.value }))}
@@ -3390,19 +3469,20 @@ export default function App() {
 
                 <div>
                   <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Địa chỉ *</label>
-                  <select
+                  <input
+                    type="text"
                     required
+                    list="addressOptionsList"
+                    placeholder="Chọn hoặc nhập địa chỉ..."
                     value={newPatientData.PatientAddress}
                     onChange={(e) => setNewPatientData(prev => ({ ...prev, PatientAddress: e.target.value }))}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-extrabold focus:outline-none"
-                  >
-                    {!ADDRESS_OPTIONS.includes(newPatientData.PatientAddress) && newPatientData.PatientAddress && (
-                      <option value={newPatientData.PatientAddress}>{newPatientData.PatientAddress}</option>
-                    )}
-                    {ADDRESS_OPTIONS.map((addr) => (
-                      <option key={addr} value={addr}>{addr}</option>
+                  />
+                  <datalist id="addressOptionsList">
+                    {SOURCE_PROVINCE.map((addr) => (
+                      <option key={addr} value={addr} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
 
                 {/* Patient Creator Admin Details (Grayed Out ReadOnly Column inputs) */}
@@ -3412,7 +3492,7 @@ export default function App() {
                     <input
                       type="text"
                       disabled
-                      value={editingPatientKey ? (patients.find(p => p.PatientKey === editingPatientKey)?.PatientCreateBy || '01378') : (currentStaff?.StaffKey || '01378')}
+                      value={editingPatientKey ? (getPatientByKey(editingPatientKey)?.PatientCreateBy || '01378') : (currentStaff?.StaffKey || '01378')}
                       className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-mono"
                     />
                   </div>
@@ -3421,7 +3501,7 @@ export default function App() {
                     <input
                       type="text"
                       disabled
-                      value={editingPatientKey ? formatDateTime(patients.find(p => p.PatientKey === editingPatientKey)?.PatientCreateTime) : formatDateTime(new Date().toISOString())}
+                      value={editingPatientKey ? formatDateTime(getPatientByKey(editingPatientKey)?.PatientCreateTime) : formatDateTime(new Date().toISOString())}
                       className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-mono text-[11px]"
                     />
                   </div>
@@ -3571,7 +3651,7 @@ export default function App() {
 
       {/* Footer bar */}
       <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 text-[10px] py-1.5 shrink-0 text-center font-medium font-sans">
-        <span>© 2026 CHD Management v4.0 | Bệnh viện Tim Tim Mạch &amp; Khoa Phẫu Thuật Tim Nhi (Google Sheets &amp; PDF Sync)</span>
+        <span>© 2026 CHD Management v5.0 | Bệnh viện Tim Tim Mạch &amp; Khoa Phẫu Thuật Tim Nhi (Google Sheets &amp; PDF Sync)</span>
       </footer>
 
     </div>

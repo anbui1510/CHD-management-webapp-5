@@ -36,6 +36,17 @@ function getOrCreateSheet(sheetName, headers) {
     headerRange.setBackground("#E8F5E9"); // light green for Patients, or customize
     sheet.setFrozenRows(1);
   }
+  
+  // Set number format of string columns to Plain Text to preserve leading zeros
+  for (var col = 0; col < headers.length; col++) {
+    var header = headers[col];
+    if (header === "PatientID1" || header === "PatientID2" || header === "PatientPhone1" || header === "PatientPhone2" || header === "StaffPhone") {
+      var numRows = sheet.getMaxRows() - 1;
+      if (numRows > 0) {
+        sheet.getRange(2, col + 1, numRows, 1).setNumberFormat("@");
+      }
+    }
+  }
   return sheet;
 }
 
@@ -190,6 +201,21 @@ function doPost(e) {
       for (var col = 0; col < headers.length; col++) {
         var header = headers[col];
         var val = record[header];
+        if (val !== undefined && val !== null) {
+          var strVal = String(val).trim();
+          var isNumericTextCol = (
+            header === "PatientID1" || 
+            header === "PatientID2" || 
+            header === "PatientPhone1" || 
+            header === "PatientPhone2" || 
+            header === "StaffPhone"
+          );
+          if (isNumericTextCol && strVal !== "") {
+            if (!strVal.startsWith("'")) {
+              val = "'" + strVal;
+            }
+          }
+        }
         rowValues.push(val !== undefined ? val : "");
       }
 
@@ -247,7 +273,20 @@ function readSheetAsJson(sheetName) {
           obj[headers[c]] = cellVal.toISOString();
         }
       } else {
-        obj[headers[c]] = cellVal;
+        var headerName = headers[c];
+        if (cellVal !== undefined && cellVal !== null) {
+          if (headerName === "PatientID1" || headerName === "PatientID2" || headerName === "PatientPhone1" || headerName === "PatientPhone2" || headerName === "StaffPhone") {
+            var strVal = String(cellVal).trim();
+            if (strVal.startsWith("'")) {
+              strVal = strVal.substring(1);
+            }
+            obj[headerName] = strVal;
+          } else {
+            obj[headerName] = cellVal;
+          }
+        } else {
+          obj[headerName] = "";
+        }
       }
       
       if (cellVal !== "") {

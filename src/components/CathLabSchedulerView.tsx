@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import { Patient, Consult, Staff, formatVNTime } from '../types';
+import { Patient, Consult, Staff, formatVNTime, removeDiacritics } from '../types';
+import { VNDateInput } from './VNDateInput';
+import { SOURCE_PROVINCE } from '../data/source';
 import { 
   ClipboardList, 
   Search, 
@@ -1018,15 +1020,15 @@ export default function CathLabSchedulerView({
     const activeList = activeTab === 'unscheduled' ? segmentedWaitlist.unscheduled : segmentedWaitlist.scheduled;
     let result = activeList;
     
-    const q = searchQuery.toLowerCase().trim();
+    const q = removeDiacritics(searchQuery).toLowerCase().trim();
     if (q) {
       result = activeList.filter(c => {
         const pat = patients.find(p => p.PatientKey === c.PatientKey);
         if (!pat) return false;
         return (
-          String(pat.PatientName || '').toLowerCase().includes(q) ||
-          String(pat.PatientID1 || '').toLowerCase().includes(q) ||
-          (pat.PatientID2 && String(pat.PatientID2).toLowerCase().includes(q))
+          removeDiacritics(String(pat.PatientName || '')).toLowerCase().includes(q) ||
+          removeDiacritics(String(pat.PatientID1 || '')).toLowerCase().includes(q) ||
+          (pat.PatientID2 && removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q))
         );
       });
     }
@@ -1047,11 +1049,11 @@ export default function CathLabSchedulerView({
   // Filter existing patients for selection in ad-hoc modal
   const filteredSearchPatients = useMemo(() => {
     if (!adHocSearchQuery.trim()) return [];
-    const query = adHocSearchQuery.toLowerCase().trim();
+    const query = removeDiacritics(adHocSearchQuery).toLowerCase().trim();
     return patients.filter((pat) => 
-      String(pat.PatientName || '').toLowerCase().includes(query) || 
-      String(pat.PatientID1 || '').toLowerCase().includes(query) ||
-      (pat.PatientID2 && String(pat.PatientID2).toLowerCase().includes(query))
+      removeDiacritics(String(pat.PatientName || '')).toLowerCase().includes(query) || 
+      removeDiacritics(String(pat.PatientID1 || '')).toLowerCase().includes(query) ||
+      (pat.PatientID2 && removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(query))
     ).slice(0, 10);
   }, [patients, adHocSearchQuery]);
 
@@ -1194,7 +1196,6 @@ export default function CathLabSchedulerView({
       if (!adHocPatientName) errors.push('PatientName');
       if (!adHocPatientDOB) errors.push('PatientDOB');
       if (!adHocPatientAddress) errors.push('PatientAddress');
-      if (!adHocPatientPhone1) errors.push('PatientPhone1');
     }
 
     if (!adHocConsultDate) errors.push('ConsultDate');
@@ -1219,8 +1220,8 @@ export default function CathLabSchedulerView({
     const patientKey = adHocPatientMode === 'existing' ? adHocSelectedPatientKey : `pat_${Date.now()}`;
     const patientData: Patient = {
       PatientKey: patientKey,
-      PatientID1: adHocPatientID1,
-      PatientID2: adHocPatientID2,
+      PatientID1: String(adHocPatientID1 || '').trim(),
+      PatientID2: String(adHocPatientID2 || '').trim(),
       PatientName: adHocPatientName,
       OtherPatientName: adHocOtherPatientName,
       PatientDOB: adHocPatientDOB,
@@ -2207,35 +2208,35 @@ export default function CathLabSchedulerView({
                           Thông tin hành chính bệnh nhi
                         </span>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                          <div>
+                          <div className="col-span-2 sm:col-span-2">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Họ và tên:</span>
-                            <span className="font-extrabold text-slate-900 uppercase text-[11.5px] block truncate">{pat.PatientName}</span>
+                            <span className="font-extrabold text-slate-900 uppercase text-[11.5px] block whitespace-normal break-words">{pat.PatientName}</span>
                           </div>
-                          <div>
+                          <div className="col-span-1 sm:col-span-1">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB1 (ID1):</span>
                             <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1}</span>
                           </div>
-                          <div>
+                          <div className="col-span-1 sm:col-span-1">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB2 (ID2):</span>
                             <span className="font-semibold font-mono text-slate-700">{pat.PatientID2 || '—'}</span>
                           </div>
-                          <div>
+                          <div className="col-span-1 sm:col-span-1">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Tuổi / Ngày sinh:</span>
                             <span className="font-bold text-slate-800">{getAgeDescription(pat.PatientDOB)} ({formatVNTime(pat.PatientDOB)})</span>
                           </div>
-                          <div>
+                          <div className="col-span-1 sm:col-span-1">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Giới tính:</span>
                             <span className="font-bold text-slate-800">{pat.PatientSex}</span>
                           </div>
-                          <div>
+                          <div className="col-span-2 sm:col-span-2">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Địa chỉ:</span>
-                            <span className="font-bold text-slate-800 block truncate">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
+                            <span className="font-bold text-slate-800 block whitespace-normal break-words">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
                           </div>
-                          <div>
+                          <div className="col-span-2 sm:col-span-2">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 1:</span>
                             <span className="font-extrabold text-slate-800 font-mono text-[11px]">{pat.PatientPhone1 || '—'}</span>
                           </div>
-                          <div>
+                          <div className="col-span-2 sm:col-span-2">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 2:</span>
                             <span className="font-semibold text-slate-700 font-mono">{pat.PatientPhone2 || '—'}</span>
                           </div>
@@ -3168,9 +3169,9 @@ export default function CathLabSchedulerView({
                 `-----------------------------------\n` +
                 `👤 *HÀNH CHÍNH BỆNH NHÂN:*\n` +
                 `- Họ và tên bệnh nhân: ${pObj.PatientName.toUpperCase()} (${pObj.PatientSex}, ${ageDesc})\n` +
-                (pObj.OtherPatientName && pObj.OtherPatientName.trim() !== '' && pObj.OtherPatientName !== '-' ? `- Họ và tên khác: ${pObj.OtherPatientName.toUpperCase()}\n` : '') +
+                (pObj.OtherPatientName && String(pObj.OtherPatientName).trim() !== '' && pObj.OtherPatientName !== '-' ? `- Họ và tên khác: ${pObj.OtherPatientName.toUpperCase()}\n` : '') +
                 `- Mã bệnh nhân (ID1): ${pObj.PatientID1}\n` +
-                (pObj.PatientID2 && pObj.PatientID2.trim() !== '' && pObj.PatientID2 !== '-' ? `- Mã NB khác (ID2): ${pObj.PatientID2}\n` : '') +
+                (pObj.PatientID2 && String(pObj.PatientID2).trim() !== '' && pObj.PatientID2 !== '-' ? `- Mã NB khác (ID2): ${pObj.PatientID2}\n` : '') +
                 `- Số điện thoại liên hệ: ${phoneList || '—'}\n` +
                 `- Địa chỉ thường trú: ${addressDisplay}\n` +
                 `- Chỉ số bé: ${weightDisplay} / ${heightDisplay}\n\n` +
@@ -3275,13 +3276,13 @@ export default function CathLabSchedulerView({
                         THÔNG TIN HÀNH CHÍNH
                       </span>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2.5 text-[12px] pb-0.5">
-                        {pat.OtherPatientName && pat.OtherPatientName.trim() !== '' && pat.OtherPatientName !== '-' && (
+                        {pat.OtherPatientName && String(pat.OtherPatientName).trim() !== '' && pat.OtherPatientName !== '-' && (
                           <div>
                             <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Họ và tên khác:</span>
                             <span className="font-extrabold text-slate-900 uppercase block break-words text-[13px]">{pat.OtherPatientName}</span>
                           </div>
                         )}
-                        {pat.PatientID2 && pat.PatientID2 !== '-' && pat.PatientID2.trim() !== '' && (
+                        {pat.PatientID2 && pat.PatientID2 !== '-' && String(pat.PatientID2).trim() !== '' && (
                           <div>
                             <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Mã NB khác (ID2):</span>
                             <span className="font-black font-mono text-slate-855 text-[13px]">{pat.PatientID2}</span>
@@ -3675,11 +3676,10 @@ export default function CathLabSchedulerView({
                                 Ngày sinh *
                                 {adHocErrors.includes('PatientDOB') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
                               </label>
-                              <input
-                                type="date"
+                              <VNDateInput
                                 required
                                 value={adHocPatientDOB}
-                                onChange={(e) => setAdHocPatientDOB(e.target.value)}
+                                onChange={(val) => setAdHocPatientDOB(val)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-mono font-bold"
                               />
                             </div>
@@ -3713,20 +3713,24 @@ export default function CathLabSchedulerView({
                               <input
                                 type="text"
                                 required
+                                list="adHocProvincesList"
                                 placeholder="Nhập địa chỉ của bệnh nhi..."
                                 value={adHocPatientAddress}
                                 onChange={(e) => setAdHocPatientAddress(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium"
                               />
+                              <datalist id="adHocProvincesList">
+                                {SOURCE_PROVINCE.map((p) => (
+                                  <option key={p} value={p}>{p}</option>
+                                ))}
+                              </datalist>
                             </div>
                             <div>
                               <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                                Số ĐT 1 *
-                                {adHocErrors.includes('PatientPhone1') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
+                                Số ĐT 1
                               </label>
                               <input
                                 type="text"
-                                required
                                 placeholder="ĐT liên lạc..."
                                 value={adHocPatientPhone1}
                                 onChange={(e) => setAdHocPatientPhone1(e.target.value)}

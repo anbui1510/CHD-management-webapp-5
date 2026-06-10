@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Patient, Consult, formatVNTime, Staff } from '../types';
+import { Patient, Consult, formatVNTime, Staff, removeDiacritics } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { StaffMultiSelect } from './StaffMultiSelect';
 
@@ -190,7 +190,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
         }
 
         // Check for duplicate PatientID1
-        const dup = patients.find(p => p.PatientID1.trim().toLowerCase() === newPatID1.trim().toLowerCase());
+        const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === newPatID1.trim().toLowerCase());
         if (dup) {
           setSubmitLoading(false);
           setErrorMsg(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${dup.PatientName}). Đề nghị chọn bệnh nhi sẵn có hoặc kiểm tra lại thông tin!`);
@@ -200,8 +200,8 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
         finalPatientKey = `pat_${Date.now()}`;
         const patientPayload = {
           PatientKey: finalPatientKey,
-          PatientID1: newPatID1,
-          PatientID2: newPatID2 || '',
+          PatientID1: String(newPatID1 || '').trim(),
+          PatientID2: String(newPatID2 || '').trim(),
           PatientName: newPatName,
           OtherPatientName: newPatName,
           PatientDOB: newPatDOB || '2020-01-01',
@@ -322,17 +322,23 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
   const cathConsults = consults.filter(c => c.ConsultType === 'Staff thông');
   const surgConsults = consults.filter(c => c.ConsultType === 'Staff mổ');
 
+  const isPendingResult = (resultId: any) => {
+    if (!resultId) return true;
+    const s = String(resultId).trim().toLowerCase();
+    return s === '' || s === 'nodata' || s === 'no data' || s === '—' || s === '-';
+  };
+
   // Counters
   const cathStats = {
     all: cathConsults.length,
-    pending: cathConsults.filter(c => !c.ConsultResultID).length,
-    completed: cathConsults.filter(c => c.ConsultResultID).length
+    pending: cathConsults.filter(c => isPendingResult(c.ConsultResultID)).length,
+    completed: cathConsults.filter(c => !isPendingResult(c.ConsultResultID)).length
   };
 
   const surgStats = {
     all: surgConsults.length,
-    pending: surgConsults.filter(c => !c.ConsultResultID).length,
-    completed: surgConsults.filter(c => c.ConsultResultID).length
+    pending: surgConsults.filter(c => isPendingResult(c.ConsultResultID)).length,
+    completed: surgConsults.filter(c => !isPendingResult(c.ConsultResultID)).length
   };
 
   const [cathSortOrder, setCathSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -341,17 +347,17 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
   // Filter lists with pagination support
   const filteredCathAll = cathConsults.filter(c => {
     // 1. Tab filtering
-    if (cathTab === 'pending' && c.ConsultResultID) return false;
-    if (cathTab === 'completed' && !c.ConsultResultID) return false;
+    if (cathTab === 'pending' && !isPendingResult(c.ConsultResultID)) return false;
+    if (cathTab === 'completed' && isPendingResult(c.ConsultResultID)) return false;
 
     // 2. Search query filtering
     if (cathSearch.trim() !== '') {
-      const q = cathSearch.toLowerCase().trim();
-      const pat = patients.find(p => p.PatientKey === c.PatientKey);
-      const nameMatch = pat?.PatientName ? pat.PatientName.toLowerCase().includes(q) : false;
-      const id1Match = pat?.PatientID1 ? pat.PatientID1.toLowerCase().includes(q) : false;
-      const id2Match = pat?.PatientID2 ? pat.PatientID2.toLowerCase().includes(q) : false;
-      const diagMatch = c.DiagnosisID ? c.DiagnosisID.toLowerCase().includes(q) : false;
+      const q = removeDiacritics(cathSearch).toLowerCase().trim();
+      const pat = patients.find(p => String(p.PatientKey) === String(c.PatientKey));
+      const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
+      const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
+      const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
+      const diagMatch = c.DiagnosisID ? removeDiacritics(String(c.DiagnosisID)).toLowerCase().includes(q) : false;
       return nameMatch || id1Match || id2Match || diagMatch;
     }
 
@@ -364,17 +370,17 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
 
   const filteredSurgAll = surgConsults.filter(c => {
     // 1. Tab filtering
-    if (surgTab === 'pending' && c.ConsultResultID) return false;
-    if (surgTab === 'completed' && !c.ConsultResultID) return false;
+    if (surgTab === 'pending' && !isPendingResult(c.ConsultResultID)) return false;
+    if (surgTab === 'completed' && isPendingResult(c.ConsultResultID)) return false;
 
     // 2. Search query filtering
     if (surgSearch.trim() !== '') {
-      const q = surgSearch.toLowerCase().trim();
-      const pat = patients.find(p => p.PatientKey === c.PatientKey);
-      const nameMatch = pat?.PatientName ? pat.PatientName.toLowerCase().includes(q) : false;
-      const id1Match = pat?.PatientID1 ? pat.PatientID1.toLowerCase().includes(q) : false;
-      const id2Match = pat?.PatientID2 ? pat.PatientID2.toLowerCase().includes(q) : false;
-      const diagMatch = c.DiagnosisID ? c.DiagnosisID.toLowerCase().includes(q) : false;
+      const q = removeDiacritics(surgSearch).toLowerCase().trim();
+      const pat = patients.find(p => String(p.PatientKey) === String(c.PatientKey));
+      const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
+      const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
+      const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
+      const diagMatch = c.DiagnosisID ? removeDiacritics(String(c.DiagnosisID)).toLowerCase().includes(q) : false;
       return nameMatch || id1Match || id2Match || diagMatch;
     }
 
@@ -404,7 +410,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
     return (
       <div className="space-y-2.5">
         {filtered.map((c) => {
-          const pat = patients.find(p => p.PatientKey === c.PatientKey);
+          const pat = patients.find(p => String(p.PatientKey) === String(c.PatientKey));
           if (!pat) return null;
 
           return (
@@ -848,10 +854,10 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
                         {!selectedPatKey && searchPatQuery.trim().length > 0 && (
                           <div className="max-h-32 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-lg animate-in fade-in-50 duration-150">
                             {(() => {
-                              const trimmed = searchPatQuery.trim().toLowerCase();
+                              const trimmed = removeDiacritics(searchPatQuery).trim().toLowerCase();
                               const matched = patients.filter(p => {
-                                const nameOk = p.PatientName ? String(p.PatientName).toLowerCase().includes(trimmed) : false;
-                                const idOk = p.PatientID1 ? String(p.PatientID1).toLowerCase().includes(trimmed) : false;
+                                const nameOk = p.PatientName ? removeDiacritics(String(p.PatientName)).toLowerCase().includes(trimmed) : false;
+                                const idOk = p.PatientID1 ? removeDiacritics(String(p.PatientID1)).toLowerCase().includes(trimmed) : false;
                                 return nameOk || idOk;
                               });
 
@@ -881,7 +887,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
                         )}
 
                         {selectedPatKey && (() => {
-                          const selectedPat = patients.find(p => p.PatientKey === selectedPatKey);
+                          const selectedPat = patients.find(p => String(p.PatientKey) === String(selectedPatKey));
                           if (!selectedPat) return null;
                           return (
                             <div className="bg-indigo-50/50 border border-indigo-150 rounded-xl p-2.5 text-slate-800 flex flex-col gap-1.5 animate-in zoom-in-95 duration-150 shadow-sm relative">
@@ -936,7 +942,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
                           );
                         })()}
 
-                        {selectedPatKey && consults.some(c => c.PatientKey === selectedPatKey && !c.ConsultResultID) && (
+                        {selectedPatKey && consults.some(c => String(c.PatientKey) === String(selectedPatKey) && !c.ConsultResultID) && (
                           <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-[10px] flex gap-2 animate-in fade-in duration-200">
                             <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
                             <div>

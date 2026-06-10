@@ -221,3 +221,24 @@ export function formatVNTime(dateArg: any): string {
   }
   return dateString;
 }
+
+export function removeDiacritics(str: any): string {
+  if (!str) return '';
+  const s = String(str);
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+}
+
+export function findPatientByKey(patients: Patient[], patientKey: any): Patient | undefined {
+  if (!patientKey) return undefined;
+  const keyStr = String(patientKey).trim().toLowerCase();
+  return patients.find(p => {
+    const pk = String(p.PatientKey || '').trim().toLowerCase();
+    const pid1 = String(p.PatientID1 || '').trim().toLowerCase();
+    return pk === keyStr || (pid1 && pid1 === keyStr);
+  });
+}
+

@@ -99,6 +99,27 @@ async function fetchWithTimeout(url: string, options: any = {}, timeout = 15000)
 let lastSyncTime = 0;
 const SYNC_COOLDOWN_MS = 6000; // 6 seconds minimum between background pulls
 
+const recentLocalEdits = new Map<string, { timestamp: number; data: any }>();
+
+// Periodically clean up stale recentLocalEdits (older than 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of recentLocalEdits.entries()) {
+    if (now - val.timestamp > 300000) {
+      recentLocalEdits.delete(key);
+    }
+  }
+}, 60000);
+
+function cleanSheetText(val: any): string {
+  if (val === undefined || val === null) return '';
+  let str = String(val).trim();
+  if (str.startsWith("'")) {
+    str = str.substring(1);
+  }
+  return str;
+}
+
 async function syncFromGoogleSheets(force = false): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
@@ -129,6 +150,26 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           let k = p.PatientKey || `pat_no_key_${i}`;
           if (pMap.has(k)) k = `${k}_dup_${i}`;
           p.PatientKey = k;
+          
+          if (p.PatientID1 !== undefined && p.PatientID1 !== null) {
+            p.PatientID1 = cleanSheetText(p.PatientID1);
+          }
+          if (p.PatientID2 !== undefined && p.PatientID2 !== null) {
+            p.PatientID2 = cleanSheetText(p.PatientID2);
+          }
+          if (p.PatientPhone1 !== undefined && p.PatientPhone1 !== null) {
+            p.PatientPhone1 = cleanSheetText(p.PatientPhone1);
+          }
+          if (p.PatientPhone2 !== undefined && p.PatientPhone2 !== null) {
+            p.PatientPhone2 = cleanSheetText(p.PatientPhone2);
+          }
+          
+          // Overlay recent local edit if < 45s old to avoid overwriting with stale Sheets data
+          const recent = recentLocalEdits.get(`Patient_${k}`);
+          if (recent && (Date.now() - recent.timestamp < 45000)) {
+            p = { ...p, ...recent.data };
+          }
+          
           pMap.set(k, p);
         });
         writeDB(PATIENTS_FILE, Array.from(pMap.values()));
@@ -151,6 +192,13 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           let k = c.ConsultKey || `con_no_key_${i}`;
           if (cMap.has(k)) k = `${k}_dup_${i}`;
           c.ConsultKey = k;
+          
+          // Overlay recent local edit if < 45s old to avoid overwriting with stale Sheets data
+          const recent = recentLocalEdits.get(`Consult_${k}`);
+          if (recent && (Date.now() - recent.timestamp < 45000)) {
+            c = { ...c, ...recent.data };
+          }
+          
           cMap.set(k, c);
         });
         writeDB(CONSULTS_FILE, Array.from(cMap.values()));
@@ -161,6 +209,13 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           let k = c.CathKey || `cl_no_key_${i}`;
           if (clMap.has(k)) k = `${k}_dup_${i}`;
           c.CathKey = k;
+          
+          // Overlay recent local edit if < 45s old to avoid overwriting with stale Sheets data
+          const recent = recentLocalEdits.get(`CathLab_${k}`);
+          if (recent && (Date.now() - recent.timestamp < 45000)) {
+            c = { ...c, ...recent.data };
+          }
+          
           clMap.set(k, c);
         });
         writeDB(CATHLABS_FILE, Array.from(clMap.values()));
@@ -192,6 +247,9 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           let k = s.StaffKey || `st_no_key_${i}`;
           if (stMap.has(k)) k = `${k}_dup_${i}`;
           s.StaffKey = k;
+          if (s.StaffPhone !== undefined && s.StaffPhone !== null) {
+            s.StaffPhone = cleanSheetText(s.StaffPhone);
+          }
           stMap.set(k, s);
         });
         writeDB(STAFF_FILE, Array.from(stMap.values()));
@@ -213,6 +271,22 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
+  // Clone record to format fields safely without polluting the database cache
+  const dataToPush = { ...record };
+  const numericTextCols = ['PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone'];
+  
+  numericTextCols.forEach(col => {
+    if (dataToPush[col] !== undefined && dataToPush[col] !== null) {
+      let val = String(dataToPush[col]).trim();
+      if (val !== "") {
+        if (!val.startsWith("'")) {
+          val = "'" + val;
+        }
+        dataToPush[col] = val;
+      }
+    }
+  });
+
   try {
     console.log(`Pushing mutation to Google Sheets: type=${type}, action=${action}, key=${key}`);
     const response = await fetchWithTimeout(config.scriptUrl, {
@@ -224,7 +298,7 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
         action,
         type,
         key,
-        data: record
+        data: dataToPush
       })
     }, 15000);
 
@@ -611,6 +685,19 @@ app.post('/api/patients', async (req, res) => {
   const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
   const newPatient: Patient = req.body;
   
+  if (newPatient.PatientID1 !== undefined && newPatient.PatientID1 !== null) {
+    newPatient.PatientID1 = cleanSheetText(newPatient.PatientID1);
+  }
+  if (newPatient.PatientID2 !== undefined && newPatient.PatientID2 !== null) {
+    newPatient.PatientID2 = cleanSheetText(newPatient.PatientID2);
+  }
+  if (newPatient.PatientPhone1 !== undefined && newPatient.PatientPhone1 !== null) {
+    newPatient.PatientPhone1 = cleanSheetText(newPatient.PatientPhone1);
+  }
+  if (newPatient.PatientPhone2 !== undefined && newPatient.PatientPhone2 !== null) {
+    newPatient.PatientPhone2 = cleanSheetText(newPatient.PatientPhone2);
+  }
+  
   // Back-end validation / augmentation
   newPatient.PatientKey = newPatient.PatientKey || `pat_${Date.now()}`;
   newPatient.PatientCreateTime = newPatient.PatientCreateTime || newTimestamp();
@@ -618,8 +705,13 @@ app.post('/api/patients', async (req, res) => {
   patients.push(newPatient);
   writeDB<Patient>(PATIENTS_FILE, patients);
   
-  // Update Google Sheet asynchronously if configured
-  syncToGoogleSheets('Patient', 'insert', newPatient.PatientKey, newPatient);
+  // Track this locally so we don't overwrite with stale Google Sheets data
+  recentLocalEdits.set(`Patient_${newPatient.PatientKey}`, { timestamp: Date.now(), data: newPatient });
+  
+  // Sync to Google Sheet asynchronously in the background so API stays fast
+  syncToGoogleSheets('Patient', 'insert', newPatient.PatientKey, newPatient).catch(err => {
+    console.error('Error syncing patient to google sheets background:', err);
+  });
   
   res.status(201).json(newPatient);
 });
@@ -629,13 +721,34 @@ app.put('/api/patients/:key', async (req, res) => {
   const key = req.params.key;
   const updateData: Partial<Patient> = req.body;
   
-  const index = patients.findIndex(p => p.PatientKey === key || p.PatientID1 === key);
+  if (updateData.PatientID1 !== undefined && updateData.PatientID1 !== null) {
+    updateData.PatientID1 = cleanSheetText(updateData.PatientID1);
+  }
+  if (updateData.PatientID2 !== undefined && updateData.PatientID2 !== null) {
+    updateData.PatientID2 = cleanSheetText(updateData.PatientID2);
+  }
+  if (updateData.PatientPhone1 !== undefined && updateData.PatientPhone1 !== null) {
+    updateData.PatientPhone1 = cleanSheetText(updateData.PatientPhone1);
+  }
+  if (updateData.PatientPhone2 !== undefined && updateData.PatientPhone2 !== null) {
+    updateData.PatientPhone2 = cleanSheetText(updateData.PatientPhone2);
+  }
+  
+  const index = patients.findIndex(p => 
+    String(p.PatientKey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase() || 
+    String(p.PatientID1 || '').trim().toLowerCase() === String(key || '').trim().toLowerCase()
+  );
   if (index !== -1) {
     patients[index] = { ...patients[index], ...updateData };
     writeDB<Patient>(PATIENTS_FILE, patients);
     
-    // Update Google Sheet asynchronously if configured
-    syncToGoogleSheets('Patient', 'update', patients[index].PatientKey, patients[index]);
+    // Track this locally so we don't overwrite with stale Google Sheets data
+    recentLocalEdits.set(`Patient_${patients[index].PatientKey}`, { timestamp: Date.now(), data: patients[index] });
+    
+    // Sync to Google Sheet asynchronously in the background so API stays fast
+    syncToGoogleSheets('Patient', 'update', patients[index].PatientKey, patients[index]).catch(err => {
+      console.error('Error syncing patient update to google sheets background:', err);
+    });
     
     res.json(patients[index]);
   } else {
@@ -678,8 +791,13 @@ app.post('/api/consults', async (req, res) => {
   consults.push(newConsult);
   writeDB<Consult>(CONSULTS_FILE, consults);
   
-  // Update Google Sheet asynchronously
-  syncToGoogleSheets('Consult', 'insert', newConsult.ConsultKey, newConsult);
+  // Track this locally so we don't overwrite with stale Google Sheets data
+  recentLocalEdits.set(`Consult_${newConsult.ConsultKey}`, { timestamp: Date.now(), data: newConsult });
+  
+  // Sync to Google Sheet asynchronously in the background so API stays fast
+  syncToGoogleSheets('Consult', 'insert', newConsult.ConsultKey, newConsult).catch(err => {
+    console.error('Error syncing consult to google sheets background:', err);
+  });
   
   res.status(201).json(newConsult);
 });
@@ -695,8 +813,13 @@ app.put('/api/consults/:key', async (req, res) => {
     consults[index] = { ...consults[index], ...updateData };
     writeDB<Consult>(CONSULTS_FILE, consults);
     
-    // Update Google Sheet asynchronously
-    syncToGoogleSheets('Consult', 'update', consults[index].ConsultKey, consults[index]);
+    // Track this locally so we don't overwrite with stale Google Sheets data
+    recentLocalEdits.set(`Consult_${consults[index].ConsultKey}`, { timestamp: Date.now(), data: consults[index] });
+    
+    // Sync to Google Sheet asynchronously in the background so API stays fast
+    syncToGoogleSheets('Consult', 'update', consults[index].ConsultKey, consults[index]).catch(err => {
+      console.error('Error syncing consult update to google sheets background:', err);
+    });
     
     res.json(consults[index]);
   } else {
@@ -718,7 +841,14 @@ app.post('/api/cathlabs', async (req, res) => {
   cathlabs.push(newCathLab);
   writeDB<CathLab>(CATHLABS_FILE, cathlabs);
   
-  syncToGoogleSheets('CathLab', 'insert', newCathLab.CathKey, newCathLab);
+  // Track this locally so we don't overwrite with stale Google Sheets data
+  recentLocalEdits.set(`CathLab_${newCathLab.CathKey}`, { timestamp: Date.now(), data: newCathLab });
+  
+  // Sync to Google Sheet asynchronously in the background so API stays fast
+  syncToGoogleSheets('CathLab', 'insert', newCathLab.CathKey, newCathLab).catch(err => {
+    console.error('Error syncing cathlab to google sheets background:', err);
+  });
+  
   res.status(201).json(newCathLab);
 });
 
@@ -730,7 +860,14 @@ app.put('/api/cathlabs/:key', async (req, res) => {
     cathlabs[index] = { ...cathlabs[index], ...req.body };
     writeDB<CathLab>(CATHLABS_FILE, cathlabs);
     
-    syncToGoogleSheets('CathLab', 'update', cathlabs[index].CathKey, cathlabs[index]);
+    // Track this locally so we don't overwrite with stale Google Sheets data
+    recentLocalEdits.set(`CathLab_${cathlabs[index].CathKey}`, { timestamp: Date.now(), data: cathlabs[index] });
+    
+    // Sync to Google Sheet asynchronously in the background so API stays fast
+    syncToGoogleSheets('CathLab', 'update', cathlabs[index].CathKey, cathlabs[index]).catch(err => {
+      console.error('Error syncing cathlab update to google sheets background:', err);
+    });
+    
     res.json(cathlabs[index]);
   } else {
     res.status(404).json({ error: 'CathLab not found' });
