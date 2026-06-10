@@ -198,7 +198,7 @@ export default function CathLabSchedulerView({
   const [adHocErrors, setAdHocErrors] = useState<string[]>([]);
   const [adHocPatientDOB, setAdHocPatientDOB] = useState('2018-01-01');
   const [adHocPatientSex, setAdHocPatientSex] = useState<'Nam' | 'Nữ'>('Nam');
-  const [adHocPatientAdress, setAdHocPatientAdress] = useState('');
+  const [adHocPatientAddress, setAdHocPatientAddress] = useState('');
   const [adHocPatientPhone1, setAdHocPatientPhone1] = useState('');
   const [adHocPatientPhone2, setAdHocPatientPhone2] = useState('');
   const [adHocOutcome, setAdHocOutcome] = useState<'Tử vong' | 'Nặng xin về' | 'Đã mổ' | 'Đã thông' | ''>('');
@@ -340,8 +340,8 @@ export default function CathLabSchedulerView({
     ];
 
     return consults.filter(c => {
-      // 1. YEAR([ConsultDate]) >= 2026
-      if (getYear(c.ConsultDate) < 2026) return false;
+      // 1. YEAR([ConsultDate]) >= 2026 (Removed strict year filter to allow seeing past data)
+      // if (getYear(c.ConsultDate) < 2026) return false;
 
       // 2. [_THISROW].[ConsultKey] = [PatientKey].[LatestPrepConsultID]
       if (latestConsultsMap.get(c.PatientKey) !== c.ConsultKey) return false;
@@ -481,10 +481,8 @@ export default function CathLabSchedulerView({
 
       const vnDays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
-      // EXCELJS EXPORT DISABLED TEMPORARILY TO FIX CRASH IN VITE
-      /*
-      const ExcelJSModule = await import('exceljs/dist/exceljs.min.js');
-      const ExcelJS = (ExcelJSModule as any).default || ExcelJSModule;
+      // EXCELJS EXPORT ENABLED
+      const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
 
       const worksheet = workbook.addWorksheet('DuTruDungCu');
@@ -579,7 +577,7 @@ export default function CathLabSchedulerView({
         })() : '';
 
         const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
-        const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAdress || (p as any).PatientAdress || ''}` : '';
+        const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAddress || ''}` : '';
         
         const chanDoan = c.DetailDiagnosis || '';
         const keHoach = c.DetailConsultResult || '';
@@ -649,8 +647,6 @@ export default function CathLabSchedulerView({
         setErrorMsg('Tải file thành công!');
         setTimeout(() => setErrorMsg(''), 3000);
       }, 0);
-      */
-      setErrorMsg("Tạm tắt tính năng xuất (do xung đột). Đã khóa.");
     } catch (err: any) {
       console.error("Lỗi xuất excel: ", err);
       setErrorMsg("Lỗi xuất excel: " + err.message);
@@ -787,9 +783,8 @@ export default function CathLabSchedulerView({
       const endFormatted = exportEndDateStr.split('-').reverse().join('/');
       const dateStr = `LỊCH THÔNG TIM TỪ NGÀY ${startFormatted} ĐẾN NGÀY ${endFormatted}`;
 
-      /*
-      const ExcelJSModule = await import('exceljs/dist/exceljs.min.js');
-      const ExcelJS = (ExcelJSModule as any).default || ExcelJSModule;
+      // EXCELJS EXPORT ENABLED
+      const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('LichThongTim');
 
@@ -887,7 +882,7 @@ export default function CathLabSchedulerView({
       })() : '';
 
       const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
-      const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAdress || (p as any).PatientAdress || ''}` : '';
+      const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAddress || ''}` : '';
       
       const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join('\n');
       const chanDoan = c.DetailDiagnosis || '';
@@ -1011,8 +1006,6 @@ export default function CathLabSchedulerView({
         setErrorMsg('Tải file thành công!');
         setTimeout(() => setErrorMsg(''), 3000);
       }, 0);
-      */
-      setErrorMsg("Tính năng xuất excel đang bị vô hiệu hóa để fix lỗi trắng trang.");
     } catch (err: any) {
       console.error("Lỗi xuất excel: ", err);
       // Removed alert() which crashes in iframes without permissions.
@@ -1070,7 +1063,7 @@ export default function CathLabSchedulerView({
     setAdHocOtherPatientName(String(pat.OtherPatientName || ''));
     setAdHocPatientDOB(String(pat.PatientDOB || ''));
     setAdHocPatientSex(pat.PatientSex);
-    setAdHocPatientAdress(String(pat.PatientAdress || (pat as any).PatientAdress || ''));
+    setAdHocPatientAddress(String(pat.PatientAddress || (pat as any).PatientAddress || ''));
     setAdHocPatientPhone1(String(pat.PatientPhone1 || ''));
     setAdHocPatientPhone2(String(pat.PatientPhone2 || ''));
     setAdHocOutcome(String(pat.Outcome || ''));
@@ -1085,7 +1078,7 @@ export default function CathLabSchedulerView({
     setAdHocOtherPatientName('');
     setAdHocPatientDOB('2018-01-01');
     setAdHocPatientSex('Nam');
-    setAdHocPatientAdress('');
+    setAdHocPatientAddress('');
     setAdHocPatientPhone1('');
     setAdHocPatientPhone2('');
     setAdHocOutcome('');
@@ -1111,11 +1104,12 @@ export default function CathLabSchedulerView({
     // Parse CathMethod array/comma text
     let methods: string[] = [];
     if (c.CathMethod) {
-      try {
-        methods = JSON.parse(c.CathMethod);
-      } catch (err) {
-        methods = c.CathMethod.split(';').map(m => m.trim()).filter(Boolean);
-      }
+       if (c.CathMethod.includes('+')) {
+         methods = c.CathMethod.split('+').map(m => m.trim()).filter(Boolean);
+       } else {
+         const tm = c.CathMethod.trim();
+         if (tm) methods = [tm];
+       }
     }
     setSelectedMethods(methods);
     
@@ -1199,7 +1193,7 @@ export default function CathLabSchedulerView({
       if (!adHocPatientID1) errors.push('PatientID1');
       if (!adHocPatientName) errors.push('PatientName');
       if (!adHocPatientDOB) errors.push('PatientDOB');
-      if (!adHocPatientAdress) errors.push('PatientAdress');
+      if (!adHocPatientAddress) errors.push('PatientAddress');
       if (!adHocPatientPhone1) errors.push('PatientPhone1');
     }
 
@@ -1231,7 +1225,7 @@ export default function CathLabSchedulerView({
       OtherPatientName: adHocOtherPatientName,
       PatientDOB: adHocPatientDOB,
       PatientSex: adHocPatientSex,
-      PatientAdress: adHocPatientAdress,
+      PatientAddress: adHocPatientAddress,
       PatientPhone1: adHocPatientPhone1,
       PatientPhone2: adHocPatientPhone2,
       PatientCreateBy: adHocRequestBy || 'system',
@@ -1273,7 +1267,7 @@ export default function CathLabSchedulerView({
       FundingRequest: adHocFundingRequest,
       CheckDeviceUpdatedTime: adHocCheckDeviceDate ? new Date(adHocCheckDeviceDate).toISOString() : '',
       CheckDeviceUpdatedBy: adHocCheckDeviceBy,
-      CathMethod: JSON.stringify(adHocCathMethod)
+      CathMethod: adHocCathMethod.join(' + ')
     };
 
     try {
@@ -1311,7 +1305,7 @@ export default function CathLabSchedulerView({
       setAdHocOtherPatientName('');
       setAdHocPatientDOB('2018-01-01');
       setAdHocPatientSex('Nam');
-      setAdHocPatientAdress('');
+      setAdHocPatientAddress('');
       setAdHocPatientPhone1('');
       setAdHocPatientPhone2('');
       setAdHocOutcome('');
@@ -1358,7 +1352,7 @@ export default function CathLabSchedulerView({
       CallNote: callNote,
       PriorityOrder: priorityOrder,
       PlannedCathLabDate: plannedCathLabDate,
-      CathMethod: JSON.stringify(selectedMethods),
+      CathMethod: selectedMethods.join(' + '),
       PostCathDepart: postCathDepart,
       Scheduled1stInterventionist: scheduled1st,
       Scheduled2ndInterventionist: finalScheduled2nd,
@@ -1663,7 +1657,7 @@ export default function CathLabSchedulerView({
                 Danh sách chờ xếp lịch
               </h3>
               <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
-                Tổng cộng: {allEligibleWaitlist.length} ca hợp lệ trong hệ thống
+                Tổng cộng: {allEligibleWaitlist.length} ca hợp lệ trong hệ thống (C:{consults.length}, P:{patients.length}, M:{latestConsultsMap.size})
               </p>
             </div>
             <button
@@ -2235,7 +2229,7 @@ export default function CathLabSchedulerView({
                           </div>
                           <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Địa chỉ:</span>
-                            <span className="font-bold text-slate-800 block truncate">{pat.PatientAdress || (pat as any).PatientAdress || '—'}</span>
+                            <span className="font-bold text-slate-800 block truncate">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
                           </div>
                           <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 1:</span>
@@ -3165,7 +3159,7 @@ export default function CathLabSchedulerView({
               const weightDisplay = selectedConsult?.PatientWeight ? `${selectedConsult.PatientWeight} kg` : '—';
               const heightDisplay = selectedConsult?.PatientHeight ? `${selectedConsult.PatientHeight} cm` : '—';
               const ageDesc = getAgeDescription(pObj.PatientDOB) || '—';
-              const addressDisplay = pObj.PatientAdress || (pObj as any).PatientAdress || '';
+              const addressDisplay = pObj.PatientAddress || (pObj as any).PatientAddress || '';
               const phoneList = [pObj.PatientPhone1, pObj.PatientPhone2].filter(Boolean).join(' | ');
               const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);
               const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : 'Chưa gán';
@@ -3303,7 +3297,7 @@ export default function CathLabSchedulerView({
                         </div>
                         <div className="col-span-1 md:col-span-2">
                           <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Địa chỉ:</span>
-                          <span className="font-bold text-slate-800 block break-words text-[12px]">{pat.PatientAdress || (pat as any).PatientAdress || '—'}</span>
+                          <span className="font-bold text-slate-800 block break-words text-[12px]">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
                         </div>
                         <div className="col-span-1 md:col-span-2">
                           <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Điện thoại:</span>
@@ -3535,115 +3529,120 @@ export default function CathLabSchedulerView({
                         </span>
                       </div>
 
-                      {/* Patient mode selector tabs */}
-                      <div className="bg-slate-100 rounded-2xl p-1 flex gap-1 border border-slate-200">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAdHocPatientMode('existing');
-                            handleClearSelectedPatient();
-                          }}
-                          className={`flex-1 py-1.5 rounded-xl text-[11px] font-extrabold transition cursor-pointer ${
-                            adHocPatientMode === 'existing'
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'text-slate-650 hover:bg-slate-200/50'
-                          }`}
-                        >
-                          Chọn bệnh nhi có sẵn
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAdHocPatientMode('new');
-                            handleClearSelectedPatient();
-                          }}
-                          className={`flex-1 py-1.5 rounded-xl text-[11px] font-extrabold transition cursor-pointer ${
-                            adHocPatientMode === 'new'
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'text-slate-650 hover:bg-slate-200/50'
-                          }`}
-                        >
-                          Tạo nhanh bệnh nhi mới
-                        </button>
-                      </div>
+                         <div className="flex items-center justify-between mb-3">
+                            <label className="block text-[#d2145a] font-extrabold uppercase text-[10px]">
+                              Chọn Bệnh nhi cần đăng ký *
+                            </label>
+                            <button
+                               type="button"
+                               onClick={() => {
+                                 setAdHocPatientMode('new');
+                                 handleClearSelectedPatient();
+                               }} 
+                               className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-3 py-1 rounded-lg text-[10px] transition flex items-center gap-1 cursor-pointer"
+                            >
+                               <Plus className="w-3 h-3" /> Mới
+                            </button>
+                         </div>
 
-                      {/* Search Bar / Selected summary */}
-                      {adHocPatientMode === 'existing' && (
-                        <div className="relative">
-                          {adHocSelectedPatientKey ? (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex justify-between items-start text-xs shadow-sm">
-                              <div className="flex flex-col gap-1.5 w-full">
-                                <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="bg-emerald-500 text-white rounded-full p-0.5"><Check className="w-3 h-3" /></span>
-                                    <span className="font-extrabold text-emerald-900 text-[11px] uppercase">
-                                      Đã chọn hồ sơ bệnh nhi
-                                    </span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={handleClearSelectedPatient}
-                                    className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[9px] font-black transition cursor-pointer uppercase shrink-0 ml-2"
-                                  >
-                                    Thay đổi
-                                  </button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 mt-1 border-t border-emerald-100/50 pt-2 text-[10px]">
-                                    <span className="text-emerald-800"><b className="opacity-60">Họ và tên:</b> <span className="font-bold uppercase ml-1">{adHocPatientName}</span></span>
-                                    <span className="text-emerald-800"><b className="opacity-60">Mã BN1:</b> <span className="font-bold ml-1 font-mono">{adHocPatientID1}</span></span>
-                                    {adHocPatientID2 && <span className="text-emerald-800"><b className="opacity-60">Mã BN2:</b> <span className="font-bold ml-1 font-mono">{adHocPatientID2}</span></span>}
-                                    <span className="text-emerald-800"><b className="opacity-60">Ngày sinh:</b> <span className="font-bold ml-1 font-mono">{adHocPatientDOB ? adHocPatientDOB.split('-').reverse().join('/') : ''}</span></span>
-                                    <span className="text-emerald-800"><b className="opacity-60">Giới tính:</b> <span className="font-bold ml-1">{adHocPatientSex}</span></span>
-                                    <span className="text-emerald-800 col-span-2"><b className="opacity-60">Địa chỉ:</b> <span className="font-bold ml-1">{adHocPatientAdress}</span></span>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
+                         {/* Search Bar / Selected summary */}
+                         {adHocPatientMode === 'existing' && !adHocSelectedPatientKey && (
                             <div className="relative">
-                              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                <Search className="w-4 h-4 text-slate-400" />
-                              </div>
                               <input
                                 type="text"
-                                placeholder="Tìm tên, mã bệnh nhân hoặc mã khác để chọn..."
+                                placeholder="🔍 Nhập tên hoặc mã ID1 của bệnh nhi..."
                                 value={adHocSearchQuery}
                                 onChange={(e) => setAdHocSearchQuery(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-220 rounded-xl pl-9 pr-3 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none placeholder-slate-400 font-semibold"
                               />
-                              
+
                               {/* Search Dropdown Result List */}
                               {adHocSearchQuery.trim() && filteredSearchPatients.length > 0 && (
-                                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
-                                  {filteredSearchPatients.map((pat) => (
+                                <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-sm z-50">
+                                  {filteredSearchPatients.slice(0, 15).map((pat) => (
                                     <button
                                       key={pat.PatientKey}
                                       type="button"
                                       onClick={() => handleSelectPatient(pat)}
-                                      className="w-full text-left px-3 py-2 hover:bg-slate-50/75 flex flex-col transition cursor-pointer"
+                                      className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"
                                     >
-                                      <span className="font-extrabold text-[#d2145a] text-[11px]">{pat.PatientName}</span>
-                                      <span className="text-[9px] text-slate-500 font-mono font-bold">
-                                        Mã BN: {pat.PatientID1} {pat.PatientID2 ? `| Mã phụ: ${pat.PatientID2}` : ''} | NS: {pat.PatientDOB}
-                                      </span>
+                                      <div>
+                                        <span className="font-extrabold uppercase">{pat.PatientName}</span>
+                                        <span className="text-[10px] text-slate-500 font-mono ml-1">(ID1: {pat.PatientID1})</span>
+                                      </div>
+                                      <span className="text-[10px] font-mono italic text-slate-400">{formatVNTime(pat.PatientDOB)} | {pat.PatientSex === 'Nữ' ? 'Nữ' : 'Nam'}</span>
                                     </button>
                                   ))}
                                 </div>
                               )}
                               {adHocSearchQuery.trim() && filteredSearchPatients.length === 0 && (
-                                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg p-3 z-50 text-center text-[11px] text-indigo-950 font-semibold">
-                                  Không tìm thấy bệnh nhi. Hãy thử nhập tên đầy đủ hoặc chọn "Tạo nhanh bệnh nhi mới"!
+                                <div className="absolute left-0 right-0 mt-2 p-3 text-center text-slate-400 italic bg-white border border-slate-200 rounded-xl shadow-lg z-50 text-[11px]">
+                                  Không tìm thấy bệnh nhi "{adHocSearchQuery}"
                                 </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      )}
+                         )}
 
-                      {/* Demographics Area */}
-                      {adHocPatientMode === 'new' && (
-                        <div className="border-t border-slate-100 pt-3.5 space-y-3.5 animate-in fade-in slide-in-from-top-2">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
+                         {/* Selected Patient details complex card */}
+                         {adHocPatientMode === 'existing' && adHocSelectedPatientKey && (
+                            <div className="bg-pink-50/70 border border-pink-100 rounded-2xl p-4 text-xs text-slate-800 relative shadow-sm mt-2">
+                              <button
+                                onClick={handleClearSelectedPatient}
+                                className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 p-1.5 rounded-full transition cursor-pointer"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-2 w-full">
+                                  <h4 className="font-black text-sm uppercase text-[#d2145a] flex items-center gap-2">
+                                    <span>👤 {adHocPatientName}</span>
+                                    <span className="bg-white border border-pink-200 text-[#d2145a] text-[10px] px-2 py-0.5 rounded-full font-mono normal-case">{adHocPatientSex}</span>
+                                  </h4>
+                                  
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2.5">
+                                    <div>
+                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Mã ID1:</span>
+                                      <span className="font-mono text-[11px] font-bold text-slate-800">{adHocPatientID1}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Mã ID2:</span>
+                                      <span className="font-mono text-[11px] font-bold text-slate-800">{adHocPatientID2 || '—'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Ngày sinh:</span>
+                                      <span className="font-bold text-slate-800 font-mono">{adHocPatientDOB ? adHocPatientDOB.split('-').reverse().join('/') : ''}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">SĐT liên hệ:</span>
+                                      <span className="font-bold text-slate-800 font-mono">{adHocPatientPhone1 || adHocPatientPhone2 || '—'}</span>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Địa chỉ thường trú:</span>
+                                      <span className="font-bold text-slate-800">{adHocPatientAddress || '—'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                         )}
+
+                         {/* Demographics Area */}
+                         {adHocPatientMode === 'new' && (
+                           <div className="mt-2 space-y-3">
+                              <div className="flex justify-between items-center bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
+                                 <span className="text-rose-600 font-bold text-[11px] uppercase">📝 Tạo Bệnh Nhi Mới</span>
+                                 <button 
+                                    type="button" 
+                                    className="text-xs font-bold text-slate-500 hover:text-slate-700 underline cursor-pointer" 
+                                    onClick={() => setAdHocPatientMode('existing')}
+                                 >
+                                    Quay lại tìm kiếm
+                                 </button>
+                               </div>
+                              <div className="border-t border-slate-100 pt-3.5 space-y-3.5 animate-in fade-in slide-in-from-top-2">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
                               <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
                                 Mã bệnh nhân *
                                 {adHocErrors.includes('PatientID1') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
@@ -3709,14 +3708,14 @@ export default function CathLabSchedulerView({
                             <div className="col-span-2">
                               <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
                                 Địa chỉ thường trú *
-                                {adHocErrors.includes('PatientAdress') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
+                                {adHocErrors.includes('PatientAddress') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
                               </label>
                               <input
                                 type="text"
                                 required
                                 placeholder="Nhập địa chỉ của bệnh nhi..."
-                                value={adHocPatientAdress}
-                                onChange={(e) => setAdHocPatientAdress(e.target.value)}
+                                value={adHocPatientAddress}
+                                onChange={(e) => setAdHocPatientAddress(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium"
                               />
                             </div>
@@ -3745,8 +3744,9 @@ export default function CathLabSchedulerView({
                               />
                             </div>
                           </div>
+                         </div>
                         </div>
-                      )}
+                       )}
                     </div>
 
                     <div className="bg-white border border-slate-200 rounded-2xl p-3 md:p-4 space-y-3 shadow-sm">

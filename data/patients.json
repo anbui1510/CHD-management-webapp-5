@@ -1,0 +1,47 @@
+[
+  {
+    "PatientKey": "pat_001",
+    "PatientID1": "BN001",
+    "PatientID2": "NB-2024-05",
+    "PatientName": "Nguyễn Hoàng Nam",
+    "OtherPatientName": "Nguyễn Hoàng Nam",
+    "PatientDOB": "2018-04-12",
+    "PatientSex": "Nam",
+    "PatientAddress": "Hà Nội",
+    "PatientPhone1": "0912345678",
+    "PatientPhone2": "0987654321",
+    "PatientCreateBy": "01378",
+    "PatientCreateTime": "2026-01-10T08:30:00Z",
+    "Outcome": "Đã mổ"
+  },
+  {
+    "PatientKey": "pat_002",
+    "PatientID1": "BN002",
+    "PatientID2": "NB-2024-11",
+    "PatientName": "Trần Mai Phương",
+    "OtherPatientName": "Trần Mai Phương",
+    "PatientDOB": "2020-08-25",
+    "PatientSex": "Nữ",
+    "PatientAddress": "Hải Phòng",
+    "PatientPhone1": "0923456789",
+    "PatientPhone2": "",
+    "PatientCreateBy": "11111",
+    "PatientCreateTime": "2026-02-15T14:15:00Z",
+    "Outcome": ""
+  },
+  {
+    "PatientKey": "pat_003",
+    "PatientID1": "BN003",
+    "PatientID2": "NB-2025-01",
+    "PatientName": "Lê Minh Khôi",
+    "OtherPatientName": "Lê Minh Khôi",
+    "PatientDOB": "2022-11-02",
+    "PatientSex": "Nam",
+    "PatientAddress": "Nghệ An",
+    "PatientPhone1": "0934567890",
+    "PatientPhone2": "0911223344",
+    "PatientCreateBy": "11111",
+    "PatientCreateTime": "2026-03-01T09:00:00Z",
+    "Outcome": "Đã thông"
+  }
+]

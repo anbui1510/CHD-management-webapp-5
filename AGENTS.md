@@ -12,7 +12,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 
 ## Cấu trúc dữ liệu chi tiết
 
-### 1. Bảng Patient (Thông tin hành chính bệnh nhi)
+### 1. Bảng Patient (Danh sách bệnh nhi)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -23,14 +23,14 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `OtherPatientName`| Họ và tên khai sinh | Text | | | |
 | `PatientDOB` | Ngày sinh | Date | | Bắt buộc | Định dạng dd/mm/yyyy |
 | `PatientSex` | Giới tính | Enum | Nam/Nữ | Bắt buộc | |
-| `PatientAddress` | Địa chỉ | Enum | Danh sách tỉnh | Bắt buộc |  |
+| `PatientAddress` | Địa chỉ | Enum | Danh sách tỉnh | Bắt buộc | Lưu ý ghi đúng tên `PatientAddress` |
 | `PatientPhone1` | Số ĐT 1 | Phone | | | |
 | `PatientPhone2` | Số ĐT 2 | Phone | | | |
 | `PatientCreateBy` | Người tạo thông tin BN | Ref | | | Liên kết đến bảng Staff thông qua StaffKey |
 | `PatientCreateTime`| Ngày tạo thông tin BN | DateTime | | | |
 | `Outcome` | Trạng thái cuối cùng của BN | Enum | Tử vong / Nặng xin về / Đã mổ / Đã thông / Chờ chỉ định | | |
 
-### 2. Bảng Consult (Quá trình hội chẩn - xếp lịch - chuẩn bị dụng cụ)
+### 2. Bảng Consult (Lịch trình / Biên bản hội chẩn)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -65,13 +65,13 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `FundingRequest` | Hỗ trợ tài chính | Enum | Không tài trợ / Chờ duyệt / Đã duyệt | | |
 | `CheckDeviceDate`| Ngày kiểm dụng cụ | DateTime| | | |
 | `CheckDeviceBy` | Người kiểm dụng cụ | Ref | | | |
-| `CathMethod` | Phương pháp can thiệp | Ref | Ref tới bảng Sourse | | |
+| `CathMethod` | Phương pháp can thiệp | Ref | Ref tới bảng Source | | |
 | `PostCathDepart` | Khoa nằm sau TT | Enum | Danh sách khoa | | |
 | `Scheduled1stInterventionist`| PTV chính dự kiến | Enum | Danh sách bác sĩ | | |
 | `Scheduled2ndInterventionist`| PTV phụ 1 dự kiến | Enum | Danh sách bác sĩ | | |
 | `Scheduled3rdInterventionist`| PTV phụ 2 dự kiến | Enum | Danh sách bác sĩ | | |
 
-### 3. Bảng CathLab (Can thiệp)
+### 3. Bảng CathLab (Can thiệp tim mạch)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |

@@ -130,7 +130,7 @@ export default function PatientDetailsDrawer({
               <p className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-slate-400" />
                 <span className="text-slate-400 font-medium">Địa chỉ:</span>
-                <span className="font-extrabold text-slate-800">{patient.PatientAdress || (patient as any).PatientAdress || ''}</span>
+                <span className="font-extrabold text-slate-800">{patient.PatientAddress || (patient as any).PatientAddress || ''}</span>
               </p>
             </div>
 

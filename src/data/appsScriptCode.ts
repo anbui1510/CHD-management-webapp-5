@@ -43,7 +43,7 @@ function getOrCreateSheet(sheetName, headers) {
 function initializeDatabase() {
   var patientHeaders = [
     "PatientKey", "PatientID1", "PatientID2", "PatientName", "OtherPatientName",
-    "PatientDOB", "PatientSex", "PatientAdress", "PatientPhone1", "PatientPhone2",
+    "PatientDOB", "PatientSex", "PatientAddress", "PatientPhone1", "PatientPhone2",
     "PatientCreateBy", "PatientCreateTime", "Outcome"
   ];
   
@@ -78,7 +78,7 @@ function initializeDatabase() {
     "CMRKey", "ConsultKey", "PatientKey", "CMRDate", "CMRMethod", "CMRResult", "CMRNote"
   ];
 
-  var sourseHeaders = [];
+  var sourceHeaders = [];
 
   getOrCreateSheet("Patient", patientHeaders);
   getOrCreateSheet("Consult", consultHeaders);
@@ -87,12 +87,12 @@ function initializeDatabase() {
   getOrCreateSheet("Operation", operationHeaders);
   getOrCreateSheet("CMR", cmrHeaders);
   
-  if (sourseHeaders.length > 0) {
-    getOrCreateSheet("Sourse", sourseHeaders);
+  if (sourceHeaders.length > 0) {
+    getOrCreateSheet("Source", sourceHeaders);
   } else {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss.getSheetByName("Sourse")) {
-      ss.insertSheet("Sourse");
+    if (!ss.getSheetByName("Source")) {
+      ss.insertSheet("Source");
     }
   }
 }
@@ -116,7 +116,7 @@ function doGet(e) {
   var cathlabs = readSheetAsJson("CathLab");
   var operations = readSheetAsJson("Operation");
   var cmrs = readSheetAsJson("CMR");
-  var sourses = readSheetAsJson("Sourse");
+  var sources = readSheetAsJson("Source");
 
   // If Staff is completely empty, populate with some default users so admin can login
   if (staff.length === 0) {
@@ -135,7 +135,7 @@ function doGet(e) {
     cathlabs: cathlabs,
     operations: operations,
     cmrs: cmrs,
-    sourses: sourses
+    sources: sources
   };
 
   return ContentService.createTextOutput(JSON.stringify(responseData))

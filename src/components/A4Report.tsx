@@ -122,7 +122,7 @@ export default function A4Report({ consult, patient, onClose }: A4ReportProps) {
                 </div>
                 <div>
                   <span className="text-gray-500 font-medium">Địa chỉ cư trú:</span>{' '}
-                  <span className="font-medium text-gray-800">{patient.PatientAdress || (patient as any).PatientAdress || 'Thành phố lớn'}</span>
+                  <span className="font-medium text-gray-800">{patient.PatientAddress || (patient as any).PatientAddress || 'Thành phố lớn'}</span>
                 </div>
                 <div>
                   <span className="text-gray-500 font-medium font-sans">Mã HS bệnh nhi (ID1/ID2):</span>{' '}

@@ -17,7 +17,7 @@ import {
   CathLab,
   Operation,
   CMR,
-  Sourse,
+  Source,
   formatVNTime
 } from './types';
 import * as XLSX from 'xlsx';
@@ -31,6 +31,7 @@ import CathLabSchedulerView from './components/CathLabSchedulerView';
 import CathLabRoomView from './components/CathLabRoomView';
 import TransferredCathLabView from './components/TransferredCathLabView';
 import ArchiveView from './components/ArchiveView';
+import WorkspaceDashboard from './components/WorkspaceDashboard';
 import { StaffMultiSelect } from './components/StaffMultiSelect';
 import { VNDateInput } from './components/VNDateInput';
 
@@ -66,7 +67,9 @@ import {
   Stethoscope,
   ArrowRightLeft,
   Undo2,
-  Archive
+  Archive,
+  LayoutDashboard,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -188,7 +191,7 @@ export default function App() {
   const [cathlabs, setCathlabs] = useState<CathLab[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [cmrs, setCmrs] = useState<CMR[]>([]);
-  const [sourses, setSourses] = useState<Sourse[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
 
   // Refs for synchronized double scrollbar in consult log list
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -208,7 +211,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
 
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
@@ -250,7 +253,7 @@ export default function App() {
     OtherPatientName: '',
     PatientDOB: '',
     PatientSex: 'Nam' as 'Nam' | 'Nữ',
-    PatientAdress: 'TP Hà Nội',
+    PatientAddress: 'TP Hà Nội',
     PatientPhone1: '',
     PatientPhone2: '',
     Outcome: '' as OutcomeType
@@ -372,10 +375,10 @@ export default function App() {
       .then(data => setCmrs(data));
   };
 
-  const fetchSourses = () => {
-    fetch('/api/sourses')
+  const fetchSources = () => {
+    fetch('/api/sources')
       .then(res => res.json())
-      .then(data => setSourses(data));
+      .then(data => setSources(data));
   };
 
   useEffect(() => {
@@ -385,7 +388,7 @@ export default function App() {
     fetchCathlabs();
     fetchOperations();
     fetchCmrs();
-    fetchSourses();
+    fetchSources();
 
     // Recover logged-in session if exists
     const storedStaff = localStorage.getItem('CurrentStaffKey');
@@ -531,7 +534,7 @@ export default function App() {
         OtherPatientName: newPatientData.OtherPatientName || newPatientData.PatientName,
         PatientDOB: newPatientData.PatientDOB || '2020-01-01',
         PatientSex: newPatientData.PatientSex,
-        PatientAdress: newPatientData.PatientAdress,
+        PatientAddress: newPatientData.PatientAddress,
         PatientPhone1: newPatientData.PatientPhone1,
         PatientPhone2: newPatientData.PatientPhone2,
         PatientCreateBy: currentStaff?.StaffKey || '01378',
@@ -560,7 +563,7 @@ export default function App() {
             OtherPatientName: '',
             PatientDOB: '',
             PatientSex: 'Nam',
-            PatientAdress: 'Hà Nội',
+            PatientAddress: 'Hà Nội',
             PatientPhone1: '',
             PatientPhone2: '',
             Outcome: ''
@@ -856,9 +859,8 @@ export default function App() {
           };
 
           // Import ExcelJS dynamically to keep initial bundle size light
-          // const ExcelJS = await import('exceljs');
-          return;
-          /*
+          const ExcelJS = await import('exceljs');
+          
           const workbook = new ExcelJS.Workbook();
           const worksheet = workbook.addWorksheet('DanhSachHoiChan');
           
@@ -950,7 +952,7 @@ export default function App() {
               const ageDesc = getAgeDescription(pat.PatientDOB) || '';
               const phone1 = pat.PatientPhone1 || '';
               const phone2 = pat.PatientPhone2 || '';
-              const address = pat.PatientAdress || (pat as any).PatientAdress || '';
+              const address = pat.PatientAddress || (pat as any).PatientAddress || '';
 
               const lines = [];
               if (sex) lines.push(sex);
@@ -1033,7 +1035,7 @@ export default function App() {
           anchor.download = `Danh_sach_${cleanType}_-_${cleanDate}.xlsx`;
           anchor.click();
           window.URL.revokeObjectURL(url);
-          */
+          
 
           setBotMessage('Bot đã chạy Task 1 thành công: Tạo file Excel (.xlsx) danh sách hội chẩn tương thích 100% cực kỳ chuyên nghiệp!');
           setTimeout(() => {
@@ -1179,6 +1181,7 @@ export default function App() {
   // Define sidebar shortcuts navigation schema
   const primarySideMenus = [
     { id: 'home', label: 'Home', icon: <Home className="w-4 h-4" /> },
+    { id: 'workspace', label: 'Không gian làm việc', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'patients', label: 'Hồ sơ bệnh án', icon: <Heart className="w-4 h-4" /> },
     { id: 'consult-list', label: 'Hội chẩn', icon: <ClipboardList className="w-4 h-4" /> },
     { id: 'results-staff', label: 'Nhập kết quả staff', icon: <FileText className="w-4 h-4" /> },
@@ -1199,7 +1202,7 @@ export default function App() {
     const id1 = p.PatientID1 ? String(p.PatientID1).toLowerCase() : '';
     const id2 = p.PatientID2 ? String(p.PatientID2).toLowerCase() : '';
     
-    const addr = (p.PatientAdress || (p as any).PatientAdress) ? String(p.PatientAdress || (p as any).PatientAdress).toLowerCase() : '';
+    const addr = (p.PatientAddress || (p as any).PatientAddress) ? String(p.PatientAddress || (p as any).PatientAddress).toLowerCase() : '';
     const addrRaw = removeDiacritics(addr);
     
     return name.includes(q) || nameRaw.includes(qRaw) ||
@@ -1232,7 +1235,7 @@ export default function App() {
         };
       case 'patients':
         return {
-          title: "QUẢN LÝ HỒ SƠ HÀNH CHÍNH & BỆNH ÁN BỆNH NHI",
+          title: "HỒ SƠ BỆNH ÁN",
           subtitle: "",
           icon: <Heart className="w-5 h-5 text-pink-200" />
         };
@@ -1250,15 +1253,16 @@ export default function App() {
         };
       case 'schedule-tt':
         return {
-          title: "Xếp lịch & Dụng cụ",
+          title: "XẾP LỊCH & DỤNG CỤ",
           subtitle: "",
           icon: <CalendarDays className="w-5 h-5 text-pink-200 animate-pulse" />
         };
+      case 'cathlab-room':
       case 'transferred-cathlab':
         return {
-          title: "BỆNH NHI ĐÃ CHUYỂN PHÒNG THÔNG TIM",
-          subtitle: "Danh sách chờ hoặc đang thực hiện ở phòng Thông tim",
-          icon: <ArrowRightLeft className="w-5 h-5 text-pink-200" />
+          title: "PHÒNG THÔNG TIM",
+          subtitle: "",
+          icon: <Activity className="w-5 h-5 text-pink-200" />
         };
       case 'archive':
         return {
@@ -1439,12 +1443,12 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'schedule-tt' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
             <HomeDashboard 
-              onNavigate={(menu) => setActiveMenu(menu)}
+              onNavigate={(menu) => setActiveMenu(menu as any)}
               patientCount={patients.length}
               pendingConsultCount={consults.filter(c => !c.ConsultResultID).length}
               completedConsultCount={consults.filter(c => c.ConsultResultID).length}
@@ -1454,12 +1458,21 @@ export default function App() {
             />
           )}
 
+          {/* WORKSPACE DASHBOARD */}
+          {activeMenu === 'workspace' && (
+            <WorkspaceDashboard 
+              onNavigate={(menu) => setActiveMenu(menu as any)}
+              patientCount={patients.length}
+              pendingConsultCount={consults.filter(c => c.ConsultResultID).length}
+            />
+          )}
+
           {/* PATIENT MANAGER PANEL */}
           {activeMenu === 'patients' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-4 sm:p-6 space-y-4 overflow-hidden">
               
               {/* Header and Add Patient Trigger */}
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 shrink-0">
                 <div>
                   <h2 className="text-base font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase">
                     <Heart className="w-5 h-5 text-pink-600 fill-pink-50" /> DANH SÁCH BỆNH NHI
@@ -1503,14 +1516,14 @@ export default function App() {
                         OtherPatientName: '',
                         PatientDOB: '',
                         PatientSex: 'Nam',
-                        PatientAdress: 'Hà Nội',
+                        PatientAddress: 'Hà Nội',
                         PatientPhone1: '',
                         PatientPhone2: '',
                         Outcome: ''
                       });
                       setShowAddPatient(true);
                     }}
-                    className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer"
+                    className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
                   >
                     <Plus className="w-4 h-4" /> Thêm bệnh nhi mới
                   </button>
@@ -1518,18 +1531,18 @@ export default function App() {
               </div>
 
               {/* Patient data flat list table styled strictly like Screenshot 3 */}
-              <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl flex flex-col shadow-sm overflow-hidden">
                 
-                <div className="overflow-x-auto">
+                <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
                   <table className="w-full text-left text-xs border-collapse">
-                    <thead>
+                    <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] uppercase font-black tracking-wider font-mono">
-                        <th className="py-3 px-4">Họ và tên bé</th>
-                        <th className="py-3 px-4">Ngày sinh</th>
-                        <th className="py-3 px-4">Giới tính</th>
-                        <th className="py-3 px-4">Địa chỉ</th>
-                        <th className="py-3 px-4">Chẩn đoán gần nhất</th>
-                        <th className="py-3 px-4 text-right">Chi tiết</th>
+                        <th className="py-3 px-4 shadow-sm">Họ và tên bé</th>
+                        <th className="py-3 px-4 shadow-sm">Ngày sinh</th>
+                        <th className="py-3 px-4 shadow-sm">Giới tính</th>
+                        <th className="py-3 px-4 shadow-sm">Địa chỉ</th>
+                        <th className="py-3 px-4 shadow-sm">Chẩn đoán gần nhất</th>
+                        <th className="py-3 px-4 text-right shadow-sm">Chi tiết</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -1561,7 +1574,7 @@ export default function App() {
                                   {pat.PatientSex}
                                 </span>
                               </td>
-                              <td className="py-3 px-4 text-slate-600 font-medium truncate max-w-[150px]">{pat.PatientAdress || (pat as any).PatientAdress || ''}</td>
+                              <td className="py-3 px-4 text-slate-600 font-medium truncate max-w-[150px]">{pat.PatientAddress || (pat as any).PatientAddress || ''}</td>
                               <td className="py-3 px-4">
                                 {latestConsult ? (
                                   <div className="flex flex-col">
@@ -1593,12 +1606,12 @@ export default function App() {
                   </table>
                 </div>
 
-                <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
                   <div className="text-[11px] text-slate-500 font-semibold font-mono uppercase">
                     Tổng số: {filteredPatients.length} / {patients.length} bệnh nhi tim bẩm sinh CHD 
                     {filteredPatients.length > 0 && (
                       <span className="text-[#d2145a] ml-1">
-                        (Trang {patientCurrentPage}/{totalPatientPages} - Hiển thị {(patientCurrentPage - 1) * PATIENTS_PER_PAGE + 1} đến {Math.min(patientCurrentPage * PATIENTS_PER_PAGE, filteredPatients.length)})
+                        (Trang {patientCurrentPage} / {totalPatientPages} - Hiển thị {(patientCurrentPage - 1) * PATIENTS_PER_PAGE + 1} đến {Math.min(patientCurrentPage * PATIENTS_PER_PAGE, filteredPatients.length)})
                       </span>
                     )}
                   </div>
@@ -1692,7 +1705,7 @@ export default function App() {
                               OtherPatientName: '',
                               PatientDOB: '',
                               PatientSex: 'Nam',
-                              PatientAdress: 'Hà Nội',
+                              PatientAddress: 'Hà Nội',
                               PatientPhone1: '',
                               PatientPhone2: '',
                               Outcome: ''
@@ -1722,10 +1735,10 @@ export default function App() {
                       {!newConsultData.PatientKey && searchPatientQuery.trim().length > 0 && (
                         <div className="max-h-48 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-sm">
                           {(() => {
-                            const trimmedQuery = searchPatientQuery.trim().toLowerCase();
+                            const trimmedQuery = removeVietnameseTones(searchPatientQuery).toLowerCase().trim();
                             const matched = patients.filter(p => {
-                              const nameOk = p.PatientName ? String(p.PatientName).toLowerCase().includes(trimmedQuery) : false;
-                              const idOk = p.PatientID1 ? String(p.PatientID1).toLowerCase().includes(trimmedQuery) : false;
+                              const nameOk = p.PatientName ? removeVietnameseTones(String(p.PatientName)).toLowerCase().includes(trimmedQuery) : false;
+                              const idOk = p.PatientID1 ? removeVietnameseTones(String(p.PatientID1)).toLowerCase().includes(trimmedQuery) : false;
                               return nameOk || idOk;
                             });
 
@@ -1787,7 +1800,7 @@ export default function App() {
                                   </div>
                                   <div className="col-span-2">
                                     <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Địa chỉ thường trú:</span>
-                                    <span className="font-bold text-slate-800">{selectedPat.PatientAdress || (selectedPat as any).PatientAdress || 'Không rõ địa chỉ'}</span>
+                                    <span className="font-bold text-slate-800">{selectedPat.PatientAddress || (selectedPat as any).PatientAddress || 'Không rõ địa chỉ'}</span>
                                   </div>
                                 </div>
                               </div>
@@ -2493,7 +2506,7 @@ export default function App() {
               cathlabs={cathlabs}
               operations={operations}
               cmrs={cmrs}
-              sourses={sourses}
+              sources={sources}
               onRefreshData={() => {
                 fetchPatients();
                 fetchConsults();
@@ -2501,7 +2514,7 @@ export default function App() {
                 fetchCathlabs();
                 fetchOperations();
                 fetchCmrs();
-                fetchSourses();
+                fetchSources();
               }}
             />
           )}
@@ -2526,7 +2539,7 @@ export default function App() {
                 OtherPatientName: pat.OtherPatientName || '',
                 PatientDOB: pat.PatientDOB,
                 PatientSex: pat.PatientSex,
-                PatientAdress: pat.PatientAdress,
+                PatientAddress: pat.PatientAddress,
                 PatientPhone1: pat.PatientPhone1,
                 PatientPhone2: pat.PatientPhone2 || '',
                 Outcome: pat.Outcome
@@ -2636,7 +2649,7 @@ export default function App() {
                                 <p><span className="text-slate-400">Ngày sinh:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(edp.PatientDOB)}</span></p>
                                 <p><span className="text-slate-400">Tuổi:</span> <span className="font-bold text-rose-600 font-mono">{getExcelAgeHelper(edp.PatientDOB)}</span></p>
                                 <p><span className="text-slate-400">Giới tính:</span> <span className="font-bold text-slate-800">{edp.PatientSex}</span></p>
-                                {edp.PatientAdress && <p className="col-span-1"><span className="text-slate-400">Địa chỉ:</span> <span className="font-bold text-slate-800 leading-tight">{edp.PatientAdress}</span></p>}
+                                {edp.PatientAddress && <p className="col-span-1"><span className="text-slate-400">Địa chỉ:</span> <span className="font-bold text-slate-800 leading-tight">{edp.PatientAddress}</span></p>}
                                 {edp.PatientPhone1 && <p><span className="text-slate-400">Số ĐT 1:</span> <span className="font-bold text-slate-800 font-mono">{edp.PatientPhone1}</span></p>}
                                 {edp.PatientPhone2 && <p><span className="text-slate-400">Số ĐT 2:</span> <span className="font-bold text-slate-800 font-mono">{edp.PatientPhone2}</span></p>}
                               </div>
@@ -2687,7 +2700,7 @@ export default function App() {
                                     OtherPatientName: edp.OtherPatientName || '',
                                     PatientDOB: edp.PatientDOB,
                                     PatientSex: edp.PatientSex,
-                                    PatientAdress: edp.PatientAdress || (edp as any).PatientAdress || '',
+                                    PatientAddress: edp.PatientAddress || (edp as any).PatientAddress || '',
                                     PatientPhone1: edp.PatientPhone1,
                                     PatientPhone2: edp.PatientPhone2 || '',
                                     Outcome: edp.Outcome || ''
@@ -3006,7 +3019,7 @@ export default function App() {
                                 OtherPatientName: edp.OtherPatientName || '',
                                 PatientDOB: edp.PatientDOB,
                                 PatientSex: edp.PatientSex,
-                                PatientAdress: edp.PatientAdress || (edp as any).PatientAdress || '',
+                                PatientAddress: edp.PatientAddress || (edp as any).PatientAddress || '',
                                 PatientPhone1: edp.PatientPhone1 || '',
                                 PatientPhone2: edp.PatientPhone2 || '',
                                 Outcome: edp.Outcome || ''
@@ -3038,7 +3051,7 @@ export default function App() {
                           </div>
                           <div className="col-span-2">
                             <span className="text-slate-400 font-medium block text-[9px] uppercase">Địa chỉ:</span>
-                            <span className="text-slate-700 font-semibold">{edp.PatientAdress || (edp as any).PatientAdress || '—'}</span>
+                            <span className="text-slate-700 font-semibold">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
                           </div>
                           <div>
                             <span className="text-slate-400 font-medium block text-[9px] uppercase">Số ĐT1:</span>
@@ -3379,12 +3392,12 @@ export default function App() {
                   <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Địa chỉ *</label>
                   <select
                     required
-                    value={newPatientData.PatientAdress}
-                    onChange={(e) => setNewPatientData(prev => ({ ...prev, PatientAdress: e.target.value }))}
+                    value={newPatientData.PatientAddress}
+                    onChange={(e) => setNewPatientData(prev => ({ ...prev, PatientAddress: e.target.value }))}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-extrabold focus:outline-none"
                   >
-                    {!ADDRESS_OPTIONS.includes(newPatientData.PatientAdress) && newPatientData.PatientAdress && (
-                      <option value={newPatientData.PatientAdress}>{newPatientData.PatientAdress}</option>
+                    {!ADDRESS_OPTIONS.includes(newPatientData.PatientAddress) && newPatientData.PatientAddress && (
+                      <option value={newPatientData.PatientAddress}>{newPatientData.PatientAddress}</option>
                     )}
                     {ADDRESS_OPTIONS.map((addr) => (
                       <option key={addr} value={addr}>{addr}</option>

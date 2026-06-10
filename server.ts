@@ -42,7 +42,7 @@ const CONSULTS_FILE = path.join(DB_DIR, 'consults.json');
 const CATHLABS_FILE = path.join(DB_DIR, 'cathlabs.json');
 const OPERATIONS_FILE = path.join(DB_DIR, 'operations.json');
 const CMRS_FILE = path.join(DB_DIR, 'cmrs.json');
-const SOURSES_FILE = path.join(DB_DIR, 'sourses.json');
+const SOURCES_FILE = path.join(DB_DIR, 'sources.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
 
 // Ensure DB directory exists
@@ -122,13 +122,18 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
     const data = await response.json() as any;
 
-    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sourses))) {
+    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources))) {
       if (Array.isArray(data.patients)) {
-        const uniquePatients = Array.from(new Map(data.patients.map((p: any) => [p.PatientKey, p])).values());
-        writeDB(PATIENTS_FILE, uniquePatients);
+        const pMap = new Map();
+        data.patients.forEach((p: any, i: number) => {
+          let k = p.PatientKey || `pat_no_key_${i}`;
+          if (pMap.has(k)) k = `${k}_dup_${i}`;
+          p.PatientKey = k;
+          pMap.set(k, p);
+        });
+        writeDB(PATIENTS_FILE, Array.from(pMap.values()));
       }
       if (Array.isArray(data.consults)) {
-        // preserve local fields like TransferredToCathLab
         const currentConsults = readDB(CONSULTS_FILE, []);
         const currentMap = new Map();
         currentConsults.forEach(c => currentMap.set((c as any).ConsultKey, c));
@@ -141,27 +146,58 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           return c;
         });
 
-        const uniqueConsults = Array.from(new Map(data.consults.map((c: any) => [c.ConsultKey, c])).values());
-        writeDB(CONSULTS_FILE, uniqueConsults);
+        const cMap = new Map();
+        data.consults.forEach((c: any, i: number) => {
+          let k = c.ConsultKey || `con_no_key_${i}`;
+          if (cMap.has(k)) k = `${k}_dup_${i}`;
+          c.ConsultKey = k;
+          cMap.set(k, c);
+        });
+        writeDB(CONSULTS_FILE, Array.from(cMap.values()));
       }
       if (Array.isArray(data.cathlabs) && data.cathlabs.length > 0) {
-        const uniqueCathlabs = Array.from(new Map(data.cathlabs.map((c: any, i: number) => [c.CathKey || `cl_${i}`, c])).values());
-        writeDB(CATHLABS_FILE, uniqueCathlabs);
+        const clMap = new Map();
+        data.cathlabs.forEach((c: any, i: number) => {
+          let k = c.CathKey || `cl_no_key_${i}`;
+          if (clMap.has(k)) k = `${k}_dup_${i}`;
+          c.CathKey = k;
+          clMap.set(k, c);
+        });
+        writeDB(CATHLABS_FILE, Array.from(clMap.values()));
       }
       if (Array.isArray(data.operations) && data.operations.length > 0) {
-        const uniqueOperations = Array.from(new Map(data.operations.map((o: any, i: number) => [o.OpKey || o.SurgKey || `op_${i}`, o])).values());
-        writeDB(OPERATIONS_FILE, uniqueOperations);
+        const opMap = new Map();
+        data.operations.forEach((o: any, i: number) => {
+          let k = o.OpKey || o.SurgKey || `op_no_key_${i}`;
+          if (opMap.has(k)) k = `${k}_dup_${i}`;
+          if (o.SurgKey) o.SurgKey = k;
+          if (o.OpKey) o.OpKey = k;
+          opMap.set(k, o);
+        });
+        writeDB(OPERATIONS_FILE, Array.from(opMap.values()));
       }
       if (Array.isArray(data.cmrs) && data.cmrs.length > 0) {
-        const uniqueCMRs = Array.from(new Map(data.cmrs.map((m: any, i: number) => [m.CMRKey || `cmr_${i}`, m])).values());
-        writeDB(CMRS_FILE, uniqueCMRs);
+        const cmrmap = new Map();
+        data.cmrs.forEach((m: any, i: number) => {
+          let k = m.CMRKey || `cmr_no_key_${i}`;
+          if (cmrmap.has(k)) k = `${k}_dup_${i}`;
+          m.CMRKey = k;
+          cmrmap.set(k, m);
+        });
+        writeDB(CMRS_FILE, Array.from(cmrmap.values()));
       }
       if (Array.isArray(data.staff) && data.staff.length > 0) {
-        const uniqueStaff = Array.from(new Map(data.staff.map((s: any, i: number) => [s.StaffKey || `st_${i}`, s])).values());
-        writeDB(STAFF_FILE, uniqueStaff);
+        const stMap = new Map();
+        data.staff.forEach((s: any, i: number) => {
+          let k = s.StaffKey || `st_no_key_${i}`;
+          if (stMap.has(k)) k = `${k}_dup_${i}`;
+          s.StaffKey = k;
+          stMap.set(k, s);
+        });
+        writeDB(STAFF_FILE, Array.from(stMap.values()));
       }
-      if (Array.isArray(data.sourses) && data.sourses.length > 0) {
-        writeDB(SOURSES_FILE, data.sourses);
+      if (Array.isArray(data.sources) && data.sources.length > 0) {
+        writeDB(SOURCES_FILE, data.sources);
       }
       lastSyncTime = Date.now();
       console.log('Successfully pulling synced and updated local database cache!');
@@ -323,7 +359,7 @@ const defaultPatients: Patient[] = [
     OtherPatientName: "Nguyễn Hoàng Nam",
     PatientDOB: "2018-04-12",
     PatientSex: "Nam",
-    PatientAdress: "Hà Nội",
+    PatientAddress: "Hà Nội",
     PatientPhone1: "0912345678",
     PatientPhone2: "0987654321",
     PatientCreateBy: "01378",
@@ -338,7 +374,7 @@ const defaultPatients: Patient[] = [
     OtherPatientName: "Trần Mai Phương",
     PatientDOB: "2020-08-25",
     PatientSex: "Nữ",
-    PatientAdress: "Hải Phòng",
+    PatientAddress: "Hải Phòng",
     PatientPhone1: "0923456789",
     PatientPhone2: "",
     PatientCreateBy: "11111",
@@ -353,7 +389,7 @@ const defaultPatients: Patient[] = [
     OtherPatientName: "Lê Minh Khôi",
     PatientDOB: "2022-11-02",
     PatientSex: "Nam",
-    PatientAdress: "Nghệ An",
+    PatientAddress: "Nghệ An",
     PatientPhone1: "0934567890",
     PatientPhone2: "0911223344",
     PatientCreateBy: "11111",
@@ -424,13 +460,41 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
     // Deduplicate read data just in case
     if (Array.isArray(parsed) && parsed.length > 0) {
       if ('PatientKey' in parsed[0]) {
-        parsed = Array.from(new Map(parsed.map((p: any) => [p.PatientKey, p])).values());
+        const pMap = new Map();
+        parsed.forEach((p: any, i: number) => {
+          let k = p.PatientKey || `pat_no_key_${i}`;
+          if (pMap.has(k)) k = `${k}_dup_${i}`;
+          p.PatientKey = k;
+          pMap.set(k, p);
+        });
+        parsed = Array.from(pMap.values());
       } else if ('ConsultKey' in parsed[0]) {
-        parsed = Array.from(new Map(parsed.map((c: any) => [c.ConsultKey, c])).values());
+        const cMap = new Map();
+        parsed.forEach((c: any, i: number) => {
+          let k = c.ConsultKey || `con_no_key_${i}`;
+          if (cMap.has(k)) k = `${k}_dup_${i}`;
+          c.ConsultKey = k;
+          cMap.set(k, c);
+        });
+        parsed = Array.from(cMap.values());
       } else if ('CathKey' in parsed[0]) {
-        parsed = Array.from(new Map(parsed.map((c: any) => [c.CathKey, c])).values());
+        const clMap = new Map();
+        parsed.forEach((c: any, i: number) => {
+          let k = c.CathKey || `cl_no_key_${i}`;
+          if (clMap.has(k)) k = `${k}_dup_${i}`;
+          c.CathKey = k;
+          clMap.set(k, c);
+        });
+        parsed = Array.from(clMap.values());
       } else if ('StaffKey' in parsed[0]) {
-        parsed = Array.from(new Map(parsed.map((s: any) => [s.StaffKey, s])).values());
+        const stMap = new Map();
+        parsed.forEach((s: any, i: number) => {
+          let k = s.StaffKey || `st_no_key_${i}`;
+          if (stMap.has(k)) k = `${k}_dup_${i}`;
+          s.StaffKey = k;
+          stMap.set(k, s);
+        });
+        parsed = Array.from(stMap.values());
       }
     }
     
@@ -597,10 +661,10 @@ app.get('/api/cmrs', async (req, res) => {
   res.json(cmrs);
 });
 
-app.get('/api/sourses', async (req, res) => {
+app.get('/api/sources', async (req, res) => {
   await syncFromGoogleSheets();
-  const sourses = readDB<any>(SOURSES_FILE, []);
-  res.json(sourses);
+  const sources = readDB<any>(SOURCES_FILE, []);
+  res.json(sources);
 });
 
 app.post('/api/consults', async (req, res) => {

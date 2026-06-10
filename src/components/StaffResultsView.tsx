@@ -206,7 +206,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
           OtherPatientName: newPatName,
           PatientDOB: newPatDOB || '2020-01-01',
           PatientSex: newPatSex,
-          PatientAdress: newPatAddress || 'TP Hà Nội',
+          PatientAddress: newPatAddress || 'TP Hà Nội',
           PatientPhone1: newPatPhone || '',
           PatientPhone2: '',
           PatientCreateBy: '01378',
@@ -921,7 +921,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
                                 </div>
                                 <div>
                                   <span className="text-slate-400 font-bold block text-[8px] uppercase">Địa chỉ:</span>
-                                  <span className="font-bold text-slate-800">{selectedPat.PatientAdress || (selectedPat as any).PatientAdress || '—'}</span>
+                                  <span className="font-bold text-slate-800">{selectedPat.PatientAddress || (selectedPat as any).PatientAddress || '—'}</span>
                                 </div>
                                 <div>
                                   <span className="text-slate-400 font-bold block text-[8px] uppercase">Số ĐT1:</span>

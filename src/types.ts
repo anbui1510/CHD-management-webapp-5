@@ -29,7 +29,7 @@ export interface Patient {
   OtherPatientName: string;
   PatientDOB: string;
   PatientSex: 'Nam' | 'Nữ';
-  PatientAdress: string;
+  PatientAddress: string;
   PatientPhone1: string;
   PatientPhone2: string;
   PatientCreateBy: string; // StaffKey
@@ -182,12 +182,13 @@ export interface CMR {
   [key: string]: any;
 }
 
-export interface Sourse {
+export interface Source {
   [key: string]: any;
 }
 
-export function formatVNTime(dateString: string | undefined): string {
-  if (!dateString) return '';
+export function formatVNTime(dateArg: any): string {
+  if (!dateArg) return '';
+  const dateString = String(dateArg);
   const trimmed = dateString.trim().split('T')[0];
   
   // If it's already in format DD/MM/YYYY, return as is
