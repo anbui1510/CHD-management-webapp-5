@@ -475,6 +475,21 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
 
+    // [TEMP] Hardcode bypass: tài khoản Admin/123 để test giao diện Dashboard
+    if (loginStaffKey === 'Admin' && loginPassword === '123') {
+      const adminStaff: Staff = {
+        StaffKey: 'Admin',
+        StaffName: 'Admin (Test)',
+        Password: '123',
+        FireDate: '',
+        StaffRole: 'admin'
+      } as unknown as Staff;
+      localStorage.setItem('CurrentStaffKey', JSON.stringify(adminStaff));
+      setCurrentStaff(adminStaff);
+      return;
+    }
+    // [END TEMP]
+
     const staffMember = staffList.find(s => s.StaffKey === loginStaffKey);
     if (!staffMember) {
       setLoginError('Mã nhân viên nhập vào không tồn tại trong hệ thống!');
