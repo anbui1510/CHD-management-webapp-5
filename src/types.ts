@@ -54,6 +54,7 @@ export type ConsultResultEnum =
   | 'Can thiệp thông tim'
   | 'Chụp chẩn đoán-Đo kháng lực'
   | 'Chụp chẩn đoán/Đo kháng lực'
+  | 'Chụp chẩn đoán +/- can thiệp'
   | 'Tiền Glenn'
   | 'Tiền Fontan'
   | 'Điện sinh lý'

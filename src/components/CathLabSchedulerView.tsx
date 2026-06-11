@@ -38,8 +38,11 @@ interface CathLabSchedulerViewProps {
   patients: Patient[];
   consults: Consult[];
   staffList: Staff[];
+  currentStaff?: Staff | null;
   onRefreshData: () => void;
   onViewPatientRecord?: (patient: Patient) => void;
+  pureCalendarMode?: boolean;
+  onTogglePureMode?: () => void;
 }
 
 const AUTHORIZED_DOCTORS_FOR_PTV2 = [
@@ -108,9 +111,24 @@ export default function CathLabSchedulerView({
   patients,
   consults,
   staffList,
+  currentStaff,
   onRefreshData,
-  onViewPatientRecord
+  onViewPatientRecord,
+  pureCalendarMode = false,
+  onTogglePureMode
 }: CathLabSchedulerViewProps) {
+  
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const pad = (num: number) => String(num).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
   
   // Tab states for waitlist
   const [activeTab, setActiveTab] = useState<'unscheduled' | 'scheduled'>('unscheduled');
@@ -341,37 +359,48 @@ export default function CathLabSchedulerView({
       "Điện sinh lý"
     ];
 
-    return consults.filter(c => {
-      // 1. YEAR([ConsultDate]) >= 2026 (Removed strict year filter to allow seeing past data)
-      // if (getYear(c.ConsultDate) < 2026) return false;
+    const result = consults.filter(c => {
+      // Must have ConsultDate of 2026-01-01 or later
+      if (!c.ConsultDate) return false;
+      const formattedConsultDate = getFormattedDateKey(c.ConsultDate);
+      if (formattedConsultDate < '2026-01-01') return false;
 
-      // 2. [_THISROW].[ConsultKey] = [PatientKey].[LatestPrepConsultID]
-      if (latestConsultsMap.get(c.PatientKey) !== c.ConsultKey) return false;
+      if (latestConsultsMap.get(c.PatientKey) !== c.ConsultKey) { return false; }
 
-      // 3. Removed <> "Có" / true
-      if (c.Removed === true || (c as any).Removed === 'Có' || (c as any).Removed === 'yes') return false;
+      const isRemoved = c.Removed === true || String(c.Removed).toUpperCase() === 'TRUE' || String(c.Removed).toLowerCase() === 'có' || String(c.Removed).toLowerCase() === 'yes';
+      if (isRemoved) { return false; }
 
-      // 4. [TransferredToCathLab] = FALSE
-      if ((c as any).TransferredToCathLab === true || (c as any).TransferredToCathLab === 'Yes' || (c as any).TransferredToCathLab === 'Có') return false;
+      const isTransferred = (c as any).TransferredToCathLab === true || String((c as any).TransferredToCathLab).toUpperCase() === 'TRUE' || String((c as any).TransferredToCathLab).toLowerCase() === 'yes' || String((c as any).TransferredToCathLab).toLowerCase() === 'có';
+      if (isTransferred) { return false; }
 
-      // 5. IN([ConsultResultID], { ... })
-      if (!ELIGIBLE_RESULTS.includes(c.ConsultResultID || '')) return false;
+      const resID = (c.ConsultResultID || '').trim();
+      let matchRes = false;
+      if (ELIGIBLE_RESULTS.includes(resID)) {
+        matchRes = true;
+      } else {
+        const normalized = ELIGIBLE_RESULTS.map(e => e.trim().toLowerCase());
+        if (normalized.includes(resID.toLowerCase())) matchRes = true;
+      }
+      if (!matchRes) { return false; }
 
-      // 6. [CallStatus] <> "Đã can thiệp/mổ" AND <> "Loại" AND <> "Đã làm nơi khác" AND <> "Muốn theo dõi nơi khác"
+      const callSt = String(c.CallStatus || '').trim().toLowerCase();
       if (
-        c.CallStatus === "Đã can thiệp/mổ" || 
-        c.CallStatus === "Loại" || 
-        c.CallStatus === "Đã làm nơi khác" || 
-        c.CallStatus === "Muốn theo dõi nơi khác"
-      ) return false;
+        callSt === "đã can thiệp/mổ" || 
+        callSt === "loại" || 
+        callSt === "đã làm nơi khác" || 
+        callSt === "muốn theo dõi nơi khác"
+      ) { return false; }
 
-      // 7. Patient matches, is not blank and is not deceased ('Tử vong', 'Nặng xin về')
-      const pat = patients.find(p => p.PatientKey === c.PatientKey);
-      if (!pat) return false;
-      if (pat.Outcome === "Tử vong" || pat.Outcome === "Nặng xin về") return false;
+      const pat = patients.find(p => String(p.PatientKey || '').trim() === String(c.PatientKey || '').trim());
+      if (!pat) { return false; }
+      
+      const pOut = String(pat.Outcome || '').toLowerCase().trim();
+      if (pOut === "tử vong" || pOut === "nặng xin về") { return false; }
 
       return true;
     });
+    
+    return result;
   }, [consults, patients, latestConsultsMap]);
 
   // Segment Waiting List into tabs: "Chưa xếp lịch" and "Đã xếp lịch"
@@ -562,7 +591,7 @@ export default function CathLabSchedulerView({
           cathLabDateDisplay = `${formatVNTime(c.PlannedCathLabDate)}\n(${dayOfWeekStr})`;
         }
         
-        const p = patients.find(pat => pat.PatientKey === c.PatientKey);
+        const p = patients.find(pat => pat.PatientKey == c.PatientKey);
         
         const dobFormatted = p?.PatientDOB ? formatVNTime(p.PatientDOB) : '';
         const ageDesc = p?.PatientDOB ? (() => {
@@ -691,8 +720,8 @@ export default function CathLabSchedulerView({
         if (maNB) {
           const p = patients.find(pat => String(pat.PatientID1) === maNB);
           if (p) {
-            const cList = consults.filter(con => con.PatientKey === p.PatientKey && con.ConsultResultID && ['Can thiệp thông tim', 'Mổ tim', 'Tiền Glenn', 'Tiền Fontan'].includes(con.ConsultResultID));
-            const c = cList.length > 0 ? cList.sort((a,b) => (b.ConsultDate || '').localeCompare(a.ConsultDate || ''))[0] : consults.find(con => con.PatientKey === p.PatientKey);
+            const cList = consults.filter(con => con.PatientKey == p.PatientKey && con.ConsultResultID && ['Can thiệp thông tim', 'Mổ tim', 'Tiền Glenn', 'Tiền Fontan'].includes(con.ConsultResultID));
+            const c = cList.length > 0 ? cList.sort((a,b) => (b.ConsultDate || '').localeCompare(a.ConsultDate || ''))[0] : consults.find(con => con.PatientKey == p.PatientKey);
 
             if (c) {
               const payload: any = {};
@@ -855,7 +884,7 @@ export default function CathLabSchedulerView({
 
     // 4. Data
     exportFilteredConsults.forEach((c, i) => {
-      const p = patients.find(pat => pat.PatientKey === c.PatientKey);
+      const p = patients.find(pat => pat.PatientKey == c.PatientKey);
       
       let dayOfWeekStr = '';
       if (c.PlannedCathLabDate) {
@@ -1023,7 +1052,7 @@ export default function CathLabSchedulerView({
     const q = removeDiacritics(searchQuery).toLowerCase().trim();
     if (q) {
       result = activeList.filter(c => {
-        const pat = patients.find(p => p.PatientKey === c.PatientKey);
+        const pat = patients.find(p => p.PatientKey == c.PatientKey);
         if (!pat) return false;
         return (
           removeDiacritics(String(pat.PatientName || '')).toLowerCase().includes(q) ||
@@ -1088,7 +1117,7 @@ export default function CathLabSchedulerView({
 
   // Setup form fields on consult selection
   const handleSelectConsult = (c: Consult) => {
-    const pat = patients.find(p => p.PatientKey === c.PatientKey);
+    const pat = patients.find(p => p.PatientKey == c.PatientKey);
     setSelectedConsult(c);
     setPlannedDevice(c.PlannedDevice || '');
     setPlannedPrice(c.PlannedPrice || '');
@@ -1266,8 +1295,8 @@ export default function CathLabSchedulerView({
       Scheduled3rdInterventionist: adHocScheduled3rd,
       PostCathDepart: adHocPostCathDepart,
       FundingRequest: adHocFundingRequest,
-      CheckDeviceUpdatedTime: adHocCheckDeviceDate ? new Date(adHocCheckDeviceDate).toISOString() : '',
-      CheckDeviceUpdatedBy: adHocCheckDeviceBy,
+      CheckDeviceUpdatedTime: new Date().toISOString(),
+      CheckDeviceUpdatedBy: currentStaff?.StaffKey || '01378',
       CathMethod: adHocCathMethod.join(' + ')
     };
 
@@ -1358,6 +1387,8 @@ export default function CathLabSchedulerView({
       Scheduled1stInterventionist: scheduled1st,
       Scheduled2ndInterventionist: finalScheduled2nd,
       Scheduled3rdInterventionist: scheduled3rd,
+      CheckDeviceUpdatedBy: currentStaff?.StaffKey || '01378',
+      CheckDeviceUpdatedTime: new Date().toISOString()
     };
   };
 
@@ -1764,7 +1795,7 @@ export default function CathLabSchedulerView({
                 </thead>
                 <tbody className="divide-y divide-slate-150">
                   {paginatedWaitlist.map((c) => {
-                    const pat = patients.find(p => p.PatientKey === c.PatientKey);
+                    const pat = patients.find(p => p.PatientKey == c.PatientKey);
                     if (!pat) return null;
                     const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
                     
@@ -1905,7 +1936,7 @@ export default function CathLabSchedulerView({
                 </div>
                 
                 {/* Views and Today navigation */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-wrap">
                   <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-600">
                     <button 
                       onClick={() => setCalendarView('day')}
@@ -1978,9 +2009,8 @@ export default function CathLabSchedulerView({
                     <div className="grid grid-cols-7 gap-1 border-l border-r border-b border-slate-200 rounded-b-2xl bg-slate-100/50 p-1 flex-1 overflow-hidden">
                       {calendarCells.map((cell, idx) => {
                         // Filter matching scheduled consults for this date string (YYYY-MM-DD)
-                        const matchingConsults = consults.filter(c => {
+                        const matchingConsults = segmentedWaitlist.scheduled.filter(c => {
                           if (!c.PlannedCathLabDate) return false;
-                          if (c.Removed === true || (c as any).Removed === 'Có') return false;
                           return getFormattedDateKey(c.PlannedCathLabDate) === cell.dateStr;
                         });
 
@@ -2007,7 +2037,7 @@ export default function CathLabSchedulerView({
                             {/* Scheduled Patient badging inside day cell */}
                             <div className="flex-1 overflow-y-auto mt-1 flex flex-col gap-1 pr-0.5 custom-scrollbar">
                               {matchingConsults.map(c => {
-                                const pat = patients.find(p => p.PatientKey === c.PatientKey);
+                                const pat = patients.find(p => p.PatientKey == c.PatientKey);
                                 return (
                                   <div
                                     key={c.ConsultKey}
@@ -2044,9 +2074,8 @@ export default function CathLabSchedulerView({
                     </div>
                     <div className="grid grid-cols-7 gap-1.5 border-l border-r border-b border-slate-200 rounded-b-2xl bg-slate-50/55 p-2 flex-1">
                       {calendarWeekCells.map((cell, idx) => {
-                        const matchingConsults = consults.filter(c => {
+                        const matchingConsults = segmentedWaitlist.scheduled.filter(c => {
                           if (!c.PlannedCathLabDate) return false;
-                          if (c.Removed === true || (c as any).Removed === 'Có') return false;
                           return getFormattedDateKey(c.PlannedCathLabDate) === cell.dateStr;
                         });
 
@@ -2068,7 +2097,7 @@ export default function CathLabSchedulerView({
 
                             <div className="flex-1 overflow-y-auto flex flex-col gap-1.5">
                               {matchingConsults.map(c => {
-                                const pat = patients.find(p => p.PatientKey === c.PatientKey);
+                                const pat = patients.find(p => p.PatientKey == c.PatientKey);
                                 return (
                                   <div
                                     key={c.ConsultKey}
@@ -2112,9 +2141,8 @@ export default function CathLabSchedulerView({
                     <div className="flex-1 overflow-y-auto space-y-2">
                       {(() => {
                         const targetKey = getFormattedDateKey(activeDate.toISOString().split('T')[0]);
-                        const dayMatches = consults.filter(c => {
+                        const dayMatches = segmentedWaitlist.scheduled.filter(c => {
                           if (!c.PlannedCathLabDate) return false;
-                          if (c.Removed === true || (c as any).Removed === 'Có') return false;
                           return getFormattedDateKey(c.PlannedCathLabDate) === targetKey;
                         });
 
@@ -2127,7 +2155,7 @@ export default function CathLabSchedulerView({
                         }
 
                         return dayMatches.map(c => {
-                          const pat = patients.find(p => p.PatientKey === c.PatientKey);
+                          const pat = patients.find(p => p.PatientKey == c.PatientKey);
                           return (
                             <div 
                               key={c.ConsultKey}
@@ -2197,7 +2225,7 @@ export default function CathLabSchedulerView({
               <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-full">
                 
                 {(() => {
-                  const pat = patients.find(p => p.PatientKey === selectedConsult.PatientKey);
+                  const pat = patients.find(p => p.PatientKey == selectedConsult.PatientKey);
                   if (!pat) return null;
                   return (
                     <div className="space-y-4">
@@ -2628,6 +2656,30 @@ export default function CathLabSchedulerView({
                         </>
                       )}
 
+                      <div className="md:col-span-2 grid grid-cols-2 gap-2 mt-2 pt-3 border-t border-slate-100">
+                        <div>
+                          <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase">Người xếp lịch/check DC</label>
+                          <input
+                            type="text"
+                            disabled
+                            value={(() => {
+                              const editorId = currentStaff?.StaffKey;
+                              return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
+                            })()}
+                            className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default" title="CheckDeviceUpdatedTime">Cập nhật lúc</label>
+                          <input
+                            type="text"
+                            disabled
+                            value={formatDateTime(new Date().toISOString())}
+                            className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-mono cursor-default"
+                          />
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 )}
@@ -2654,7 +2706,7 @@ export default function CathLabSchedulerView({
                 <div className="flex gap-2 items-center flex-wrap">
                   {/* Xem hồ sơ */}
                   {(() => {
-                    const pat = patients.find(p => p.PatientKey === selectedConsult.PatientKey);
+                    const pat = patients.find(p => p.PatientKey == selectedConsult.PatientKey);
                     if (!pat) return null;
                     return (
                       <button
@@ -2750,7 +2802,7 @@ export default function CathLabSchedulerView({
                   </thead>
                   <tbody className="text-[11px] font-bold text-slate-700 divide-y divide-slate-100">
                     {(isDeviceFilterExpanded ? deviceFilteredConsults : exportFilteredConsults).map((c, idx) => {
-                      const p = patients.find(pat => pat.PatientKey === c.PatientKey);
+                      const p = patients.find(pat => pat.PatientKey == c.PatientKey);
                       const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join(' - ');
                       
                       const vnDays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
@@ -3153,7 +3205,7 @@ export default function CathLabSchedulerView({
       {showSummaryModal && selectedConsult && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
           {(() => {
-            const pat = patients.find(p => p.PatientKey === selectedConsult.PatientKey);
+            const pat = patients.find(p => p.PatientKey == selectedConsult.PatientKey);
             if (!pat) return null;
             
             const generateTextSummary = (pObj: Patient, cObj: Consult) => {
@@ -3923,6 +3975,7 @@ export default function CathLabSchedulerView({
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-indigo-900 font-black"
                           >
                             <option value="Can thiệp thông tim">Can thiệp thông tim</option>
+                            <option value="Chụp chẩn đoán +/- can thiệp">Chụp chẩn đoán +/- can thiệp</option>
                             <option value="Chụp chẩn đoán/Đo kháng lực">Chụp chẩn đoán/Đo kháng lực</option>
                             <option value="Tiền Glenn">Tiền Glenn</option>
                             <option value="Tiền Fontan">Tiền Fontan</option>
@@ -4182,6 +4235,30 @@ export default function CathLabSchedulerView({
                               <option value="BS. Tĩnh">BS. Tĩnh</option>
                               <option value="BS. Thịnh">BS. Thịnh</option>
                             </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-2 pt-3 border-t border-slate-100">
+                          <div>
+                            <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase">Người xếp lịch/check DC</label>
+                            <input
+                              type="text"
+                              disabled
+                              value={(() => {
+                                const editorId = currentStaff?.StaffKey;
+                                return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
+                              })()}
+                              className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default" title="CheckDeviceUpdatedTime">Cập nhật lúc</label>
+                            <input
+                              type="text"
+                              disabled
+                              value={formatDateTime(new Date().toISOString())}
+                              className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-mono cursor-default"
+                            />
                           </div>
                         </div>
                       </div>

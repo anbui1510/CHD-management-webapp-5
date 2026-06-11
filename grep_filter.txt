@@ -1,0 +1,30 @@
+348:    return consults.filter(c => {
+349:      // 1. YEAR([ConsultDate]) >= 2026 (Removed strict year filter to allow seeing past data)
+384:    const unscheduledList = allEligibleWaitlist.filter(c => !c.PlannedCathLabDate);
+385:    const scheduledList = allEligibleWaitlist.filter(c => !!c.PlannedCathLabDate);
+405:    return [...allEligibleWaitlist].filter(c => {
+415:      // no date filtering
+435:    return [...allEligibleWaitlist].filter(c => {
+698:            const cList = consults.filter(con => con.PatientKey === p.PatientKey && con.ConsultResultID && ['Can thiệp thông tim', 'Mổ tim', 'Tiền Glenn', 'Tiền Fontan'].includes(con.ConsultResultID));
+893:      const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join('\n');
+1022:  // Apply search and sort filtering on current active list tab
+1029:      result = activeList.filter(c => {
+1054:  const filteredSearchPatients = useMemo(() => {
+1057:    return patients.filter((pat) => 
+1114:         methods = c.CathMethod.split('+').map(m => m.trim()).filter(Boolean);
+1141:      setSelectedMethods(selectedMethods.filter(m => m !== method));
+1996:                        const matchingConsults = consults.filter(c => {
+2062:                        const matchingConsults = consults.filter(c => {
+2130:                        const dayMatches = consults.filter(c => {
+2769:                      const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join(' - ');
+3179:              const phoneList = [pObj.PatientPhone1, pObj.PatientPhone2].filter(Boolean).join(' | ');
+3180:              const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);
+3321:                            {[pat.PatientPhone1, pat.PatientPhone2].filter(Boolean).join(' | ') || '—'}
+3404:                                {[supplyDepFeedback, operationFeedback].filter(Boolean).join(' | ')}
+3438:                                {[scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean).join(' - ') || 'Chưa gán'}
+3576:                              {adHocSearchQuery.trim() && filteredSearchPatients.length > 0 && (
+3578:                                  {filteredSearchPatients.slice(0, 15).map((pat) => (
+3594:                              {adHocSearchQuery.trim() && filteredSearchPatients.length === 0 && (
+3856:                              {staffList.filter(s => !s.FireDate).map((st) => (
+4105:                                          setAdHocCathMethod(adHocCathMethod.filter(i => i !== m));
+4131:                                              setAdHocCathMethod(adHocCathMethod.filter(m => m !== opt));

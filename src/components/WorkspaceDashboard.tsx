@@ -45,11 +45,14 @@ export default function WorkspaceDashboard({
             <p className="text-xs text-slate-500">{patientCount} BN trong hệ thống</p>
           </button>
           
-          <button className="bg-white border rounded-2xl p-5 opacity-60 cursor-not-allowed text-left">
-             <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4">
-              <Calendar className="w-6 h-6 text-rose-500" />
+          <button
+            onClick={() => onNavigate('schedule-tt')}
+            className="bg-white border rounded-2xl p-5 hover:border-rose-300 hover:shadow-md transition text-left group"
+          >
+             <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <Calendar className="w-6 h-6 text-[#d2145a]" />
             </div>
-            <h3 className="font-extrabold text-sm text-rose-600 mb-1">Lịch thông dự kiến</h3>
+            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Lịch thông dự kiến</h3>
             <p className="text-xs text-slate-500">Lịch phòng Cathlab</p>
           </button>
           

@@ -213,7 +213,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
      let pName = adHocPatientName;
      // If existing patient, grab the name from existing pat
      if (adHocPatientMode === 'existing') {
-        const pat = patients.find(p => p.PatientKey === patientKey);
+        const pat = patients.find(p => p.PatientKey == patientKey);
         if (pat) pName = pat.PatientName;
      }
 
@@ -592,7 +592,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
 
                          {/* Selected Patient details complex card */}
                          {adHocPatientMode === 'existing' && adHocSelectedPatientKey && (() => {
-                            const selectedPat = patients.find(p => p.PatientKey === adHocSelectedPatientKey);
+                            const selectedPat = patients.find(p => p.PatientKey == adHocSelectedPatientKey);
                             if (!selectedPat) return null;
                             return (
                               <div className="bg-pink-50/70 border border-pink-100 rounded-2xl p-4 text-xs text-slate-800 relative shadow-sm mt-2">

@@ -14,6 +14,7 @@ const icdCodes = [
 const conclusionOptions = [
   "Can thiệp thông tim",
   "Chụp chẩn đoán-Đo kháng lực",
+  "Chụp chẩn đoán +/- can thiệp",
   "Tiền Glenn",
   "Tiền Fontan",
   "Điện sinh lý",
@@ -79,11 +80,24 @@ interface StaffResultsViewProps {
   patients: Patient[];
   consults: Consult[];
   staffList?: Staff[];
+  currentStaff?: Staff | null;
   onSelectConsult: (consult: Consult) => void;
   onRefreshData?: () => void;
 }
 
-export default function StaffResultsView({ patients, consults, staffList = [], onSelectConsult, onRefreshData }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, staffList = [], currentStaff, onSelectConsult, onRefreshData }: StaffResultsViewProps) {
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const pad = (num: number) => String(num).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   const ITEMS_PER_PAGE = 100;
 
   // New Staff Registration combined states
@@ -209,7 +223,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
           PatientAddress: newPatAddress || 'TP Hà Nội',
           PatientPhone1: newPatPhone || '',
           PatientPhone2: '',
-          PatientCreateBy: '01378',
+          PatientCreateBy: currentStaff?.StaffKey || '01378',
           PatientCreateTime: new Date().toISOString(),
           Outcome: automaticOutcome
         };
@@ -220,7 +234,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
           body: JSON.stringify(patientPayload)
         });
         if (!patRes.ok) {
-          throw new Error('Không thể đăng ký thông tin bệnh nhi mới');
+          throw new Error('Không thể đăng ký thông tự do nhi mới');
         }
       } else {
         // Select mode: selected patient must be chose
@@ -256,7 +270,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
         DiagnosisID: diagnosisID || 'VSD',
         DetailDiagnosis: detailDiagnosis,
         Department: chosenDept || 'Tim Mạch',
-        ConsultCreateBy: '01378',
+        ConsultCreateBy: currentStaff?.StaffKey || '01378',
         ConsultCreateTime: new Date().toISOString(),
         ConsultResultID: consultResultID,
         DetailConsultResult: detailConsultResult,
@@ -266,6 +280,8 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
         PriorityOrder: 'Chương trình',
         RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
         CheckDevice: checkDevice,
+        ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
+        ConsultResultUpdatedTime: new Date().toISOString(),
         PDFTrigger: false
       };
 
@@ -1313,6 +1329,31 @@ export default function StaffResultsView({ patients, consults, staffList = [], o
                         className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold text-xs focus:outline-none text-slate-800 font-mono"
                       />
                     </div>
+
+                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100">
+                      <div>
+                        <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase text-left">Người điền KQ</label>
+                        <input
+                          type="text"
+                          disabled
+                          value={(() => {
+                            const editorId = currentStaff?.StaffKey;
+                            return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
+                          })()}
+                          className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default text-left" title="ConsultResultUpdatedTime">Điền lúc</label>
+                        <input
+                          type="text"
+                          disabled
+                          value={formatDateTime(new Date().toISOString())}
+                          className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-mono cursor-default"
+                        />
+                      </div>
+                    </div>
+
                   </div>
 
                 </div>

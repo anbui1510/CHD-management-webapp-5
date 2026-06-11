@@ -232,6 +232,7 @@ export default function App() {
 
   // Navigation State - Defaults to Home Bento Grid !
   const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
+  const [schedulePureCalendar, setSchedulePureCalendar] = useState<boolean>(false);
 
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
@@ -319,7 +320,9 @@ export default function App() {
     RequestBy: '',
     DiagnosisID: '',
     DetailDiagnosis: '',
-    ConsultMember: [] as string[]
+    ConsultMember: [] as string[],
+    ConsultResultUpdatedBy: '',
+    ConsultResultUpdatedTime: ''
   });
 
   // State for editing registration (Sửa Đăng ký staff)
@@ -770,11 +773,17 @@ export default function App() {
 
     const currentConsult = consults.find(c => c.ConsultKey === editingConsultKey);
     const patKey = currentConsult?.PatientKey;
+    
+    const finalData = {
+      ...resultUpdateData,
+      ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
+      ConsultResultUpdatedTime: new Date().toISOString()
+    };
 
     fetch(`/api/consults/${editingConsultKey}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(resultUpdateData)
+      body: JSON.stringify(finalData)
     })
       .then(res => res.json())
       .then(() => {
@@ -1450,7 +1459,10 @@ export default function App() {
               {primarySideMenus.map((menu) => (
                 <button
                   key={menu.id}
-                  onClick={() => setActiveMenu(menu.id as any)}
+                  onClick={() => {
+                    setActiveMenu(menu.id as any);
+                    setSchedulePureCalendar(false);
+                  }}
                   title={!isSidebarExpanded ? menu.label : undefined}
                   className={`relative w-full flex items-center ${isSidebarExpanded ? 'gap-2.5 px-3' : 'justify-center p-2'} py-2 text-xs font-semibold rounded-2xl transition-all ${
                     activeMenu === menu.id 
@@ -1498,7 +1510,10 @@ export default function App() {
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
             <HomeDashboard 
-              onNavigate={(menu) => setActiveMenu(menu as any)}
+              onNavigate={(menu) => {
+                setSchedulePureCalendar(false);
+                setActiveMenu(menu as any);
+              }}
               patientCount={patients.length}
               pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
               completedConsultCount={consults.filter(c => c.ConsultResultID && !['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
@@ -1514,7 +1529,14 @@ export default function App() {
           {/* WORKSPACE DASHBOARD */}
           {activeMenu === 'workspace' && (
             <WorkspaceDashboard 
-              onNavigate={(menu) => setActiveMenu(menu as any)}
+              onNavigate={(menu) => {
+                if (menu === 'schedule-tt') {
+                  setSchedulePureCalendar(true);
+                } else {
+                  setSchedulePureCalendar(false);
+                }
+                setActiveMenu(menu as any);
+              }}
               patientCount={patients.length}
               pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
             />
@@ -2060,6 +2082,30 @@ export default function App() {
                       />
                     </div>
 
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div>
+                        <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Người tạo Đăng ký</label>
+                        <input
+                          type="text"
+                          disabled
+                          value={(() => {
+                            const creatorId = currentStaff?.StaffKey;
+                            return staffList.find(s => s.StaffKey === creatorId)?.StaffName || creatorId || '01378';
+                          })()}
+                          className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans text-[11px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1 font-sans">Đăng ký lúc</label>
+                        <input
+                          type="text"
+                          disabled
+                          value={formatDateTime(new Date().toISOString())}
+                          className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-mono text-[11px]"
+                        />
+                      </div>
+                    </div>
+
                   </div>
 
                   {/* Fixed Footer with Actions */}
@@ -2428,6 +2474,7 @@ export default function App() {
               patients={patients}
               consults={consults}
               staffList={staffList}
+              currentStaff={currentStaff}
               onSelectConsult={(c) => makeResultEdit(c)}
               onRefreshData={() => {
                 fetchPatients();
@@ -2490,6 +2537,9 @@ export default function App() {
               patients={patients}
               consults={consults}
               staffList={staffList}
+              currentStaff={currentStaff}
+              pureCalendarMode={schedulePureCalendar}
+              onTogglePureMode={() => setSchedulePureCalendar(prev => !prev)}
               onRefreshData={() => {
                 fetchPatients();
                 fetchConsults();
@@ -2666,6 +2716,7 @@ export default function App() {
                   const conclusionOptions = [
                     "Can thiệp thông tim",
                     "Chụp chẩn đoán-Đo kháng lực",
+                    "Chụp chẩn đoán +/- can thiệp",
                     "Tiền Glenn",
                     "Tiền Fontan",
                     "Điện sinh lý",
@@ -2966,6 +3017,29 @@ export default function App() {
                                     onChange={(e) => setResultUpdateData(prev => ({ ...prev, PlannedPrice: e.target.value }))}
                                     className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-bold font-mono"
                                   />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-indigo-100">
+                                  <div>
+                                    <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase">Người điền KQ</label>
+                                    <input
+                                      type="text"
+                                      disabled
+                                      value={(() => {
+                                        const editorId = currentStaff?.StaffKey;
+                                        return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
+                                      })()}
+                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default" title="ConsultResultUpdatedTime">Điền lúc</label>
+                                    <input
+                                      type="text"
+                                      disabled
+                                      value={formatDateTime(new Date().toISOString())}
+                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-mono cursor-default"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             )}
@@ -3492,8 +3566,11 @@ export default function App() {
                     <input
                       type="text"
                       disabled
-                      value={editingPatientKey ? (getPatientByKey(editingPatientKey)?.PatientCreateBy || '01378') : (currentStaff?.StaffKey || '01378')}
-                      className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-mono"
+                      value={(() => {
+                        const creatorId = editingPatientKey ? getPatientByKey(editingPatientKey)?.PatientCreateBy : currentStaff?.StaffKey;
+                        return staffList.find(s => s.StaffKey === creatorId)?.StaffName || creatorId || '01378';
+                      })()}
+                      className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans"
                     />
                   </div>
                   <div>
