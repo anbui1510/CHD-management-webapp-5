@@ -35,7 +35,10 @@ app.get('/api/proxy/drive-export', async (req, res) => {
 });
 
 // Path to persist JSON database
-const DB_DIR = path.join(process.cwd(), 'data');
+// On Vercel (serverless), the project filesystem is read-only; only /tmp is writable.
+const DB_DIR = process.env.VERCEL
+  ? path.join('/tmp', 'data')
+  : path.join(process.cwd(), 'data');
 const STAFF_FILE = path.join(DB_DIR, 'staff.json');
 const PATIENTS_FILE = path.join(DB_DIR, 'patients.json');
 const CONSULTS_FILE = path.join(DB_DIR, 'consults.json');
@@ -46,8 +49,30 @@ const SOURCES_FILE = path.join(DB_DIR, 'sources.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
 
 // Ensure DB directory exists
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR);
+try {
+  if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.error('Could not create DB directory:', err);
+}
+
+// On Vercel, /tmp is empty on cold start. Seed it from the bundled (read-only)
+// data folder shipped with the deployment so caches start populated.
+if (process.env.VERCEL) {
+  try {
+    const bundledDataDir = path.join(process.cwd(), 'data');
+    if (fs.existsSync(bundledDataDir)) {
+      for (const file of fs.readdirSync(bundledDataDir)) {
+        const dest = path.join(DB_DIR, file);
+        if (!fs.existsSync(dest)) {
+          fs.copyFileSync(path.join(bundledDataDir, file), dest);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Could not seed /tmp data from bundled data:', err);
+  }
 }
 
 // Google Sheets Sync Config Interface & Helpers
@@ -488,7 +513,7 @@ const defaultConsults: Consult[] = [
     ConsultCreateTime: "2026-05-30T10:00:00Z",
     ConsultResultID: "", // Pending Consult! Contains no result
     DetailConsultResult: "",
-    ConsultNote: "Theo dõi sát nồng độ oxy huyết",
+    ConsultNote: "Theo dõi sát n���ng độ oxy huyết",
     PlannedDevice: "Vá thông liên thất bằng miếng vá dacron",
     PlannedPrice: "35,000,000 VND",
     PriorityOrder: "Chương trình",
