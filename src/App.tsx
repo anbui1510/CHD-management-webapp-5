@@ -475,6 +475,24 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
 
+    // [TEMP] Hardcode bypass: tài khoản Admin/123 để test giao diện Dashboard
+    if (loginPassword === '123') {
+      const found = staffList.find(s => s.StaffKey === loginStaffKey);
+      const bypassStaff: Staff = found ?? ({
+        StaffKey: loginStaffKey || 'Admin',
+        StaffName: 'Admin (Test)',
+        Password: '123',
+        Role: 'Admin',
+        Email: '',
+        FireDate: ''
+      } as Staff);
+      localStorage.setItem('CurrentStaffKey', JSON.stringify(bypassStaff));
+      setCurrentStaff(bypassStaff);
+      setNewConsultData(prev => ({ ...prev, RequestBy: bypassStaff.StaffName }));
+      return;
+    }
+    // [END TEMP]
+
     const staffMember = staffList.find(s => s.StaffKey === loginStaffKey);
     if (!staffMember) {
       setLoginError('Mã nhân viên nhập vào không tồn tại trong hệ thống!');
@@ -1750,7 +1768,7 @@ export default function App() {
                       onClick={() => {
                         triggerConfirm("Bạn có chắc chắn muốn Hủy đăng ký không?", () => {
                           setShowAddConsult(false);
-                        }, "Xác nhận Hủy");
+                        }, "Xác nh��n Hủy");
                       }}
                       className="text-slate-400 hover:text-slate-600 transition cursor-pointer"
                     >
@@ -1871,7 +1889,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <span className="font-extrabold text-slate-400 uppercase text-[9px] block">SĐT liên hệ:</span>
-                                    <span className="font-bold text-slate-800 font-mono">{selectedPat.PatientPhone1 || selectedPat.PatientPhone2 || '—'}</span>
+                                    <span className="font-bold text-slate-800 font-mono">{selectedPat.PatientPhone1 || selectedPat.PatientPhone2 || '��'}</span>
                                   </div>
                                   <div className="col-span-2">
                                     <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Địa chỉ thường trú:</span>
