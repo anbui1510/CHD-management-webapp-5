@@ -481,9 +481,10 @@ export default function App() {
         StaffKey: 'Admin',
         StaffName: 'Admin (Test)',
         Password: '123',
-        FireDate: '',
-        StaffRole: 'admin'
-      } as unknown as Staff;
+        Role: 'Admin',
+        Email: '',
+        FireDate: ''
+      };
       localStorage.setItem('CurrentStaffKey', JSON.stringify(adminStaff));
       setCurrentStaff(adminStaff);
       return;
@@ -1765,7 +1766,7 @@ export default function App() {
                       onClick={() => {
                         triggerConfirm("Bạn có chắc chắn muốn Hủy đăng ký không?", () => {
                           setShowAddConsult(false);
-                        }, "Xác nhận Hủy");
+                        }, "Xác nh��n Hủy");
                       }}
                       className="text-slate-400 hover:text-slate-600 transition cursor-pointer"
                     >
@@ -1886,7 +1887,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <span className="font-extrabold text-slate-400 uppercase text-[9px] block">SĐT liên hệ:</span>
-                                    <span className="font-bold text-slate-800 font-mono">{selectedPat.PatientPhone1 || selectedPat.PatientPhone2 || '—'}</span>
+                                    <span className="font-bold text-slate-800 font-mono">{selectedPat.PatientPhone1 || selectedPat.PatientPhone2 || '��'}</span>
                                   </div>
                                   <div className="col-span-2">
                                     <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Địa chỉ thường trú:</span>
