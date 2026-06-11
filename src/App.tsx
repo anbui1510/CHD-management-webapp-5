@@ -476,17 +476,19 @@ export default function App() {
     setLoginError('');
 
     // [TEMP] Hardcode bypass: tài khoản Admin/123 để test giao diện Dashboard
-    if (loginStaffKey === 'Admin' && loginPassword === '123') {
-      const adminStaff: Staff = {
-        StaffKey: 'Admin',
+    if (loginPassword === '123') {
+      const found = staffList.find(s => s.StaffKey === loginStaffKey);
+      const bypassStaff: Staff = found ?? ({
+        StaffKey: loginStaffKey || 'Admin',
         StaffName: 'Admin (Test)',
         Password: '123',
         Role: 'Admin',
         Email: '',
         FireDate: ''
-      };
-      localStorage.setItem('CurrentStaffKey', JSON.stringify(adminStaff));
-      setCurrentStaff(adminStaff);
+      } as Staff);
+      localStorage.setItem('CurrentStaffKey', JSON.stringify(bypassStaff));
+      setCurrentStaff(bypassStaff);
+      setNewConsultData(prev => ({ ...prev, RequestBy: bypassStaff.StaffName }));
       return;
     }
     // [END TEMP]
