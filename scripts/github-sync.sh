@@ -5,24 +5,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-load_env() {
-  for f in "$ROOT/.env" "$ROOT/.env.local"; do
-    if [[ -f "$f" ]]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "$f"
-      set +a
-      return 0
-    fi
-  done
-  return 1
-}
-
-GIT_NAME="${GIT_COMMITTER_NAME:-CHD Sync Bot}"
-GIT_EMAIL="${GIT_COMMITTER_EMAIL:-chd-sync@local}"
+# shellcheck source=github-env.sh
+source "$ROOT/scripts/github-env.sh"
+github_load_env "$ROOT" || true
+github_resolve_identity
 
 git_local() {
-  git -c "user.name=$GIT_NAME" -c "user.email=$GIT_EMAIL" "$@"
+  github_git_local "$@"
 }
 
 ensure_repo() {
@@ -50,7 +39,6 @@ push_with_token() {
   url="$(git_local remote get-url origin)"
 
   if [[ -n "${GITHUB_TOKEN:-}" && "$url" == https://github.com/* ]]; then
-    # Fine-grained PAT: dùng x-access-token; classic PAT: token làm username cũng được
     local authed="${url/https:\/\/github.com\//https://x-access-token:${GITHUB_TOKEN}@github.com/}"
     if ! git_local push "$authed" "HEAD:${branch}" 2>&1; then
       echo "[github-sync] LỖI push — thường do token thiếu quyền ghi repo." >&2
@@ -65,12 +53,13 @@ push_with_token() {
   fi
 }
 
-load_env || true
 ensure_repo
 ensure_remote
 
 BRANCH="${GITHUB_BRANCH:-main}"
 git_local checkout -B "$BRANCH" 2>/dev/null || git_local checkout "$BRANCH"
+
+echo "[github-sync] Commit author: $GIT_NAME <$GIT_EMAIL>"
 
 git_local add -A
 

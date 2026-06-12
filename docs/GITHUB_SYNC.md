@@ -32,6 +32,13 @@ GITHUB_BRANCH="main"
 GITHUB_SYNC_INTERVAL="300"
 ```
 
+Thêm tên/email commit (trùng tài khoản GitHub — tránh Vercel báo `developer@local`):
+
+```env
+GIT_COMMITTER_NAME="anbui1510"
+GIT_COMMITTER_EMAIL="email-trên-github-của-bạn@gmail.com"
+```
+
 ## Bước 4 — Khởi tạo và push lần đầu
 
 ```bash

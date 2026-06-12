@@ -5,25 +5,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-GIT_NAME="${GIT_COMMITTER_NAME:-CHD Developer}"
-GIT_EMAIL="${GIT_COMMITTER_EMAIL:-developer@local}"
+# shellcheck source=github-env.sh
+source "$ROOT/scripts/github-env.sh"
+github_load_env "$ROOT" || true
+github_resolve_identity
 
 git_local() {
-  git -c "user.name=$GIT_NAME" -c "user.email=$GIT_EMAIL" "$@"
+  github_git_local "$@"
 }
-
-load_env() {
-  for f in "$ROOT/.env" "$ROOT/.env.local"; do
-    if [[ -f "$f" ]]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "$f"
-      set +a
-    fi
-  done
-}
-
-load_env || true
 
 if [[ ! -d .git ]]; then
   git_local init -b "${GITHUB_BRANCH:-main}"
@@ -41,8 +30,9 @@ if ! git_local remote get-url origin &>/dev/null; then
   fi
 fi
 
+echo "[init] Git author: $GIT_NAME <$GIT_EMAIL>"
 echo "[init] Xong. Tiếp theo:"
 echo "  1. Tạo repo private trên GitHub (nếu chưa có)"
-echo "  2. Điền GITHUB_TOKEN + GITHUB_REPO vào .env"
+echo "  2. Điền GITHUB_TOKEN + GITHUB_REPO + GIT_COMMITTER_* vào .env"
 echo "  3. npm run sync:github        # đồng bộ một lần"
 echo "  4. npm run sync:github:watch  # tự động mỗi 5 phút"
