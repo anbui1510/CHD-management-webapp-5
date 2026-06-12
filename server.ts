@@ -147,8 +147,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.patients)) {
         const pMap = new Map();
         data.patients.forEach((p: any, i: number) => {
-          let k = p.PatientKey || `pat_no_key_${i}`;
-          if (pMap.has(k)) k = `${k}_dup_${i}`;
+          const k = p.PatientKey || `pat_no_key_${i}`;
           p.PatientKey = k;
           
           if (p.PatientID1 !== undefined && p.PatientID1 !== null) {
@@ -189,8 +188,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
         const cMap = new Map();
         data.consults.forEach((c: any, i: number) => {
-          let k = c.ConsultKey || `con_no_key_${i}`;
-          if (cMap.has(k)) k = `${k}_dup_${i}`;
+          const k = c.ConsultKey || `con_no_key_${i}`;
           c.ConsultKey = k;
           
           // Overlay recent local edit if < 45s old to avoid overwriting with stale Sheets data
@@ -206,8 +204,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.cathlabs) && data.cathlabs.length > 0) {
         const clMap = new Map();
         data.cathlabs.forEach((c: any, i: number) => {
-          let k = c.CathKey || `cl_no_key_${i}`;
-          if (clMap.has(k)) k = `${k}_dup_${i}`;
+          const k = c.CathKey || `cl_no_key_${i}`;
           c.CathKey = k;
           
           // Overlay recent local edit if < 45s old to avoid overwriting with stale Sheets data
@@ -223,8 +220,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.operations) && data.operations.length > 0) {
         const opMap = new Map();
         data.operations.forEach((o: any, i: number) => {
-          let k = o.OpKey || o.SurgKey || `op_no_key_${i}`;
-          if (opMap.has(k)) k = `${k}_dup_${i}`;
+          const k = o.OpKey || o.SurgKey || `op_no_key_${i}`;
           if (o.SurgKey) o.SurgKey = k;
           if (o.OpKey) o.OpKey = k;
           opMap.set(k, o);
@@ -234,8 +230,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.cmrs) && data.cmrs.length > 0) {
         const cmrmap = new Map();
         data.cmrs.forEach((m: any, i: number) => {
-          let k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
-          if (cmrmap.has(k)) k = `${k}_dup_${i}`;
+          const k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
           m.CMRKey = k;
 
           const recent = recentLocalEdits.get(`CMR_${k}`);
@@ -250,8 +245,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.staff) && data.staff.length > 0) {
         const stMap = new Map();
         data.staff.forEach((s: any, i: number) => {
-          let k = s.StaffKey || `st_no_key_${i}`;
-          if (stMap.has(k)) k = `${k}_dup_${i}`;
+          const k = s.StaffKey || `st_no_key_${i}`;
           s.StaffKey = k;
           if (s.StaffPhone !== undefined && s.StaffPhone !== null) {
             s.StaffPhone = cleanSheetText(s.StaffPhone);
@@ -543,8 +537,7 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
       if ('PatientKey' in parsed[0]) {
         const pMap = new Map();
         parsed.forEach((p: any, i: number) => {
-          let k = p.PatientKey || `pat_no_key_${i}`;
-          if (pMap.has(k)) k = `${k}_dup_${i}`;
+          const k = p.PatientKey || `pat_no_key_${i}`;
           p.PatientKey = k;
           pMap.set(k, p);
         });
@@ -552,8 +545,7 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
       } else if ('ConsultKey' in parsed[0]) {
         const cMap = new Map();
         parsed.forEach((c: any, i: number) => {
-          let k = c.ConsultKey || `con_no_key_${i}`;
-          if (cMap.has(k)) k = `${k}_dup_${i}`;
+          const k = c.ConsultKey || `con_no_key_${i}`;
           c.ConsultKey = k;
           cMap.set(k, c);
         });
@@ -561,8 +553,7 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
       } else if ('CathKey' in parsed[0]) {
         const clMap = new Map();
         parsed.forEach((c: any, i: number) => {
-          let k = c.CathKey || `cl_no_key_${i}`;
-          if (clMap.has(k)) k = `${k}_dup_${i}`;
+          const k = c.CathKey || `cl_no_key_${i}`;
           c.CathKey = k;
           clMap.set(k, c);
         });
@@ -570,8 +561,7 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
       } else if ('CMRKey' in parsed[0] || 'CMRkey' in parsed[0]) {
         const cmrMap = new Map();
         parsed.forEach((m: any, i: number) => {
-          let k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
-          if (cmrMap.has(k)) k = `${k}_dup_${i}`;
+          const k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
           m.CMRKey = k;
           cmrMap.set(k, m);
         });
@@ -579,8 +569,7 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
       } else if ('StaffKey' in parsed[0]) {
         const stMap = new Map();
         parsed.forEach((s: any, i: number) => {
-          let k = s.StaffKey || `st_no_key_${i}`;
-          if (stMap.has(k)) k = `${k}_dup_${i}`;
+          const k = s.StaffKey || `st_no_key_${i}`;
           s.StaffKey = k;
           stMap.set(k, s);
         });

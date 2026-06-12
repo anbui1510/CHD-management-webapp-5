@@ -253,11 +253,18 @@ export function removeDiacritics(str: any): string {
     .replace(/Đ/g, 'D');
 }
 
+export function normalizePatientKey(patientKey: any): string {
+  return String(patientKey || '')
+    .trim()
+    .replace(/_dup_\d+$/i, '')
+    .toLowerCase();
+}
+
 export function findPatientByKey(patients: Patient[], patientKey: any): Patient | undefined {
   if (!patientKey) return undefined;
-  const keyStr = String(patientKey).trim().toLowerCase();
+  const keyStr = normalizePatientKey(patientKey);
   return patients.find(p => {
-    const pk = String(p.PatientKey || '').trim().toLowerCase();
+    const pk = normalizePatientKey(p.PatientKey);
     const pid1 = String(p.PatientID1 || '').trim().toLowerCase();
     return pk === keyStr || (pid1 && pid1 === keyStr);
   });

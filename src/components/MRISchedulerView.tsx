@@ -11,6 +11,7 @@ import {
   X
 } from 'lucide-react';
 import { CMR, Consult, Patient, Source, Staff, formatVNTime, removeDiacritics } from '../types';
+import { SearchableEnumSelect } from './SearchableEnumSelect';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
@@ -81,87 +82,6 @@ const getAgeDescription = (dobStr?: string): string => {
   }
   return `${years} tuổi`;
 };
-
-interface SearchableSelectProps {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-  placeholder?: string;
-  required?: boolean;
-}
-
-function SearchableSelect({
-  label,
-  value,
-  options,
-  onChange,
-  placeholder = 'Gõ để tìm hoặc chọn',
-  required = false
-}: SearchableSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState('');
-
-  const filteredOptions = useMemo(() => {
-    const normalizedQuery = removeDiacritics(query).toLowerCase().trim();
-    if (!normalizedQuery) return options;
-    return options.filter(option =>
-      removeDiacritics(option).toLowerCase().includes(normalizedQuery)
-    );
-  }, [options, query]);
-
-  return (
-    <div className="relative">
-      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-        {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
-      </label>
-      <div className="relative">
-        <input
-          type="text"
-          value={isOpen ? query : value}
-          onFocus={() => {
-            setIsOpen(true);
-            setQuery('');
-          }}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setIsOpen(true);
-          }}
-          onBlur={() => setTimeout(() => setIsOpen(false), 120)}
-          placeholder={value || placeholder}
-          required={required && !value}
-          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 pr-8 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
-        />
-        <span className="absolute right-3 top-2 text-slate-500 text-[10px] pointer-events-none">▼</span>
-      </div>
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg text-xs">
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map(option => (
-              <button
-                key={option}
-                type="button"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  onChange(option);
-                  setQuery('');
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 hover:bg-pink-50 transition font-semibold ${
-                  option === value ? 'bg-pink-50 text-[#d2145a]' : 'text-slate-700'
-                }`}
-              >
-                {option}
-              </button>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-slate-400 italic">Không có dữ liệu phù hợp</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function MRISchedulerView({
   patients,
@@ -467,14 +387,19 @@ export default function MRISchedulerView({
   );
 
   const renderEnumInput = (key: keyof CMR, label: string, options: string[], placeholder = 'Gõ để tìm hoặc chọn', required = false) => (
-    <SearchableSelect
-      label={label}
-      value={String(formData[key] || '')}
-      options={options}
-      onChange={(value) => updateField(key, value)}
-      placeholder={placeholder}
-      required={required}
-    />
+    <div>
+      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
+        {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
+      </label>
+      <SearchableEnumSelect
+        required={required}
+        value={String(formData[key] || '')}
+        options={options}
+        onChange={(value) => updateField(key, value)}
+        placeholder="-- Chọn --"
+        searchPlaceholder={placeholder}
+      />
+    </div>
   );
 
   const renderTextarea = (key: keyof CMR, label: string, required = false) => (

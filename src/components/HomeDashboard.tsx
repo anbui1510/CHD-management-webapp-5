@@ -21,7 +21,7 @@ import {
   ChevronUp,
   ChevronDown
 } from 'lucide-react';
-import { Patient, Consult, CathLab } from '../types';
+import { Patient, Consult, CathLab, findPatientByKey, normalizePatientKey } from '../types';
 
 interface HomeDashboardProps {
   onNavigate: (menu: string) => void;
@@ -160,8 +160,9 @@ export default function HomeDashboard({
 
     sorted.forEach(c => {
       if (!c.PatientKey) return;
-      if (!map.has(c.PatientKey)) {
-        map.set(c.PatientKey, c.ConsultKey);
+      const patientKey = normalizePatientKey(c.PatientKey);
+      if (!map.has(patientKey)) {
+        map.set(patientKey, c.ConsultKey);
       }
     });
     return map;
@@ -184,9 +185,11 @@ export default function HomeDashboard({
       const formattedConsultDate = getFormattedDateKey(c.ConsultDate);
       if (formattedConsultDate < '2026-01-01') return false;
 
-      if (latestConsultsMap.get(c.PatientKey) !== c.ConsultKey) return false;
-      if (c.Removed === true || (c as any).Removed === 'Có' || (c as any).Removed === 'yes') return false;
-      if ((c as any).TransferredToCathLab === true || (c as any).TransferredToCathLab === 'Yes' || (c as any).TransferredToCathLab === 'Có') return false;
+      if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) return false;
+      const removed = c.Removed === true || String((c as any).Removed || '').trim().toLowerCase() === 'true' || String((c as any).Removed || '').trim().toLowerCase() === 'có' || String((c as any).Removed || '').trim().toLowerCase() === 'yes';
+      if (removed) return false;
+      const transferred = (c as any).TransferredToCathLab === true || String((c as any).TransferredToCathLab || '').trim().toLowerCase() === 'true' || String((c as any).TransferredToCathLab || '').trim().toLowerCase() === 'yes' || String((c as any).TransferredToCathLab || '').trim().toLowerCase() === 'có';
+      if (transferred) return false;
       if (!ELIGIBLE_RESULTS.includes(c.ConsultResultID || '')) return false;
 
       if (
@@ -196,7 +199,7 @@ export default function HomeDashboard({
         c.CallStatus === "Muốn theo dõi nơi khác"
       ) return false;
 
-      const pat = (patients || []).find(p => p.PatientKey == c.PatientKey);
+      const pat = findPatientByKey(patients || [], c.PatientKey);
       if (!pat) return false;
       if (pat.Outcome === "Tử vong" || pat.Outcome === "Nặng xin về") return false;
 
@@ -772,7 +775,7 @@ export default function HomeDashboard({
                 {(() => {
                   const validDays = daysOfWeek.filter(day => {
                     const dayKey = formatDateToKey(day);
-                    return consults.some(c => !c.Removed && c.PlannedCathLabDate && getFormattedDateKey(c.PlannedCathLabDate) === dayKey);
+                    return eligibleWaitlist.some(c => c.PlannedCathLabDate && getFormattedDateKey(c.PlannedCathLabDate) === dayKey);
                   });
 
                   if (validDays.length === 0) {
@@ -789,8 +792,8 @@ export default function HomeDashboard({
                     const dayName = getVNDayName(day.getDay());
                     const dayNumStr = getVNMonthDayStr(day);
                     
-                    const dayConsults = consults.filter(c => {
-                      if (!c.PlannedCathLabDate || c.Removed) return false;
+                    const dayConsults = eligibleWaitlist.filter(c => {
+                      if (!c.PlannedCathLabDate) return false;
                       return getFormattedDateKey(c.PlannedCathLabDate) === dayKey;
                     });
 
@@ -822,7 +825,7 @@ export default function HomeDashboard({
                         <div className="flex-1 min-w-0 flex flex-col gap-1.5 justify-center pl-0 sm:pl-2">
                           <div className="grid grid-cols-1 gap-1.5">
                             {dayConsults.map((c) => {
-                              const pat = patients.find(p => p.PatientKey == c.PatientKey);
+                              const pat = findPatientByKey(patients || [], c.PatientKey);
                               
                               return (
                                 <div 

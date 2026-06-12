@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Patient, Consult, formatVNTime, Staff, removeDiacritics } from '../types';
+import React, { useEffect, useState } from 'react';
+import { Patient, Consult, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
-import { StaffMultiSelect } from './StaffMultiSelect';
+import { SearchableEnumSelect } from './SearchableEnumSelect';
 
 const icdCodes = [
   "ASD", "VSD", "PDA", "PS", "AS", "APSO", "APSI", "CoA", 
@@ -133,17 +133,45 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
   const [showAddDeptInput, setShowAddDeptInput] = useState<boolean>(false);
   const [customDeptVal, setCustomDeptVal] = useState<string>('');
 
-  const [diagnosisID, setDiagnosisID] = useState<string>('VSD');
+  const [diagnosisID, setDiagnosisID] = useState<string>('');
   const [detailDiagnosis, setDetailDiagnosis] = useState<string>('');
   
   const [consultMembers, setConsultMembers] = useState<string[]>([]);
   
   // 4. Clinical Result outcome fields
-  const [consultResultID, setConsultResultID] = useState<string>('Can thiệp thông tim');
+  const [consultResultID, setConsultResultID] = useState<string>('');
   const [detailConsultResult, setDetailConsultResult] = useState<string>('');
   const [plannedDevice, setPlannedDevice] = useState<string>('');
   const [plannedPrice, setPlannedPrice] = useState<string>('');
   const [checkDevice, setCheckDevice] = useState<'Đủ' | 'Thiếu' | 'Thừa'>('Đủ');
+
+  const getLatestPriorDetailDiagnosis = (patientKey: any, beforeDate?: string) => {
+    const normalizedKey = normalizePatientKey(patientKey);
+    if (!normalizedKey) return '';
+    const targetTime = beforeDate ? new Date(beforeDate).getTime() : Number.POSITIVE_INFINITY;
+
+    return [...consults]
+      .filter(c => normalizePatientKey(c.PatientKey) === normalizedKey && String(c.DetailDiagnosis || '').trim())
+      .filter(c => {
+        if (!beforeDate || !c.ConsultDate) return true;
+        const consultTime = new Date(c.ConsultDate).getTime();
+        return !Number.isNaN(consultTime) && consultTime <= targetTime;
+      })
+      .sort((a, b) => {
+        const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
+        const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
+        if (dateA !== dateB) return dateB - dateA;
+        return String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || ''));
+      })[0]?.DetailDiagnosis || '';
+  };
+
+  useEffect(() => {
+    if (patientMode !== 'select' || !selectedPatKey) {
+      setDetailDiagnosis('');
+      return;
+    }
+    setDetailDiagnosis(getLatestPriorDetailDiagnosis(selectedPatKey, consultDate));
+  }, [patientMode, selectedPatKey]);
 
   const resetForm = () => {
     setPatientMode('select');
@@ -167,9 +195,9 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
     setShowAddDeptInput(false);
     setCustomDeptVal('');
     setConsultMembers([]);
-    setDiagnosisID('VSD');
+    setDiagnosisID('');
     setDetailDiagnosis('');
-    setConsultResultID('Can thiệp thông tim');
+    setConsultResultID('');
     setDetailConsultResult('');
     setPlannedDevice('');
     setPlannedPrice('');
@@ -186,6 +214,18 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
 
     try {
       let finalPatientKey = selectedPatKey;
+
+      if (!diagnosisID) {
+        setSubmitLoading(false);
+        setErrorMsg('Vui lòng chọn ICD!');
+        return;
+      }
+
+      if (!consultResultID) {
+        setSubmitLoading(false);
+        setErrorMsg('Vui lòng chọn Kết luận chính!');
+        return;
+      }
 
       // Calculate automatic outcome
       let automaticOutcome: any = '';
@@ -267,7 +307,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
         ConsultDate: consultDate,
         RequestBy: chosenDoc || 'BS Hội đồng',
         ConsultMember: consultMembers,
-        DiagnosisID: diagnosisID || 'VSD',
+        DiagnosisID: diagnosisID,
         DetailDiagnosis: detailDiagnosis,
         Department: chosenDept || 'Tim Mạch',
         ConsultCreateBy: currentStaff?.StaffKey || '01378',
@@ -369,7 +409,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
     // 2. Search query filtering
     if (cathSearch.trim() !== '') {
       const q = removeDiacritics(cathSearch).toLowerCase().trim();
-      const pat = patients.find(p => String(p.PatientKey) === String(c.PatientKey));
+      const pat = findPatientByKey(patients, c.PatientKey);
       const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
       const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
       const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
@@ -392,7 +432,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
     // 2. Search query filtering
     if (surgSearch.trim() !== '') {
       const q = removeDiacritics(surgSearch).toLowerCase().trim();
-      const pat = patients.find(p => String(p.PatientKey) === String(c.PatientKey));
+      const pat = findPatientByKey(patients, c.PatientKey);
       const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
       const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
       const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
@@ -426,7 +466,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
     return (
       <div className="space-y-2.5">
         {filtered.map((c) => {
-          const pat = patients.find(p => String(p.PatientKey) === String(c.PatientKey));
+          const pat = findPatientByKey(patients, c.PatientKey);
           if (!pat) return null;
 
           return (
@@ -903,7 +943,7 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
                         )}
 
                         {selectedPatKey && (() => {
-                          const selectedPat = patients.find(p => String(p.PatientKey) === String(selectedPatKey));
+                          const selectedPat = findPatientByKey(patients, selectedPatKey);
                           if (!selectedPat) return null;
                           return (
                             <div className="bg-indigo-50/50 border border-indigo-150 rounded-xl p-2.5 text-slate-800 flex flex-col gap-1.5 animate-in zoom-in-95 duration-150 shadow-sm relative">
@@ -1240,10 +1280,17 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
 
                     <div className="pb-0.5">
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                      <StaffMultiSelect 
-                        staffList={staffList}
-                        selectedMembers={consultMembers}
-                        onChange={(members) => setConsultMembers(members)}
+                      <SearchableEnumSelect
+                        multiple
+                        required
+                        options={[
+                          ...staffList.map(s => getShortStaffName(s.StaffName, staffList)),
+                          ...Array.from(new Set(consults.flatMap(c => Array.isArray(c.ConsultMember) ? c.ConsultMember : String(c.ConsultMember || '').split(',').map(s => s.trim()).filter(Boolean))))
+                        ]}
+                        values={consultMembers}
+                        onMultiChange={(members) => setConsultMembers(members)}
+                        placeholder="-- Bấm hoặc tìm để chọn bác sĩ --"
+                        searchPlaceholder="Gõ tìm bác sĩ..."
                         direction="up"
                       />
                     </div>
@@ -1259,16 +1306,15 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
 
                   <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2">
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">ICD Chẩn đoán chính *</label>
-                      <select
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">ICD *</label>
+                      <SearchableEnumSelect
+                        required
+                        options={icdCodes}
                         value={diagnosisID}
-                        onChange={(e) => setDiagnosisID(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold font-mono focus:outline-none text-xs text-indigo-700"
-                      >
-                        {icdCodes.map(code => (
-                          <option key={code} value={code}>{code}</option>
-                        ))}
-                      </select>
+                        onChange={setDiagnosisID}
+                        placeholder="-- Chọn ICD --"
+                        searchPlaceholder="Gõ ICD để tìm..."
+                      />
                     </div>
 
                     <div>
@@ -1285,15 +1331,14 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
 
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kết luận chính *</label>
-                      <select
+                      <SearchableEnumSelect
+                        required
+                        options={conclusionOptions}
                         value={consultResultID}
-                        onChange={(e) => setConsultResultID(e.target.value)}
-                        className="w-full bg-indigo-50/70 border border-indigo-200 rounded-xl px-2.5 py-1 font-extrabold focus:outline-none text-xs text-indigo-800"
-                      >
-                        {conclusionOptions.map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                        onChange={setConsultResultID}
+                        placeholder="-- Chọn Kết luận chính --"
+                        searchPlaceholder="Gõ tìm kết luận..."
+                      />
                     </div>
 
                     <div>

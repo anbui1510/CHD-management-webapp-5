@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ArrowUpDown, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { formatVNTime, removeDiacritics } from '../types';
+import { findPatientByKey, formatVNTime, removeDiacritics } from '../types';
 
 export default function ArchiveView({ consults, patients, onRefreshData, triggerConfirm }: any) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,7 +19,7 @@ export default function ArchiveView({ consults, patients, onRefreshData, trigger
     if (searchQuery.trim()) {
       const q = removeDiacritics(searchQuery).toLowerCase().trim();
       result = result.filter((c: any) => {
-        const p = patients.find((pat: any) => String(pat.PatientKey) === String(c.PatientKey));
+        const p = findPatientByKey(patients, c.PatientKey);
         if (!p) return false;
         return removeDiacritics(String(p.PatientName || '')).toLowerCase().includes(q) || 
                removeDiacritics(String(p.PatientID1 || '')).toLowerCase().includes(q) || 
@@ -39,12 +39,19 @@ export default function ArchiveView({ consults, patients, onRefreshData, trigger
 
   const handleUndo = (c: any) => {
     if (triggerConfirm) {
-      triggerConfirm('Hoàn tác Lưu trữ', 'Đưa ca này trở lại trạng thái Đồng ý và xếp lịch?', async () => {
+      triggerConfirm('Đưa ca này về lại view "Xếp lịch & Dụng cụ" và xóa trạng thái lưu trữ/xếp lịch?', async () => {
         try {
           const response = await fetch(`/api/consults/${c.ConsultKey}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ CallStatus: 'Đồng ý' })
+            body: JSON.stringify({
+              CallStatus: '',
+              CallNote: '',
+              CheckDevice: '',
+              PlannedCathLabDate: '',
+              TransferredToCathLab: false,
+              Removed: false
+            })
           });
           if (response.ok) {
             onRefreshData();
@@ -52,7 +59,7 @@ export default function ArchiveView({ consults, patients, onRefreshData, trigger
         } catch (err) {
           console.error(err);
         }
-      });
+      }, 'Hoàn tác Lưu trữ');
     }
   };
 
@@ -99,7 +106,7 @@ export default function ArchiveView({ consults, patients, onRefreshData, trigger
              </thead>
              <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700 bg-white">
                {paginatedData.map((c: any, index: number) => {
-                 const pat = patients.find((p: any) => String(p.PatientKey) === String(c.PatientKey)) || {};
+                const pat: any = findPatientByKey(patients, c.PatientKey) || {};
                  return (
                    <tr key={c.ConsultKey} className="hover:bg-cyan-50/30 transition-colors">
                      <td className="p-3 text-center font-black text-slate-400">

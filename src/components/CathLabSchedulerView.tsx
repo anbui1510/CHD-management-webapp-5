@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import { Patient, Consult, Staff, formatVNTime, removeDiacritics } from '../types';
+import { Patient, Consult, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE } from '../data/source';
+import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { 
   ClipboardList, 
   Search, 
@@ -205,7 +206,6 @@ export default function CathLabSchedulerView({
   const [scheduled2nd, setScheduled2nd] = useState('');
   const [scheduled3rd, setScheduled3rd] = useState('');
 
-  const [showMethodsDropdown, setShowMethodsDropdown] = useState(false);
   const [showConfirmRemoveDialog, setShowConfirmRemoveDialog] = useState(false);
   const [prevCallStatus, setPrevCallStatus] = useState('');
 
@@ -236,14 +236,14 @@ export default function CathLabSchedulerView({
   const [adHocConsultResultID, setAdHocConsultResultID] = useState<string>('Can thiệp thông tim');
   const [adHocPriorityOrder, setAdHocPriorityOrder] = useState<'Cấp cứu' | 'Chương trình' | 'YC' | 'Ngoại giao'>('Chương trình');
 
-  const [adHocCheckDevice, setAdHocCheckDevice] = useState<'Đủ' | 'Thiếu' | ''>('Đủ');
+  const [adHocCheckDevice, setAdHocCheckDevice] = useState<'Đủ' | 'Thiếu' | ''>('');
   const [adHocPlannedDevice, setAdHocPlannedDevice] = useState('');
   const [adHocPlannedPrice, setAdHocPlannedPrice] = useState('');
   const [adHocSupplyDepFeedback, setAdHocSupplyDepFeedback] = useState('');
   const [adHocOperationFeedback, setAdHocOperationFeedback] = useState('');
 
-  const [adHocPlannedCathLabDate, setAdHocPlannedCathLabDate] = useState('2026-06-06');
-  const [adHocCallStatus, setAdHocCallStatus] = useState('Đồng ý');
+  const [adHocPlannedCathLabDate, setAdHocPlannedCathLabDate] = useState('');
+  const [adHocCallStatus, setAdHocCallStatus] = useState('');
   const [adHocCallNote, setAdHocCallNote] = useState('');
   const [adHocScheduled1st, setAdHocScheduled1st] = useState('');
   const [adHocScheduled2nd, setAdHocScheduled2nd] = useState('');
@@ -254,17 +254,19 @@ export default function CathLabSchedulerView({
   const [adHocSelectedPatientKey, setAdHocSelectedPatientKey] = useState('');
   const [adHocDetailConsultResult, setAdHocDetailConsultResult] = useState('');
   const [adHocRiskFactor, setAdHocRiskFactor] = useState('3 -SpO2 > 75% ổn định');
-  const [adHocFundingRequest, setAdHocFundingRequest] = useState<string>('Không tài trợ');
+  const [adHocFundingRequest, setAdHocFundingRequest] = useState<string>('');
   const [adHocCheckDeviceDate, setAdHocCheckDeviceDate] = useState<string>('');
   const [adHocCheckDeviceBy, setAdHocCheckDeviceBy] = useState<string>('');
   const [adHocCathMethod, setAdHocCathMethod] = useState<string[]>([]);
-  const [showAdHocMethodsDropdown, setShowAdHocMethodsDropdown] = useState(false);
 
   // Summary copyable modal states
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [isCopyingImage, setIsCopyingImage] = useState(false);
+  const [showSmsModal, setShowSmsModal] = useState(false);
+  const [smsMessage, setSmsMessage] = useState('');
+  const [smsCopied, setSmsCopied] = useState(false);
 
   const formatShortDoctorName = (name: string) => {
     if (!name) return '';
@@ -314,6 +316,62 @@ export default function CathLabSchedulerView({
     return trimmed;
   };
 
+  const VN_WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+  const parseLocalDateFromKey = (dateStr?: string): Date | null => {
+    const key = getFormattedDateKey(dateStr);
+    if (!key) return null;
+    const [yyyy, mm, dd] = key.split('-').map(Number);
+    if (!yyyy || !mm || !dd) return null;
+    const dateObj = new Date(yyyy, mm - 1, dd);
+    return isNaN(dateObj.getTime()) ? null : dateObj;
+  };
+
+  const formatDateWithWeekday = (dateStr?: string): string => {
+    const dateObj = parseLocalDateFromKey(dateStr);
+    if (!dateObj) return 'Chưa xếp lịch';
+    return `${VN_WEEKDAYS[dateObj.getDay()]}, ${formatVNTime(getFormattedDateKey(dateStr))}`;
+  };
+
+  const formatAdmissionDate = (dateStr?: string): string => {
+    const dateObj = parseLocalDateFromKey(dateStr);
+    if (!dateObj) return 'Chưa xếp lịch';
+    dateObj.setDate(dateObj.getDate() - 2);
+    const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    return `${VN_WEEKDAYS[dateObj.getDay()]}, ${formatVNTime(key)}`;
+  };
+
+  const buildSmsMessage = (patient: Patient, consult: Consult): string => {
+    const plannedDate = plannedCathLabDate || consult.PlannedCathLabDate || '';
+    return `KHOA TIM MẠCH THÔNG BÁO:
+Họ tên: ${patient.PatientName || '—'}
+Ngày sinh: ${patient.PatientDOB ? formatVNTime(patient.PatientDOB) : '—'}
+Chẩn đoán: ${consult.DiagnosisID || '—'}-${consult.DetailDiagnosis || '—'}
+Kết luận: ${consult.ConsultResultID || '—'} - ${consult.DetailConsultResult || '—'}
+Lịch can thiệp dự kiến: ${formatDateWithWeekday(plannedDate)}
+Ngày nhập viện: ${formatAdmissionDate(plannedDate)}
+Đề nghị quý thân nhân đưa bé nhập viện đúng hẹn để công việc chuẩn bị diễn ra thuận lợi
+Xin cảm ơn!`;
+  };
+
+  const handleOpenSmsModal = (patient: Patient) => {
+    if (!selectedConsult) return;
+    setSmsMessage(buildSmsMessage(patient, selectedConsult));
+    setSmsCopied(false);
+    setShowSmsModal(true);
+  };
+
+  const handleCopySmsMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(smsMessage);
+      setSmsCopied(true);
+      setTimeout(() => setSmsCopied(false), 2000);
+    } catch (err) {
+      console.error('Error copying SMS message: ', err);
+      setErrorMsg('Không thể copy nội dung SMS. Vui lòng chọn nội dung và copy thủ công.');
+    }
+  };
+
   // Determine authorized check for doctor
   const getAutoScheduled2nd = (requestBy: string) => {
     if (!requestBy) return '';
@@ -340,8 +398,9 @@ export default function CathLabSchedulerView({
 
     sorted.forEach(c => {
       if (!c.PatientKey) return;
-      if (!map.has(c.PatientKey)) {
-        map.set(c.PatientKey, c.ConsultKey);
+      const patientKey = normalizePatientKey(c.PatientKey);
+      if (!map.has(patientKey)) {
+        map.set(patientKey, c.ConsultKey);
       }
     });
     return map;
@@ -365,7 +424,7 @@ export default function CathLabSchedulerView({
       const formattedConsultDate = getFormattedDateKey(c.ConsultDate);
       if (formattedConsultDate < '2026-01-01') return false;
 
-      if (latestConsultsMap.get(c.PatientKey) !== c.ConsultKey) { return false; }
+      if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) { return false; }
 
       const isRemoved = c.Removed === true || String(c.Removed).toUpperCase() === 'TRUE' || String(c.Removed).toLowerCase() === 'có' || String(c.Removed).toLowerCase() === 'yes';
       if (isRemoved) { return false; }
@@ -391,7 +450,7 @@ export default function CathLabSchedulerView({
         callSt === "muốn theo dõi nơi khác"
       ) { return false; }
 
-      const pat = patients.find(p => String(p.PatientKey || '').trim() === String(c.PatientKey || '').trim());
+      const pat = findPatientByKey(patients, c.PatientKey);
       if (!pat) { return false; }
       
       const pOut = String(pat.Outcome || '').toLowerCase().trim();
@@ -591,7 +650,7 @@ export default function CathLabSchedulerView({
           cathLabDateDisplay = `${formatVNTime(c.PlannedCathLabDate)}\n(${dayOfWeekStr})`;
         }
         
-        const p = patients.find(pat => pat.PatientKey == c.PatientKey);
+        const p = findPatientByKey(patients, c.PatientKey);
         
         const dobFormatted = p?.PatientDOB ? formatVNTime(p.PatientDOB) : '';
         const ageDesc = p?.PatientDOB ? (() => {
@@ -884,7 +943,7 @@ export default function CathLabSchedulerView({
 
     // 4. Data
     exportFilteredConsults.forEach((c, i) => {
-      const p = patients.find(pat => pat.PatientKey == c.PatientKey);
+      const p = findPatientByKey(patients, c.PatientKey);
       
       let dayOfWeekStr = '';
       if (c.PlannedCathLabDate) {
@@ -1052,7 +1111,7 @@ export default function CathLabSchedulerView({
     const q = removeDiacritics(searchQuery).toLowerCase().trim();
     if (q) {
       result = activeList.filter(c => {
-        const pat = patients.find(p => p.PatientKey == c.PatientKey);
+        const pat = findPatientByKey(patients, c.PatientKey);
         if (!pat) return false;
         return (
           removeDiacritics(String(pat.PatientName || '')).toLowerCase().includes(q) ||
@@ -1117,7 +1176,7 @@ export default function CathLabSchedulerView({
 
   // Setup form fields on consult selection
   const handleSelectConsult = (c: Consult) => {
-    const pat = patients.find(p => p.PatientKey == c.PatientKey);
+    const pat = findPatientByKey(patients, c.PatientKey);
     setSelectedConsult(c);
     setPlannedDevice(c.PlannedDevice || '');
     setPlannedPrice(c.PlannedPrice || '');
@@ -1157,16 +1216,7 @@ export default function CathLabSchedulerView({
 
     setSuccessMsg('');
     setErrorMsg('');
-    setShowMethodsDropdown(false);
     setShowConfirmRemoveDialog(false);
-  };
-
-  const handleToggleMethod = (method: string) => {
-    if (selectedMethods.includes(method)) {
-      setSelectedMethods(selectedMethods.filter(m => m !== method));
-    } else {
-      setSelectedMethods([...selectedMethods, method]);
-    }
   };
 
   const handleCallStatusSelect = (opt: string) => {
@@ -1233,9 +1283,6 @@ export default function CathLabSchedulerView({
     if (!adHocDiagnosisID) errors.push('DiagnosisID');
     if (!adHocDetailDiagnosis) errors.push('DetailDiagnosis');
     if (!adHocDetailConsultResult) errors.push('DetailConsultResult');
-    if (!adHocCheckDevice) errors.push('CheckDevice');
-    if (!adHocCallStatus) errors.push('CallStatus');
-
     if (errors.length > 0) {
       setAdHocErrors(errors);
       return;
@@ -1295,8 +1342,8 @@ export default function CathLabSchedulerView({
       Scheduled3rdInterventionist: adHocScheduled3rd,
       PostCathDepart: adHocPostCathDepart,
       FundingRequest: adHocFundingRequest,
-      CheckDeviceUpdatedTime: new Date().toISOString(),
-      CheckDeviceUpdatedBy: currentStaff?.StaffKey || '01378',
+      CheckDeviceUpdatedTime: adHocCheckDevice ? new Date().toISOString() : '',
+      CheckDeviceUpdatedBy: adHocCheckDevice ? (currentStaff?.StaffKey || '01378') : '',
       CathMethod: adHocCathMethod.join(' + ')
     };
 
@@ -1345,8 +1392,11 @@ export default function CathLabSchedulerView({
       setAdHocDetailDiagnosis('');
       setAdHocPlannedDevice('');
       setAdHocPlannedPrice('');
+      setAdHocCheckDevice('');
       setAdHocSupplyDepFeedback('');
       setAdHocOperationFeedback('');
+      setAdHocPlannedCathLabDate('');
+      setAdHocCallStatus('');
       setAdHocCallNote('');
       setAdHocScheduled1st('');
       setAdHocScheduled2nd('');
@@ -1354,11 +1404,10 @@ export default function CathLabSchedulerView({
       setAdHocDetailConsultResult('');
       setAdHocSelectedPatientKey('');
       setAdHocSearchQuery('');
-      setAdHocFundingRequest('Không tài trợ');
+      setAdHocFundingRequest('');
       setAdHocCheckDeviceDate('');
       setAdHocCheckDeviceBy('');
       setAdHocCathMethod([]);
-      setShowAdHocMethodsDropdown(false);
 
       setTimeout(() => {
         setSuccessMsg('');
@@ -1699,7 +1748,10 @@ export default function CathLabSchedulerView({
                 const d = String(activeDate.getDate()).padStart(2, '0');
                 const formattedDate = `${y}-${m}-${d}`;
                 setAdHocConsultDate(formattedDate);
-                setAdHocPlannedCathLabDate(formattedDate);
+                setAdHocPlannedCathLabDate('');
+                setAdHocCheckDevice('');
+                setAdHocCallStatus('');
+                setAdHocFundingRequest('');
                 setShowAdHocModal(true);
               }}
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10.5px] uppercase tracking-wider rounded-xl cursor-pointer transition flex items-center gap-1 shrink-0 shadow-xs"
@@ -1795,7 +1847,7 @@ export default function CathLabSchedulerView({
                 </thead>
                 <tbody className="divide-y divide-slate-150">
                   {paginatedWaitlist.map((c) => {
-                    const pat = patients.find(p => p.PatientKey == c.PatientKey);
+                    const pat = findPatientByKey(patients, c.PatientKey);
                     if (!pat) return null;
                     const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
                     
@@ -2037,7 +2089,7 @@ export default function CathLabSchedulerView({
                             {/* Scheduled Patient badging inside day cell */}
                             <div className="flex-1 overflow-y-auto mt-1 flex flex-col gap-1 pr-0.5 custom-scrollbar">
                               {matchingConsults.map(c => {
-                                const pat = patients.find(p => p.PatientKey == c.PatientKey);
+                                const pat = findPatientByKey(patients, c.PatientKey);
                                 return (
                                   <div
                                     key={c.ConsultKey}
@@ -2098,7 +2150,7 @@ export default function CathLabSchedulerView({
 
                             <div className="flex-1 overflow-y-auto flex flex-col gap-1.5">
                               {matchingConsults.map(c => {
-                                const pat = patients.find(p => p.PatientKey == c.PatientKey);
+                                const pat = findPatientByKey(patients, c.PatientKey);
                                 return (
                                   <div
                                     key={c.ConsultKey}
@@ -2156,7 +2208,7 @@ export default function CathLabSchedulerView({
                         }
 
                         return dayMatches.map(c => {
-                          const pat = patients.find(p => p.PatientKey == c.PatientKey);
+                          const pat = findPatientByKey(patients, c.PatientKey);
                           return (
                             <div 
                               key={c.ConsultKey}
@@ -2226,7 +2278,7 @@ export default function CathLabSchedulerView({
               <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-full">
                 
                 {(() => {
-                  const pat = patients.find(p => p.PatientKey == selectedConsult.PatientKey);
+                  const pat = findPatientByKey(patients, selectedConsult.PatientKey);
                   if (!pat) return null;
                   return (
                     <div className="space-y-4">
@@ -2541,69 +2593,20 @@ export default function CathLabSchedulerView({
                             </select>
                           </div>
 
-                          {/* Cath Methods checklist (Dropdown select) */}
+                          {/* Cath Methods */}
                           <div className="md:col-span-2 relative">
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
                               Phương pháp thủ thuật (có thể chọn nhiều)
                             </label>
-                            <div className="relative">
-                              <button
-                                type="button"
-                                onClick={() => setShowMethodsDropdown(!showMethodsDropdown)}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-left flex items-center justify-between cursor-pointer focus:outline-none hover:bg-slate-50 transition min-h-[36px]"
-                              >
-                                <span className="truncate text-slate-700 pr-4">
-                                  {selectedMethods.length === 0 
-                                    ? "— Chọn phương pháp thủ thuật —" 
-                                    : selectedMethods.join(', ')}
-                                </span>
-                                <span className="bg-[#d2145a]/10 border border-[#d2145a]/20 text-[#d2145a] text-[10px] font-extrabold px-2 py-0.5 rounded-lg shrink-0">
-                                  {selectedMethods.length} đã chọn
-                                </span>
-                              </button>
-
-                              {showMethodsDropdown && (
-                                <>
-                                  <div 
-                                    className="fixed inset-0 z-40" 
-                                    onClick={() => setShowMethodsDropdown(false)} 
-                                  />
-                                  <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 max-h-[220px] overflow-y-auto space-y-1">
-                                    <div className="flex justify-between items-center text-[9px] font-black text-slate-400 px-1.5 py-0.5 border-b border-slate-100 uppercase mb-1">
-                                      <span>Danh sách phương pháp</span>
-                                      <button 
-                                        type="button"
-                                        onClick={() => setShowMethodsDropdown(false)}
-                                        className="text-[#d2145a] hover:bg-slate-100 px-1.5 py-0.5 rounded-md"
-                                      >
-                                        Đóng
-                                      </button>
-                                    </div>
-                                    {METHOD_OPTIONS.map((opt) => {
-                                      const isChecked = selectedMethods.includes(opt);
-                                      return (
-                                        <label 
-                                          key={opt}
-                                          className={`flex items-start gap-2 p-1.5 rounded-xl text-[10px] cursor-pointer transition ${
-                                            isChecked 
-                                              ? 'bg-rose-50/50 border border-rose-200/50 text-[#d2145a] font-bold' 
-                                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-                                          }`}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            onChange={() => handleToggleMethod(opt)}
-                                            className="mt-0.5 rounded text-[#d2145a] focus:ring-[#d2145a] cursor-pointer"
-                                          />
-                                          <span className="leading-snug">{opt}</span>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                </>
-                              )}
-                            </div>
+                            <SearchableEnumSelect
+                              multiple
+                              options={METHOD_OPTIONS}
+                              values={selectedMethods}
+                              onMultiChange={setSelectedMethods}
+                              placeholder="— Chọn phương pháp thủ thuật —"
+                              searchPlaceholder="Gõ phương pháp để tìm..."
+                              direction="up"
+                            />
                           </div>
 
                           {/* Scheduled Interventionists (1, 2, 3) */}
@@ -2707,7 +2710,7 @@ export default function CathLabSchedulerView({
                 <div className="flex gap-2 items-center flex-wrap">
                   {/* Xem hồ sơ */}
                   {(() => {
-                    const pat = patients.find(p => p.PatientKey == selectedConsult.PatientKey);
+                    const pat = findPatientByKey(patients, selectedConsult.PatientKey);
                     if (!pat) return null;
                     return (
                       <button
@@ -2734,6 +2737,21 @@ export default function CathLabSchedulerView({
                   >
                     <Clipboard className="w-3.5 h-3.5 text-emerald-700" /> Tóm tắt
                   </button>
+
+                  {(() => {
+                    const pat = findPatientByKey(patients, selectedConsult.PatientKey);
+                    if (!pat) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSmsModal(pat)}
+                        className="bg-rose-50 hover:bg-rose-100 text-[#d2145a] border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
+                        title="Tạo nội dung SMS thông báo kết quả hội chẩn và lịch can thiệp để copy gửi thân nhân"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" /> Gửi tin nhắn SMS
+                      </button>
+                    );
+                  })()}
 
                   <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block"></div>
 
@@ -2803,7 +2821,7 @@ export default function CathLabSchedulerView({
                   </thead>
                   <tbody className="text-[11px] font-bold text-slate-700 divide-y divide-slate-100">
                     {(isDeviceFilterExpanded ? deviceFilteredConsults : exportFilteredConsults).map((c, idx) => {
-                      const p = patients.find(pat => pat.PatientKey == c.PatientKey);
+                      const p = findPatientByKey(patients, c.PatientKey);
                       const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join(' - ');
                       
                       const vnDays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
@@ -3206,7 +3224,7 @@ export default function CathLabSchedulerView({
       {showSummaryModal && selectedConsult && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
           {(() => {
-            const pat = patients.find(p => p.PatientKey == selectedConsult.PatientKey);
+            const pat = findPatientByKey(patients, selectedConsult.PatientKey);
             if (!pat) return null;
             
             const generateTextSummary = (pObj: Patient, cObj: Consult) => {
@@ -3545,10 +3563,102 @@ export default function CathLabSchedulerView({
         </div>
       )}
 
+      {/* SMS MESSAGE MODAL */}
+      {showSmsModal && selectedConsult && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          {(() => {
+            const pat = findPatientByKey(patients, selectedConsult.PatientKey);
+            if (!pat) return null;
+            const hasPhone = Boolean(pat.PatientPhone1 || pat.PatientPhone2);
+            return (
+              <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-250 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-4 border-b border-slate-200 bg-rose-50/60 flex items-center justify-between text-[#d2145a] shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="bg-white text-[#d2145a] rounded-xl p-2 border border-rose-100 shadow-xs">
+                      <PhoneCall className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-xs uppercase tracking-wider leading-tight">
+                        Gửi tin nhắn SMS
+                      </h3>
+                      <p className="text-[9.5px] text-slate-500 font-bold mt-0.5">
+                        Kiểm tra nội dung, copy rồi gửi thủ công qua SMS hoặc Zalo
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSmsModal(false)}
+                    className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1.5 hover:bg-white rounded-xl outline-none"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
+                    <span className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                      Số điện thoại thân nhân
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="bg-white border border-slate-200 rounded-xl px-3 py-2">
+                        <span className="block text-[8.5px] font-bold uppercase text-slate-400">SĐT 1</span>
+                        <span className="font-extrabold text-slate-850 font-mono">{pat.PatientPhone1 || '—'}</span>
+                      </div>
+                      <div className="bg-white border border-slate-200 rounded-xl px-3 py-2">
+                        <span className="block text-[8.5px] font-bold uppercase text-slate-400">SĐT 2</span>
+                        <span className="font-extrabold text-slate-850 font-mono">{pat.PatientPhone2 || '—'}</span>
+                      </div>
+                    </div>
+                    {!hasPhone && (
+                      <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-xl text-[11px] font-bold">
+                        Chưa có số điện thoại liên hệ. Vẫn có thể copy nội dung để gửi qua kênh khác.
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-500 font-black text-[9.5px] uppercase mb-1.5">
+                      Nội dung SMS có thể chỉnh sửa
+                    </label>
+                    <textarea
+                      rows={11}
+                      value={smsMessage}
+                      onChange={(e) => setSmsMessage(e.target.value)}
+                      className="w-full bg-white border border-slate-250 rounded-2xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200 text-xs text-slate-850 font-semibold leading-relaxed resize-y shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between gap-3 shrink-0 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowSmsModal(false)}
+                    className="px-4 py-2 border border-slate-200 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-white rounded-xl transition cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopySmsMessage}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none ${
+                      smsCopied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#d2145a] hover:bg-pink-700'
+                    }`}
+                  >
+                    <Clipboard className="w-3.5 h-3.5 shrink-0" />
+                    {smsCopied ? 'Đã copy nội dung!' : 'Copy nội dung'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* AD-HOC SCHEDULING MODAL (XẾP BỔ SUNG) */}
       {showAdHocModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 sm:p-6 overflow-hidden animate-in fade-in duration-200">
-          <div className="bg-slate-50 rounded-3xl shadow-2xl border border-slate-205 w-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 h-full max-h-[92vh]">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-2 overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-slate-50 rounded-3xl shadow-2xl border border-slate-205 w-full max-w-[1280px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[98vh]">
             
             {/* Modal Header */}
             <div className="py-2.5 px-4 bg-indigo-900 text-white flex justify-between items-center shrink-0">
@@ -3570,13 +3680,13 @@ export default function CathLabSchedulerView({
             {/* Modal Form */}
             <form onSubmit={handleSaveAdHoc} className="flex-1 flex flex-col overflow-hidden" noValidate>
               
-              <div className="p-4 lg:p-5 overflow-y-auto flex-1">
+              <div className="p-2.5 lg:p-3 overflow-visible flex-1">
                 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 lg:gap-3 items-start">
                   
                   {/* LEFT COLUMN: 1. ĐĂNG KÝ STAFF & BỆNH NHI */}
-                  <div className="space-y-3">
-                    <div className="bg-white border border-slate-200 rounded-2xl p-3 md:p-4 space-y-3 shadow-sm">
+                  <div className="space-y-2.5">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-2.5 md:p-3 space-y-2.5 shadow-sm">
                       <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
                         <span className="text-[11.5px] font-black uppercase text-indigo-800 tracking-wider flex items-center gap-1.5">
                           1. Đăng ký bệnh nhân
@@ -3763,20 +3873,14 @@ export default function CathLabSchedulerView({
                                 Địa chỉ thường trú *
                                 {adHocErrors.includes('PatientAddress') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
                               </label>
-                              <input
-                                type="text"
+                              <SearchableEnumSelect
                                 required
-                                list="adHocProvincesList"
-                                placeholder="Nhập địa chỉ của bệnh nhi..."
+                                options={SOURCE_PROVINCE}
                                 value={adHocPatientAddress}
-                                onChange={(e) => setAdHocPatientAddress(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium"
+                                onChange={setAdHocPatientAddress}
+                                placeholder="-- Chọn tỉnh/thành --"
+                                searchPlaceholder="Gõ tỉnh/thành để tìm..."
                               />
-                              <datalist id="adHocProvincesList">
-                                {SOURCE_PROVINCE.map((p) => (
-                                  <option key={p} value={p}>{p}</option>
-                                ))}
-                              </datalist>
                             </div>
                             <div>
                               <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
@@ -3806,7 +3910,7 @@ export default function CathLabSchedulerView({
                        )}
                     </div>
 
-                    <div className="bg-white border border-slate-200 rounded-2xl p-3 md:p-4 space-y-3 shadow-sm">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-2.5 md:p-3 space-y-2.5 shadow-sm">
                       <div className="border-b border-slate-100 pb-2">
                         <span className="text-[11.5px] font-black uppercase text-[#d2145a] tracking-wider">
                           2. THÔNG TIN HỘI CHẨN
@@ -3916,16 +4020,14 @@ export default function CathLabSchedulerView({
                             ICD CHẨN ĐOÁN CHÍNH *
                             {adHocErrors.includes('DiagnosisID') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
                           </label>
-                          <select
+                          <SearchableEnumSelect
+                            required
+                            options={ICD_DIAGNOSIS_OPTIONS}
                             value={adHocDiagnosisID}
-                            onChange={(e) => setAdHocDiagnosisID(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-black"
-                          >
-                            <option value="">— Chọn mã ICD —</option>
-                            {ICD_DIAGNOSIS_OPTIONS.map((code) => (
-                              <option key={code} value={code}>{code}</option>
-                            ))}
-                          </select>
+                            onChange={setAdHocDiagnosisID}
+                            placeholder="— Chọn mã ICD —"
+                            searchPlaceholder="Gõ ICD để tìm..."
+                          />
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">ƯU TIÊN *</label>
@@ -3970,24 +4072,27 @@ export default function CathLabSchedulerView({
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">KẾT LUẬN CHÍNH *</label>
-                          <select
+                          <SearchableEnumSelect
+                            required
+                            options={[
+                              'Can thiệp thông tim',
+                              'Chụp chẩn đoán +/- can thiệp',
+                              'Chụp chẩn đoán/Đo kháng lực',
+                              'Tiền Glenn',
+                              'Tiền Fontan',
+                              'Điện sinh lý',
+                              'Mổ tim',
+                              'Thêm CĐHA; vđ khác - Staff lại',
+                              'Chưa có chỉ định - Theo dõi tiếp',
+                              'Điều trị nội khoa - Hẹn staff lại',
+                              'Quá chỉ định',
+                              'Không có thông tin'
+                            ]}
                             value={adHocConsultResultID}
-                            onChange={(e) => setAdHocConsultResultID(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-indigo-900 font-black"
-                          >
-                            <option value="Can thiệp thông tim">Can thiệp thông tim</option>
-                            <option value="Chụp chẩn đoán +/- can thiệp">Chụp chẩn đoán +/- can thiệp</option>
-                            <option value="Chụp chẩn đoán/Đo kháng lực">Chụp chẩn đoán/Đo kháng lực</option>
-                            <option value="Tiền Glenn">Tiền Glenn</option>
-                            <option value="Tiền Fontan">Tiền Fontan</option>
-                            <option value="Điện sinh lý">Điện sinh lý</option>
-                            <option value="Mổ tim">Mổ tim</option>
-                            <option value="Thêm CĐHA; vđ khác - Staff lại">Thêm CĐHA; vđ khác - Staff lại</option>
-                            <option value="Chưa có chỉ định - Theo dõi tiếp">Chưa có chỉ định - Theo dõi tiếp</option>
-                            <option value="Điều trị nội khoa - Hẹn staff lại">Điều trị nội khoa - Hẹn staff lại</option>
-                            <option value="Quá chỉ định">Quá chỉ định</option>
-                            <option value="Không có thông tin">Không có thông tin</option>
-                          </select>
+                            onChange={setAdHocConsultResultID}
+                            placeholder="— Chọn kết luận —"
+                            searchPlaceholder="Gõ tìm kết luận..."
+                          />
                         </div>
                         <div className="col-span-2">
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
@@ -4008,8 +4113,8 @@ export default function CathLabSchedulerView({
                   </div>
 
                   {/* RIGHT COLUMN: 3. DỤNG CỤ & XẾP LỊCH */}
-                  <div className="space-y-3">
-                    <div className="bg-white border border-slate-200 rounded-2xl p-3 md:p-4 space-y-3 shadow-sm">
+                  <div className="space-y-2.5">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-2.5 md:p-3 space-y-2.5 shadow-sm">
                       <div className="border-b border-slate-100 pb-2">
                         <span className="text-[11.5px] font-black uppercase text-indigo-800 tracking-wider">
                           3. DỤNG CỤ & XẾP LỊCH
@@ -4039,8 +4144,7 @@ export default function CathLabSchedulerView({
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                            KIỂM TRA DỤNG CỤ *
-                            {adHocErrors.includes('CheckDevice') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
+                            KIỂM TRA DỤNG CỤ
                           </label>
                           <select
                             value={adHocCheckDevice}
@@ -4076,14 +4180,14 @@ export default function CathLabSchedulerView({
                         <div className="col-span-2 border-t border-slate-100 pt-3 opacity-0"></div>
                         <div className="col-span-2 -mt-7">
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                            Trạng thái gọi bệnh *
-                            {adHocErrors.includes('CallStatus') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
+                            Trạng thái gọi bệnh
                           </label>
                           <select
                             value={adHocCallStatus}
                             onChange={(e) => setAdHocCallStatus(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-[#d2145a] font-black"
                           >
+                            <option value="">— Chưa gọi —</option>
                             {CALL_STATUS_OPTIONS.map((opt) => (
                               <option key={opt} value={opt}>{opt}</option>
                             ))}
@@ -4122,6 +4226,7 @@ export default function CathLabSchedulerView({
                             onChange={(e) => setAdHocFundingRequest(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
                           >
+                            <option value="">— Chưa chọn —</option>
                             <option value="Không tài trợ">Không tài trợ</option>
                             <option value="Chờ duyệt">Chờ duyệt</option>
                             <option value="Đã duyệt">Đã duyệt</option>
@@ -4129,55 +4234,15 @@ export default function CathLabSchedulerView({
                         </div>
                         <div className="col-span-2 relative">
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Phương pháp can thiệp</label>
-                            <div 
-                              onClick={() => setShowAdHocMethodsDropdown(!showAdHocMethodsDropdown)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 cursor-pointer relative flex flex-wrap gap-1 min-h-[36px]"
-                            >
-                                {adHocCathMethod.length === 0 
-                                  ? <span className="text-slate-400 text-xs">Click chọn phương pháp...</span>
-                                  : adHocCathMethod.map(m => (
-                                    <span key={m} className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.5 rounded font-bold border border-indigo-100 flex items-center gap-1">
-                                      {m}
-                                      <div 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setAdHocCathMethod(adHocCathMethod.filter(i => i !== m));
-                                        }}
-                                        className="hover:bg-indigo-200 rounded-full p-0.5 text-indigo-400 hover:text-indigo-800"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </div>
-                                    </span>
-                                  ))}
-                            </div>
-                            
-                            {showAdHocMethodsDropdown && (
-                              <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 shadow-xl rounded-xl z-[70] p-1.5">
-                                  {METHOD_OPTIONS.map((opt) => {
-                                    const isChecked = adHocCathMethod.includes(opt);
-                                    return (
-                                      <label key={opt} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer">
-                                        <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition ${isChecked ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 bg-white'}`}>
-                                          {isChecked && <Check className="w-3 h-3" />}
-                                        </div>
-                                        <span className="text-xs text-slate-700">{opt}</span>
-                                        <input
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          className="hidden"
-                                          onChange={() => {
-                                            if (isChecked) {
-                                              setAdHocCathMethod(adHocCathMethod.filter(m => m !== opt));
-                                            } else {
-                                              setAdHocCathMethod([...adHocCathMethod, opt]);
-                                            }
-                                          }}
-                                        />
-                                      </label>
-                                    );
-                                  })}
-                              </div>
-                            )}
+                            <SearchableEnumSelect
+                              multiple
+                              options={METHOD_OPTIONS}
+                              values={adHocCathMethod}
+                              onMultiChange={setAdHocCathMethod}
+                              placeholder="Click chọn phương pháp..."
+                              searchPlaceholder="Gõ phương pháp để tìm..."
+                              direction="up"
+                            />
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Khoá nằm sau thủ thuật</label>
@@ -4271,7 +4336,7 @@ export default function CathLabSchedulerView({
               </div>
 
               {/* Form Save Footer Bar for Ad-hoc Scheduling */}
-              <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0 rounded-b-3xl">
+              <div className="p-2.5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0 rounded-b-3xl">
                 <button
                   type="button"
                   onClick={() => {

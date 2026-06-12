@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Patient, Consult, Staff, CathLab, formatVNTime, removeDiacritics } from '../types';
+import { Patient, Consult, Staff, CathLab, findPatientByKey, formatVNTime, removeDiacritics } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User } from 'lucide-react';
 import { SOURCE_DIAGNOSIS_ID, SOURCE_CATH_METHOD, SOURCE_PROVINCE } from '../data/source';
-import { MethodMultiSelect } from './MethodMultiSelect';
+import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
 
 interface Props {
@@ -61,16 +61,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
   
   // Data prep
   const pendingConsults = useMemo(() => {
-     let list = consults.filter(c => 
-       c.TransferredToCathLab === true && 
-       !c.Removed &&
-       !cathlabs.some(cath => cath.ConsultKey === c.ConsultKey)
-     );
+     let list = consults.filter(c => {
+       const transferred = c.TransferredToCathLab === true || String(c.TransferredToCathLab).trim().toLowerCase() === 'true';
+       return transferred && !c.Removed && !cathlabs.some(cath => cath.ConsultKey === c.ConsultKey);
+     });
      
      if (searchTerm.trim() !== '') {
         const lowerSearch = removeVietnameseTones(searchTerm).toLowerCase();
         list = list.filter(c => {
-           const p = patients.find(pa => pa.PatientKey === c.PatientKey);
+           const p = findPatientByKey(patients, c.PatientKey);
            const pName = removeVietnameseTones(String(p?.PatientName || '')).toLowerCase();
            const dId = removeVietnameseTones(String(c.DiagnosisID || '')).toLowerCase();
            return pName.includes(lowerSearch) || dId.includes(lowerSearch);
@@ -91,7 +90,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
      if (searchTerm.trim() !== '') {
         const lowerSearch = removeVietnameseTones(searchTerm).toLowerCase();
         list = list.filter(cath => {
-           const p = patients.find(pa => pa.PatientKey === cath.PatientKey);
+           const p = findPatientByKey(patients, cath.PatientKey);
            const pName = removeVietnameseTones(String(p?.PatientName || '')).toLowerCase();
            const postD = removeVietnameseTones(String(cath.PostDiagnosisID || '')).toLowerCase();
            return pName.includes(lowerSearch) || postD.includes(lowerSearch);
@@ -147,7 +146,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
   };
 
   const openDoneForm = (cath: CathLab) => {
-    const p = patients.find(pa => pa.PatientKey === cath.PatientKey);
+    const p = findPatientByKey(patients, cath.PatientKey);
     
     if(p) {
       setSelectedDone({p, cath});
@@ -213,7 +212,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
      let pName = adHocPatientName;
      // If existing patient, grab the name from existing pat
      if (adHocPatientMode === 'existing') {
-        const pat = patients.find(p => p.PatientKey == patientKey);
+        const pat = findPatientByKey(patients, patientKey);
         if (pat) pName = pat.PatientName;
      }
 
@@ -346,14 +345,30 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
 
      triggerConfirm(`Xác nhận ${action === 'return' ? 'chuyển về Xếp lịch' : 'Loại ca này'} với lý do nãy?`, async () => {
        try {
+         const payload = action === 'return'
+           ? {
+               TransferredToCathLab: false,
+               PlannedCathLabDate: '',
+               CheckDevice: '',
+               CallStatus: '',
+               CallNote: callNote,
+               Scheduled1stInterventionist: '',
+               Scheduled2ndInterventionist: '',
+               Scheduled3rdInterventionist: ''
+             }
+           : {
+               TransferredToCathLab: false,
+               Removed: false,
+               CallStatus: 'Loại',
+               CallNote: callNote,
+               PlannedCathLabDate: '',
+               CheckDevice: ''
+             };
+
          await fetch(`/api/consults/${selectedPending.c.ConsultKey}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              TransferredToCathLab: action === 'return' ? false : selectedPending.c.TransferredToCathLab,
-              Removed: action === 'remove' ? true : selectedPending.c.Removed,
-              CallNote: callNote
-            })
+            body: JSON.stringify(payload)
          });
          onRefreshData();
          closeModal();
@@ -431,7 +446,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
                      </tr>
                    )}
                    {pendingConsults.map((c, i) => {
-                      const p = patients.find(pa => pa.PatientKey === c.PatientKey);
+                      const p = findPatientByKey(patients, c.PatientKey);
                       if (!p) return null;
                       return (
                         <tr key={c.ConsultKey} onClick={() => openPendingForm(c, p)} className="hover:bg-slate-50 cursor-pointer transition">
@@ -481,7 +496,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
                      </tr>
                    )}
                    {doneCathlabs.map((cath, i) => {
-                      const p = patients.find(pa => pa.PatientKey === cath.PatientKey);
+                      const p = findPatientByKey(patients, cath.PatientKey);
                       if (!p) return null;
                       return (
                         <tr key={cath.CathKey} onClick={() => openDoneForm(cath)} className="hover:bg-slate-50 cursor-pointer transition">
@@ -592,7 +607,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
 
                          {/* Selected Patient details complex card */}
                          {adHocPatientMode === 'existing' && adHocSelectedPatientKey && (() => {
-                            const selectedPat = patients.find(p => p.PatientKey == adHocSelectedPatientKey);
+                            const selectedPat = findPatientByKey(patients, adHocSelectedPatientKey);
                             if (!selectedPat) return null;
                             return (
                               <div className="bg-pink-50/70 border border-pink-100 rounded-2xl p-4 text-xs text-slate-800 relative shadow-sm mt-2">
@@ -692,15 +707,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
                                   </div>
                                   <div className="md:col-span-2">
                                      <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Địa chỉ <span className="text-rose-500">*</span></label>
-                                     <input type="text"
-                                        list="provinces-list"
+                                     <SearchableEnumSelect
+                                        required
+                                        options={SOURCE_PROVINCE}
                                         value={adHocPatientAddress}
-                                        onChange={e => setAdHocPatientAddress(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800"
+                                        onChange={setAdHocPatientAddress}
+                                        placeholder="-- Chọn tỉnh/thành --"
+                                        searchPlaceholder="Gõ tỉnh/thành để tìm..."
                                      />
-                                     <datalist id="provinces-list">
-                                        {SOURCE_PROVINCE.map(p => <option key={p} value={p}>{p}</option>)}
-                                     </datalist>
                                   </div>
                                   <div>
                                      <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">SĐT 1</label>
@@ -795,14 +809,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
                       
                       <div>
                         <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">ICD Sau TT <span className="text-rose-500">*</span></label>
-                        <select 
+                        <SearchableEnumSelect
+                          required
+                          options={SOURCE_DIAGNOSIS_ID}
                           value={formData.PostDiagnosisID} 
-                          onChange={e => setFormData({...formData, PostDiagnosisID: e.target.value})}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        >
-                           <option value="">- Chọn mã -</option>
-                           {SOURCE_DIAGNOSIS_ID.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
+                          onChange={(value) => setFormData({...formData, PostDiagnosisID: value})}
+                          placeholder="- Chọn mã -"
+                          searchPlaceholder="Gõ ICD để tìm..."
+                        />
                       </div>
 
                       <div>
@@ -824,10 +838,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
                     <div className="space-y-4 pt-2">
                        <div>
                          <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Phương pháp can thiệp <span className="text-rose-500">*</span></label>
-                         <MethodMultiSelect 
+                         <SearchableEnumSelect
+                           multiple
+                           required
                            options={SOURCE_CATH_METHOD}
-                           selectedMethods={parseCathMethods(formData.CathMethod)}
-                           onChange={(methods) => setFormData({...formData, CathMethod: methods})}
+                           values={parseCathMethods(formData.CathMethod)}
+                           onMultiChange={(methods) => setFormData({...formData, CathMethod: methods})}
+                           placeholder="Chọn phương pháp..."
+                           searchPlaceholder="Gõ phương pháp để tìm..."
                            direction="up"
                          />
                        </div>

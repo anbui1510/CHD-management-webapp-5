@@ -20,7 +20,8 @@ import {
   Source,
   formatVNTime,
   removeDiacritics,
-  findPatientByKey
+  findPatientByKey,
+  normalizePatientKey
 } from './types';
 import * as XLSX from 'xlsx';
 import VirtualSheets from './components/VirtualSheets';
@@ -35,7 +36,7 @@ import TransferredCathLabView from './components/TransferredCathLabView';
 import ArchiveView from './components/ArchiveView';
 import WorkspaceDashboard from './components/WorkspaceDashboard';
 import MRISchedulerView from './components/MRISchedulerView';
-import { StaffMultiSelect } from './components/StaffMultiSelect';
+import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE } from './data/source';
 
@@ -191,7 +192,7 @@ export default function App() {
     patients.forEach(p => {
       if (p) {
         if (p.PatientKey) {
-          const pk = String(p.PatientKey).trim().toLowerCase();
+          const pk = normalizePatientKey(p.PatientKey);
           map.set(pk, p);
         }
         if (p.PatientID1) {
@@ -205,10 +206,10 @@ export default function App() {
 
   const getPatientByKey = (key: any): Patient | undefined => {
     if (!key) return undefined;
-    const keyStr = String(key).trim().toLowerCase();
+    const keyStr = normalizePatientKey(key);
     
     // Prioritize direct match by PatientKey to prevent collisions with PatientID1 mapping
-    const directMatch = patients.find(p => p && String(p.PatientKey).trim().toLowerCase() === keyStr);
+    const directMatch = patients.find(p => p && normalizePatientKey(p.PatientKey) === keyStr);
     if (directMatch) return directMatch;
     
     return patientsMap.get(keyStr);
@@ -293,11 +294,40 @@ export default function App() {
     Department: 'Tim Mạch' as string,
     PriorityOrder: 'Chương trình' as PriorityOrderEnum,
     RiskFactor: '' as string,
-    CheckDevice: 'Đủ' as 'Đủ' | 'Thiếu' | '',
+    CheckDevice: '' as 'Đủ' | 'Thiếu' | '',
     ConsultNote: '',
     PlannedDevice: '',
     PlannedPrice: ''
   });
+
+  const getLatestPriorDetailDiagnosis = (patientKey: any, beforeDate?: string) => {
+    const normalizedKey = normalizePatientKey(patientKey);
+    if (!normalizedKey) return '';
+    const targetTime = beforeDate ? new Date(beforeDate).getTime() : Number.POSITIVE_INFINITY;
+
+    return [...consults]
+      .filter(c => normalizePatientKey(c.PatientKey) === normalizedKey && String(c.DetailDiagnosis || '').trim())
+      .filter(c => {
+        if (!beforeDate || !c.ConsultDate) return true;
+        const consultTime = new Date(c.ConsultDate).getTime();
+        return !Number.isNaN(consultTime) && consultTime <= targetTime;
+      })
+      .sort((a, b) => {
+        const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
+        const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
+        if (dateA !== dateB) return dateB - dateA;
+        return String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || ''));
+      })[0]?.DetailDiagnosis || '';
+  };
+
+  useEffect(() => {
+    if (!newConsultData.PatientKey) return;
+    const previousDiagnosis = getLatestPriorDetailDiagnosis(newConsultData.PatientKey, newConsultData.ConsultDate);
+    setNewConsultData(prev => ({
+      ...prev,
+      DetailDiagnosis: previousDiagnosis
+    }));
+  }, [newConsultData.PatientKey]);
   
   // Pending Consult UX alert checker
   const [pendingConsultsCount, setPendingConsultsCount] = useState<number>(0);
@@ -312,7 +342,7 @@ export default function App() {
     DetailConsultResult: '',
     PlannedDevice: '',
     PlannedPrice: '',
-    CheckDevice: 'Đủ' as 'Đủ' | 'Thiếu' | '',
+    CheckDevice: '' as 'Đủ' | 'Thiếu' | '',
     PatientWeight: '',
     PatientHeight: '',
     ConsultType: 'Staff mổ' as ConsultTypeEnum,
@@ -716,7 +746,7 @@ export default function App() {
       PatientHeight: c.PatientHeight || '',
       ConsultDate: c.ConsultDate || '',
       RequestBy: c.RequestBy || '',
-      DiagnosisID: c.DiagnosisID || 'VSD',
+      DiagnosisID: c.DiagnosisID || '',
       DetailDiagnosis: c.DetailDiagnosis || '',
       Department: c.Department || 'Tim Mạch',
       RiskFactor: c.RiskFactor || ''
@@ -767,7 +797,7 @@ export default function App() {
       DetailConsultResult: c.DetailConsultResult || '',
       PlannedDevice: c.PlannedDevice || '',
       PlannedPrice: c.PlannedPrice || '',
-      CheckDevice: c.CheckDevice || 'Đủ',
+      CheckDevice: c.CheckDevice || '',
       PatientWeight: c.PatientWeight || '',
       PatientHeight: c.PatientHeight || '',
       ConsultType: c.ConsultType || 'Staff mổ',
@@ -784,6 +814,16 @@ export default function App() {
     e.preventDefault();
     if (!editingConsultKey) return;
     
+    if (!resultUpdateData.DiagnosisID) {
+      triggerAlert('Vui lòng chọn ICD (DiagnosisID)!', 'Thiếu thông tin');
+      return;
+    }
+
+    if (!resultUpdateData.ConsultResultID) {
+      triggerAlert('Vui lòng chọn Kết luận chính (ConsultResultID)!', 'Thiếu thông tin');
+      return;
+    }
+
     if (!resultUpdateData.ConsultMember || resultUpdateData.ConsultMember.length === 0) {
       triggerAlert('Vui lòng chọn ít nhất một Thành viên duyệt hội chẩn!', 'Thiếu thông tin');
       return;
@@ -2217,7 +2257,7 @@ export default function App() {
                           Department: 'Tim Mạch',
                           PriorityOrder: 'Chương trình',
                           RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
-                          CheckDevice: 'Đủ',
+                          CheckDevice: '',
                           ConsultNote: '',
                           PlannedDevice: '',
                           PlannedPrice: ''
@@ -2951,10 +2991,17 @@ export default function App() {
 
                                 <div className="pb-2">
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                                  <StaffMultiSelect 
-                                    staffList={staffList}
-                                    selectedMembers={resultUpdateData.ConsultMember || []}
-                                    onChange={(members) => setResultUpdateData(prev => ({ ...prev, ConsultMember: members }))}
+                                  <SearchableEnumSelect
+                                    multiple
+                                    required
+                                    options={[
+                                      ...staffList.map(s => getShortStaffName(s.StaffName, staffList)),
+                                      ...Array.from(new Set(consults.flatMap(c => Array.isArray(c.ConsultMember) ? c.ConsultMember : String(c.ConsultMember || '').split(',').map(s => s.trim()).filter(Boolean))))
+                                    ]}
+                                    values={resultUpdateData.ConsultMember || []}
+                                    onMultiChange={(members) => setResultUpdateData(prev => ({ ...prev, ConsultMember: members }))}
+                                    placeholder="-- Bấm hoặc tìm để chọn bác sĩ --"
+                                    searchPlaceholder="Gõ tìm bác sĩ..."
                                   />
                                 </div>
 
@@ -3004,36 +3051,26 @@ export default function App() {
                               <div className="space-y-3.5 pt-1">
                                 <div className="grid grid-cols-2 gap-3.5">
                                   <div>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD (Chẩn đoán chính)</label>
-                                    <select
+                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
+                                    <SearchableEnumSelect
+                                      required
+                                      options={icdCodes}
                                       value={resultUpdateData.DiagnosisID}
-                                      onChange={(e) => setResultUpdateData(prev => ({ ...prev, DiagnosisID: e.target.value }))}
-                                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-bold font-mono text-slate-800"
-                                    >
-                                      <option value="">-- Chọn ICD --</option>
-                                      {icdCodes.map(code => (
-                                        <option key={code} value={code}>{code}</option>
-                                      ))}
-                                      {resultUpdateData.DiagnosisID && !icdCodes.includes(resultUpdateData.DiagnosisID) && (
-                                        <option value={resultUpdateData.DiagnosisID}>{resultUpdateData.DiagnosisID}</option>
-                                      )}
-                                    </select>
+                                      onChange={(value) => setResultUpdateData(prev => ({ ...prev, DiagnosisID: value }))}
+                                      placeholder="-- Chọn ICD --"
+                                      searchPlaceholder="Gõ ICD để tìm..."
+                                    />
                                   </div>
                                   <div>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1 font-sans">Kết luận chính</label>
-                                    <select
+                                    <label className="block text-slate-500 font-bold text-[10px] mb-1 font-sans">Kết luận chính <span className="text-red-500">*</span></label>
+                                    <SearchableEnumSelect
+                                      required
+                                      options={conclusionOptions}
                                       value={resultUpdateData.ConsultResultID}
-                                      onChange={(e) => setResultUpdateData(prev => ({ ...prev, ConsultResultID: e.target.value as any }))}
-                                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-bold text-slate-800"
-                                    >
-                                      <option value="">-- Chọn Kết luận chính --</option>
-                                      {conclusionOptions.map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                      ))}
-                                      {resultUpdateData.ConsultResultID && !conclusionOptions.includes(resultUpdateData.ConsultResultID) && (
-                                        <option value={resultUpdateData.ConsultResultID}>{resultUpdateData.ConsultResultID}</option>
-                                      )}
-                                    </select>
+                                      onChange={(value) => setResultUpdateData(prev => ({ ...prev, ConsultResultID: value as any }))}
+                                      placeholder="-- Chọn Kết luận chính --"
+                                      searchPlaceholder="Gõ tìm kết luận..."
+                                    />
                                   </div>
                                 </div>
 
@@ -3133,7 +3170,7 @@ export default function App() {
                                   DetailConsultResult: edc.DetailConsultResult || '',
                                   PlannedDevice: edc.PlannedDevice || '',
                                   PlannedPrice: edc.PlannedPrice || '',
-                                  CheckDevice: edc.CheckDevice || 'Đủ',
+                                  CheckDevice: edc.CheckDevice || '',
                                   PatientWeight: edc.PatientWeight || '',
                                   PatientHeight: edc.PatientHeight || '',
                                   ConsultType: edc.ConsultType || 'Staff mổ',
@@ -3605,20 +3642,14 @@ export default function App() {
 
                 <div>
                   <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Địa chỉ *</label>
-                  <input
-                    type="text"
+                  <SearchableEnumSelect
                     required
-                    list="addressOptionsList"
-                    placeholder="Chọn hoặc nhập địa chỉ..."
+                    options={SOURCE_PROVINCE}
                     value={newPatientData.PatientAddress}
-                    onChange={(e) => setNewPatientData(prev => ({ ...prev, PatientAddress: e.target.value }))}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-extrabold focus:outline-none"
+                    onChange={(value) => setNewPatientData(prev => ({ ...prev, PatientAddress: value }))}
+                    placeholder="-- Chọn tỉnh/thành --"
+                    searchPlaceholder="Gõ tỉnh/thành để tìm..."
                   />
-                  <datalist id="addressOptionsList">
-                    {SOURCE_PROVINCE.map((addr) => (
-                      <option key={addr} value={addr} />
-                    ))}
-                  </datalist>
                 </div>
 
                 {/* Patient Creator Admin Details (Grayed Out ReadOnly Column inputs) */}
