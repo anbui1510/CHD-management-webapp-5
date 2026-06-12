@@ -7,7 +7,7 @@ Project này có script **commit + push tự động** khi có thay đổi.
 ## Bước 1 — Tạo repo trên GitHub
 
 1. Vào https://github.com/new
-2. Tên repo: `chd-management-webapp-5`
+2. Tên repo: dùng repo sẵn có — https://github.com/anbui1510/CHD-management-webapp-5 (**không** tạo repo mới)
 3. Chọn **Private**
 4. **Không** tick "Add README" (repo trống)
 
