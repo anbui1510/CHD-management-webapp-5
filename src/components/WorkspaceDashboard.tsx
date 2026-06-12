@@ -17,12 +17,14 @@ interface WorkspaceDashboardProps {
   onNavigate: (menu: string) => void;
   patientCount: number;
   pendingConsultCount: number;
+  pendingMriCount?: number;
 }
 
 export default function WorkspaceDashboard({
   onNavigate,
   patientCount,
-  pendingConsultCount
+  pendingConsultCount,
+  pendingMriCount = 0
 }: WorkspaceDashboardProps) {
 
   return (
@@ -56,12 +58,15 @@ export default function WorkspaceDashboard({
             <p className="text-xs text-slate-500">Lịch phòng Cathlab</p>
           </button>
           
-          <button className="bg-white border rounded-2xl p-5 opacity-60 cursor-not-allowed text-left">
-             <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4">
+          <button
+            onClick={() => onNavigate('mri-scheduler')}
+            className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
+          >
+             <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
               <Activity className="w-6 h-6 text-purple-500" />
             </div>
             <h3 className="font-extrabold text-sm text-purple-600 mb-1">Lịch chụp MRI</h3>
-            <p className="text-xs text-slate-500">MRI Tim bẩm sinh</p>
+            <p className="text-xs text-slate-500">{pendingMriCount} ca MRI cần theo dõi</p>
           </button>
 
           <button className="bg-white border rounded-2xl p-5 opacity-60 cursor-not-allowed text-left">
@@ -160,6 +165,25 @@ export default function WorkspaceDashboard({
             </div>
             <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Phòng thông tim</h3>
             <p className="text-xs text-slate-500">Kiểm soát ca thủ thuật</p>
+          </button>
+        </div>
+      </div>
+
+      {/* 6. QUẢN LÝ MRI TIM */}
+      <div>
+        <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 6. QUẢN LÝ MRI TIM
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button
+            onClick={() => onNavigate('mri-scheduler')}
+            className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
+          >
+            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <Activity className="w-6 h-6 text-purple-600" />
+            </div>
+            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Xếp lịch MRI</h3>
+            <p className="text-xs text-slate-500">Danh sách chờ và lịch chụp MRI tim</p>
           </button>
         </div>
       </div>

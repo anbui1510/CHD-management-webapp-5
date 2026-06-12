@@ -34,6 +34,7 @@ import CathLabRoomView from './components/CathLabRoomView';
 import TransferredCathLabView from './components/TransferredCathLabView';
 import ArchiveView from './components/ArchiveView';
 import WorkspaceDashboard from './components/WorkspaceDashboard';
+import MRISchedulerView from './components/MRISchedulerView';
 import { StaffMultiSelect } from './components/StaffMultiSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE } from './data/source';
@@ -231,7 +232,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'mri-scheduler' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
 
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
@@ -1291,6 +1292,7 @@ export default function App() {
     { id: 'consult-list', label: 'Hội chẩn', icon: <ClipboardList className="w-4 h-4" /> },
     { id: 'results-staff', label: 'Nhập kết quả staff', icon: <FileText className="w-4 h-4" /> },
     { id: 'schedule-tt', label: 'Xếp lịch & Dụng cụ', icon: <CalendarDays className="w-4 h-4" /> },
+    { id: 'mri-scheduler', label: 'Xếp lịch MRI', icon: <Activity className="w-4 h-4" /> },
     { id: 'google-sheets', label: 'Virtual Google Sheets', icon: <Database className="w-4 h-4" /> },
     { id: 'excel-export', label: 'Bảng Filter_Consult', icon: <Download className="w-4 h-4" /> },
   ];
@@ -1334,6 +1336,12 @@ export default function App() {
           title: "LỊCH THÔNG TIM DỰ KIẾN",
           subtitle: "",
           icon: <CalendarDays className="w-5 h-5 text-pink-200" />
+        };
+      case 'mri-scheduler':
+        return {
+          title: "XẾP LỊCH MRI",
+          subtitle: "Quản lý MRI tim",
+          icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
         };
       case 'cathlab-room':
       case 'transferred-cathlab':
@@ -1413,6 +1421,7 @@ export default function App() {
                 fetchPatients();
                 fetchConsults();
                 fetchStaff();
+                fetchCmrs();
               }}
               className="hover:bg-white/10 p-1.5 rounded-xl transition flex items-center gap-1 text-xs shrink-0"
               title="Đồng bộ lại"
@@ -1462,7 +1471,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
+      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
         
         {/* Collapsible Left navigation Aside drawer */}
         <aside className={`${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
@@ -1527,7 +1536,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -1555,6 +1564,7 @@ export default function App() {
               }}
               patientCount={patients.length}
               pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
+              pendingMriCount={cmrs.filter(c => !c.CMRScheduledDate).length + consults.filter(c => String(c.ConsultResultID || '').trim().toLowerCase() === 'chụp mri').length}
             />
           )}
 
@@ -2583,6 +2593,23 @@ export default function App() {
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');
                 setSelectedPatientForDetail(pat);
+              }}
+            />
+          )}
+
+          {/* XẾP LỊCH MRI PANEL */}
+          {activeMenu === 'mri-scheduler' && (
+            <MRISchedulerView
+              patients={patients}
+              consults={consults}
+              cmrs={cmrs}
+              sources={sources}
+              currentStaff={currentStaff}
+              onRefreshData={() => {
+                fetchPatients();
+                fetchConsults();
+                fetchCmrs();
+                fetchSources();
               }}
             />
           )}
