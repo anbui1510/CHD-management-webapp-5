@@ -86,7 +86,11 @@ function initializeDatabase() {
   ];
   
   var cmrHeaders = [
-    "CMRKey", "ConsultKey", "PatientKey", "CMRDate", "CMRMethod", "CMRResult", "CMRNote"
+    "CMRKey", "CMRkey", "ConsultKey", "PatientKey", "MBN", "Họ và tên", "Tình trạng",
+    "PatientWeight", "CMRDigagnosisID", "CMRDiagnosis", "CMRRequest", "DepartRequest",
+    "CMRMethod", "CMRDevice", "PostDepart", "Anesthesia", "CMRScheduledDate", "DayOfWeek",
+    "CMRCallStatus", "CMRCallStatusNote", "CMRDate", "CMRResult", "CMRNote",
+    "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime"
   ];
 
   var sourceHeaders = [];

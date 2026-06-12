@@ -7,7 +7,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { Patient, Consult, Staff, CathLab } from './src/types';
+import { Patient, Consult, Staff, CathLab, CMR } from './src/types';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -234,9 +234,15 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.cmrs) && data.cmrs.length > 0) {
         const cmrmap = new Map();
         data.cmrs.forEach((m: any, i: number) => {
-          let k = m.CMRKey || `cmr_no_key_${i}`;
+          let k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
           if (cmrmap.has(k)) k = `${k}_dup_${i}`;
           m.CMRKey = k;
+
+          const recent = recentLocalEdits.get(`CMR_${k}`);
+          if (recent && (Date.now() - recent.timestamp < 45000)) {
+            m = { ...m, ...recent.data };
+          }
+
           cmrmap.set(k, m);
         });
         writeDB(CMRS_FILE, Array.from(cmrmap.values()));
@@ -267,7 +273,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   return false;
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
@@ -520,6 +526,7 @@ const defaultConsults: Consult[] = [
 
 // Initial CathLab Data
 const defaultCathlabs: CathLab[] = [];
+const defaultCmrs: CMR[] = [];
 
 // Helper functions for reading/writing Database
 function readDB<T>(filePath: string, defaultData: T[]): T[] {
@@ -560,6 +567,15 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
           clMap.set(k, c);
         });
         parsed = Array.from(clMap.values());
+      } else if ('CMRKey' in parsed[0] || 'CMRkey' in parsed[0]) {
+        const cmrMap = new Map();
+        parsed.forEach((m: any, i: number) => {
+          let k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
+          if (cmrMap.has(k)) k = `${k}_dup_${i}`;
+          m.CMRKey = k;
+          cmrMap.set(k, m);
+        });
+        parsed = Array.from(cmrMap.values());
       } else if ('StaffKey' in parsed[0]) {
         const stMap = new Map();
         parsed.forEach((s: any, i: number) => {
@@ -770,8 +786,51 @@ app.get('/api/operations', async (req, res) => {
 
 app.get('/api/cmrs', async (req, res) => {
   await syncFromGoogleSheets();
-  const cmrs = readDB<any>(CMRS_FILE, []);
+  const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
   res.json(cmrs);
+});
+
+app.post('/api/cmrs', async (req, res) => {
+  const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
+  const newCmr: CMR = req.body;
+
+  newCmr.CMRKey = newCmr.CMRKey || newCmr.CMRkey || `cmr_${Date.now()}`;
+  newCmr.UpdateTime = newCmr.UpdateTime || newTimestamp();
+  cmrs.push(newCmr);
+  writeDB<CMR>(CMRS_FILE, cmrs);
+
+  recentLocalEdits.set(`CMR_${newCmr.CMRKey}`, { timestamp: Date.now(), data: newCmr });
+
+  syncToGoogleSheets('CMR', 'insert', newCmr.CMRKey, newCmr).catch(err => {
+    console.error('Error syncing CMR to google sheets background:', err);
+  });
+
+  res.status(201).json(newCmr);
+});
+
+app.put('/api/cmrs/:key', async (req, res) => {
+  const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
+  const key = req.params.key;
+  const index = cmrs.findIndex(m =>
+    String(m.CMRKey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase() ||
+    String(m.CMRkey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase()
+  );
+
+  if (index !== -1) {
+    cmrs[index] = { ...cmrs[index], ...req.body, UpdateTime: newTimestamp() };
+    cmrs[index].CMRKey = cmrs[index].CMRKey || cmrs[index].CMRkey || key;
+    writeDB<CMR>(CMRS_FILE, cmrs);
+
+    recentLocalEdits.set(`CMR_${cmrs[index].CMRKey}`, { timestamp: Date.now(), data: cmrs[index] });
+
+    syncToGoogleSheets('CMR', 'update', cmrs[index].CMRKey, cmrs[index]).catch(err => {
+      console.error('Error syncing CMR update to google sheets background:', err);
+    });
+
+    res.json(cmrs[index]);
+  } else {
+    res.status(404).json({ error: 'CMR record not found' });
+  }
 });
 
 app.get('/api/sources', async (req, res) => {

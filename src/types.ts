@@ -174,12 +174,32 @@ export interface Operation {
 
 export interface CMR {
   CMRKey?: string;
+  CMRkey?: string;
   ConsultKey?: string;
   PatientKey?: string;
+  MBN?: string;
+  "Họ và tên"?: string;
+  "Tình trạng"?: string;
+  PatientWeight?: string;
+  CMRDigagnosisID?: string;
+  CMRDiagnosis?: string;
+  CMRRequest?: string;
+  DepartRequest?: string;
   CMRDate?: string;
   CMRMethod?: string;
+  CMRDevice?: string;
+  PostDepart?: string;
+  Anesthesia?: string;
+  CMRScheduledDate?: string;
+  DayOfWeek?: string;
+  CMRCallStatus?: string;
+  CMRCallStatusNote?: string;
   CMRResult?: string;
   CMRNote?: string;
+  ConcludedResult?: string;
+  PDFResult?: string;
+  NextPlan?: string;
+  UpdateTime?: string;
   [key: string]: any;
 }
 
