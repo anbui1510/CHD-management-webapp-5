@@ -50,8 +50,16 @@ push_with_token() {
   url="$(git_local remote get-url origin)"
 
   if [[ -n "${GITHUB_TOKEN:-}" && "$url" == https://github.com/* ]]; then
-    local authed="${url/https:\/\/github.com\//https://${GITHUB_TOKEN}@github.com/}"
-    git_local push "$authed" "HEAD:${branch}"
+    # Fine-grained PAT: dùng x-access-token; classic PAT: token làm username cũng được
+    local authed="${url/https:\/\/github.com\//https://x-access-token:${GITHUB_TOKEN}@github.com/}"
+    if ! git_local push "$authed" "HEAD:${branch}" 2>&1; then
+      echo "[github-sync] LỖI push — thường do token thiếu quyền ghi repo." >&2
+      echo "  → GitHub → Settings → Developer settings → Fine-grained token" >&2
+      echo "  → Repository access: chọn CHD-management-webapp-5" >&2
+      echo "  → Permissions: Contents = Read and write" >&2
+      echo "  → Sửa GITHUB_TOKEN trong .env (nano .env) rồi chạy lại." >&2
+      exit 1
+    fi
   else
     git_local push -u origin "$branch"
   fi

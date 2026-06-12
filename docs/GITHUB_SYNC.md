@@ -27,7 +27,7 @@ Sửa `.env`:
 
 ```env
 GITHUB_TOKEN="ghp_xxxxxxxx"
-GITHUB_REPO="https://github.com/YOUR_USERNAME/chd-management-webapp-5.git"
+GITHUB_REPO="https://github.com/anbui1510/CHD-management-webapp-5.git"
 GITHUB_BRANCH="main"
 GITHUB_SYNC_INTERVAL="300"
 ```
@@ -55,6 +55,31 @@ Chạy nền (tùy chọn):
 ```bash
 nohup npm run sync:github:watch > /tmp/chd-github-sync.log 2>&1 &
 ```
+
+### Tự chạy khi đăng nhập Arch Linux (systemd user)
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp scripts/chd-github-sync.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now chd-github-sync.service
+systemctl --user status chd-github-sync.service   # xem log
+```
+
+Dừng auto-sync:
+
+```bash
+systemctl --user stop chd-github-sync.service
+systemctl --user disable chd-github-sync.service
+```
+
+### Lỗi 403 "Write access not granted"
+
+Token fine-grained cần:
+- **Repository access:** Only select → `CHD-management-webapp-5`
+- **Permissions → Repository permissions → Contents:** Read and write
+
+Sửa token trong `nano .env` rồi service sẽ tự thử lại ở chu kỳ tiếp theo.
 
 ## Lệnh tóm tắt
 

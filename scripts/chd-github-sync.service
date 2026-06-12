@@ -1,0 +1,14 @@
+[Unit]
+Description=CHD Management - auto sync to GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hieubt1710/Downloads/CHD-management-webapp-5-main
+ExecStart=/bin/bash /home/hieubt1710/Downloads/CHD-management-webapp-5-main/scripts/github-auto-sync.sh
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target
