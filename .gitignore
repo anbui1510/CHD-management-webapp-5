@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Cursor / IDE
+.cursor/
+
+# Dữ liệu nhạy cảm / cấu hình máy local (dùng file *.example.json)
+data/sync_config.json
+
+# Cache dev
+.vite/

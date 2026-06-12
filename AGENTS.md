@@ -1,0 +1,143 @@
+# Định nghĩa Database Google Sheets và Hướng dẫn Agent (AGENTS.md)
+
+Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ liệu, tên biến và hướng dẫn lập trình cho dự án "Hệ Thống Cơ Sở Dữ Liệu Virtual Google Sheets" (Pediatric Cardiac Patient Management System). Bạn PHẢI tuân thủ các quy tắc trong file này.
+
+## Quy tắc chung
+1. KHI VIẾT CODE CẦN ĐẢM BẢO TÊN BIẾN PHẢI TRÙNG KHỚP HOÀN TOÀN VỚI TÊN CỘT TRONG GOOGLE SHEETS theo định nghĩa dưới đây.
+2. Không tự ý chế tên biến hoặc thay đổi cách viết hoa/thường (ví dụ `PatientName` không được thành `patientName`).
+3. Nếu thêm tính năng liên quan đến Table nào, phải dùng đúng Schema đã khai báo.
+4. Bất cứ khi nào user yêu cầu cập nhật hoặc thêm cột, hãy cập nhật lại tài liệu này và file `src/types.ts` cùng `src/data/appsScriptCode.ts`.
+
+---
+
+## Cấu trúc dữ liệu chi tiết
+
+### 1. Bảng Patient (Danh sách bệnh nhi)
+
+| Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `PatientKey` | Key | Text | UniqueID() | Bắt buộc | Mỗi bệnh nhân sẽ có 1 key duy nhất. |
+| `PatientID1` | Mã bệnh nhân / Mã BN | Text | | Bắt buộc | |
+| `PatientID2` | Mã bệnh nhân khác / Mã BN khác | Text | | | Mã BN khác có thể có từ 2 ID trở đi, cách nhau bởi dấu gạch ngang "-" |
+| `PatientName` | Họ và tên | Text | | Bắt buộc | |
+| `OtherPatientName`| Họ và tên khai sinh | Text | | | |
+| `PatientDOB` | Ngày sinh | Date | | Bắt buộc | Định dạng dd/mm/yyyy |
+| `PatientSex` | Giới tính | Enum | Nam/Nữ | Bắt buộc | |
+| `PatientAddress` | Địa chỉ | Enum | Danh sách tỉnh | Bắt buộc | Lưu ý ghi đúng tên `PatientAddress` |
+| `PatientPhone1` | Số ĐT 1 | Phone | | | |
+| `PatientPhone2` | Số ĐT 2 | Phone | | | |
+| `PatientCreateBy` | Người tạo thông tin BN | Ref | | | Liên kết đến bảng Staff thông qua StaffKey |
+| `PatientCreateTime`| Ngày tạo thông tin BN | DateTime | | | |
+| `Outcome` | Trạng thái cuối cùng của BN | Enum | Tử vong / Nặng xin về / Đã mổ / Đã thông / Chờ chỉ định | | |
+
+### 2. Bảng Consult (Lịch trình / Biên bản hội chẩn)
+
+| Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `ConsultKey` | Key | Text | UniqueID() | Bắt buộc | Mỗi lượt hội chẩn sẽ có 1 ConsultKey duy nhất |
+| `PatientKey` | | Ref | | Bắt buộc | Liên kết với Bảng Patient |
+| `ConsultType` | Loại hội chẩn | Enum | Staff mổ / Staff thông | Bắt buộc | |
+| `PatientWeight` | Cân nặng (kg) | Text | | Bắt buộc | |
+| `PatientHeight` | Chiều cao (cm) | Text | | | |
+| `ConsultDate` | Ngày hội chẩn | Date | | Bắt buộc | Định dạng dd/mm/yyyy |
+| `RequestBy` | BS đăng ký | Enum | Danh sách bác sĩ | Bắt buộc | Người đăng ký hội chẩn |
+| `DiagnosisID` | Bệnh chính | Enum | VSD, ASD, PDA... | Bắt buộc | Mã ICD bệnh theo chữ |
+| `DetailDiagnosis`| Chẩn đoán chi tiết | LongText| | Bắt buộc | |
+| `Department` | Khoa hội chẩn | Enum | Khoa Tim mạch / Khoa NgLMM | | |
+| `ConsultCreateBy`| Người tạo đăng ký staff| Ref | | | Liên kết bảng Staff qua StaffKey |
+| `ConsultCreateTime`| Ngày tạo đăng ký staff| DateTime| | | |
+| `ConsultMember` | Thành viên quyết định staff| Enumlist| Danh sách bác sĩ | | |
+| `ConsultResultID`| Kết luận chính | Enum | Can thiệp thông tim / Chụp chẩn đoán... / Mổ tim / Thêm CĐHA... | Bắt buộc | |
+| `DetailConsultResult`| Kết luận staff chi tiết| LongText| | Bắt buộc | |
+| `ConsultNote` | Lưu ý staff khác | LongText| | | |
+| `PlannedDevice` | Dụng cụ dự kiến | LongText| | Bắt buộc | |
+| `PlannedPrice` | Giá tiền dự kiến | Text | | | |
+| `PriorityOrder` | Ưu tiên | Enum | Cấp cứu / Chương trình / Ngoại giao / YC | | |
+| `RiskFactor` | Nguy cơ | Enumlist| 1 - Hỗ trợ SHH / NT khó kiểm soát... | | |
+| `ConsultResultCreateBy`| Người nhập kết quả | Ref | | | Liên kết Staff |
+| `ConsultResultCreateTime`| Ngày tạo kết quả | DateTime| | | |
+| `CheckDevice` | Check dụng cụ | Enum | Đủ / Thiếu | Bắt buộc | |
+| `OperationFeedback`| Phòng mổ phản hồi | LongText| | | |
+| `SupplyDepFeedback`| Phòng vật tư phản hồi| LongText| | | |
+| `CallStatus` | Trạng thái gọi bệnh | Enum | Sai số điện thoại / Chưa liên lạc được... | Bắt buộc | |
+| `CallNote` | Ghi chú gọi bệnh | LongText| Muốn theo dõi nơi khác / Chờ tài trợ...| | |
+| `PlannedCathLabDate`| Dự kiến ngày thông tim| Date | | Bắt buộc | Định dạng dd/mm/yyyy |
+| `FundingRequest` | Hỗ trợ tài chính | Enum | Không tài trợ / Chờ duyệt / Đã duyệt | | |
+| `CheckDeviceDate`| Ngày kiểm dụng cụ | DateTime| | | |
+| `CheckDeviceBy` | Người kiểm dụng cụ | Ref | | | |
+| `CathMethod` | Phương pháp can thiệp | Ref | Ref tới bảng Source | | |
+| `PostCathDepart` | Khoa nằm sau TT | Enum | Danh sách khoa | | |
+| `Scheduled1stInterventionist`| PTV chính dự kiến | Enum | Danh sách bác sĩ | | |
+| `Scheduled2ndInterventionist`| PTV phụ 1 dự kiến | Enum | Danh sách bác sĩ | | |
+| `Scheduled3rdInterventionist`| PTV phụ 2 dự kiến | Enum | Danh sách bác sĩ | | |
+
+### 3. Bảng CathLab (Can thiệp tim mạch)
+
+| Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `CathKey` | Khoá chính | Text | UniqueID() | Bắt buộc | |
+| `PatientKey` | Liên kết Patient | Ref | | Bắt buộc | Liên kết với Bảng Patient |
+| `ConsultKey` | Liên kết Consult | Ref | | | Liên kết với Bảng Consult |
+| `CathDate` | Ngày thông tim | Date | | Bắt buộc | Định dạng dd/mm/yyyy |
+| `PostDiagnosisID`| Bệnh chính sau TT | Enum | | Bắt buộc | |
+| `PostDiagnosis` | Chẩn đoán chi tiết sau PT| LongText| | | |
+| `CathResultID` | Kết luận sau TT | Enum | Thành công / Không thành công / Hoãn | Bắt buộc | |
+| `CathMethod` | Phương pháp TT | Enumlist| Danh sách can thiệp | Bắt buộc | |
+| `CathPlan` | Kế hoạch tiếp theo | Enum | Tái khám theo hẹn / Cần thông tim can thiệp lại...| Bắt buộc | |
+| `CathNote` | Ghi chú thông tim | LongText| | | |
+| `_1stInterventionist`| PTV chính | Enum | Danh sách bác sĩ can thiệp | Bắt buộc | |
+| `_2ndInterventionist`| PTV phụ 1 | Enum | Danh sách bác sĩ can thiệp | Bắt buộc | |
+| `_3rdInterventionist`| PTV phụ 2 | Enum | Danh sách bác sĩ can thiệp | | |
+| `_4thInterventionist`| PTV phụ 3 | Enum | Danh sách bác sĩ can thiệp | | |
+| `PlannedFollowUpDate`| Ngày hẹn tái khám | Date | | | Định dạng dd/mm/yyyy |
+| `CathUpdatedBy` | Người cập nhật | Ref | | | |
+| `CathUpdatedTime`| Ngày cập nhật | DateTime| | | |
+
+### 4. Bảng Operation (Mổ tim)
+
+| Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `SurgKey` | Key | Text | UniqueID() | Bắt buộc | Khóa mổ |
+| `PatientKey` | Key | Ref | | Bắt buộc | Liên kết Bảng Patient |
+| `ConsultKey` | Key | Ref | | | Liên kết Bảng Consult |
+| `SurgDate` | Ngày PT | Date | | Bắt buộc | |
+| `DetailDiagnosisManual`| Chẩn đoán thủ công | LongText| | | |
+| `PostDiagnosis` | Chẩn đoán PT | LongText| | | |
+| `SurgResultID` | Kết quả PT | Enum | | | |
+| `SurgNote` | Ghi chú PT | LongText| | | |
+| `SurgMethod` | Phương pháp PT | Enum | | | |
+| `PlannedFollowUpDate`| Ngày tái khám | Date | | | |
+| `1stSurgeon` | PTV chính | Enum | | | |
+| `2ndSurgeon` | PTV phụ 1 | Enum | | | |
+| `3rdSurgeon` | PTV phụ 2 | Enum | | | |
+| `4thSurgeon` | PTV phụ 3 | Enum | | | |
+| `SurgCreateTime` | Thời gian tạo | DateTime| | | |
+| `SurgUpdatedBy` | Người cập nhật | Ref | | | |
+
+### 5. Bảng Staff (Nhân viên Y Tế)
+*   **Lưu ý**: Bảng Staff quản lý phân quyền và phiên đăng nhập.
+*   `StaffKey`: Mã NV (Primary Key)
+*   `StaffName`: Tên nhân viên hiển thị
+*   `Name`: Tên đầy đủ
+*   `StaffSex`: Giới tính
+*   `Avatar`: Link ảnh
+*   `StaffDOB`: Ngày sinh
+*   `Department`: Khoa / Phòng ban
+*   `Career`: Chức danh chuyên môn
+*   `StaffPhone`: Số điện thoại
+*   `Password`: Mật khẩu đăng nhập
+*   `Role`: Quyền ('Admin' | 'User')
+*   `Email`: Địa chỉ email
+*   `FireDate`: Ngày nghỉ việc (Trống nếu còn làm)
+
+### 6. Bảng CMR (Cộng hưởng từ tim)
+*   `CMRKey`: Khóa CMR
+*   `ConsultKey`: Khóa hội chẩn 
+*   `PatientKey`: Khóa bệnh nhi
+*   `CMRDate`: Ngày chụp 
+*   `CMRMethod`: Phương thức chụp 
+*   `CMRResult`: Kết quả CMR
+*   `CMRNote`: Ghi chú CMR
+
+### 7. Bảng Source (Cấu hình nguồn và danh mục)
+*   Chứa các danh mục thiết lập, các cột phụ thuộc vào cấu hình người dùng. Hệ thống sẽ tự động quét hết các cột vào mảng.
