@@ -231,8 +231,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
-  const [schedulePureCalendar, setSchedulePureCalendar] = useState<boolean>(false);
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
 
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
@@ -1330,6 +1329,12 @@ export default function App() {
           subtitle: "",
           icon: <CalendarDays className="w-5 h-5 text-pink-200 animate-pulse" />
         };
+      case 'schedule-view':
+        return {
+          title: "LỊCH THÔNG TIM DỰ KIẾN",
+          subtitle: "",
+          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
+        };
       case 'cathlab-room':
       case 'transferred-cathlab':
         return {
@@ -1457,7 +1462,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
+      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
         
         {/* Collapsible Left navigation Aside drawer */}
         <aside className={`${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
@@ -1479,7 +1484,6 @@ export default function App() {
                   key={menu.id}
                   onClick={() => {
                     setActiveMenu(menu.id as any);
-                    setSchedulePureCalendar(false);
                   }}
                   title={!isSidebarExpanded ? menu.label : undefined}
                   className={`relative w-full flex items-center ${isSidebarExpanded ? 'gap-2.5 px-3' : 'justify-center p-2'} py-2 text-xs font-semibold rounded-2xl transition-all ${
@@ -1523,13 +1527,12 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
             <HomeDashboard 
               onNavigate={(menu) => {
-                setSchedulePureCalendar(false);
                 setActiveMenu(menu as any);
               }}
               patientCount={patients.length}
@@ -1548,11 +1551,6 @@ export default function App() {
           {activeMenu === 'workspace' && (
             <WorkspaceDashboard 
               onNavigate={(menu) => {
-                if (menu === 'schedule-tt') {
-                  setSchedulePureCalendar(true);
-                } else {
-                  setSchedulePureCalendar(false);
-                }
                 setActiveMenu(menu as any);
               }}
               patientCount={patients.length}
@@ -2549,15 +2547,34 @@ export default function App() {
              />
           )}
 
-          {/* XẾP LỊCH THÔNG TIM PANEL */}
+          {/* XẾP LỊCH THÔNG TIM PANEL (FULL - có danh sách chờ, bộ lọc) */}
           {activeMenu === 'schedule-tt' && (
             <CathLabSchedulerView 
               patients={patients}
               consults={consults}
               staffList={staffList}
               currentStaff={currentStaff}
-              pureCalendarMode={schedulePureCalendar}
-              onTogglePureMode={() => setSchedulePureCalendar(prev => !prev)}
+              pureCalendarMode={false}
+              onRefreshData={() => {
+                fetchPatients();
+                fetchConsults();
+                fetchStaff();
+              }}
+              onViewPatientRecord={(pat) => {
+                setActiveMenu('patients');
+                setSelectedPatientForDetail(pat);
+              }}
+            />
+          )}
+
+          {/* LỊCH THÔNG TIM DỰ KIẾN (VIEW-ONLY - chỉ xem lịch) */}
+          {activeMenu === 'schedule-view' && (
+            <CathLabSchedulerView 
+              patients={patients}
+              consults={consults}
+              staffList={staffList}
+              currentStaff={currentStaff}
+              pureCalendarMode={true}
               onRefreshData={() => {
                 fetchPatients();
                 fetchConsults();

@@ -1681,7 +1681,7 @@ export default function CathLabSchedulerView({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${isAnyFilterExpanded ? 'hidden md:flex lg:col-span-5 xl:col-span-4' : 'lg:col-span-5 xl:col-span-5'}`}>
+        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : (isAnyFilterExpanded ? 'hidden md:flex lg:col-span-5 xl:col-span-4' : 'lg:col-span-5 xl:col-span-5')}`}>
           
           <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between gap-2">
             <div>
@@ -1915,12 +1915,12 @@ export default function CathLabSchedulerView({
         </div>
 
         {/* RIGHT COLUMN: Selection Detailed Form Editor OR Preview List */}
-        <div className={`flex flex-col rounded-3xl shadow-sm overflow-hidden h-full min-h-0 ${isAnyFilterExpanded ? 'lg:col-span-7 xl:col-span-8 bg-white border border-slate-200' : 'lg:col-span-7 xl:col-span-7 bg-white border border-[#e2e8f0]'}`}>
+        <div className={`flex flex-col rounded-3xl shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : (isAnyFilterExpanded ? 'lg:col-span-7 xl:col-span-8 bg-white border border-slate-200' : 'lg:col-span-7 xl:col-span-7 bg-white border border-[#e2e8f0]')}`}>
           {!isAnyFilterExpanded ? (
             <>
-              {!selectedConsult ? (
+              {(!selectedConsult || pureCalendarMode) ? (
             
-            /* SHOW THE BEAUTIFUL INDEPENDENT CALENDAR WHEN NO PATIENT IS SELECTED */
+            /* SHOW THE BEAUTIFUL INDEPENDENT CALENDAR WHEN NO PATIENT IS SELECTED (or in pure calendar mode) */
             <div className="flex-1 flex flex-col min-h-0 bg-white">
               
               {/* Calendar Title Bar */}
@@ -2044,6 +2044,7 @@ export default function CathLabSchedulerView({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleSelectConsult(c);
+                                      if (pureCalendarMode) setShowSummaryModal(true);
                                     }}
                                     className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight px-1.5 py-0.5 rounded-lg truncate cursor-pointer transition select-none tracking-wide text-center uppercase"
                                     title={`${pat?.PatientName || 'Unknown Patient'} (${c.DiagnosisID || 'N/A'})`}
@@ -2101,7 +2102,7 @@ export default function CathLabSchedulerView({
                                 return (
                                   <div
                                     key={c.ConsultKey}
-                                    onClick={() => handleSelectConsult(c)}
+                                    onClick={() => { handleSelectConsult(c); if (pureCalendarMode) setShowSummaryModal(true); }}
                                     className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight p-1 rounded-lg cursor-pointer transition tracking-wide text-center uppercase border border-[#80072d]"
                                   >
                                     <p className="truncate font-black">{pat?.PatientName || 'BỆNH NHI'}</p>
@@ -2159,7 +2160,7 @@ export default function CathLabSchedulerView({
                           return (
                             <div 
                               key={c.ConsultKey}
-                              onClick={() => handleSelectConsult(c)}
+                              onClick={() => { handleSelectConsult(c); if (pureCalendarMode) setShowSummaryModal(true); }}
                               className="bg-white border border-slate-150 p-3 rounded-2xl flex justify-between items-center hover:bg-slate-100 cursor-pointer transition shadow-xs"
                             >
                               <div>
@@ -2877,7 +2878,7 @@ export default function CathLabSchedulerView({
         </div>
 
         {/* Right Collapsible Panels Container */}
-        <div className="shrink-0 flex flex-col gap-4 self-start h-full min-h-0">
+        <div className={`shrink-0 flex flex-col gap-4 self-start h-full min-h-0 ${pureCalendarMode ? 'hidden' : ''}`}>
           
           {/* Export Schedule Panel */}
           <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-[320px] flex-1 min-h-0' : 'w-[52px]'}`}>

@@ -46,7 +46,7 @@ export default function WorkspaceDashboard({
           </button>
           
           <button
-            onClick={() => onNavigate('schedule-tt')}
+            onClick={() => onNavigate('schedule-view')}
             className="bg-white border rounded-2xl p-5 hover:border-rose-300 hover:shadow-md transition text-left group"
           >
              <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
