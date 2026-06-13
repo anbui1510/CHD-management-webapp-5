@@ -1,26 +1,55 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  AlertTriangle,
   Calendar,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Filter,
+  Plus,
   Save,
   Search,
   X
 } from 'lucide-react';
-import { CMR, Consult, Patient, Source, Staff, formatVNTime, removeDiacritics } from '../types';
+import { CMR, Consult, Patient, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
+import { getDiagnosisOptions } from '../data/source';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
   consults: Consult[];
   cmrs: CMR[];
   sources: Source[];
+  staffList?: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
 }
+
+const ADDRESS_OPTIONS = [
+  "TP Hà Nội", "Tuyên Quang", "Cao Bằng", "Lai Châu", "Lào Cai", "Thái Nguyên", "Điện Biên", "Lạng Sơn", "Sơn La", "Phú Thọ", "Bắc Ninh", "Quảng Ninh", "TP Hải Phòng", "Hưng Yên", "Ninh Bình", "Thanh Hoá", "Nghệ An", "Hà Tĩnh", "Quảng Trị", "TP Huế", "TP Đà Nẵng", "Quảng Ngãi", "Gia Lai", "Đắk Lắk", "Khánh Hoà", "Lâm Đồng", "Đồng Nai", "Tây Ninh", "TP Hồ Chí Minh", "Đồng Tháp", "An Giang", "Vĩnh Long", "TP Cần Thơ", "Cà Mau"
+];
+
+const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] = []): string => {
+  if (!fullName) return '';
+  let cleaned = fullName.replace(/\s*\(.*?\)\s*/g, '').trim();
+  cleaned = cleaned.replace(/^(BS\.|BS)\s+/i, '').trim();
+  const parts = cleaned.split(/\s+/);
+  if (parts.length === 0) return '';
+  const firstName = parts[parts.length - 1];
+  if (parts.length === 1) return `BS. ${firstName}`;
+  const middleName = parts[parts.length - 2];
+  const hasFirstNameDuplicate = staffList.length > 0 && staffList.some(s => {
+    let sClean = s.StaffName.replace(/\s*\(.*?\)\s*/g, '').trim();
+    sClean = sClean.replace(/^(BS\.|BS)\s+/i, '').trim();
+    const sParts = sClean.split(/\s+/);
+    if (sParts.length <= 1) return false;
+    return sParts[sParts.length - 1] === firstName && s.StaffName !== fullName;
+  });
+  if (hasFirstNameDuplicate && middleName) return `BS. ${middleName} ${firstName}`;
+  return `BS. ${firstName}`;
+};
 
 type MriTab = 'unscheduled' | 'scheduled';
 
@@ -88,10 +117,28 @@ export default function MRISchedulerView({
   consults,
   cmrs,
   sources,
+  staffList = [],
   currentStaff,
   onRefreshData
 }: MRISchedulerViewProps) {
   const [activeTab, setActiveTab] = useState<MriTab>('unscheduled');
+
+  // Ad-hoc "Xếp bổ sung" modal states
+  const [showAdHoc, setShowAdHoc] = useState(false);
+  const [adHocLoading, setAdHocLoading] = useState(false);
+  const [adHocSuccess, setAdHocSuccess] = useState('');
+  const [adHocError, setAdHocError] = useState('');
+  const [adHocPatientMode, setAdHocPatientMode] = useState<'select' | 'create'>('select');
+  const [adHocSearchPat, setAdHocSearchPat] = useState('');
+  const [adHocSelectedPatKey, setAdHocSelectedPatKey] = useState('');
+  const [adHocNewPatID1, setAdHocNewPatID1] = useState('');
+  const [adHocNewPatID2, setAdHocNewPatID2] = useState('');
+  const [adHocNewPatName, setAdHocNewPatName] = useState('');
+  const [adHocNewPatDOB, setAdHocNewPatDOB] = useState('');
+  const [adHocNewPatSex, setAdHocNewPatSex] = useState<'Nam' | 'Nữ'>('Nam');
+  const [adHocNewPatAddress, setAdHocNewPatAddress] = useState('TP Hà Nội');
+  const [adHocNewPatPhone, setAdHocNewPatPhone] = useState('');
+  const [adHocForm, setAdHocForm] = useState<Partial<CMR>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<MRISchedulerItem | null>(null);
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
@@ -113,15 +160,28 @@ export default function MRISchedulerView({
   }, [patients]);
 
   const diagnosisOptions = useMemo(() => {
-    return Array.from(new Set(
-      [
-        ...sources.map(source => String(source.DiagnosisID || '').trim()),
-        ...consults.map(consult => String(consult.DiagnosisID || '').trim()),
-        ...cmrs.map(cmr => String(cmr.CMRDigagnosisID || '').trim())
-      ]
-        .filter(Boolean)
-    )).sort((a, b) => a.localeCompare(b, 'vi'));
+    return getDiagnosisOptions(sources, [
+      ...consults.map(consult => consult.DiagnosisID),
+      ...cmrs.map(cmr => cmr.CMRDiagnosisID)
+    ]);
   }, [sources, consults, cmrs]);
+
+  const createDiagnosisSource = async (DiagnosisID: string) => {
+    const trimmed = DiagnosisID.trim();
+    if (!trimmed) return;
+
+    const response = await fetch('/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ DiagnosisID: trimmed })
+    });
+
+    if (!response.ok) {
+      throw new Error('Không thể thêm DiagnosisID vào Source');
+    }
+
+    onRefreshData();
+  };
 
   const departmentOptions = useMemo(() => {
     return Array.from(new Set(
@@ -175,7 +235,7 @@ export default function MRISchedulerView({
           MBN: patient?.PatientID1 || '',
           'Họ và tên': patient?.PatientName || '',
           PatientWeight: consult.PatientWeight || '',
-          CMRDigagnosisID: consult.DiagnosisID || '',
+          CMRDiagnosisID: consult.DiagnosisID || '',
           CMRDiagnosis: consult.DetailDiagnosis || '',
           CMRRequest: consult.DetailConsultResult || consult.ConsultNote || '',
           DepartRequest: consult.Department || '',
@@ -210,7 +270,7 @@ export default function MRISchedulerView({
         patient?.PatientID1,
         item['Họ và tên'],
         item.MBN,
-        item.CMRDigagnosisID,
+        item.CMRDiagnosisID,
         item.CMRDiagnosis,
         item.CMRRequest,
         item.CMRCallStatus
@@ -289,7 +349,7 @@ export default function MRISchedulerView({
       MBN: item.MBN || item.__patient?.PatientID1 || '',
       'Họ và tên': item['Họ và tên'] || item.__patient?.PatientName || '',
       PatientWeight: item.PatientWeight || item.__consult?.PatientWeight || '',
-      CMRDigagnosisID: item.CMRDigagnosisID || item.__consult?.DiagnosisID || '',
+      CMRDiagnosisID: item.CMRDiagnosisID || item.__consult?.DiagnosisID || '',
       CMRDiagnosis: item.CMRDiagnosis || item.__consult?.DetailDiagnosis || '',
       CMRRequest: item.CMRRequest || item.__consult?.DetailConsultResult || item.__consult?.ConsultNote || '',
       DepartRequest: item.DepartRequest || item.__consult?.Department || '',
@@ -321,7 +381,7 @@ export default function MRISchedulerView({
     const patient = selectedItem.__patient;
     const requiredFields: { key: keyof CMR; label: string }[] = [
       { key: 'PatientWeight', label: 'Cân nặng (kg)' },
-      { key: 'CMRDigagnosisID', label: 'Mã chẩn đoán MRI' },
+      { key: 'CMRDiagnosisID', label: 'Mã chẩn đoán MRI' },
       { key: 'CMRDiagnosis', label: 'Chẩn đoán MRI' },
       { key: 'CMRRequest', label: 'Yêu cầu MRI' },
       { key: 'Anesthesia', label: 'Gây mê' },
@@ -370,6 +430,149 @@ export default function MRISchedulerView({
     }
   };
 
+  const extraDoctorOptions = useMemo(() => {
+    return Array.from(new Set([
+      ...cmrs.map(cmr => String(cmr.RequestBy || '')),
+      ...consults.map(consult => String(consult.RequestBy || ''))
+    ])).filter(d => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d));
+  }, [cmrs, consults, staffList]);
+
+  const updateAdHocField = (key: keyof CMR, value: string) => {
+    setAdHocForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const resetAdHoc = () => {
+    setAdHocPatientMode('select');
+    setAdHocSearchPat('');
+    setAdHocSelectedPatKey('');
+    setAdHocNewPatID1('');
+    setAdHocNewPatID2('');
+    setAdHocNewPatName('');
+    setAdHocNewPatDOB('');
+    setAdHocNewPatSex('Nam');
+    setAdHocNewPatAddress('TP Hà Nội');
+    setAdHocNewPatPhone('');
+    setAdHocForm({});
+    setAdHocSuccess('');
+    setAdHocError('');
+  };
+
+  const getAdHocBlockingCmr = (patientKey: string): CMR | undefined => {
+    const normalized = normalizePatientKey(patientKey);
+    if (!normalized) return undefined;
+    return cmrs.find(cmr =>
+      normalizePatientKey(cmr.PatientKey) === normalized &&
+      !getFormattedDateKey(cmr.CMRScheduledDate) &&
+      !getFormattedDateKey(cmr.CMRDate)
+    );
+  };
+
+  const adHocBlockingCmr = adHocSelectedPatKey ? getAdHocBlockingCmr(adHocSelectedPatKey) : undefined;
+
+  const handleAdHocSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAdHocLoading(true);
+    setAdHocError('');
+    setAdHocSuccess('');
+
+    try {
+      if (!String(adHocForm.CMRDiagnosisID || '').trim()) {
+        setAdHocError('Vui lòng chọn Mã chẩn đoán MRI (CMRDiagnosisID)!');
+        setAdHocLoading(false);
+        return;
+      }
+
+      let finalPatientKey = adHocSelectedPatKey;
+      let finalPatient: Patient | undefined = findPatientByKey(patients, adHocSelectedPatKey) || undefined;
+
+      if (adHocPatientMode === 'create') {
+        if (!adHocNewPatID1.trim() || !adHocNewPatName.trim()) {
+          setAdHocError('Vui lòng nhập Mã bệnh nhi (ID1) và Họ tên bệnh nhi!');
+          setAdHocLoading(false);
+          return;
+        }
+        const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === adHocNewPatID1.trim().toLowerCase());
+        if (dup) {
+          setAdHocError(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${dup.PatientName}).`);
+          setAdHocLoading(false);
+          return;
+        }
+        finalPatientKey = `pat_${Date.now()}`;
+        const patientPayload = {
+          PatientKey: finalPatientKey,
+          PatientID1: adHocNewPatID1.trim(),
+          PatientID2: adHocNewPatID2.trim(),
+          PatientName: adHocNewPatName,
+          OtherPatientName: adHocNewPatName,
+          PatientDOB: adHocNewPatDOB || '2020-01-01',
+          PatientSex: adHocNewPatSex,
+          PatientAddress: adHocNewPatAddress || 'TP Hà Nội',
+          PatientPhone1: adHocNewPatPhone || '',
+          PatientPhone2: '',
+          PatientCreateBy: currentStaff?.StaffKey || '01378',
+          PatientCreateTime: new Date().toISOString()
+        };
+        const patRes = await fetch('/api/patients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patientPayload)
+        });
+        if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
+        finalPatient = patientPayload as unknown as Patient;
+      } else {
+        if (!finalPatientKey) {
+          setAdHocError('Vui lòng tìm và chọn bệnh nhi sẵn có hoặc đổi sang chế độ tạo mới!');
+          setAdHocLoading(false);
+          return;
+        }
+        if (getAdHocBlockingCmr(finalPatientKey)) {
+          setAdHocError('Bệnh nhi này đã có lượt đăng ký MRI đang chờ (chưa xếp lịch và chưa chụp).');
+          setAdHocLoading(false);
+          return;
+        }
+      }
+
+      const cmrPayload: CMR = {
+        CMRKey: `cmr_${Date.now()}`,
+        PatientKey: finalPatientKey,
+        MBN: finalPatient?.PatientID1 || '',
+        'Họ và tên': finalPatient?.PatientName || '',
+        PatientWeight: String(adHocForm.PatientWeight || ''),
+        CMRDiagnosisID: String(adHocForm.CMRDiagnosisID || ''),
+        CMRDiagnosis: String(adHocForm.CMRDiagnosis || ''),
+        CMRRequest: String(adHocForm.CMRRequest || ''),
+        RequestBy: String(adHocForm.RequestBy || ''),
+        DepartRequest: String(adHocForm.DepartRequest || ''),
+        CMRMethod: String(adHocForm.CMRMethod || ''),
+        CMRDevice: String(adHocForm.CMRDevice || ''),
+        PostDepart: String(adHocForm.PostDepart || ''),
+        Anesthesia: String(adHocForm.Anesthesia || ''),
+        CMRScheduledDate: getFormattedDateKey(adHocForm.CMRScheduledDate),
+        CMRCallStatus: String(adHocForm.CMRCallStatus || ''),
+        CMRCallStatusNote: String(adHocForm.CMRCallStatusNote || ''),
+        UpdateTime: new Date().toISOString()
+      };
+
+      const res = await fetch('/api/cmrs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cmrPayload)
+      });
+      if (!res.ok) throw new Error('Không thể xếp bổ sung MRI');
+
+      setAdHocSuccess('Đã xếp bổ sung MRI thành công!');
+      setTimeout(() => {
+        setShowAdHoc(false);
+        resetAdHoc();
+        onRefreshData();
+      }, 1500);
+    } catch (error: any) {
+      setAdHocError(`Đã xảy ra lỗi: ${error.message || error}`);
+    } finally {
+      setAdHocLoading(false);
+    }
+  };
+
   const renderInput = (key: keyof CMR, label: string, placeholder = '', required = false) => (
     <div>
       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
@@ -396,6 +599,9 @@ export default function MRISchedulerView({
         value={String(formData[key] || '')}
         options={options}
         onChange={(value) => updateField(key, value)}
+        allowCreate={key === 'CMRDiagnosisID'}
+        createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+        onCreateOption={key === 'CMRDiagnosisID' ? createDiagnosisSource : undefined}
         placeholder="-- Chọn --"
         searchPlaceholder={placeholder}
       />
@@ -422,14 +628,23 @@ export default function MRISchedulerView({
       <div className="flex-1 overflow-hidden p-3 lg:p-4 flex h-full min-h-0 gap-4">
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
           <div className={`${isFilterExpanded ? 'hidden xl:flex xl:col-span-5' : 'lg:col-span-6'} bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
-            <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0">
-              <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-[#d2145a]" />
-                Danh sách chờ xếp lịch MRI
-              </h3>
-              <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
-                Tổng cộng: {allMriItems.length} ca MRI tim
-              </p>
+            <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between gap-2">
+              <div>
+                <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
+                  <Activity className="w-4 h-4 text-[#d2145a]" />
+                  Danh sách chờ xếp lịch MRI
+                </h3>
+                <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
+                  Tổng cộng: {allMriItems.length} ca MRI tim
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { resetAdHoc(); setShowAdHoc(true); }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3 py-2 rounded-xl text-[10px] flex items-center justify-center gap-1.5 shadow-md transition shrink-0 cursor-pointer uppercase tracking-wider"
+              >
+                <Plus className="w-3.5 h-3.5" /> Xếp bổ sung
+              </button>
             </div>
 
             <div className="px-4 py-2 bg-slate-50/75 border-b border-slate-150 flex gap-2 shrink-0">
@@ -507,7 +722,7 @@ export default function MRISchedulerView({
                         </td>
                         <td className="py-3 px-3">
                           <span className="text-[9px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">
-                            {item.CMRDigagnosisID || '—'}
+                            {item.CMRDiagnosisID || '—'}
                           </span>
                           <span className="line-clamp-2">{item.CMRDiagnosis || '—'}</span>
                         </td>
@@ -666,7 +881,7 @@ export default function MRISchedulerView({
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                       {renderInput('PatientWeight', 'Cân nặng (kg)', 'vd: 12', true)}
-                      {renderEnumInput('CMRDigagnosisID', 'Mã chẩn đoán MRI', diagnosisOptions, 'Gõ ICD để tìm', true)}
+                      {renderEnumInput('CMRDiagnosisID', 'Mã chẩn đoán MRI', diagnosisOptions, 'Gõ ICD để tìm', true)}
                       {renderEnumInput('DepartRequest', 'Khoa yêu cầu', departmentOptions, 'Gõ khoa để tìm')}
                       {renderInput('CMRMethod', 'Phương thức chụp', 'Phương thức chụp')}
                       {renderInput('CMRDevice', 'Máy/thiết bị MRI', 'Máy/thiết bị MRI')}
@@ -792,7 +1007,7 @@ export default function MRISchedulerView({
                           {item.__patient?.PatientName || item['Họ và tên'] || '—'}
                         </span>
                         <span className="block text-[10px] text-slate-500 truncate">
-                          {item.CMRDigagnosisID || '—'} - {item.CMRCallStatus || 'Chưa gọi'}
+                          {item.CMRDiagnosisID || '—'} - {item.CMRCallStatus || 'Chưa gọi'}
                         </span>
                       </button>
                     ))}
@@ -810,6 +1025,333 @@ export default function MRISchedulerView({
           </div>
         </div>
       </div>
+
+      {/* XẾP BỔ SUNG MRI MODAL */}
+      {showAdHoc && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[96vh] md:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
+
+            <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <div>
+                  <h3 className="font-extrabold text-sm uppercase text-indigo-900">Xếp bổ sung MRI</h3>
+                  <p className="text-[10px] text-slate-500 normal-case mt-0.5">Tạo nhanh một ca MRI và xếp lịch bổ sung.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowAdHoc(false); resetAdHoc(); }}
+                className="text-slate-400 hover:text-red-600 p-1 bg-white hover:bg-red-50 border border-slate-200 rounded-full transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdHocSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
+
+              {adHocSuccess && (
+                <div className="absolute inset-x-0 top-0 bg-emerald-500 text-white py-3.5 px-6 font-bold text-center z-50 animate-in slide-in-from-top flex items-center justify-center gap-2 text-xs">
+                  <CheckCircle2 className="w-5 h-5 shrink-0" />
+                  <span>{adHocSuccess}</span>
+                </div>
+              )}
+
+              {adHocError && (
+                <div className="bg-rose-50 border-r-4 border-rose-500 text-rose-800 py-2.5 px-6 text-[11px] font-semibold animate-in slide-in-from-top flex items-center gap-2 shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{adHocError}</span>
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-slate-50/50">
+
+                {/* Patient choice */}
+                <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2">
+                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                    1. Bệnh nhi
+                  </span>
+
+                  <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => { setAdHocPatientMode('select'); setAdHocSelectedPatKey(''); setAdHocSearchPat(''); }}
+                      className={`flex-1 py-1 px-2 text-center font-bold transition-all text-xs cursor-pointer rounded-lg ${
+                        adHocPatientMode === 'select' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                      }`}
+                    >
+                      Chọn bệnh nhi có sẵn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAdHocPatientMode('create'); setAdHocSelectedPatKey(''); setAdHocSearchPat(''); }}
+                      className={`flex-1 py-1 px-2 text-center font-bold transition-all text-xs cursor-pointer rounded-lg ${
+                        adHocPatientMode === 'create' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                      }`}
+                    >
+                      Tạo nhanh bệnh nhi mới
+                    </button>
+                  </div>
+
+                  {adHocPatientMode === 'select' && (
+                    <div className="space-y-1.5">
+                      {!adHocSelectedPatKey && (
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <Search className="h-4 w-4 text-slate-400" />
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="Tìm tên, mã NB (ID1) để chọn..."
+                            value={adHocSearchPat}
+                            onChange={(e) => setAdHocSearchPat(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 shadow-sm"
+                          />
+                        </div>
+                      )}
+
+                      {!adHocSelectedPatKey && adHocSearchPat.trim().length > 0 && (
+                        <div className="max-h-32 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-lg">
+                          {(() => {
+                            const trimmed = removeDiacritics(adHocSearchPat).trim().toLowerCase();
+                            const matched = patients.filter(p => {
+                              const nameOk = p.PatientName ? removeDiacritics(String(p.PatientName)).toLowerCase().includes(trimmed) : false;
+                              const idOk = p.PatientID1 ? removeDiacritics(String(p.PatientID1)).toLowerCase().includes(trimmed) : false;
+                              return nameOk || idOk;
+                            });
+                            if (matched.length === 0) {
+                              return <div className="p-3 text-center text-slate-400 italic">Không tìm thấy bệnh nhi "{adHocSearchPat}"</div>;
+                            }
+                            return matched.slice(0, 12).map(p => (
+                              <button
+                                key={p.PatientKey}
+                                type="button"
+                                onClick={() => { setAdHocSelectedPatKey(p.PatientKey); setAdHocSearchPat(''); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition flex justify-between items-center cursor-pointer"
+                              >
+                                <div>
+                                  <span className="font-extrabold uppercase text-slate-800">{p.PatientName}</span>
+                                  <span className="text-[10px] text-slate-500 font-mono ml-1">(ID1: {p.PatientID1})</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 italic">DOB: {formatVNTime(p.PatientDOB)} | {p.PatientSex}</span>
+                              </button>
+                            ));
+                          })()}
+                        </div>
+                      )}
+
+                      {adHocSelectedPatKey && (() => {
+                        const selectedPat = findPatientByKey(patients, adHocSelectedPatKey);
+                        if (!selectedPat) return null;
+                        return (
+                          <div className="bg-indigo-50/50 border border-indigo-150 rounded-xl p-2.5 text-slate-800 flex flex-col gap-1.5 shadow-sm">
+                            <div className="flex justify-between items-center border-b border-indigo-100 pb-1 shrink-0">
+                              <span className="text-[10px] uppercase font-bold text-indigo-850">Thông tin đối chiếu</span>
+                              <button
+                                type="button"
+                                onClick={() => setAdHocSelectedPatKey('')}
+                                className="text-indigo-600 hover:text-red-500 font-bold text-[9px] bg-white hover:bg-rose-50 px-2 py-0.5 rounded-lg border border-indigo-150 shadow-xs transition shrink-0 cursor-pointer"
+                              >
+                                ✕ Bỏ chọn
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                              <div>
+                                <span className="text-slate-400 font-bold block text-[8px] uppercase">Họ và tên:</span>
+                                <span className="font-extrabold text-indigo-950 uppercase text-[11px]">{selectedPat.PatientName}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-bold block text-[8px] uppercase">Mã NB1 (ID1):</span>
+                                <span className="font-bold font-mono text-slate-800">{selectedPat.PatientID1}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {adHocBlockingCmr && (
+                        <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-3 text-[10px] flex gap-2">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Bệnh nhi đã có lượt đăng ký MRI đang chờ (chưa xếp lịch và chưa chụp).</p>
+                            <p>Không thể xếp bổ sung cho đến khi hoàn tất lượt hiện tại.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {adHocPatientMode === 'create' && (
+                    <div className="bg-pink-50/50 border border-pink-100 rounded-2xl p-2.5 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Mã bệnh nhi (ID1) *</label>
+                          <input type="text" placeholder="Mã ID1..." value={adHocNewPatID1} onChange={(e) => setAdHocNewPatID1(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-mono text-xs focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Mã bệnh nhi phụ (ID2)</label>
+                          <input type="text" placeholder="Mã ID2 (nếu có)..." value={adHocNewPatID2} onChange={(e) => setAdHocNewPatID2(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-mono text-xs focus:outline-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Họ tên Bệnh Nhi *</label>
+                        <input type="text" placeholder="Nhập họ và tên viết hoa..." value={adHocNewPatName} onChange={(e) => setAdHocNewPatName(e.target.value.toUpperCase())} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold text-xs focus:outline-none uppercase text-slate-800" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày sinh</label>
+                          <input type="date" value={adHocNewPatDOB} onChange={(e) => setAdHocNewPatDOB(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-mono text-xs focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Giới tính</label>
+                          <div className="flex gap-2 pt-1">
+                            <label className="flex items-center gap-1 font-bold cursor-pointer">
+                              <input type="radio" name="mri-adhoc-gender" checked={adHocNewPatSex === 'Nam'} onChange={() => setAdHocNewPatSex('Nam')} className="accent-indigo-600 scale-105" /> Nam
+                            </label>
+                            <label className="flex items-center gap-1 font-bold cursor-pointer">
+                              <input type="radio" name="mri-adhoc-gender" checked={adHocNewPatSex === 'Nữ'} onChange={() => setAdHocNewPatSex('Nữ')} className="accent-indigo-600 scale-105" /> Nữ
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">SĐT gia đình</label>
+                          <input type="text" placeholder="Số ĐT..." value={adHocNewPatPhone} onChange={(e) => setAdHocNewPatPhone(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-mono text-xs focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Địa chỉ</label>
+                          <select value={adHocNewPatAddress} onChange={(e) => setAdHocNewPatAddress(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold focus:outline-none text-xs text-slate-800">
+                            {ADDRESS_OPTIONS.map((addr) => <option key={addr} value={addr}>{addr}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* MRI fields */}
+                <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2.5">
+                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                    2. Thông tin MRI &amp; Xếp lịch
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Cân nặng (kg) *</label>
+                      <input type="text" required placeholder="vd: 12" value={String(adHocForm.PatientWeight || '')} onChange={(e) => updateAdHocField('PatientWeight', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Mã chẩn đoán MRI *</label>
+                      <SearchableEnumSelect
+                        required
+                        value={String(adHocForm.CMRDiagnosisID || '')}
+                        options={diagnosisOptions}
+                        onChange={(value) => updateAdHocField('CMRDiagnosisID', value)}
+                        allowCreate
+                        createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                        onCreateOption={createDiagnosisSource}
+                        placeholder="-- Chọn ICD --"
+                        searchPlaceholder="Gõ ICD để tìm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký (RequestBy)</label>
+                      <select
+                        value={String(adHocForm.RequestBy || '')}
+                        onChange={(e) => updateAdHocField('RequestBy', e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800"
+                      >
+                        <option value="">-- Chọn BS --</option>
+                        {staffList.map(s => {
+                          const displayName = getShortStaffName(s.StaffName, staffList);
+                          return <option key={s.StaffKey} value={displayName}>{displayName}</option>;
+                        })}
+                        {extraDoctorOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa yêu cầu</label>
+                      <SearchableEnumSelect
+                        value={String(adHocForm.DepartRequest || '')}
+                        options={departmentOptions}
+                        onChange={(value) => updateAdHocField('DepartRequest', value)}
+                        placeholder="-- Chọn khoa --"
+                        searchPlaceholder="Gõ khoa để tìm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phương thức chụp</label>
+                      <input type="text" value={String(adHocForm.CMRMethod || '')} onChange={(e) => updateAdHocField('CMRMethod', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Máy/thiết bị MRI</label>
+                      <input type="text" value={String(adHocForm.CMRDevice || '')} onChange={(e) => updateAdHocField('CMRDevice', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa sau chụp</label>
+                      <SearchableEnumSelect
+                        value={String(adHocForm.PostDepart || '')}
+                        options={departmentOptions}
+                        onChange={(value) => updateAdHocField('PostDepart', value)}
+                        placeholder="-- Chọn khoa --"
+                        searchPlaceholder="Gõ khoa để tìm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Gây mê</label>
+                      <select value={String(adHocForm.Anesthesia || '')} onChange={(e) => updateAdHocField('Anesthesia', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs">
+                        {ANESTHESIA_OPTIONS.map(option => <option key={option} value={option}>{option || 'Chọn'}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày chụp MRI dự kiến</label>
+                      <input type="date" value={String(adHocForm.CMRScheduledDate || '')} onChange={(e) => updateAdHocField('CMRScheduledDate', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Trạng thái gọi MRI</label>
+                      <select value={String(adHocForm.CMRCallStatus || '')} onChange={(e) => updateAdHocField('CMRCallStatus', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs">
+                        {CALL_STATUS_OPTIONS.map(option => <option key={option} value={option}>{option || 'Chọn'}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI (CMRDiagnosis) *</label>
+                    <textarea required rows={2} value={String(adHocForm.CMRDiagnosis || '')} onChange={(e) => updateAdHocField('CMRDiagnosis', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI (CMRRequest) *</label>
+                    <textarea required rows={2} value={String(adHocForm.CMRRequest || '')} onChange={(e) => updateAdHocField('CMRRequest', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ghi chú gọi MRI (CMRCallStatusNote)</label>
+                    <textarea rows={2} value={String(adHocForm.CMRCallStatusNote || '')} onChange={(e) => updateAdHocField('CMRCallStatusNote', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowAdHoc(false); resetAdHoc(); }}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-2xl cursor-pointer transition"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={adHocLoading || !!adHocBlockingCmr}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2 rounded-2xl shadow-xs text-xs cursor-pointer transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-4 h-4" />
+                  {adHocLoading ? 'Đang lưu...' : 'Lưu xếp bổ sung'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

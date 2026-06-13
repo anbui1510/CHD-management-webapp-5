@@ -1,4 +1,4 @@
-# Định nghĩa Database Google Sheets và Hướng dẫn Agent (AGENTS.md)
+﻿# Định nghĩa Database Google Sheets và Hướng dẫn Agent (AGENTS.md)
 
 Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ liệu, tên biến và hướng dẫn lập trình cho dự án "Hệ Thống Cơ Sở Dữ Liệu Virtual Google Sheets" (Pediatric Cardiac Patient Management System). Bạn PHẢI tuân thủ các quy tắc trong file này.
 
@@ -142,9 +142,10 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `Họ và tên` | Họ và tên | Text | | | Cột legacy trong bảng CMR, giữ đúng dấu và khoảng trắng. |
 | `Tình trạng` | Tình trạng | Text | | | Trạng thái legacy trong bảng CMR. |
 | `PatientWeight` | Cân nặng (kg) | Text | | Bắt buộc | Cân nặng tại thời điểm đăng ký MRI. |
-| `CMRDigagnosisID` | Mã chẩn đoán MRI | Enum | Ref tới `Source.DiagnosisID` | Bắt buộc | Lưu ý giữ đúng chính tả legacy `CMRDigagnosisID`. |
+| `CMRDiagnosisID` | Mã chẩn đoán MRI | Enum | Ref tới `Source.DiagnosisID` | Bắt buộc | Mã chẩn đoán MRI dùng chung danh mục với DiagnosisID. |
 | `CMRDiagnosis` | Chẩn đoán MRI | LongText | | Bắt buộc | Chẩn đoán phục vụ chỉ định MRI. |
 | `CMRRequest` | Yêu cầu MRI | LongText | | Bắt buộc | Nội dung cần khảo sát/chỉ định MRI. |
+| `RequestBy` | BS đăng ký MRI | Enum | Danh sách bác sĩ | | Người đăng ký chụp MRI, logic giống `RequestBy` bảng Consult, không bắt buộc. |
 | `DepartRequest` | Khoa yêu cầu | Enum | Ref tới `Source.Department` | | Khoa/phòng đăng ký chụp MRI. |
 | `CMRMethod` | Phương thức chụp | Text | | | Phương thức/kỹ thuật CMR. |
 | `CMRDevice` | Máy/thiết bị MRI | Text | | | Thiết bị hoặc máy MRI dự kiến. |
@@ -164,3 +165,4 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 
 ### 7. Bảng Source (Cấu hình nguồn và danh mục)
 *   Chứa các danh mục thiết lập, các cột phụ thuộc vào cấu hình người dùng. Hệ thống sẽ tự động quét hết các cột vào mảng.
+*   `DiagnosisID`: Danh mục mã chẩn đoán dùng chung cho `Consult.DiagnosisID`, `CathLab.PostDiagnosisID` và `CMR.CMRDiagnosisID`. Không hard-code danh sách DiagnosisID mới trong component; nếu user thêm mã mới thì lưu vào cột này.

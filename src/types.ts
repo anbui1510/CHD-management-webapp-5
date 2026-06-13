@@ -181,9 +181,10 @@ export interface CMR {
   "Họ và tên"?: string;
   "Tình trạng"?: string;
   PatientWeight?: string;
-  CMRDigagnosisID?: string;
+  CMRDiagnosisID?: string;
   CMRDiagnosis?: string;
   CMRRequest?: string;
+  RequestBy?: string;
   DepartRequest?: string;
   CMRDate?: string;
   CMRMethod?: string;

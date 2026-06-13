@@ -1,15 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Patient, Consult, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Patient, Consult, Source, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
-
-const icdCodes = [
-  "ASD", "VSD", "PDA", "PS", "AS", "APSO", "APSI", "CoA", 
-  "Đứt đoạn cung ĐMC", "Dò vành", "TOF", "TBS phức tạp khác", 
-  "AVSD", "SV", "DORV", "Truncus", "TAPVR/PAPVR", "TGA", 
-  "Ebstein", "SVT", "Nhịp nhanh thất", "RLN khác", 
-  "Bệnh lý mạch mẫu", "Bệnh van tim", "Bệnh cơ tim"
-];
+import { getDiagnosisOptions } from '../data/source';
 
 const conclusionOptions = [
   "Can thiệp thông tim",
@@ -79,13 +72,14 @@ const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] 
 interface StaffResultsViewProps {
   patients: Patient[];
   consults: Consult[];
+  sources?: Source[];
   staffList?: Staff[];
   currentStaff?: Staff | null;
   onSelectConsult: (consult: Consult) => void;
   onRefreshData?: () => void;
 }
 
-export default function StaffResultsView({ patients, consults, staffList = [], currentStaff, onSelectConsult, onRefreshData }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, sources = [], staffList = [], currentStaff, onSelectConsult, onRefreshData }: StaffResultsViewProps) {
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -105,6 +99,27 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const diagnosisOptions = useMemo(
+    () => getDiagnosisOptions(sources, consults.map(consult => consult.DiagnosisID)),
+    [sources, consults]
+  );
+
+  const createDiagnosisSource = async (DiagnosisID: string) => {
+    const trimmed = DiagnosisID.trim();
+    if (!trimmed) return;
+
+    const response = await fetch('/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ DiagnosisID: trimmed })
+    });
+
+    if (!response.ok) {
+      throw new Error('Không thể thêm DiagnosisID vào Source');
+    }
+
+    onRefreshData?.();
+  };
 
   // 1. Patient Mode (select existing vs create new)
   const [patientMode, setPatientMode] = useState<'select' | 'create'>('select');
@@ -1309,9 +1324,12 @@ export default function StaffResultsView({ patients, consults, staffList = [], c
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">ICD *</label>
                       <SearchableEnumSelect
                         required
-                        options={icdCodes}
+                        options={diagnosisOptions}
                         value={diagnosisID}
                         onChange={setDiagnosisID}
+                        allowCreate
+                        createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                        onCreateOption={createDiagnosisSource}
                         placeholder="-- Chọn ICD --"
                         searchPlaceholder="Gõ ICD để tìm..."
                       />

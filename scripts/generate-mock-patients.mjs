@@ -206,7 +206,7 @@ for (let i = 1; i <= 100; i++) {
       'Họ và tên': name,
       'Tình trạng': i % 3 === 0 ? '2. Đã xếp lịch MRI' : '1. Chờ xếp lịch MRI',
       PatientWeight: (5 + (i % 45) * 0.7).toFixed(1),
-      CMRDigagnosisID: pick(diagnoses, i),
+      CMRDiagnosisID: pick(diagnoses, i),
       CMRDiagnosis: pick(detailDiagnoses, i),
       CMRRequest: 'Đánh giá giải phẫu tim, chức năng thất và dòng chảy',
       DepartRequest: pick(departments, i),

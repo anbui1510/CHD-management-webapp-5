@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import { Patient, Consult, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
+import { Patient, Consult, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
 import { VNDateInput } from './VNDateInput';
-import { SOURCE_PROVINCE } from '../data/source';
+import { SOURCE_PROVINCE, getDiagnosisOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { 
   ClipboardList, 
@@ -38,6 +38,7 @@ import {
 interface CathLabSchedulerViewProps {
   patients: Patient[];
   consults: Consult[];
+  sources?: Source[];
   staffList: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
@@ -46,14 +47,64 @@ interface CathLabSchedulerViewProps {
   onTogglePureMode?: () => void;
 }
 
-const AUTHORIZED_DOCTORS_FOR_PTV2 = [
-  'BS. Ân', 
-  'BS. Tài', 
-  'BS. Hiếu', 
-  'BS. Hùng', 
-  'BS. Tĩnh', 
-  'BS. Thịnh'
+const CATH_INTERVENTIONIST_DOCTORS = [
+  'BS. Phụng',
+  'BS. Lợi',
+  'BS. Thịnh',
+  'BS. Ân',
+  'BS. Hiếu',
+  'BS. Tài',
+  'BS. Hùng',
+  'BS. Tĩnh',
 ];
+
+const getAutoScheduled2nd = (requestBy: string) => {
+  if (!requestBy) return '';
+  const norm = requestBy.trim();
+  const found = CATH_INTERVENTIONIST_DOCTORS.find(doc =>
+    norm.toLowerCase() === doc.toLowerCase() ||
+    norm.toLowerCase().replace('bs.', '').trim() === doc.toLowerCase().replace('bs.', '').trim() ||
+    norm.toLowerCase().includes(doc.toLowerCase().replace('bs.', '').trim())
+  );
+  return found || '';
+};
+
+const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
+  if (!ptvPhu?.trim()) return patientName;
+  return `${patientName} - PTV phụ: ${ptvPhu}`;
+};
+
+type SchedulingFormSnapshot = {
+  plannedDevice: string;
+  plannedPrice: string;
+  checkDevice: string;
+  operationFeedback: string;
+  supplyDepFeedback: string;
+  callStatus: string;
+  callNote: string;
+  priorityOrder: string;
+  plannedCathLabDate: string;
+  selectedMethods: string[];
+  postCathDepart: string;
+  scheduled1st: string;
+  scheduled2nd: string;
+  scheduled3rd: string;
+};
+
+const snapshotsEqual = (a: SchedulingFormSnapshot, b: SchedulingFormSnapshot) =>
+  JSON.stringify(a) === JSON.stringify(b);
+
+const resolvePtvPhu1Display = (
+  requestBy: string,
+  savedScheduled2nd?: string,
+  stateScheduled2nd?: string
+) => {
+  const autoFromRequest = getAutoScheduled2nd(requestBy);
+  if (autoFromRequest) return autoFromRequest;
+  if (stateScheduled2nd?.trim()) return stateScheduled2nd.trim();
+  if (savedScheduled2nd?.trim()) return savedScheduled2nd.trim();
+  return '';
+};
 
 const METHOD_OPTIONS = [
   "Chụp động mạch chủ số hóa xóa nền (DSA) (18.05.03.0052)",
@@ -104,13 +155,10 @@ const PRIORITY_OPTIONS: ('Cấp cứu' | 'Chương trình' | 'YC' | 'Ngoại gia
   'Ngoại giao'
 ];
 
-const ICD_DIAGNOSIS_OPTIONS = [
-  'VSD', 'ASD', 'PDA', 'TOF', 'PA/VSD', 'PA/IVS', 'TGA', 'TAPVR', 'CoAo', 'IAA', 'HLHS', 'Single Ventricle', 'Ebstein', 'AVSD', 'DORV', 'Truncus Arteriosus', 'Aortic Stenosis', 'Pulmonary Stenosis', 'Mitral Regurgitation', 'Aortic Regurgitation', 'Heart Tumors', 'Arrhythmia', 'Other'
-];
-
 export default function CathLabSchedulerView({
   patients,
   consults,
+  sources = [],
   staffList,
   currentStaff,
   onRefreshData,
@@ -118,6 +166,27 @@ export default function CathLabSchedulerView({
   pureCalendarMode = false,
   onTogglePureMode
 }: CathLabSchedulerViewProps) {
+  const diagnosisOptions = useMemo(
+    () => getDiagnosisOptions(sources, consults.map(consult => consult.DiagnosisID)),
+    [sources, consults]
+  );
+
+  const createDiagnosisSource = async (DiagnosisID: string) => {
+    const trimmed = DiagnosisID.trim();
+    if (!trimmed) return;
+
+    const response = await fetch('/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ DiagnosisID: trimmed })
+    });
+
+    if (!response.ok) {
+      throw new Error('Không thể thêm DiagnosisID vào Source');
+    }
+
+    onRefreshData();
+  };
   
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
@@ -226,6 +295,10 @@ export default function CathLabSchedulerView({
   const [adHocConsultType, setAdHocConsultType] = useState<'Staff mổ' | 'Staff thông'>('Staff thông');
   const [actionConfirm, setActionConfirm] = useState<{type: 'loai'|'transfer'|'undo_scheduled'|'transfer_row', title: string, message: string, consultToUpdate?: Consult} | null>(null);
   const [actionAlert, setActionAlert] = useState<string>('');
+  const [formSnapshot, setFormSnapshot] = useState<SchedulingFormSnapshot | null>(null);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  const [exitConfirmError, setExitConfirmError] = useState('');
+  const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
   const [adHocPatientWeight, setAdHocPatientWeight] = useState('');
   const [adHocPatientHeight, setAdHocPatientHeight] = useState('');
   const [adHocConsultDate, setAdHocConsultDate] = useState('2026-06-06');
@@ -316,6 +389,35 @@ export default function CathLabSchedulerView({
     return trimmed;
   };
 
+  const buildSnapshotFromConsult = (c: Consult): SchedulingFormSnapshot => {
+    let methods: string[] = [];
+    if (c.CathMethod) {
+      if (c.CathMethod.includes('+')) {
+        methods = c.CathMethod.split('+').map(m => m.trim()).filter(Boolean);
+      } else {
+        const tm = c.CathMethod.trim();
+        if (tm) methods = [tm];
+      }
+    }
+    const autoPtv2 = getAutoScheduled2nd(c.RequestBy || '');
+    return {
+      plannedDevice: c.PlannedDevice || '',
+      plannedPrice: c.PlannedPrice || '',
+      checkDevice: c.CheckDevice || '',
+      operationFeedback: c.OperationFeedback || '',
+      supplyDepFeedback: c.SupplyDepFeedback || '',
+      callStatus: c.CallStatus || '',
+      callNote: c.CallNote || '',
+      priorityOrder: c.PriorityOrder || 'Chương trình',
+      plannedCathLabDate: c.PlannedCathLabDate ? getFormattedDateKey(c.PlannedCathLabDate) : '',
+      selectedMethods: methods,
+      postCathDepart: c.PostCathDepart || '',
+      scheduled1st: c.Scheduled1stInterventionist || '',
+      scheduled2nd: autoPtv2 || c.Scheduled2ndInterventionist || '',
+      scheduled3rd: c.Scheduled3rdInterventionist || '',
+    };
+  };
+
   const VN_WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
   const parseLocalDateFromKey = (dateStr?: string): Date | null => {
@@ -370,18 +472,6 @@ Xin cảm ơn!`;
       console.error('Error copying SMS message: ', err);
       setErrorMsg('Không thể copy nội dung SMS. Vui lòng chọn nội dung và copy thủ công.');
     }
-  };
-
-  // Determine authorized check for doctor
-  const getAutoScheduled2nd = (requestBy: string) => {
-    if (!requestBy) return '';
-    const norm = requestBy.trim();
-    const found = AUTHORIZED_DOCTORS_FOR_PTV2.find(doc => 
-      norm.toLowerCase() === doc.toLowerCase() || 
-      norm.toLowerCase().replace('bs.', '').trim() === doc.toLowerCase().replace('bs.', '').trim() ||
-      norm.toLowerCase().includes(doc.toLowerCase().replace('bs.', '').trim())
-    );
-    return found || '';
   };
 
   // Group consults to resolve the Latest Consultation for each PatientKey (simulates [LatestPrepConsultID] check in AppSheet)
@@ -1175,8 +1265,69 @@ Xin cảm ơn!`;
   };
 
   // Setup form fields on consult selection
-  const handleSelectConsult = (c: Consult) => {
-    const pat = findPatientByKey(patients, c.PatientKey);
+  const buildCurrentFormSnapshot = (): SchedulingFormSnapshot => ({
+    plannedDevice,
+    plannedPrice,
+    checkDevice,
+    operationFeedback,
+    supplyDepFeedback,
+    callStatus,
+    callNote,
+    priorityOrder,
+    plannedCathLabDate,
+    selectedMethods: [...selectedMethods],
+    postCathDepart,
+    scheduled1st,
+    scheduled2nd: scheduled2nd || getAutoScheduled2nd(selectedConsult?.RequestBy || ''),
+    scheduled3rd,
+  });
+
+  const hasUnsavedChanges = () => {
+    if (!formSnapshot || !selectedConsult) return false;
+    return !snapshotsEqual(buildCurrentFormSnapshot(), formSnapshot);
+  };
+
+  const getMissingSchedulingRequiredFields = () => {
+    const missing: string[] = [];
+    if (!checkDevice) missing.push('Kiểm dụng cụ');
+    if (!callStatus) missing.push('Trạng thái gọi bệnh');
+    if (!plannedCathLabDate) missing.push('Ngày thông dự kiến');
+    return missing;
+  };
+
+  const requestCloseScheduling = (onClose: () => void) => {
+    if (!hasUnsavedChanges()) {
+      onClose();
+      return;
+    }
+    setExitConfirmError('');
+    setPendingExitAction(() => onClose);
+    setExitConfirmOpen(true);
+  };
+
+  const handleCloseSchedulingView = () => {
+    requestCloseScheduling(() => {
+      setSelectedConsult(null);
+      setFormSnapshot(null);
+    });
+  };
+
+  const handleExitCancel = () => {
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
+  };
+
+  const handleExitDiscard = () => {
+    const action = pendingExitAction;
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
+    setFormSnapshot(null);
+    action?.();
+  };
+
+  const applySelectConsult = (c: Consult) => {
     setSelectedConsult(c);
     setPlannedDevice(c.PlannedDevice || '');
     setPlannedPrice(c.PlannedPrice || '');
@@ -1187,11 +1338,9 @@ Xin cảm ơn!`;
     setCallNote(c.CallNote || '');
     setPriorityOrder(c.PriorityOrder || 'Chương trình');
     
-    // Safely parse cathlab target date
     const formattedDate = c.PlannedCathLabDate ? getFormattedDateKey(c.PlannedCathLabDate) : '';
     setPlannedCathLabDate(formattedDate);
     
-    // Parse CathMethod array/comma text
     let methods: string[] = [];
     if (c.CathMethod) {
        if (c.CathMethod.includes('+')) {
@@ -1206,17 +1355,22 @@ Xin cảm ơn!`;
     setPostCathDepart(c.PostCathDepart || '');
     setScheduled1st(c.Scheduled1stInterventionist || '');
     
-    // Auto PTV phụ 1 calculations
-    if (c.Scheduled2ndInterventionist) {
-      setScheduled2nd(c.Scheduled2ndInterventionist);
-    } else {
-      setScheduled2nd(getAutoScheduled2nd(c.RequestBy || ''));
-    }
+    const autoPtv2 = getAutoScheduled2nd(c.RequestBy || '');
+    setScheduled2nd(autoPtv2 || c.Scheduled2ndInterventionist || '');
     setScheduled3rd(c.Scheduled3rdInterventionist || '');
 
+    setFormSnapshot(buildSnapshotFromConsult(c));
     setSuccessMsg('');
     setErrorMsg('');
     setShowConfirmRemoveDialog(false);
+  };
+
+  const handleSelectConsult = (c: Consult) => {
+    if (selectedConsult && selectedConsult.ConsultKey !== c.ConsultKey && hasUnsavedChanges()) {
+      requestCloseScheduling(() => applySelectConsult(c));
+      return;
+    }
+    applySelectConsult(c);
   };
 
   const handleCallStatusSelect = (opt: string) => {
@@ -1444,6 +1598,12 @@ Xin cảm ơn!`;
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedConsult) return;
+
+    const missing = getMissingSchedulingRequiredFields();
+    if (missing.length > 0) {
+      setErrorMsg(`Vui lòng điền đầy đủ: ${missing.join(', ')}`);
+      return;
+    }
     
     setSaving(true);
     setSuccessMsg('');
@@ -1452,8 +1612,28 @@ Xin cảm ơn!`;
     await executeSave(getCurrentFormData());
   };
 
-  const executeSave = async (updatedData: Partial<Consult>) => {
+  const handleExitSave = async () => {
     if (!selectedConsult) return;
+    const missing = getMissingSchedulingRequiredFields();
+    if (missing.length > 0) {
+      setExitConfirmError(`Các trường bắt buộc: ${missing.join(', ')}`);
+      return;
+    }
+    setSaving(true);
+    setExitConfirmError('');
+    const ok = await executeSave(getCurrentFormData(), { closeOnSuccess: false });
+    setSaving(false);
+    if (ok) {
+      handleExitDiscard();
+    }
+  };
+
+  const executeSave = async (
+    updatedData: Partial<Consult>,
+    options?: { closeOnSuccess?: boolean }
+  ): Promise<boolean> => {
+    if (!selectedConsult) return false;
+    const closeOnSuccess = options?.closeOnSuccess !== false;
     try {
       const response = await fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
         method: 'PUT',
@@ -1467,18 +1647,28 @@ Xin cảm ơn!`;
       setSuccessMsg('Đánh dấu lưu thành công!');
       onRefreshData();
       
-      // Update selected local values
-      setSelectedConsult((prev: Consult | null) => prev ? { ...prev, ...updatedData } : null);
+      const merged = { ...selectedConsult, ...updatedData };
+      setSelectedConsult(merged);
+      setFormSnapshot(buildSnapshotFromConsult(merged));
 
-      // Close on success after 1s
-      setTimeout(() => {
-        setSuccessMsg('');
-        if (updatedData.CallStatus === 'Loại' || updatedData.TransferredToCathLab) {
-           setSelectedConsult(null);
-        }
-      }, 1000);
+      if (closeOnSuccess) {
+        setTimeout(() => {
+          setSuccessMsg('');
+          if (updatedData.CallStatus === 'Loại' || updatedData.TransferredToCathLab) {
+             setSelectedConsult(null);
+             setFormSnapshot(null);
+          }
+        }, 1000);
+      }
+      return true;
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error saving data');
+      const msg = err.message || 'Error saving data';
+      if (exitConfirmOpen) {
+        setExitConfirmError(msg);
+      } else {
+        setErrorMsg(msg);
+      }
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1852,7 +2042,7 @@ Xin cảm ơn!`;
                     const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
                     
                     // Display value for scheduled 2nd interventionist (auto-fills if empty in storage)
-                    const dispScheduled2nd = c.Scheduled2ndInterventionist || getAutoScheduled2nd(c.RequestBy || '');
+                    const dispScheduled2nd = getAutoScheduled2nd(c.RequestBy || '') || c.Scheduled2ndInterventionist || '';
 
                     return (
                       <tr 
@@ -2260,7 +2450,7 @@ Xin cảm ơn!`;
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
-                    onClick={() => setSelectedConsult(null)}
+                    onClick={handleCloseSchedulingView}
                     className="bg-white hover:bg-slate-100 border border-slate-350 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 select-none shadow-xs cursor-pointer"
                   >
                     ← Quay lại Lịch Tháng
@@ -2280,8 +2470,20 @@ Xin cảm ơn!`;
                 {(() => {
                   const pat = findPatientByKey(patients, selectedConsult.PatientKey);
                   if (!pat) return null;
+                  const ptvPhu1Display = resolvePtvPhu1Display(
+                    selectedConsult.RequestBy || '',
+                    selectedConsult.Scheduled2ndInterventionist,
+                    scheduled2nd
+                  );
                   return (
                     <div className="space-y-4">
+
+                      {/* Patient name highlight — tách khỏi ô hành chính */}
+                      <div className="bg-white border-2 border-[#d2145a] rounded-2xl px-4 py-3 shadow-sm">
+                        <span className="font-black text-slate-900 uppercase text-sm sm:text-base tracking-wide block whitespace-normal break-words leading-snug">
+                          {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
+                        </span>
+                      </div>
                       
                       {/* Part 1: Administrative Details */}
                       <div className="bg-white border border-slate-150 p-3.5 rounded-2xl shadow-xs">
@@ -2289,10 +2491,6 @@ Xin cảm ơn!`;
                           Thông tin hành chính bệnh nhi
                         </span>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                          <div className="col-span-2 sm:col-span-2">
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Họ và tên:</span>
-                            <span className="font-extrabold text-slate-900 uppercase text-[11.5px] block whitespace-normal break-words">{pat.PatientName}</span>
-                          </div>
                           <div className="col-span-1 sm:col-span-1">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB1 (ID1):</span>
                             <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1}</span>
@@ -2632,12 +2830,9 @@ Xin cảm ơn!`;
                               className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none text-xs text-indigo-900 font-extrabold"
                             >
                               <option value="">— Chọn PTV phụ 1 —</option>
-                              <option value="BS. Ân">BS. Ân</option>
-                              <option value="BS. Tài">BS. Tài</option>
-                              <option value="BS. Hiếu">BS. Hiếu</option>
-                              <option value="BS. Hùng">BS. Hùng</option>
-                              <option value="BS. Tĩnh">BS. Tĩnh</option>
-                              <option value="BS. Thịnh">BS. Thịnh</option>
+                              {CATH_INTERVENTIONIST_DOCTORS.map((doc) => (
+                                <option key={doc} value={doc}>{doc}</option>
+                              ))}
                             </select>
                           </div>
 
@@ -2777,7 +2972,7 @@ Xin cảm ơn!`;
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setSelectedConsult(null)}
+                    onClick={handleCloseSchedulingView}
                     className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-2xl cursor-pointer transition"
                   >
                     Đóng lại
@@ -3114,6 +3309,56 @@ Xin cảm ơn!`;
         </div>
       </div>
 
+      {/* EXIT SCHEDULING CONFIRM MODAL */}
+      {exitConfirmOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[75] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="py-3 px-4 flex items-center gap-2 bg-amber-50 border-b border-amber-100">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <h3 className="font-extrabold text-[13px] uppercase tracking-wide text-amber-900">Thay đổi chưa lưu</h3>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm font-semibold text-slate-700 leading-relaxed">
+                Bạn có thay đổi chưa được lưu. Bạn có muốn lưu kết quả xếp lịch không?
+              </p>
+              <p className="text-[11px] text-slate-500 font-semibold">
+                Trường bắt buộc khi lưu: Kiểm dụng cụ, Trạng thái gọi bệnh, Ngày thông dự kiến.
+              </p>
+              {exitConfirmError && (
+                <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
+                  {exitConfirmError}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleExitCancel}
+                className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer"
+              >
+                Ở lại
+              </button>
+              <button
+                type="button"
+                onClick={handleExitDiscard}
+                disabled={saving}
+                className="px-4 py-2 font-bold text-xs bg-white border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 transition shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                Không lưu
+              </button>
+              <button
+                type="button"
+                onClick={handleExitSave}
+                disabled={saving}
+                className="px-4 py-2 font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? 'Đang lưu...' : 'Lưu'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ACTION CONFIRM MODAL */}
       {actionConfirm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -3227,6 +3472,12 @@ Xin cảm ơn!`;
             const pat = findPatientByKey(patients, selectedConsult.PatientKey);
             if (!pat) return null;
             
+            const ptvPhu1Display = resolvePtvPhu1Display(
+              selectedConsult.RequestBy || '',
+              selectedConsult.Scheduled2ndInterventionist,
+              scheduled2nd
+            );
+
             const generateTextSummary = (pObj: Patient, cObj: Consult) => {
               const weightDisplay = selectedConsult?.PatientWeight ? `${selectedConsult.PatientWeight} kg` : '—';
               const heightDisplay = selectedConsult?.PatientHeight ? `${selectedConsult.PatientHeight} cm` : '—';
@@ -3236,7 +3487,7 @@ Xin cảm ơn!`;
               const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);
               const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : 'Chưa gán';
 
-              return `📋 *THÔNG TIN TÓM TẮT XẾP LỊCH: ${pObj.PatientName.toUpperCase()}* 📋\n` +
+              return `📋 *THÔNG TIN TÓM TẮT XẾP LỊCH: ${formatPatientWithPtvPhu(pObj.PatientName.toUpperCase(), ptvPhu1Display).toUpperCase()}* 📋\n` +
                 `-----------------------------------\n` +
                 `👤 *HÀNH CHÍNH BỆNH NHÂN:*\n` +
                 `- Họ và tên bệnh nhân: ${pObj.PatientName.toUpperCase()} (${pObj.PatientSex}, ${ageDesc})\n` +
@@ -3330,8 +3581,8 @@ Xin cảm ơn!`;
                     
                     {/* Header of summary */}
                     <div className="flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3 border-b-2 border-slate-800">
-                      <div className="bg-[#d2145a] text-white font-black text-sm uppercase tracking-wide px-3.5 py-1.5 rounded-xl shrink-0 max-w-full sm:max-w-[70%] break-words shadow-xs">
-                        {pat.PatientName}
+                      <div className="bg-[#d2145a] text-white font-black text-sm uppercase tracking-wide px-3.5 py-1.5 rounded-xl shrink-0 max-w-full sm:max-w-[75%] break-words shadow-xs leading-snug">
+                        {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
                       </div>
                       <div className="text-right shrink-0">
                         <div className="flex items-center gap-1.5 justify-start sm:justify-end">
@@ -3991,7 +4242,11 @@ Xin cảm ơn!`;
                             <select
                               required
                               value={adHocRequestBy}
-                              onChange={(e) => setAdHocRequestBy(e.target.value)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAdHocRequestBy(val);
+                                setAdHocScheduled2nd(getAutoScheduled2nd(val));
+                              }}
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
                             >
                               <option value="">— Hãy chọn bác sĩ —</option>
@@ -4022,9 +4277,12 @@ Xin cảm ơn!`;
                           </label>
                           <SearchableEnumSelect
                             required
-                            options={ICD_DIAGNOSIS_OPTIONS}
+                            options={diagnosisOptions}
                             value={adHocDiagnosisID}
                             onChange={setAdHocDiagnosisID}
+                            allowCreate
+                            createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                            onCreateOption={createDiagnosisSource}
                             placeholder="— Chọn mã ICD —"
                             searchPlaceholder="Gõ ICD để tìm..."
                           />
@@ -4090,6 +4348,7 @@ Xin cảm ơn!`;
                             ]}
                             value={adHocConsultResultID}
                             onChange={setAdHocConsultResultID}
+                            direction="up"
                             placeholder="— Chọn kết luận —"
                             searchPlaceholder="Gõ tìm kết luận..."
                           />
@@ -4278,12 +4537,9 @@ Xin cảm ơn!`;
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-indigo-950 font-bold"
                             >
                               <option value="">— Chọn PTV phụ 1 —</option>
-                              <option value="BS. Ân">BS. Ân</option>
-                              <option value="BS. Tài">BS. Tài</option>
-                              <option value="BS. Hiếu">BS. Hiếu</option>
-                              <option value="BS. Hùng">BS. Hùng</option>
-                              <option value="BS. Tĩnh">BS. Tĩnh</option>
-                              <option value="BS. Thịnh">BS. Thịnh</option>
+                              {CATH_INTERVENTIONIST_DOCTORS.map((doc) => (
+                                <option key={doc} value={doc}>{doc}</option>
+                              ))}
                             </select>
                           </div>
                           <div>

@@ -7,7 +7,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { Patient, Consult, Staff, CathLab, CMR } from './src/types';
+import { Patient, Consult, Staff, CathLab, CMR, Source } from './src/types';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -101,6 +101,41 @@ const SYNC_COOLDOWN_MS = 6000; // 6 seconds minimum between background pulls
 
 const recentLocalEdits = new Map<string, { timestamp: number; data: any }>();
 
+function preserveRecentLocalRecords(map: Map<string, any>, prefix: string, getKey: (record: any) => string): void {
+  const now = Date.now();
+  for (const [editKey, recent] of recentLocalEdits.entries()) {
+    if (!editKey.startsWith(`${prefix}_`)) continue;
+    if (now - recent.timestamp >= 300000) continue;
+
+    const recordKey = getKey(recent.data);
+    if (recordKey && !map.has(recordKey)) {
+      map.set(recordKey, recent.data);
+    }
+  }
+}
+
+function preserveLocalOnlyRecords(map: Map<string, any>, records: any[], getKey: (record: any) => string): void {
+  records.forEach(record => {
+    const key = getKey(record);
+    if (key && !map.has(key)) {
+      map.set(key, record);
+    }
+  });
+}
+
+function markLocalMutation(): void {
+  lastSyncTime = Date.now();
+}
+
+function createUniqueKey(prefix: string, existingKeys: Iterable<any>): string {
+  const existing = new Set(Array.from(existingKeys).map(key => String(key || '').trim()).filter(Boolean));
+  let key = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  while (existing.has(key)) {
+    key = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+  return key;
+}
+
 // Periodically clean up stale recentLocalEdits (older than 5 minutes)
 setInterval(() => {
   const now = Date.now();
@@ -145,6 +180,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
     if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources))) {
       if (Array.isArray(data.patients)) {
+        const currentPatients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
         const pMap = new Map();
         data.patients.forEach((p: any, i: number) => {
           const k = p.PatientKey || `pat_no_key_${i}`;
@@ -171,6 +207,8 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           
           pMap.set(k, p);
         });
+        preserveLocalOnlyRecords(pMap, currentPatients, record => record.PatientKey);
+        preserveRecentLocalRecords(pMap, 'Patient', record => record.PatientKey);
         writeDB(PATIENTS_FILE, Array.from(pMap.values()));
       }
       if (Array.isArray(data.consults)) {
@@ -199,9 +237,12 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           
           cMap.set(k, c);
         });
+        preserveLocalOnlyRecords(cMap, currentConsults, record => record.ConsultKey);
+        preserveRecentLocalRecords(cMap, 'Consult', record => record.ConsultKey);
         writeDB(CONSULTS_FILE, Array.from(cMap.values()));
       }
       if (Array.isArray(data.cathlabs) && data.cathlabs.length > 0) {
+        const currentCathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
         const clMap = new Map();
         data.cathlabs.forEach((c: any, i: number) => {
           const k = c.CathKey || `cl_no_key_${i}`;
@@ -215,6 +256,8 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           
           clMap.set(k, c);
         });
+        preserveLocalOnlyRecords(clMap, currentCathlabs, record => record.CathKey);
+        preserveRecentLocalRecords(clMap, 'CathLab', record => record.CathKey);
         writeDB(CATHLABS_FILE, Array.from(clMap.values()));
       }
       if (Array.isArray(data.operations) && data.operations.length > 0) {
@@ -228,6 +271,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         writeDB(OPERATIONS_FILE, Array.from(opMap.values()));
       }
       if (Array.isArray(data.cmrs) && data.cmrs.length > 0) {
+        const currentCmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
         const cmrmap = new Map();
         data.cmrs.forEach((m: any, i: number) => {
           const k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
@@ -240,6 +284,8 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
           cmrmap.set(k, m);
         });
+        preserveLocalOnlyRecords(cmrmap, currentCmrs, record => record.CMRKey || record.CMRkey);
+        preserveRecentLocalRecords(cmrmap, 'CMR', record => record.CMRKey || record.CMRkey);
         writeDB(CMRS_FILE, Array.from(cmrmap.values()));
       }
       if (Array.isArray(data.staff) && data.staff.length > 0) {
@@ -267,7 +313,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   return false;
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
@@ -532,17 +578,13 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
     const data = fs.readFileSync(filePath, 'utf-8');
     let parsed = JSON.parse(data);
     
-    // Deduplicate read data just in case
+    // Deduplicate read data just in case.
+    // IMPORTANT: check each table's OWN primary key first. Consult/CathLab/CMR/Operation
+    // records also contain PatientKey, so deduping by PatientKey would wrongly collapse
+    // multiple records of the same patient into one. PatientKey is only the primary key
+    // for the Patient table, so it must be checked last (as a fallback).
     if (Array.isArray(parsed) && parsed.length > 0) {
-      if ('PatientKey' in parsed[0]) {
-        const pMap = new Map();
-        parsed.forEach((p: any, i: number) => {
-          const k = p.PatientKey || `pat_no_key_${i}`;
-          p.PatientKey = k;
-          pMap.set(k, p);
-        });
-        parsed = Array.from(pMap.values());
-      } else if ('ConsultKey' in parsed[0]) {
+      if ('ConsultKey' in parsed[0]) {
         const cMap = new Map();
         parsed.forEach((c: any, i: number) => {
           const k = c.ConsultKey || `con_no_key_${i}`;
@@ -566,6 +608,15 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
           cmrMap.set(k, m);
         });
         parsed = Array.from(cmrMap.values());
+      } else if ('SurgKey' in parsed[0] || 'OpKey' in parsed[0]) {
+        const opMap = new Map();
+        parsed.forEach((o: any, i: number) => {
+          const k = o.SurgKey || o.OpKey || `op_no_key_${i}`;
+          if (o.SurgKey !== undefined) o.SurgKey = k;
+          if (o.OpKey !== undefined) o.OpKey = k;
+          opMap.set(k, o);
+        });
+        parsed = Array.from(opMap.values());
       } else if ('StaffKey' in parsed[0]) {
         const stMap = new Map();
         parsed.forEach((s: any, i: number) => {
@@ -574,6 +625,14 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
           stMap.set(k, s);
         });
         parsed = Array.from(stMap.values());
+      } else if ('PatientKey' in parsed[0]) {
+        const pMap = new Map();
+        parsed.forEach((p: any, i: number) => {
+          const k = p.PatientKey || `pat_no_key_${i}`;
+          p.PatientKey = k;
+          pMap.set(k, p);
+        });
+        parsed = Array.from(pMap.values());
       }
     }
     
@@ -709,6 +768,7 @@ app.post('/api/patients', async (req, res) => {
   
   patients.push(newPatient);
   writeDB<Patient>(PATIENTS_FILE, patients);
+  markLocalMutation();
   
   // Track this locally so we don't overwrite with stale Google Sheets data
   recentLocalEdits.set(`Patient_${newPatient.PatientKey}`, { timestamp: Date.now(), data: newPatient });
@@ -746,6 +806,7 @@ app.put('/api/patients/:key', async (req, res) => {
   if (index !== -1) {
     patients[index] = { ...patients[index], ...updateData };
     writeDB<Patient>(PATIENTS_FILE, patients);
+    markLocalMutation();
     
     // Track this locally so we don't overwrite with stale Google Sheets data
     recentLocalEdits.set(`Patient_${patients[index].PatientKey}`, { timestamp: Date.now(), data: patients[index] });
@@ -783,10 +844,13 @@ app.post('/api/cmrs', async (req, res) => {
   const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
   const newCmr: CMR = req.body;
 
-  newCmr.CMRKey = newCmr.CMRKey || newCmr.CMRkey || `cmr_${Date.now()}`;
+  const requestedCmrKey = newCmr.CMRKey || newCmr.CMRkey;
+  const cmrKeyExists = requestedCmrKey && cmrs.some(cmr => String(cmr.CMRKey || cmr.CMRkey || '') === String(requestedCmrKey));
+  newCmr.CMRKey = requestedCmrKey && !cmrKeyExists ? requestedCmrKey : createUniqueKey('cmr', cmrs.map(cmr => cmr.CMRKey || cmr.CMRkey));
   newCmr.UpdateTime = newCmr.UpdateTime || newTimestamp();
   cmrs.push(newCmr);
   writeDB<CMR>(CMRS_FILE, cmrs);
+  markLocalMutation();
 
   recentLocalEdits.set(`CMR_${newCmr.CMRKey}`, { timestamp: Date.now(), data: newCmr });
 
@@ -809,6 +873,7 @@ app.put('/api/cmrs/:key', async (req, res) => {
     cmrs[index] = { ...cmrs[index], ...req.body, UpdateTime: newTimestamp() };
     cmrs[index].CMRKey = cmrs[index].CMRKey || cmrs[index].CMRkey || key;
     writeDB<CMR>(CMRS_FILE, cmrs);
+    markLocalMutation();
 
     recentLocalEdits.set(`CMR_${cmrs[index].CMRKey}`, { timestamp: Date.now(), data: cmrs[index] });
 
@@ -824,20 +889,56 @@ app.put('/api/cmrs/:key', async (req, res) => {
 
 app.get('/api/sources', async (req, res) => {
   await syncFromGoogleSheets();
-  const sources = readDB<any>(SOURCES_FILE, []);
+  const sources = readDB<Source>(SOURCES_FILE, []);
   res.json(sources);
+});
+
+app.post('/api/sources', async (req, res) => {
+  const sources = readDB<Source>(SOURCES_FILE, []);
+  const diagnosisID = String(req.body?.DiagnosisID || '').trim();
+
+  if (!diagnosisID) {
+    res.status(400).json({ error: 'DiagnosisID is required' });
+    return;
+  }
+
+  const existingIndex = sources.findIndex(source =>
+    String(source.DiagnosisID || '').trim().toLowerCase() === diagnosisID.toLowerCase()
+  );
+
+  const sourceRecord: Source = existingIndex >= 0
+    ? { ...sources[existingIndex], ...req.body, DiagnosisID: diagnosisID }
+    : { ...req.body, DiagnosisID: diagnosisID };
+
+  if (existingIndex >= 0) {
+    sources[existingIndex] = sourceRecord;
+  } else {
+    sources.push(sourceRecord);
+  }
+
+  writeDB<Source>(SOURCES_FILE, sources);
+  markLocalMutation();
+
+  syncToGoogleSheets('Source', existingIndex >= 0 ? 'update' : 'insert', diagnosisID, sourceRecord).catch(err => {
+    console.error('Error syncing source to google sheets background:', err);
+  });
+
+  res.status(existingIndex >= 0 ? 200 : 201).json(sourceRecord);
 });
 
 app.post('/api/consults', async (req, res) => {
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
   const newConsult: Consult = req.body;
   
-  // Set Key dynamically
-  newConsult.ConsultKey = newConsult.ConsultKey || `con_${Date.now()}`;
+  // Set Key dynamically and guard against client-side duplicate keys.
+  const requestedConsultKey = newConsult.ConsultKey;
+  const consultKeyExists = requestedConsultKey && consults.some(c => String(c.ConsultKey || '') === String(requestedConsultKey));
+  newConsult.ConsultKey = requestedConsultKey && !consultKeyExists ? requestedConsultKey : createUniqueKey('con', consults.map(c => c.ConsultKey));
   newConsult.ConsultCreateTime = newConsult.ConsultCreateTime || newTimestamp();
   
   consults.push(newConsult);
   writeDB<Consult>(CONSULTS_FILE, consults);
+  markLocalMutation();
   
   // Track this locally so we don't overwrite with stale Google Sheets data
   recentLocalEdits.set(`Consult_${newConsult.ConsultKey}`, { timestamp: Date.now(), data: newConsult });
@@ -860,6 +961,7 @@ app.put('/api/consults/:key', async (req, res) => {
   if (index !== -1) {
     consults[index] = { ...consults[index], ...updateData };
     writeDB<Consult>(CONSULTS_FILE, consults);
+    markLocalMutation();
     
     // Track this locally so we don't overwrite with stale Google Sheets data
     recentLocalEdits.set(`Consult_${consults[index].ConsultKey}`, { timestamp: Date.now(), data: consults[index] });
@@ -885,9 +987,12 @@ app.post('/api/cathlabs', async (req, res) => {
   const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
   const newCathLab: CathLab = req.body;
   
-  newCathLab.CathKey = newCathLab.CathKey || `cath_${Date.now()}`;
+  const requestedCathKey = newCathLab.CathKey;
+  const cathKeyExists = requestedCathKey && cathlabs.some(cath => String(cath.CathKey || '') === String(requestedCathKey));
+  newCathLab.CathKey = requestedCathKey && !cathKeyExists ? requestedCathKey : createUniqueKey('cath', cathlabs.map(cath => cath.CathKey));
   cathlabs.push(newCathLab);
   writeDB<CathLab>(CATHLABS_FILE, cathlabs);
+  markLocalMutation();
   
   // Track this locally so we don't overwrite with stale Google Sheets data
   recentLocalEdits.set(`CathLab_${newCathLab.CathKey}`, { timestamp: Date.now(), data: newCathLab });
@@ -907,6 +1012,7 @@ app.put('/api/cathlabs/:key', async (req, res) => {
   if (index !== -1) {
     cathlabs[index] = { ...cathlabs[index], ...req.body };
     writeDB<CathLab>(CATHLABS_FILE, cathlabs);
+    markLocalMutation();
     
     // Track this locally so we don't overwrite with stale Google Sheets data
     recentLocalEdits.set(`CathLab_${cathlabs[index].CathKey}`, { timestamp: Date.now(), data: cathlabs[index] });

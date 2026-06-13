@@ -1511,8 +1511,8 @@
     "PatientPhone1": "",
     "PatientPhone2": "",
     "PatientCreateBy": "BS. Admin",
-    "PatientCreateTime": "2026-06-12T16:02:15.566Z",
-    "Outcome": ""
+    "PatientCreateTime": "2026-06-13T01:32:05.804Z",
+    "Outcome": "Đã thông"
   },
   {
     "PatientKey": "pat_1781278554274",
@@ -1525,6 +1525,7 @@
     "PatientPhone1": "0123456789",
     "PatientPhone2": "",
     "PatientCreateBy": "{\"StaffKey\":\"11111\",\"StaffName\":\"Admin\",\"Name\":\"Admin\",\"StaffSex\":\"\",\"Avatar\":\"\",\"StaffDOB\":\"\",\"Deparment\":\"\",\"Career\":\"\",\"Email\":\"\",\"StaffPhone\":\"\",\"Password\":\"1111\",\"Role\":\"Admin\",\"View\":\"\",\"StaffCreateTime\":\"\",\"FireDate\":\"\",\"ReportType\":\"Theo kỳ\",\"SelectedPeriod\":\"Năm nay\",\"DateFrom\":\"2026-01-01\",\"DateTo\":\"2027-06-30\",\"Filter_Dept\":\"\",\"Filter_Doctor\":\"\",\"Filter_Result\":\"\",\"View_Mode\":\"Theo kết quả hội chẩn\"}",
-    "PatientCreateTime": "2026-06-12T15:35:54.275Z"
+    "PatientCreateTime": "2026-06-12T15:35:54.275Z",
+    "Outcome": "Đã thông"
   }
 ]

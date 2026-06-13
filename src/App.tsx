@@ -36,9 +36,10 @@ import TransferredCathLabView from './components/TransferredCathLabView';
 import ArchiveView from './components/ArchiveView';
 import WorkspaceDashboard from './components/WorkspaceDashboard';
 import MRISchedulerView from './components/MRISchedulerView';
+import MRIRegisterView from './components/MRIRegisterView';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
-import { SOURCE_PROVINCE } from './data/source';
+import { SOURCE_PROVINCE, getDiagnosisOptions } from './data/source';
 
 import { 
   Users, 
@@ -185,6 +186,12 @@ export default function App() {
   const [cmrs, setCmrs] = useState<CMR[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
 
+  const diagnosisOptions = useMemo(() => getDiagnosisOptions(sources, [
+    ...consults.map(consult => consult.DiagnosisID),
+    ...cathlabs.map(cathlab => cathlab.PostDiagnosisID),
+    ...cmrs.map(cmr => cmr.CMRDiagnosisID)
+  ]), [sources, consults, cathlabs, cmrs]);
+
   // Fast Patients Cache map to optimize O(N*M) lookups down to O(M)
   const patientsMap = useMemo(() => {
     const map = new Map<string, Patient>();
@@ -233,7 +240,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'mri-scheduler' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'mri-scheduler' | 'mri-register' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
 
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
@@ -432,6 +439,23 @@ export default function App() {
     fetch('/api/sources')
       .then(res => res.json())
       .then(data => setSources(data));
+  };
+
+  const createDiagnosisSource = async (DiagnosisID: string) => {
+    const trimmed = DiagnosisID.trim();
+    if (!trimmed) return;
+
+    const response = await fetch('/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ DiagnosisID: trimmed })
+    });
+
+    if (!response.ok) {
+      throw new Error('Không thể thêm DiagnosisID vào Source');
+    }
+
+    fetchSources();
   };
 
   useEffect(() => {
@@ -1333,6 +1357,7 @@ export default function App() {
     { id: 'results-staff', label: 'Nhập kết quả staff', icon: <FileText className="w-4 h-4" /> },
     { id: 'schedule-tt', label: 'Xếp lịch & Dụng cụ', icon: <CalendarDays className="w-4 h-4" /> },
     { id: 'mri-scheduler', label: 'Xếp lịch MRI', icon: <Activity className="w-4 h-4" /> },
+    { id: 'mri-register', label: 'Đăng ký MRI', icon: <Activity className="w-4 h-4" /> },
     { id: 'google-sheets', label: 'Virtual Google Sheets', icon: <Database className="w-4 h-4" /> },
     { id: 'excel-export', label: 'Bảng Filter_Consult', icon: <Download className="w-4 h-4" /> },
   ];
@@ -1381,6 +1406,12 @@ export default function App() {
         return {
           title: "XẾP LỊCH MRI",
           subtitle: "Quản lý MRI tim",
+          icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
+        };
+      case 'mri-register':
+        return {
+          title: "ĐĂNG KÝ MRI TIM",
+          subtitle: "Danh sách đăng ký chụp MRI",
           icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
         };
       case 'cathlab-room':
@@ -1511,7 +1542,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
+      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
         
         {/* Collapsible Left navigation Aside drawer */}
         <aside className={`${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
@@ -1576,7 +1607,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -1975,14 +2006,22 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Kiểu staff *</label>
-                        <select
-                          value={newConsultData.ConsultType}
-                          onChange={(e) => setNewConsultData(prev => ({ ...prev, ConsultType: e.target.value as any }))}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold focus:outline-none"
-                        >
-                          <option value="Staff mổ">Staff mổ</option>
-                          <option value="Staff thông">Staff thông</option>
-                        </select>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['Staff thông', 'Staff mổ'] as ConsultTypeEnum[]).map(type => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setNewConsultData(prev => ({ ...prev, ConsultType: type }))}
+                              className={`rounded-xl px-3 py-2 font-extrabold border transition ${
+                                newConsultData.ConsultType === type
+                                  ? 'bg-[#d2145a] text-white border-[#d2145a] shadow-sm'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-[#d2145a]/40'
+                              }`}
+                            >
+                              {type}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       <div>
@@ -2539,6 +2578,7 @@ export default function App() {
             <StaffResultsView 
               patients={patients}
               consults={consults}
+              sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
               onSelectConsult={(c) => makeResultEdit(c)}
@@ -2546,6 +2586,7 @@ export default function App() {
                 fetchPatients();
                 fetchConsults();
                 fetchStaff();
+                fetchSources();
               }}
             />
           )}
@@ -2556,12 +2597,14 @@ export default function App() {
               patients={patients}
               consults={consults}
               cathlabs={cathlabs}
+              sources={sources}
               staffList={staffList}
               onRefreshData={() => {
                 fetchPatients();
                 fetchConsults();
                 fetchCathlabs();
                 fetchStaff();
+                fetchSources();
               }}
               triggerConfirm={triggerConfirm}
               onViewPatientRecord={(pat) => {
@@ -2602,6 +2645,7 @@ export default function App() {
             <CathLabSchedulerView 
               patients={patients}
               consults={consults}
+              sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
               pureCalendarMode={false}
@@ -2609,6 +2653,7 @@ export default function App() {
                 fetchPatients();
                 fetchConsults();
                 fetchStaff();
+                fetchSources();
               }}
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');
@@ -2622,6 +2667,7 @@ export default function App() {
             <CathLabSchedulerView 
               patients={patients}
               consults={consults}
+              sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
               pureCalendarMode={true}
@@ -2629,6 +2675,7 @@ export default function App() {
                 fetchPatients();
                 fetchConsults();
                 fetchStaff();
+                fetchSources();
               }}
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');
@@ -2644,6 +2691,25 @@ export default function App() {
               consults={consults}
               cmrs={cmrs}
               sources={sources}
+              staffList={staffList}
+              currentStaff={currentStaff}
+              onRefreshData={() => {
+                fetchPatients();
+                fetchConsults();
+                fetchCmrs();
+                fetchSources();
+              }}
+            />
+          )}
+
+          {/* ĐĂNG KÝ MRI TIM PANEL */}
+          {activeMenu === 'mri-register' && (
+            <MRIRegisterView
+              patients={patients}
+              consults={consults}
+              cmrs={cmrs}
+              sources={sources}
+              staffList={staffList}
               currentStaff={currentStaff}
               onRefreshData={() => {
                 fetchPatients();
@@ -2733,6 +2799,8 @@ export default function App() {
           <PatientDetailsDrawer 
             patient={selectedPatientForDetail}
             consults={consults}
+            cathlabs={cathlabs}
+            cmrs={cmrs}
             onClose={() => setSelectedPatientForDetail(null)}
             onEditPatientAdmin={(pat) => {
               setSelectedPatientForDetail(null);
@@ -2806,14 +2874,6 @@ export default function App() {
                   const edc = consults.find(c => c.ConsultKey === editingConsultKey);
                   const edp = edc ? getPatientByKey(edc.PatientKey) : null;
                   if (!edp || !edc) return null;
-
-                  const icdCodes = [
-                    "ASD", "VSD", "PDA", "PS", "AS", "APSO", "APSI", "CoA", 
-                    "Đứt đoạn cung ĐMC", "Dò vành", "TOF", "TBS phức tạp khác", 
-                    "AVSD", "SV", "DORV", "Truncus", "TAPVR/PAPVR", "TGA", 
-                    "Ebstein", "SVT", "Nhịp nhanh thất", "RLN khác", 
-                    "Bệnh lý mạch mẫu", "Bệnh van tim", "Bệnh cơ tim"
-                  ];
 
                   const conclusionOptions = [
                     "Can thiệp thông tim",
@@ -2956,14 +3016,22 @@ export default function App() {
                                 </div>
                                 <div>
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Kiểu staff</label>
-                                  <select
-                                    value={resultUpdateData.ConsultType}
-                                    onChange={(e) => setResultUpdateData(prev => ({ ...prev, ConsultType: e.target.value as any }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
-                                  >
-                                    <option value="Staff mổ">Staff mổ</option>
-                                    <option value="Staff thông">Staff thông</option>
-                                  </select>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {(['Staff thông', 'Staff mổ'] as ConsultTypeEnum[]).map(type => (
+                                      <button
+                                        key={type}
+                                        type="button"
+                                        onClick={() => setResultUpdateData(prev => ({ ...prev, ConsultType: type }))}
+                                        className={`rounded-xl px-2.5 py-1.5 text-xs font-extrabold border transition ${
+                                          resultUpdateData.ConsultType === type
+                                            ? 'bg-[#d2145a] text-white border-[#d2145a] shadow-sm'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:border-[#d2145a]/40'
+                                        }`}
+                                      >
+                                        {type}
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
                                 
                                 <div>
@@ -3054,9 +3122,12 @@ export default function App() {
                                     <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
                                     <SearchableEnumSelect
                                       required
-                                      options={icdCodes}
+                                      options={diagnosisOptions}
                                       value={resultUpdateData.DiagnosisID}
                                       onChange={(value) => setResultUpdateData(prev => ({ ...prev, DiagnosisID: value }))}
+                                      allowCreate
+                                      createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                                      onCreateOption={createDiagnosisSource}
                                       placeholder="-- Chọn ICD --"
                                       searchPlaceholder="Gõ ICD để tìm..."
                                     />
@@ -3347,14 +3418,22 @@ export default function App() {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Kiểu staff *</label>
-                              <select
-                                value={editConsultData.ConsultType}
-                                onChange={(e) => setEditConsultData(prev => ({ ...prev, ConsultType: e.target.value as any }))}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold focus:ring-1 focus:ring-pink-500 focus:outline-none"
-                              >
-                                <option value="Staff mổ">Staff mổ</option>
-                                <option value="Staff thông">Staff thông</option>
-                              </select>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(['Staff thông', 'Staff mổ'] as ConsultTypeEnum[]).map(type => (
+                                  <button
+                                    key={type}
+                                    type="button"
+                                    onClick={() => setEditConsultData(prev => ({ ...prev, ConsultType: type }))}
+                                    className={`rounded-xl px-3 py-2 font-extrabold border transition ${
+                                      editConsultData.ConsultType === type
+                                        ? 'bg-[#d2145a] text-white border-[#d2145a] shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-[#d2145a]/40'
+                                    }`}
+                                  >
+                                    {type}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
 
                             <div>

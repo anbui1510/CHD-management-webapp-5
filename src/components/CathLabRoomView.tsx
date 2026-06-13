@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Patient, Consult, Staff, CathLab, findPatientByKey, formatVNTime, removeDiacritics } from '../types';
+import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User } from 'lucide-react';
-import { SOURCE_DIAGNOSIS_ID, SOURCE_CATH_METHOD, SOURCE_PROVINCE } from '../data/source';
+import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getDiagnosisOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
 
@@ -9,6 +9,7 @@ interface Props {
   patients: Patient[];
   consults: Consult[];
   cathlabs: CathLab[];
+  sources: Source[];
   staffList: Staff[];
   onRefreshData: () => void;
   triggerConfirm: (msg: string, onConfirm: () => void, title?: string) => void;
@@ -53,11 +54,32 @@ const removeVietnameseTones = (str: any): string => {
   return removeDiacritics(str);
 };
 
-export default function CathLabRoomView({ patients, consults, cathlabs, staffList, onRefreshData, triggerConfirm, onViewPatientRecord }: Props) {
+export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord }: Props) {
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortAsc, setSortAsc] = useState(true);
+  const diagnosisOptions = useMemo(() => getDiagnosisOptions(sources, [
+    ...consults.map(consult => consult.DiagnosisID),
+    ...cathlabs.map(cathlab => cathlab.PostDiagnosisID)
+  ]), [sources, consults, cathlabs]);
+
+  const createDiagnosisSource = async (DiagnosisID: string) => {
+    const trimmed = DiagnosisID.trim();
+    if (!trimmed) return;
+
+    const response = await fetch('/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ DiagnosisID: trimmed })
+    });
+
+    if (!response.ok) {
+      throw new Error('Không thể thêm DiagnosisID vào Source');
+    }
+
+    onRefreshData();
+  };
   
   // Data prep
   const pendingConsults = useMemo(() => {
@@ -811,9 +833,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, staffLis
                         <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">ICD Sau TT <span className="text-rose-500">*</span></label>
                         <SearchableEnumSelect
                           required
-                          options={SOURCE_DIAGNOSIS_ID}
+                          options={diagnosisOptions}
                           value={formData.PostDiagnosisID} 
                           onChange={(value) => setFormData({...formData, PostDiagnosisID: value})}
+                          allowCreate
+                          createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                          onCreateOption={createDiagnosisSource}
                           placeholder="- Chọn mã -"
                           searchPlaceholder="Gõ ICD để tìm..."
                         />

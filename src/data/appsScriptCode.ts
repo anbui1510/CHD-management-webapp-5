@@ -1,4 +1,4 @@
-export const GOOGLE_APPS_SCRIPT_CODE = `/**
+﻿export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * Google Apps Script for Pediatric Cardiac (CHD) Patient Management System
  * Hook this script into your Google Sheets to sync with Cloud Run in real-time.
  * 
@@ -87,13 +87,13 @@ function initializeDatabase() {
   
   var cmrHeaders = [
     "CMRKey", "CMRkey", "ConsultKey", "PatientKey", "MBN", "Họ và tên", "Tình trạng",
-    "PatientWeight", "CMRDigagnosisID", "CMRDiagnosis", "CMRRequest", "DepartRequest",
+    "PatientWeight", "CMRDiagnosisID", "CMRDiagnosis", "CMRRequest", "RequestBy", "DepartRequest",
     "CMRMethod", "CMRDevice", "PostDepart", "Anesthesia", "CMRScheduledDate", "DayOfWeek",
     "CMRCallStatus", "CMRCallStatusNote", "CMRDate", "CMRResult", "CMRNote",
     "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime"
   ];
 
-  var sourceHeaders = [];
+  var sourceHeaders = ["DiagnosisID"];
 
   getOrCreateSheet("Patient", patientHeaders);
   getOrCreateSheet("Consult", consultHeaders);

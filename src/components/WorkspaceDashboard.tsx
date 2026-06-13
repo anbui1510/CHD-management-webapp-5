@@ -176,6 +176,17 @@ export default function WorkspaceDashboard({
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
+            onClick={() => onNavigate('mri-register')}
+            className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
+          >
+            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <Activity className="w-6 h-6 text-purple-600" />
+            </div>
+            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Đăng ký MRI tim</h3>
+            <p className="text-xs text-slate-500">Danh sách đăng ký chụp MRI</p>
+          </button>
+
+          <button
             onClick={() => onNavigate('mri-scheduler')}
             className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
           >

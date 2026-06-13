@@ -14,6 +14,9 @@ interface SearchableEnumSelectProps {
   required?: boolean;
   direction?: 'up' | 'down';
   className?: string;
+  allowCreate?: boolean;
+  createLabel?: (value: string) => string;
+  onCreateOption?: (value: string) => void | Promise<void>;
 }
 
 export function SearchableEnumSelect({
@@ -27,7 +30,10 @@ export function SearchableEnumSelect({
   multiple = false,
   required = false,
   direction = 'down',
-  className = ''
+  className = '',
+  allowCreate = false,
+  createLabel,
+  onCreateOption
 }: SearchableEnumSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,6 +78,25 @@ export function SearchableEnumSelect({
 
   const selectSingleValue = (option: string) => {
     onChange?.(option);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
+  const canCreate = useMemo(() => {
+    const valueToCreate = searchTerm.trim();
+    if (!allowCreate || !valueToCreate) return false;
+    return !normalizedOptions.some(option => option.toLowerCase() === valueToCreate.toLowerCase());
+  }, [allowCreate, normalizedOptions, searchTerm]);
+
+  const createOption = async () => {
+    const valueToCreate = searchTerm.trim();
+    if (!valueToCreate) return;
+    await onCreateOption?.(valueToCreate);
+    if (multiple) {
+      onMultiChange?.([...selectedValues, valueToCreate]);
+    } else {
+      onChange?.(valueToCreate);
+    }
     setIsOpen(false);
     setSearchTerm('');
   };
@@ -150,7 +175,7 @@ export function SearchableEnumSelect({
                 {!value && <Check className="w-4 h-4 text-[#d2145a]" />}
               </div>
             )}
-            {filteredOptions.length === 0 ? (
+            {filteredOptions.length === 0 && !canCreate ? (
               <div className="px-4 py-5 text-center text-xs italic text-slate-400">Không tìm thấy lựa chọn phù hợp</div>
             ) : filteredOptions.map(option => {
               const selected = selectedValues.includes(option);
@@ -167,6 +192,15 @@ export function SearchableEnumSelect({
                 </div>
               );
             })}
+            {canCreate && (
+              <button
+                type="button"
+                onClick={createOption}
+                className="w-full px-3.5 py-2 text-left text-xs font-extrabold text-emerald-700 hover:bg-emerald-50 border-t border-slate-100"
+              >
+                {createLabel ? createLabel(searchTerm.trim()) : `Thêm "${searchTerm.trim()}"`}
+              </button>
+            )}
           </div>
         </div>
       )}
