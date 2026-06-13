@@ -862,28 +862,33 @@ app.post('/api/cmrs', async (req, res) => {
 });
 
 app.put('/api/cmrs/:key', async (req, res) => {
-  const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
-  const key = req.params.key;
-  const index = cmrs.findIndex(m =>
-    String(m.CMRKey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase() ||
-    String(m.CMRkey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase()
-  );
+  try {
+    const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
+    const key = req.params.key;
+    const index = cmrs.findIndex(m =>
+      String(m.CMRKey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase() ||
+      String(m.CMRkey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase()
+    );
 
-  if (index !== -1) {
-    cmrs[index] = { ...cmrs[index], ...req.body, UpdateTime: newTimestamp() };
-    cmrs[index].CMRKey = cmrs[index].CMRKey || cmrs[index].CMRkey || key;
-    writeDB<CMR>(CMRS_FILE, cmrs);
-    markLocalMutation();
+    if (index !== -1) {
+      cmrs[index] = { ...cmrs[index], ...req.body, UpdateTime: newTimestamp() };
+      cmrs[index].CMRKey = cmrs[index].CMRKey || cmrs[index].CMRkey || key;
+      writeDB<CMR>(CMRS_FILE, cmrs);
+      markLocalMutation();
 
-    recentLocalEdits.set(`CMR_${cmrs[index].CMRKey}`, { timestamp: Date.now(), data: cmrs[index] });
+      recentLocalEdits.set(`CMR_${cmrs[index].CMRKey}`, { timestamp: Date.now(), data: cmrs[index] });
 
-    syncToGoogleSheets('CMR', 'update', cmrs[index].CMRKey, cmrs[index]).catch(err => {
-      console.error('Error syncing CMR update to google sheets background:', err);
-    });
+      syncToGoogleSheets('CMR', 'update', cmrs[index].CMRKey, cmrs[index]).catch(err => {
+        console.error('Error syncing CMR update to google sheets background:', err);
+      });
 
-    res.json(cmrs[index]);
-  } else {
-    res.status(404).json({ error: 'CMR record not found' });
+      res.json(cmrs[index]);
+    } else {
+      res.status(404).json({ error: 'CMR record not found' });
+    }
+  } catch (err) {
+    console.error('Error in PUT /api/cmrs/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1044,7 +1049,13 @@ app.post('/api/reset', (req, res) => {
 async function launch() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // The JSON "database" lives in data/ and is rewritten on every save.
+        // Without this, those writes make Vite trigger a full page reload,
+        // which remounts the app and resets the view back to Home.
+        watch: { ignored: ['**/data/**'] },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

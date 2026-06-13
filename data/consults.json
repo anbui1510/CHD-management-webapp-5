@@ -402,7 +402,7 @@
     "Scheduled1stInterventionist": "BS. Hiếu",
     "Scheduled2ndInterventionist": "BS. Ân",
     "Scheduled3rdInterventionist": "",
-    "TransferredToCathLab": true
+    "TransferredToCathLab": false
   },
   {
     "ConsultKey": "MOCK2025_CON_010",
@@ -4867,5 +4867,30 @@
     "CheckDeviceUpdatedBy": "11111",
     "CheckDeviceUpdatedTime": "2026-06-13T03:34:00.271Z",
     "TransferredToCathLab": true
+  },
+  {
+    "ConsultKey": "con_1781352668370",
+    "PatientKey": "pat_1781277024139",
+    "ConsultType": "Staff mổ",
+    "PatientWeight": "2",
+    "PatientHeight": "",
+    "ConsultDate": "2026-06-13",
+    "RequestBy": "BS. Ân",
+    "DiagnosisID": "",
+    "DetailDiagnosis": "Tim 1 thất dạng thất trái - đã Fontan - test 1 - TEST LẦN 2 - teesst lần 3 - lần 4 lần 5",
+    "Department": "Tim Mạch",
+    "ConsultCreateBy": "11111",
+    "ConsultCreateTime": "2026-06-13T12:11:08.370Z",
+    "ConsultResultID": "Can thiệp thông tim",
+    "DetailConsultResult": "Can thiệp thông tim",
+    "ConsultNote": "[Kích hoạt xếp lịch bổ sung - Admin 2026-06-13T12:12:12.738Z]",
+    "PlannedDevice": "",
+    "PlannedPrice": "",
+    "PriorityOrder": "Chương trình",
+    "RiskFactor": "3 - Không HF, HF độ I-II / có chỉ định mổ",
+    "CheckDevice": "",
+    "PDFTrigger": false,
+    "ConsultResultUpdatedBy": "11111",
+    "ConsultResultUpdatedTime": "2026-06-13T12:12:12.738Z"
   }
 ]

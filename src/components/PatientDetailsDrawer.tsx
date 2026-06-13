@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import { Patient, Consult, CathLab, CMR, formatVNTime } from '../types';
+import React from 'react';
+import { Patient, Consult, CathLab, CMR, Operation, formatVNTime } from '../types';
 import {
   X,
   MapPin,
@@ -8,7 +8,8 @@ import {
   ClipboardCheck,
   FileText,
   Activity,
-  CalendarDays
+  CalendarDays,
+  Scissors
 } from 'lucide-react';
 
 interface PatientDetailsDrawerProps {
@@ -16,6 +17,7 @@ interface PatientDetailsDrawerProps {
   consults: Consult[];
   cathlabs: CathLab[];
   cmrs: CMR[];
+  operations?: Operation[];
   onClose: () => void;
   onEditPatientAdmin: (patient: Patient) => void;
   onSelectPDF: (consult: Consult, patient: Patient) => void;
@@ -47,6 +49,7 @@ export default function PatientDetailsDrawer({
   consults,
   cathlabs,
   cmrs,
+  operations = [],
   onClose,
   onEditPatientAdmin,
   onSelectPDF,
@@ -89,6 +92,17 @@ export default function PatientDetailsDrawer({
       patientConsultKeys.has(normalizeKey(cmr.ConsultKey))
     )
     .sort((a, b) => getTime(b.CMRDate || b.CMRScheduledDate || b.UpdateTime) - getTime(a.CMRDate || a.CMRScheduledDate || a.UpdateTime));
+
+  const patientOperations = operations
+    .filter(op => normalizeKey(op.PatientKey) === patientKey || patientConsultKeys.has(normalizeKey(op.ConsultKey)))
+    .sort((a, b) => getTime(b.SurgDate) - getTime(a.SurgDate));
+
+  const joinSurgeons = (op: Operation) => joinPeople([
+    op['1stSurgeon'],
+    op['2ndSurgeon'],
+    op['3rdSurgeon'],
+    op['4thSurgeon']
+  ]);
 
   const latestDiagnosis = [
     ...patientConsults.map(c => ({
@@ -327,6 +341,36 @@ export default function PatientDetailsDrawer({
                     </div>
                     {cmr.CMRRequest && <p className="font-semibold text-slate-700 leading-relaxed">{cmr.CMRRequest}</p>}
                     {cmr.CMRResult && <p className="font-semibold text-slate-700 leading-relaxed">{cmr.CMRResult}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {patientOperations.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Scissors className="w-4.5 h-4.5 text-[#d2145a]" />
+                  Lịch sử phẫu thuật ({patientOperations.length})
+                </h4>
+              </div>
+              <div className="space-y-3">
+                {patientOperations.map((op) => (
+                  <div key={op.SurgKey || `${op.PatientKey}_${op.SurgDate}`} className="bg-white border text-xs border-slate-200 hover:border-rose-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-extrabold text-slate-900 uppercase">Ngày PT: {formatVNTime(op.SurgDate) || '—'}</p>
+                      <p className="text-[10px] text-slate-500 font-bold text-right">PTV: {joinSurgeons(op) || '—'}</p>
+                    </div>
+                    {op.PostDiagnosis && (
+                      <p className="font-semibold text-slate-700 leading-relaxed">
+                        <span className="text-slate-400 font-bold">Chẩn đoán:</span> {op.PostDiagnosis}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-semibold text-slate-700">
+                      <p><span className="text-slate-400 font-bold">PP PT:</span> {op.SurgMethod || '—'}</p>
+                      {op.SurgNote && <p><span className="text-slate-400 font-bold">Ghi chú:</span> {op.SurgNote}</p>}
+                    </div>
                   </div>
                 ))}
               </div>

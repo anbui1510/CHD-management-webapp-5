@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Download,
   Filter,
   Plus,
   Save,
@@ -16,6 +17,12 @@ import {
 import { CMR, Consult, Patient, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getDiagnosisOptions } from '../data/source';
+import {
+  DEFAULT_CMR_DEVICE,
+  DEFAULT_CMR_METHOD,
+  resolveCMRDevice,
+  resolveCMRMethod
+} from '../data/cmrDefaults';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
@@ -92,25 +99,35 @@ const getPatientDisplayName = (patientName?: string): string => {
   return parts.slice(-2).join(' ');
 };
 
-const getAgeDescription = (dobStr?: string): string => {
+const getAgeDescription = (dobStr?: string, refDateStr?: string): string => {
   if (!dobStr) return '';
   const key = getFormattedDateKey(dobStr);
   const parts = key.split('-');
   if (parts.length !== 3) return '';
   const dob = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
   if (Number.isNaN(dob.getTime())) return '';
-  const today = new Date(2026, 5, 6);
-  let years = today.getFullYear() - dob.getFullYear();
-  const monthDiff = today.getMonth() - dob.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+
+  const refKey = refDateStr ? getFormattedDateKey(refDateStr) : '';
+  const refParts = refKey.split('-');
+  const ref = refParts.length === 3
+    ? new Date(Number(refParts[0]), Number(refParts[1]) - 1, Number(refParts[2]))
+    : new Date();
+
+  let years = ref.getFullYear() - dob.getFullYear();
+  let months = ref.getMonth() - dob.getMonth();
+  if (months < 0 || (months === 0 && ref.getDate() < dob.getDate())) {
     years -= 1;
+    months += 12;
   }
   if (years <= 0) {
-    const months = Math.max(0, (today.getFullYear() - dob.getFullYear()) * 12 + today.getMonth() - dob.getMonth());
-    return months <= 0 ? 'Sơ sinh' : `${months} tháng`;
+    if (months <= 0) return 'Sơ sinh';
+    return `${months} tháng tuổi`;
   }
   return `${years} tuổi`;
 };
+
+const EXCEL_LINE_HEIGHT_PT = 18;
+const EXCEL_ROW_PADDING_PT = 10;
 
 export default function MRISchedulerView({
   patients,
@@ -147,8 +164,16 @@ export default function MRISchedulerView({
   const [currentYear, setCurrentYear] = useState(2026);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [exportMsg, setExportMsg] = useState('');
 
   const [formData, setFormData] = useState<Partial<CMR>>({});
+  // Snapshot of the form right after selecting/saving an item, used to detect
+  // unsaved changes when leaving the scheduling form.
+  const [formSnapshot, setFormSnapshot] = useState('');
+  // Save/exit confirmation dialog: 'save' = confirm before saving,
+  // 'exit' = unsaved changes when leaving the form.
+  const [confirmMode, setConfirmMode] = useState<null | 'save' | 'exit'>(null);
+  const [confirmError, setConfirmError] = useState('');
 
   const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();
@@ -339,9 +364,232 @@ export default function MRISchedulerView({
     });
   }, [exportStartDate, exportEndDate, segmentedItems.scheduled]);
 
+  const handleExportExcel = async () => {
+    try {
+      if (!exportStartDate || filteredScheduleItems.length === 0) {
+        setExportMsg('Không có ca bệnh nào trong khoảng thời gian này!');
+        return;
+      }
+
+      const vnDays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      const startFormatted = exportStartDate.split('-').reverse().join('/');
+      const endFormatted = exportEndDate.split('-').reverse().join('/');
+
+      const startMonth = Number(exportStartDate.split('-')[1]);
+      const endMonth = Number(exportEndDate.split('-')[1]);
+      const startYear = exportStartDate.split('-')[0];
+      const endYear = exportEndDate.split('-')[0];
+      const titleStr = startMonth === endMonth && startYear === endYear
+        ? `LỊCH CHỤP MRI TIM THÁNG ${startMonth} NĂM ${startYear}`
+        : `LỊCH CHỤP MRI TIM TỪ THÁNG ${startMonth} ĐẾN THÁNG ${endMonth} NĂM ${endYear}`;
+
+      const exportItems = [...filteredScheduleItems].sort((a, b) =>
+        getFormattedDateKey(a.CMRScheduledDate).localeCompare(getFormattedDateKey(b.CMRScheduledDate))
+      );
+
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('CMRFilter_Scheduled');
+
+      worksheet.pageSetup = {
+        paperSize: 9,
+        orientation: 'landscape',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0
+      };
+
+      const fontTimesNormal = { name: 'Times New Roman', size: 11 };
+      const fontTimesBold = { name: 'Times New Roman', size: 11, bold: true };
+      const fontTimesTitle = { name: 'Times New Roman', size: 14, bold: true };
+      const centerAlignment = { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true };
+      const thinBorder = {
+        top: { style: 'thin' as const, color: { argb: 'FF000000' } },
+        left: { style: 'thin' as const, color: { argb: 'FF000000' } },
+        bottom: { style: 'thin' as const, color: { argb: 'FF000000' } },
+        right: { style: 'thin' as const, color: { argb: 'FF000000' } }
+      };
+
+      worksheet.addRow(['BỆNH VIỆN NHI ĐỒNG THÀNH PHỐ']);
+      worksheet.addRow(['KHOA TIM MẠCH']);
+      worksheet.addRow([]);
+      worksheet.getCell('A1').font = fontTimesBold;
+      worksheet.getCell('A2').font = fontTimesBold;
+
+      const titleRow = worksheet.addRow(['', titleStr]);
+      worksheet.mergeCells(`B${titleRow.number}:K${titleRow.number}`);
+      const titleCell = worksheet.getCell(`B${titleRow.number}`);
+      titleCell.font = fontTimesTitle;
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      worksheet.addRow([]);
+
+      const headers = [
+        'STT',
+        'Ngày chụp',
+        'Mã NB',
+        'Họ và tên',
+        'Thông tin',
+        'Chẩn đoán',
+        'Khoa chỉ định',
+        'Phương pháp chụp',
+        'Dự trù dụng cụ',
+        'Khoa nằm sau chụp MRI',
+        'Ghi chú'
+      ];
+      const headerRow = worksheet.addRow(headers);
+      headerRow.height = 22;
+      headerRow.eachCell((cell) => {
+        cell.font = fontTimesBold;
+        cell.alignment = centerAlignment;
+        cell.border = thinBorder;
+      });
+
+      exportItems.forEach((item, index) => {
+        const patient = item.__patient;
+        const scheduledKey = getFormattedDateKey(item.CMRScheduledDate);
+        let dayOfWeekStr = '';
+        if (scheduledKey) {
+          const [yyyy, mm, dd] = scheduledKey.split('-');
+          if (yyyy && mm && dd) {
+            const dateObj = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10));
+            dayOfWeekStr = vnDays[dateObj.getDay()];
+          }
+        }
+        const scheduledDisplay = scheduledKey
+          ? `${dayOfWeekStr} ${scheduledKey.split('-').reverse().join('/')}`
+          : '';
+
+        const dobFormatted = patient?.PatientDOB ? formatVNTime(patient.PatientDOB) : '';
+        const ageDesc = patient?.PatientDOB ? getAgeDescription(patient.PatientDOB, scheduledKey) : '';
+        const weightRaw = String(item.PatientWeight || item.__consult?.PatientWeight || '').trim();
+        const weightStr = weightRaw
+          ? (weightRaw.toLowerCase().includes('kg') ? weightRaw : `${weightRaw}kg`)
+          : '';
+        const address = patient?.PatientAddress || '';
+        const thongTinLines = [
+          patient?.PatientSex || '',
+          dobFormatted && ageDesc ? `${dobFormatted} (${ageDesc})` : dobFormatted || ageDesc,
+          weightStr,
+          address
+        ].filter(Boolean);
+        const thongTin = thongTinLines.join('\n');
+
+        const chanDoan = String(item.CMRDiagnosis || item.__consult?.DetailDiagnosis || '').trim();
+        const khoaChiDinh = String(item.DepartRequest || item.__consult?.Department || 'Tim mạch').trim();
+        const phuongPhap = resolveCMRMethod(item.CMRMethod);
+        const duTru = resolveCMRDevice(item.CMRDevice);
+        const khoaSau = String(item.PostDepart || 'Tim mạch').trim();
+        const anesthesia = String(item.Anesthesia || '').trim();
+        const callNote = String(item.CMRCallStatusNote || '').trim();
+        const ghiChuParts = [
+          anesthesia ? anesthesia.replace(/gây mê/gi, 'GMHS') : '',
+          callNote
+        ].filter(Boolean);
+        const ghiChu = ghiChuParts.join('\n');
+
+        const rowData = [
+          index + 1,
+          scheduledDisplay,
+          patient?.PatientID1 || item.MBN || '',
+          (patient?.PatientName || item['Họ và tên'] || '').toUpperCase(),
+          thongTin,
+          chanDoan,
+          khoaChiDinh,
+          phuongPhap,
+          duTru,
+          khoaSau,
+          ghiChu
+        ];
+
+        const row = worksheet.addRow(rowData);
+        const thongTinLineCount = thongTin.split('\n').length;
+        const maxChars = Math.max(chanDoan.length, phuongPhap.length, duTru.length);
+        row.height = Math.max(
+          36,
+          thongTinLineCount * EXCEL_LINE_HEIGHT_PT + EXCEL_ROW_PADDING_PT,
+          Math.ceil(maxChars / 32) * 15 + EXCEL_ROW_PADDING_PT
+        );
+
+        row.eachCell((cell) => {
+          cell.font = fontTimesNormal;
+          cell.alignment = centerAlignment;
+          cell.border = thinBorder;
+        });
+      });
+
+      worksheet.columns = [
+        { width: 5 },
+        { width: 18 },
+        { width: 12 },
+        { width: 22 },
+        { width: 20 },
+        { width: 30 },
+        { width: 14 },
+        { width: 28 },
+        { width: 28 },
+        { width: 16 },
+        { width: 16 }
+      ];
+
+      worksheet.addRow([]);
+      worksheet.addRow([]);
+
+      const now = new Date();
+      const dateFooterRow = worksheet.addRow([]);
+      dateFooterRow.getCell(8).value = `TP Hồ Chí Minh, ngày ${String(now.getDate()).padStart(2, '0')} tháng ${String(now.getMonth() + 1).padStart(2, '0')} năm ${now.getFullYear()}`;
+      dateFooterRow.getCell(8).font = fontTimesNormal;
+      dateFooterRow.getCell(8).alignment = centerAlignment;
+      worksheet.mergeCells(`H${dateFooterRow.number}:K${dateFooterRow.number}`);
+
+      const signatureTitleRow = worksheet.addRow([
+        'TRƯỞNG KHOA TIM MẠCH',
+        '', '', '', '', '', '', 'NGƯỜI LẬP BẢNG'
+      ]);
+      worksheet.mergeCells(`A${signatureTitleRow.number}:D${signatureTitleRow.number}`);
+      worksheet.mergeCells(`H${signatureTitleRow.number}:K${signatureTitleRow.number}`);
+      signatureTitleRow.eachCell((cell) => {
+        if (cell.value) {
+          cell.font = fontTimesBold;
+          cell.alignment = centerAlignment;
+        }
+      });
+
+      worksheet.addRow([]);
+      worksheet.addRow([]);
+      worksheet.addRow([]);
+
+      const preparerName = currentStaff?.StaffName
+        ? (currentStaff.StaffName.match(/^BS/i) ? currentStaff.StaffName : `BS. ${currentStaff.StaffName}`)
+        : '';
+      const signatureNameRow = worksheet.addRow(['', '', '', '', '', '', '', preparerName]);
+      worksheet.mergeCells(`H${signatureNameRow.number}:K${signatureNameRow.number}`);
+      signatureNameRow.getCell(8).font = fontTimesBold;
+      signatureNameRow.getCell(8).alignment = centerAlignment;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      document.body.appendChild(a);
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `Lịch chụp MRI tim_Tuần ${startFormatted.replace(/\//g, '-')}_${endFormatted.replace(/\//g, '-')}.xlsx`;
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setExportMsg('Tải file thành công!');
+      window.setTimeout(() => setExportMsg(''), 3000);
+    } catch (err: any) {
+      console.error('Lỗi xuất excel MRI:', err);
+      setExportMsg(`Lỗi xuất excel: ${err?.message || 'Không rõ nguyên nhân'}`);
+    }
+  };
+
   const handleSelectItem = (item: MRISchedulerItem) => {
     setSelectedItem(item);
-    setFormData({
+    const nextForm: Partial<CMR> = {
       CMRKey: item.CMRKey,
       CMRkey: item.CMRkey,
       ConsultKey: item.ConsultKey,
@@ -353,14 +601,17 @@ export default function MRISchedulerView({
       CMRDiagnosis: item.CMRDiagnosis || item.__consult?.DetailDiagnosis || '',
       CMRRequest: item.CMRRequest || item.__consult?.DetailConsultResult || item.__consult?.ConsultNote || '',
       DepartRequest: item.DepartRequest || item.__consult?.Department || '',
-      CMRMethod: item.CMRMethod || '',
-      CMRDevice: item.CMRDevice || '',
+      CMRMethod: resolveCMRMethod(item.CMRMethod),
+      CMRDevice: resolveCMRDevice(item.CMRDevice),
       PostDepart: item.PostDepart || '',
       Anesthesia: item.Anesthesia || '',
       CMRScheduledDate: getFormattedDateKey(item.CMRScheduledDate),
       CMRCallStatus: item.CMRCallStatus || '',
       CMRCallStatusNote: item.CMRCallStatusNote || ''
-    });
+    };
+    setFormData(nextForm);
+    setFormSnapshot(JSON.stringify(nextForm));
+    setMessage('');
   };
 
   useEffect(() => {
@@ -374,25 +625,27 @@ export default function MRISchedulerView({
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedItem) return;
+  const REQUIRED_SCHEDULE_FIELDS: { key: keyof CMR; label: string }[] = [
+    { key: 'PatientWeight', label: 'Cân nặng (kg)' },
+    { key: 'CMRDiagnosisID', label: 'Mã chẩn đoán MRI' },
+    { key: 'CMRDiagnosis', label: 'Chẩn đoán MRI' },
+    { key: 'CMRRequest', label: 'Yêu cầu MRI' },
+    { key: 'Anesthesia', label: 'Gây mê' },
+    { key: 'CMRScheduledDate', label: 'Ngày chụp MRI dự kiến' },
+    { key: 'CMRCallStatus', label: 'Trạng thái gọi MRI' }
+  ];
 
+  const getMissingScheduleFields = (): string[] =>
+    REQUIRED_SCHEDULE_FIELDS
+      .filter(field => !String(formData[field.key] || '').trim())
+      .map(field => field.label);
+
+  const hasUnsavedChanges = (): boolean => JSON.stringify(formData) !== formSnapshot;
+
+  // Performs the actual save. Returns true on success. Does NOT close the form.
+  const persistSchedule = async (): Promise<boolean> => {
+    if (!selectedItem) return false;
     const patient = selectedItem.__patient;
-    const requiredFields: { key: keyof CMR; label: string }[] = [
-      { key: 'PatientWeight', label: 'Cân nặng (kg)' },
-      { key: 'CMRDiagnosisID', label: 'Mã chẩn đoán MRI' },
-      { key: 'CMRDiagnosis', label: 'Chẩn đoán MRI' },
-      { key: 'CMRRequest', label: 'Yêu cầu MRI' },
-      { key: 'Anesthesia', label: 'Gây mê' },
-      { key: 'CMRScheduledDate', label: 'Ngày chụp MRI dự kiến' },
-      { key: 'CMRCallStatus', label: 'Trạng thái gọi MRI' }
-    ];
-    const missingFields = requiredFields.filter(field => !String(formData[field.key] || '').trim());
-    if (missingFields.length > 0) {
-      setMessage(`Vui lòng nhập đủ: ${missingFields.map(field => field.label).join(', ')}.`);
-      return;
-    }
 
     const payload: CMR = {
       ...selectedItem,
@@ -401,6 +654,8 @@ export default function MRISchedulerView({
       PatientKey: String(formData.PatientKey || selectedItem.PatientKey || patient?.PatientKey || ''),
       MBN: String(formData.MBN || patient?.PatientID1 || ''),
       'Họ và tên': String(formData['Họ và tên'] || patient?.PatientName || ''),
+      CMRMethod: resolveCMRMethod(formData.CMRMethod),
+      CMRDevice: resolveCMRDevice(formData.CMRDevice),
       UpdateTime: new Date().toISOString()
     };
 
@@ -408,7 +663,9 @@ export default function MRISchedulerView({
     setMessage('');
     try {
       const method = selectedItem.__isSynthetic ? 'POST' : 'PUT';
-      const url = selectedItem.__isSynthetic ? '/api/cmrs' : `/api/cmrs/${selectedItem.CMRKey || selectedItem.CMRkey}`;
+      const url = selectedItem.__isSynthetic
+        ? '/api/cmrs'
+        : `/api/cmrs/${encodeURIComponent(selectedItem.CMRKey || selectedItem.CMRkey || '')}`;
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -416,18 +673,70 @@ export default function MRISchedulerView({
       });
 
       if (!response.ok) {
-        throw new Error('Không lưu được lịch MRI');
+        throw new Error('Không lưu được lịch MRI (server trả lỗi)');
       }
 
       setMessage(`Đã lưu lịch MRI${currentStaff?.StaffName ? ` bởi ${currentStaff.StaffName}` : ''}.`);
+      const savedItem = { ...payload, __patient: patient, __consult: selectedItem.__consult };
+      setSelectedItem(savedItem);
+      setFormSnapshot(JSON.stringify(formData));
       await onRefreshData();
-      setSelectedItem({ ...payload, __patient: patient, __consult: selectedItem.__consult });
       setTimeout(() => setMessage(''), 3500);
+      return true;
     } catch (error: any) {
-      setMessage(error?.message || 'Có lỗi khi lưu lịch MRI.');
+      const msg = error?.message || '';
+      const friendly = msg.includes('Failed to fetch')
+        ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.'
+        : (msg || 'Có lỗi khi lưu lịch MRI.');
+      if (confirmMode) setConfirmError(friendly); else setMessage(friendly);
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  // Save button -> open the confirmation popup (asks before saving).
+  const requestSave = () => {
+    if (!selectedItem) return;
+    setConfirmError('');
+    setConfirmMode('save');
+  };
+
+  // "Quay lại Lịch Tháng" -> confirm if there are unsaved changes.
+  const requestExit = () => {
+    if (hasUnsavedChanges()) {
+      setConfirmError('');
+      setConfirmMode('exit');
+    } else {
+      setSelectedItem(null);
+    }
+  };
+
+  const closeConfirm = () => {
+    setConfirmMode(null);
+    setConfirmError('');
+  };
+
+  // Confirm-dialog "Lưu": validate, save, then optionally leave the form.
+  const handleConfirmSave = async (closeAfter: boolean) => {
+    const missing = getMissingScheduleFields();
+    if (missing.length > 0) {
+      setConfirmError(`Vui lòng nhập đủ: ${missing.join(', ')}.`);
+      return;
+    }
+    const ok = await persistSchedule();
+    if (ok) {
+      setConfirmMode(null);
+      setConfirmError('');
+      if (closeAfter) setSelectedItem(null);
+    }
+  };
+
+  // Confirm-dialog "Không lưu": discard changes and leave the form.
+  const handleConfirmDiscard = () => {
+    setConfirmMode(null);
+    setConfirmError('');
+    setSelectedItem(null);
   };
 
   const extraDoctorOptions = useMemo(() => {
@@ -452,7 +761,10 @@ export default function MRISchedulerView({
     setAdHocNewPatSex('Nam');
     setAdHocNewPatAddress('TP Hà Nội');
     setAdHocNewPatPhone('');
-    setAdHocForm({});
+    setAdHocForm({
+      CMRMethod: DEFAULT_CMR_METHOD,
+      CMRDevice: DEFAULT_CMR_DEVICE
+    });
     setAdHocSuccess('');
     setAdHocError('');
   };
@@ -477,7 +789,7 @@ export default function MRISchedulerView({
 
     try {
       if (!String(adHocForm.CMRDiagnosisID || '').trim()) {
-        setAdHocError('Vui lòng chọn Mã chẩn đoán MRI (CMRDiagnosisID)!');
+        setAdHocError('Vui lòng chọn Mã chẩn đoán MRI!');
         setAdHocLoading(false);
         return;
       }
@@ -543,8 +855,8 @@ export default function MRISchedulerView({
         CMRRequest: String(adHocForm.CMRRequest || ''),
         RequestBy: String(adHocForm.RequestBy || ''),
         DepartRequest: String(adHocForm.DepartRequest || ''),
-        CMRMethod: String(adHocForm.CMRMethod || ''),
-        CMRDevice: String(adHocForm.CMRDevice || ''),
+        CMRMethod: resolveCMRMethod(adHocForm.CMRMethod),
+        CMRDevice: resolveCMRDevice(adHocForm.CMRDevice),
         PostDepart: String(adHocForm.PostDepart || ''),
         Anesthesia: String(adHocForm.Anesthesia || ''),
         CMRScheduledDate: getFormattedDateKey(adHocForm.CMRScheduledDate),
@@ -824,10 +1136,10 @@ export default function MRISchedulerView({
                 </div>
               </>
             ) : (
-              <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-white">
+              <form onSubmit={(e) => e.preventDefault()} className="flex-1 flex flex-col min-h-0 bg-white">
                 <div className="p-4 border-b border-indigo-100 bg-indigo-50/20 flex items-center justify-between gap-2 shrink-0">
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setSelectedItem(null)} className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition">
+                    <button type="button" onClick={requestExit} className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition">
                       ← Quay lại Lịch Tháng
                     </button>
                     <span className="bg-[#d2145a] text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg">
@@ -884,7 +1196,7 @@ export default function MRISchedulerView({
                       {renderEnumInput('CMRDiagnosisID', 'Mã chẩn đoán MRI', diagnosisOptions, 'Gõ ICD để tìm', true)}
                       {renderEnumInput('DepartRequest', 'Khoa yêu cầu', departmentOptions, 'Gõ khoa để tìm')}
                       {renderInput('CMRMethod', 'Phương thức chụp', 'Phương thức chụp')}
-                      {renderInput('CMRDevice', 'Máy/thiết bị MRI', 'Máy/thiết bị MRI')}
+                      {renderInput('CMRDevice', 'Dự trù dụng cụ', 'Dự trù dụng cụ')}
                       {renderEnumInput('PostDepart', 'Khoa sau chụp', departmentOptions, 'Gõ khoa để tìm')}
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
@@ -936,9 +1248,10 @@ export default function MRISchedulerView({
                     {message}
                   </span>
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={requestSave}
                     disabled={saving}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2 rounded-2xl shadow-xs text-xs transition flex items-center gap-2 disabled:opacity-50"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2 rounded-2xl shadow-xs text-xs transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
                     <Save className="w-4 h-4" />
                     {saving ? 'Đang lưu...' : 'Lưu kết quả xếp lịch'}
@@ -979,12 +1292,21 @@ export default function MRISchedulerView({
                     <label className="block text-slate-500 font-bold text-[10px] uppercase mb-2 flex items-center gap-1.5">
                       <CalendarDays className="w-4 h-4" /> Chọn ngày đầu tuần
                     </label>
-                    <input
-                      type="date"
-                      value={exportStartDate}
-                      onChange={(event) => setExportStartDate(event.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 shadow-sm"
-                    />
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={exportStartDate}
+                        onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
+                        onChange={(event) => setExportStartDate(event.target.value)}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <div className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 flex justify-between items-center pointer-events-none shadow-sm">
+                        <span className={exportStartDate ? 'text-slate-800' : 'text-slate-400'}>
+                          {exportStartDate ? exportStartDate.split('-').reverse().join(' / ') : 'dd / mm / yyyy'}
+                        </span>
+                        <CalendarDays className="w-4 h-4 text-emerald-600" />
+                      </div>
+                    </div>
                     {exportEndDate && (
                       <p className="mt-2 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 p-2 rounded-lg">
                         Lọc từ ngày: <strong>{exportStartDate.split('-').reverse().join('/')}</strong><br />
@@ -1014,11 +1336,24 @@ export default function MRISchedulerView({
                   </div>
                 </div>
 
-                <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-3xl">
+                <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-3xl space-y-3">
                   <p className="text-[10px] font-semibold text-slate-500 flex justify-between">
                     <span>Tổng số ca tìm thấy:</span>
                     <span className="font-black text-[#d2145a] text-[12px]">{filteredScheduleItems.length}</span>
                   </p>
+                  {exportMsg && (
+                    <div className={`px-3 py-2 text-[10px] rounded flex items-center gap-1 border ${exportMsg.includes('thành công') ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+                      <span>{exportMsg}</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl transition flex justify-center items-center gap-2 transform active:scale-[0.98] cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    XUẤT EXCEL (XLSX)
+                  </button>
                 </div>
               </div>
             )}
@@ -1256,7 +1591,7 @@ export default function MRISchedulerView({
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký (RequestBy)</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký</label>
                       <select
                         value={String(adHocForm.RequestBy || '')}
                         onChange={(e) => updateAdHocField('RequestBy', e.target.value)}
@@ -1285,7 +1620,7 @@ export default function MRISchedulerView({
                       <input type="text" value={String(adHocForm.CMRMethod || '')} onChange={(e) => updateAdHocField('CMRMethod', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
                     </div>
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Máy/thiết bị MRI</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Dự trù dụng cụ</label>
                       <input type="text" value={String(adHocForm.CMRDevice || '')} onChange={(e) => updateAdHocField('CMRDevice', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
                     </div>
                     <div>
@@ -1317,15 +1652,15 @@ export default function MRISchedulerView({
                   </div>
 
                   <div>
-                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI (CMRDiagnosis) *</label>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI *</label>
                     <textarea required rows={2} value={String(adHocForm.CMRDiagnosis || '')} onChange={(e) => updateAdHocField('CMRDiagnosis', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
                   </div>
                   <div>
-                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI (CMRRequest) *</label>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI *</label>
                     <textarea required rows={2} value={String(adHocForm.CMRRequest || '')} onChange={(e) => updateAdHocField('CMRRequest', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
                   </div>
                   <div>
-                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ghi chú gọi MRI (CMRCallStatusNote)</label>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ghi chú gọi MRI</label>
                     <textarea rows={2} value={String(adHocForm.CMRCallStatusNote || '')} onChange={(e) => updateAdHocField('CMRCallStatusNote', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
                   </div>
                 </div>
@@ -1349,6 +1684,62 @@ export default function MRISchedulerView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SAVE / EXIT CONFIRMATION DIALOG */}
+      {confirmMode && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[75] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="py-3 px-4 flex items-center gap-2 bg-amber-50 border-b border-amber-100">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <h3 className="font-extrabold text-[13px] uppercase tracking-wide text-amber-900">
+                {confirmMode === 'exit' ? 'Thay đổi chưa lưu' : 'Xác nhận lưu lịch MRI'}
+              </h3>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm font-semibold text-slate-700 leading-relaxed">
+                {confirmMode === 'exit'
+                  ? 'Bạn có thay đổi chưa được lưu. Bạn có muốn lưu kết quả xếp lịch không?'
+                  : 'Bạn có muốn lưu kết quả xếp lịch không?'}
+              </p>
+              <p className="text-[11px] text-slate-500 font-semibold">
+                Trường bắt buộc khi lưu: Cân nặng, Mã chẩn đoán MRI, Chẩn đoán MRI, Yêu cầu MRI, Gây mê, Ngày chụp MRI dự kiến, Trạng thái gọi MRI.
+              </p>
+              {confirmError && (
+                <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
+                  {confirmError}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeConfirm}
+                className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer"
+              >
+                {confirmMode === 'exit' ? 'Ở lại' : 'Hủy'}
+              </button>
+              {confirmMode === 'exit' && (
+                <button
+                  type="button"
+                  onClick={handleConfirmDiscard}
+                  disabled={saving}
+                  className="px-4 py-2 font-bold text-xs bg-white border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 transition shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  Không lưu
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleConfirmSave(confirmMode === 'exit')}
+                disabled={saving}
+                className="px-4 py-2 font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? 'Đang lưu...' : 'Lưu'}
+              </button>
+            </div>
           </div>
         </div>
       )}

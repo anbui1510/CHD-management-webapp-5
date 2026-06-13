@@ -32,11 +32,14 @@ import StaffResultsView from './components/StaffResultsView';
 import AuxiliaryModals from './components/AuxiliaryModals';
 import CathLabSchedulerView from './components/CathLabSchedulerView';
 import CathLabRoomView from './components/CathLabRoomView';
-import TransferredCathLabView from './components/TransferredCathLabView';
 import ArchiveView from './components/ArchiveView';
 import WorkspaceDashboard from './components/WorkspaceDashboard';
 import MRISchedulerView from './components/MRISchedulerView';
 import MRIRegisterView from './components/MRIRegisterView';
+import MRIResultView from './components/MRIResultView';
+import MRICalendarView from './components/MRICalendarView';
+import SurgeryRoomView from './components/SurgeryRoomView';
+import DevelopingFeatureView from './components/DevelopingFeatureView';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE, getDiagnosisOptions } from './data/source';
@@ -240,7 +243,8 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'mri-scheduler' | 'mri-register' | 'transferred-cathlab' | 'archive' | 'excel-export' | 'google-sheets'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets'>('home');
+  const [archiveInitialTab, setArchiveInitialTab] = useState<'transferred' | 'archive'>('archive');
 
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
@@ -691,6 +695,25 @@ export default function App() {
         "Xác nhận lưu"
       );
     }
+  };
+
+  // Reusable: open the "SỬA HỒ SƠ HÀNH CHÍNH" modal for a given patient (shared by MRI views/drawer)
+  const handleEditPatientAdmin = (pat: Patient) => {
+    setSelectedPatientForDetail(null);
+    setEditingPatientKey(pat.PatientKey);
+    setNewPatientData({
+      PatientID1: pat.PatientID1,
+      PatientID2: pat.PatientID2 || '',
+      PatientName: pat.PatientName,
+      OtherPatientName: pat.OtherPatientName || '',
+      PatientDOB: pat.PatientDOB,
+      PatientSex: pat.PatientSex,
+      PatientAddress: pat.PatientAddress,
+      PatientPhone1: pat.PatientPhone1,
+      PatientPhone2: pat.PatientPhone2 || '',
+      Outcome: pat.Outcome
+    });
+    setShowAddPatient(true);
   };
 
   // Consult reservation Form Submit
@@ -1356,8 +1379,10 @@ export default function App() {
     { id: 'consult-list', label: 'Hội chẩn', icon: <ClipboardList className="w-4 h-4" /> },
     { id: 'results-staff', label: 'Nhập kết quả staff', icon: <FileText className="w-4 h-4" /> },
     { id: 'schedule-tt', label: 'Xếp lịch & Dụng cụ', icon: <CalendarDays className="w-4 h-4" /> },
-    { id: 'mri-scheduler', label: 'Xếp lịch MRI', icon: <Activity className="w-4 h-4" /> },
     { id: 'mri-register', label: 'Đăng ký MRI', icon: <Activity className="w-4 h-4" /> },
+    { id: 'mri-scheduler', label: 'Xếp lịch MRI', icon: <Activity className="w-4 h-4" /> },
+    { id: 'mri-result', label: 'Điền KQ MRI', icon: <Activity className="w-4 h-4" /> },
+    { id: 'mri-calendar', label: 'Lịch chụp MRI', icon: <CalendarDays className="w-4 h-4" /> },
     { id: 'google-sheets', label: 'Virtual Google Sheets', icon: <Database className="w-4 h-4" /> },
     { id: 'excel-export', label: 'Bảng Filter_Consult', icon: <Download className="w-4 h-4" /> },
   ];
@@ -1414,17 +1439,46 @@ export default function App() {
           subtitle: "Danh sách đăng ký chụp MRI",
           icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
         };
+      case 'mri-result':
+        return {
+          title: "ĐIỀN KẾT QUẢ MRI TIM",
+          subtitle: "Danh sách chờ điền kết quả MRI tim",
+          icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
+        };
+      case 'mri-calendar':
+        return {
+          title: "LỊCH CHỤP MRI TIM",
+          subtitle: "Lịch các ca dự kiến chụp MRI",
+          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
+        };
       case 'cathlab-room':
-      case 'transferred-cathlab':
         return {
           title: "PHÒNG THÔNG TIM",
           subtitle: "",
           icon: <Activity className="w-5 h-5 text-pink-200" />
         };
+      case 'surgery-room':
+        return {
+          title: "PHÒNG PHẪU THUẬT",
+          subtitle: "Quản lý ca mổ tim",
+          icon: <Activity className="w-5 h-5 text-pink-200" />
+        };
+      case 'surgery-scheduler':
+        return {
+          title: "XẾP LỊCH PHẪU THUẬT",
+          subtitle: "",
+          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
+        };
+      case 'surgery-schedule-view':
+        return {
+          title: "LỊCH PHẪU THUẬT DỰ KIẾN",
+          subtitle: "",
+          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
+        };
       case 'archive':
         return {
           title: "LƯU TRỮ",
-          subtitle: "Danh sách các ca đã loại, làm nơi khác, theo dõi nơi khác",
+          subtitle: "Danh sách đã chuyển phòng TT & ca lưu trữ",
           icon: <Archive className="w-5 h-5 text-pink-200" />
         };
       case 'google-sheets':
@@ -1542,7 +1596,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
+      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-room' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
         
         {/* Collapsible Left navigation Aside drawer */}
         <aside className={`${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
@@ -1607,7 +1661,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -1631,6 +1685,9 @@ export default function App() {
           {activeMenu === 'workspace' && (
             <WorkspaceDashboard 
               onNavigate={(menu) => {
+                if (menu === 'archive') {
+                  setArchiveInitialTab('archive');
+                }
                 setActiveMenu(menu as any);
               }}
               patientCount={patients.length}
@@ -2614,24 +2671,32 @@ export default function App() {
             />
           )}
 
-          {/* TRANSFERRED CATHLAB PANEL */}
-          {activeMenu === 'transferred-cathlab' && (
-             <TransferredCathLabView 
-               consults={consults}
-               patients={patients}
-               onRefreshData={() => {
-                 fetchPatients();
-                 fetchConsults();
-               }}
-               triggerConfirm={triggerConfirm}
-             />
+          {activeMenu === 'surgery-room' && (
+            <SurgeryRoomView
+              patients={patients}
+              operations={operations}
+              onViewPatientRecord={(pat) => {
+                setActiveMenu('patients');
+                setSelectedPatientForDetail(pat);
+              }}
+            />
           )}
 
-          {/* ARCHIVE PANEL */}
+          {activeMenu === 'surgery-scheduler' && (
+            <DevelopingFeatureView title="Xếp lịch phẫu thuật" />
+          )}
+
+          {activeMenu === 'surgery-schedule-view' && (
+            <DevelopingFeatureView title="Lịch phẫu thuật dự kiến" />
+          )}
+
+          {/* ARCHIVE PANEL (includes transferred cathlab tab) */}
           {activeMenu === 'archive' && (
              <ArchiveView 
+               key={archiveInitialTab}
                consults={consults}
                patients={patients}
+               initialTab={archiveInitialTab}
                onRefreshData={() => {
                  fetchPatients();
                  fetchConsults();
@@ -2717,6 +2782,34 @@ export default function App() {
                 fetchCmrs();
                 fetchSources();
               }}
+              onEditPatientAdmin={handleEditPatientAdmin}
+            />
+          )}
+
+          {/* ĐIỀN KẾT QUẢ MRI TIM PANEL */}
+          {activeMenu === 'mri-result' && (
+            <MRIResultView
+              patients={patients}
+              consults={consults}
+              cmrs={cmrs}
+              staffList={staffList}
+              currentStaff={currentStaff}
+              onRefreshData={() => {
+                fetchPatients();
+                fetchConsults();
+                fetchCmrs();
+                fetchSources();
+              }}
+              onEditPatientAdmin={handleEditPatientAdmin}
+            />
+          )}
+
+          {/* LỊCH CHỤP MRI TIM PANEL */}
+          {activeMenu === 'mri-calendar' && (
+            <MRICalendarView
+              patients={patients}
+              consults={consults}
+              cmrs={cmrs}
             />
           )}
 
@@ -2801,24 +2894,9 @@ export default function App() {
             consults={consults}
             cathlabs={cathlabs}
             cmrs={cmrs}
+            operations={operations}
             onClose={() => setSelectedPatientForDetail(null)}
-            onEditPatientAdmin={(pat) => {
-              setSelectedPatientForDetail(null);
-              setEditingPatientKey(pat.PatientKey);
-              setNewPatientData({
-                PatientID1: pat.PatientID1,
-                PatientID2: pat.PatientID2 || '',
-                PatientName: pat.PatientName,
-                OtherPatientName: pat.OtherPatientName || '',
-                PatientDOB: pat.PatientDOB,
-                PatientSex: pat.PatientSex,
-                PatientAddress: pat.PatientAddress,
-                PatientPhone1: pat.PatientPhone1,
-                PatientPhone2: pat.PatientPhone2 || '',
-                Outcome: pat.Outcome
-              });
-              setShowAddPatient(true);
-            }}
+            onEditPatientAdmin={handleEditPatientAdmin}
             onSelectPDF={(c, p) => {
               setSelectedConsultForPDF(c);
               setSelectedPatientForPDF(p);

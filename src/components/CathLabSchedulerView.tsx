@@ -293,7 +293,7 @@ export default function CathLabSchedulerView({
   const [adHocOutcome, setAdHocOutcome] = useState<'Tử vong' | 'Nặng xin về' | 'Đã mổ' | 'Đã thông' | ''>('');
 
   const [adHocConsultType, setAdHocConsultType] = useState<'Staff mổ' | 'Staff thông'>('Staff thông');
-  const [actionConfirm, setActionConfirm] = useState<{type: 'loai'|'transfer'|'undo_scheduled'|'transfer_row', title: string, message: string, consultToUpdate?: Consult} | null>(null);
+  const [actionConfirm, setActionConfirm] = useState<{type: 'loai'|'transfer'|'undo_scheduled'|'transfer_row'|'ad_hoc_override', title: string, message: string, consultToUpdate?: Consult} | null>(null);
   const [actionAlert, setActionAlert] = useState<string>('');
   const [formSnapshot, setFormSnapshot] = useState<SchedulingFormSnapshot | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
@@ -331,6 +331,7 @@ export default function CathLabSchedulerView({
   const [adHocCheckDeviceDate, setAdHocCheckDeviceDate] = useState<string>('');
   const [adHocCheckDeviceBy, setAdHocCheckDeviceBy] = useState<string>('');
   const [adHocCathMethod, setAdHocCathMethod] = useState<string[]>([]);
+  const [adHocPendingConsult, setAdHocPendingConsult] = useState<Consult | null>(null);
 
   // Summary copyable modal states
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -495,6 +496,39 @@ Xin cảm ơn!`;
     });
     return map;
   }, [consults]);
+
+  const isPendingConsultResult = (resultId: unknown) => {
+    if (!resultId) return true;
+    const s = String(resultId).trim().toLowerCase();
+    return s === '' || s === 'nodata' || s === 'no data' || s === '—' || s === '-';
+  };
+
+  const getPendingConsultForPatient = (patientKey: string): Consult | undefined => {
+    const normalized = normalizePatientKey(patientKey);
+    if (!normalized) return undefined;
+    const patientConsults = consults
+      .filter(c => normalizePatientKey(c.PatientKey) === normalized)
+      .sort((a, b) => {
+        const aDate = a.ConsultDate || '';
+        const bDate = b.ConsultDate || '';
+        if (aDate !== bDate) return bDate.localeCompare(aDate);
+        return (b.ConsultCreateTime || '').localeCompare(a.ConsultCreateTime || '');
+      });
+    return patientConsults.find(c => isPendingConsultResult(c.ConsultResultID));
+  };
+
+  const resolvePendingConsultForAdHoc = (): Consult | undefined => {
+    if (adHocPatientMode === 'existing' && adHocSelectedPatientKey) {
+      return getPendingConsultForPatient(adHocSelectedPatientKey);
+    }
+    if (adHocPatientMode === 'new' && adHocPatientID1.trim()) {
+      const dup = patients.find(
+        p => String(p.PatientID1 || '').trim().toLowerCase() === adHocPatientID1.trim().toLowerCase()
+      );
+      if (dup) return getPendingConsultForPatient(dup.PatientKey);
+    }
+    return undefined;
+  };
 
   // Compute waitlist queue based on the exact AppSheet slice constraints
   const allEligibleWaitlist = useMemo(() => {
@@ -1248,6 +1282,7 @@ Xin cảm ơn!`;
     setAdHocPatientPhone2(String(pat.PatientPhone2 || ''));
     setAdHocOutcome(String(pat.Outcome || ''));
     setAdHocSearchQuery('');
+    setAdHocPendingConsult(getPendingConsultForPatient(pat.PatientKey) || null);
   };
 
   const handleClearSelectedPatient = () => {
@@ -1262,6 +1297,64 @@ Xin cảm ơn!`;
     setAdHocPatientPhone1('');
     setAdHocPatientPhone2('');
     setAdHocOutcome('');
+    setAdHocPendingConsult(null);
+  };
+
+  const resetAdHocFormFields = () => {
+    setAdHocPatientWeight('');
+    setAdHocPatientHeight('');
+    setAdHocDiagnosisID('');
+    setAdHocDetailDiagnosis('');
+    setAdHocPlannedDevice('');
+    setAdHocPlannedPrice('');
+    setAdHocCheckDevice('');
+    setAdHocSupplyDepFeedback('');
+    setAdHocOperationFeedback('');
+    setAdHocPlannedCathLabDate('');
+    setAdHocCallStatus('');
+    setAdHocCallNote('');
+    setAdHocScheduled1st('');
+    setAdHocScheduled2nd('');
+    setAdHocScheduled3rd('');
+    setAdHocDetailConsultResult('');
+    setAdHocFundingRequest('');
+    setAdHocCheckDeviceDate('');
+    setAdHocCheckDeviceBy('');
+    setAdHocCathMethod([]);
+    setAdHocErrors([]);
+  };
+
+  const activatePendingConsultForScheduling = async (pendingConsult: Consult) => {
+    const overrideNote = `[Kích hoạt xếp lịch bổ sung - ${currentStaff?.StaffName || currentStaff?.StaffKey || 'user'} ${new Date().toISOString()}]`;
+    const payload = {
+      ConsultResultID: 'Can thiệp thông tim',
+      DetailConsultResult: String(pendingConsult.DetailConsultResult || '').trim() || 'Can thiệp thông tim',
+      ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
+      ConsultResultUpdatedTime: new Date().toISOString(),
+      ConsultNote: pendingConsult.ConsultNote
+        ? `${pendingConsult.ConsultNote}\n${overrideNote}`
+        : overrideNote,
+    };
+
+    const response = await fetch(`/api/consults/${pendingConsult.ConsultKey}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      throw new Error('Không thể kích hoạt lượt hội chẩn');
+    }
+
+    const mergedConsult = { ...pendingConsult, ...payload } as Consult;
+    setShowAdHocModal(false);
+    handleClearSelectedPatient();
+    resetAdHocFormFields();
+    setAdHocPatientMode('existing');
+    setActiveTab('unscheduled');
+    onRefreshData();
+    applySelectConsult(mergedConsult);
+    setSuccessMsg('Đã kích hoạt lượt hội chẩn và mở form Xếp lịch.');
+    setTimeout(() => setSuccessMsg(''), 4000);
   };
 
   // Setup form fields on consult selection
@@ -1416,6 +1509,18 @@ Xin cảm ơn!`;
 
   const handleSaveAdHoc = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const pendingOverride = resolvePendingConsultForAdHoc();
+    if (pendingOverride) {
+      const bnLabel = adHocPatientID1.trim() || adHocPatientName.trim() || 'BN';
+      setActionConfirm({
+        type: 'ad_hoc_override',
+        title: 'Lượt hội chẩn chờ kết luận',
+        message: `${bnLabel} có lượt hội chẩn đang chờ kết luận. Bạn có muốn tiếp tục? Hệ thống sẽ kích hoạt lượt hội chẩn hiện tại với kết luận "Can thiệp thông tim" và mở form Xếp lịch.`,
+        consultToUpdate: pendingOverride
+      });
+      return;
+    }
 
     const errors: string[] = [];
 
@@ -1763,6 +1868,13 @@ Xin cảm ơn!`;
         }
       } catch (e) {
         console.error(e);
+      }
+    } else if (actionConfirm.type === 'ad_hoc_override' && actionConfirm.consultToUpdate) {
+      try {
+        await activatePendingConsultForScheduling(actionConfirm.consultToUpdate);
+      } catch (err: any) {
+        console.error(err);
+        setErrorMsg(err.message || 'Không thể kích hoạt lượt hội chẩn');
       }
     }
     setSaving(false);
@@ -3363,9 +3475,9 @@ Xin cảm ơn!`;
       {actionConfirm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
-            <div className={`py-3 px-4 flex items-center gap-2 ${actionConfirm.type === 'loai' ? 'bg-rose-50 border-b border-rose-100' : 'bg-sky-50 border-b border-sky-100'}`}>
-               <AlertTriangle className={`w-5 h-5 ${actionConfirm.type === 'loai' ? 'text-rose-600' : 'text-sky-600'}`} />
-               <h3 className={`font-extrabold text-[13px] uppercase tracking-wide ${actionConfirm.type === 'loai' ? 'text-rose-900' : 'text-sky-900'}`}>{actionConfirm.title}</h3>
+            <div className={`py-3 px-4 flex items-center gap-2 ${actionConfirm.type === 'loai' ? 'bg-rose-50 border-b border-rose-100' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-50 border-b border-indigo-100' : 'bg-sky-50 border-b border-sky-100'}`}>
+               <AlertTriangle className={`w-5 h-5 ${actionConfirm.type === 'loai' ? 'text-rose-600' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-600' : 'text-sky-600'}`} />
+               <h3 className={`font-extrabold text-[13px] uppercase tracking-wide ${actionConfirm.type === 'loai' ? 'text-rose-900' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-900' : 'text-sky-900'}`}>{actionConfirm.title}</h3>
             </div>
             <div className="p-5">
               <p className="text-sm font-semibold text-slate-700">{actionConfirm.message}</p>
@@ -3374,7 +3486,7 @@ Xin cảm ơn!`;
                <button onClick={() => setActionConfirm(null)} className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer">
                   Hủy bỏ
                </button>
-               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' ? 'bg-[#d2145a] hover:bg-rose-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
+               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' ? 'bg-[#d2145a] hover:bg-rose-700' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
                   {saving ? 'Đang thực hiện...' : 'Đồng ý'}
                </button>
             </div>
@@ -3953,6 +4065,7 @@ Xin cảm ơn!`;
                                onClick={() => {
                                  setAdHocPatientMode('new');
                                  handleClearSelectedPatient();
+                                 setAdHocPendingConsult(null);
                                }} 
                                className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-3 py-1 rounded-lg text-[10px] transition flex items-center gap-1 cursor-pointer"
                             >
@@ -4042,6 +4155,16 @@ Xin cảm ơn!`;
                             </div>
                          )}
 
+                         {adHocPendingConsult && (
+                            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
+                              <p className="font-extrabold uppercase tracking-wide">Lượt hội chẩn chờ kết luận</p>
+                              <p className="mt-1 font-semibold">
+                                BN có lượt hội chẩn (mã {adHocPendingConsult.ConsultKey}) đang chờ kết luận staff.
+                                Nhấn &quot;Lưu kết quả xếp lịch&quot; để kích hoạt và mở form Xếp lịch — không tạo bản ghi trùng.
+                              </p>
+                            </div>
+                         )}
+
                          {/* Demographics Area */}
                          {adHocPatientMode === 'new' && (
                            <div className="mt-2 space-y-3">
@@ -4067,7 +4190,14 @@ Xin cảm ơn!`;
                                 required
                                 placeholder="Nhập mã NB / ID1..."
                                 value={adHocPatientID1}
-                                onChange={(e) => setAdHocPatientID1(e.target.value)}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setAdHocPatientID1(val);
+                                  const dup = patients.find(
+                                    p => String(p.PatientID1 || '').trim().toLowerCase() === val.trim().toLowerCase()
+                                  );
+                                  setAdHocPendingConsult(dup ? getPendingConsultForPatient(dup.PatientKey) || null : null);
+                                }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
                               />
                             </div>

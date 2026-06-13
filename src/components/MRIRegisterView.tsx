@@ -1,11 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
   ArrowUpDown,
   CheckCircle2,
+  Eye,
+  Pencil,
   Plus,
+  Save,
   Search,
+  UserCog,
   X
 } from 'lucide-react';
 import {
@@ -21,6 +25,12 @@ import {
 } from '../types';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getDiagnosisOptions } from '../data/source';
+import {
+  DEFAULT_CMR_DEVICE,
+  DEFAULT_CMR_METHOD,
+  resolveCMRDevice,
+  resolveCMRMethod
+} from '../data/cmrDefaults';
 
 interface MRIRegisterViewProps {
   patients: Patient[];
@@ -30,6 +40,7 @@ interface MRIRegisterViewProps {
   staffList?: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
+  onEditPatientAdmin?: (patient: Patient) => void;
 }
 
 type RegisterTab = 'pending' | 'done';
@@ -96,11 +107,22 @@ export default function MRIRegisterView({
   sources = [],
   staffList = [],
   currentStaff,
-  onRefreshData
+  onRefreshData,
+  onEditPatientAdmin
 }: MRIRegisterViewProps) {
   const [activeTab, setActiveTab] = useState<RegisterTab>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // Preview / edit-registration popup states
+  const [previewItem, setPreviewItem] = useState<MRIRegisterItem | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<CMR>>({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMsg, setEditMsg] = useState('');
+  // Timestamp of when edit mode was entered, used to ignore stray/phantom
+  // submits that can fire right after toggling to edit (prevents auto-save).
+  const editArmedAtRef = useRef(0);
 
   // Registration popup states
   const [showForm, setShowForm] = useState(false);
@@ -263,7 +285,7 @@ export default function MRIRegisterView({
 
     try {
       if (!cmrDiagnosisID) {
-        setErrorMsg('Vui lòng chọn Mã chẩn đoán MRI (CMRDiagnosisID)!');
+        setErrorMsg('Vui lòng chọn Mã chẩn đoán MRI!');
         setSubmitLoading(false);
         return;
       }
@@ -335,6 +357,8 @@ export default function MRIRegisterView({
         CMRRequest: cmrRequest,
         RequestBy: chosenDoc || '',
         DepartRequest: departRequest,
+        CMRMethod: DEFAULT_CMR_METHOD,
+        CMRDevice: DEFAULT_CMR_DEVICE,
         CMRScheduledDate: '',
         CMRDate: '',
         CMRCallStatus: '',
@@ -364,6 +388,87 @@ export default function MRIRegisterView({
   };
 
   const selectedBlockingCmr = selectedPatKey ? getBlockingCmr(selectedPatKey) : undefined;
+
+  const openPreview = (item: MRIRegisterItem) => {
+    setPreviewItem(item);
+    setEditMode(false);
+    setEditMsg('');
+    setEditForm({
+      PatientWeight: item.PatientWeight || '',
+      CMRDiagnosisID: item.CMRDiagnosisID || '',
+      CMRDiagnosis: item.CMRDiagnosis || '',
+      CMRRequest: item.CMRRequest || '',
+      RequestBy: item.RequestBy || '',
+      DepartRequest: item.DepartRequest || '',
+      CMRMethod: resolveCMRMethod(item.CMRMethod),
+      CMRDevice: resolveCMRDevice(item.CMRDevice)
+    });
+  };
+
+  const closePreview = () => {
+    setPreviewItem(null);
+    setEditMode(false);
+    setEditForm({});
+    setEditMsg('');
+  };
+
+  const handleEditAdmin = () => {
+    const patient = previewItem?.__patient;
+    if (patient && onEditPatientAdmin) {
+      closePreview();
+      onEditPatientAdmin(patient);
+    }
+  };
+
+  const handleSaveEdit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!previewItem) return;
+    // Ignore submits firing within 350ms of entering edit mode (phantom clicks).
+    if (Date.now() - editArmedAtRef.current < 350) return;
+    if (editSaving) return;
+    if (!String(editForm.CMRDiagnosisID || '').trim()) {
+      setEditMsg('Vui lòng chọn Mã chẩn đoán MRI!');
+      return;
+    }
+    const key = previewItem.CMRKey || previewItem.CMRkey;
+    if (!key) {
+      setEditMsg('Không xác định được mã CMR để cập nhật!');
+      return;
+    }
+
+    const payload: CMR = {
+      ...previewItem,
+      PatientWeight: String(editForm.PatientWeight || ''),
+      CMRDiagnosisID: String(editForm.CMRDiagnosisID || ''),
+      CMRDiagnosis: String(editForm.CMRDiagnosis || ''),
+      CMRRequest: String(editForm.CMRRequest || ''),
+      RequestBy: String(editForm.RequestBy || ''),
+      DepartRequest: String(editForm.DepartRequest || ''),
+      CMRMethod: resolveCMRMethod(editForm.CMRMethod),
+      CMRDevice: resolveCMRDevice(editForm.CMRDevice),
+      UpdateTime: new Date().toISOString()
+    };
+    delete (payload as any).__patient;
+
+    setEditSaving(true);
+    setEditMsg('');
+    try {
+      const res = await fetch(`/api/cmrs/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Không cập nhật được đăng ký MRI (server trả lỗi)');
+      setEditMsg('Đã cập nhật đăng ký MRI thành công!');
+      await onRefreshData();
+      setTimeout(() => closePreview(), 1200);
+    } catch (err: any) {
+      const msg = err?.message || '';
+      setEditMsg(msg.includes('Failed to fetch') ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.' : (msg || 'Có lỗi khi cập nhật đăng ký MRI.'));
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   return (
     <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50">
@@ -434,7 +539,7 @@ export default function MRIRegisterView({
           <button
             onClick={() => setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'))}
             className="bg-white border border-slate-200 text-slate-600 px-3 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shrink-0 shadow-sm cursor-pointer"
-            title="Sắp xếp theo ngày dự kiến chụp (CMRScheduledDate)"
+            title="Sắp xếp theo ngày dự kiến chụp"
           >
             <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
           </button>
@@ -449,20 +554,24 @@ export default function MRIRegisterView({
               <tr>
                 <th className="py-3 px-3 border-b border-slate-200 w-12 text-center">STT</th>
                 <th className="py-3 px-3 border-b border-slate-200 min-w-[170px]">Họ tên / ID</th>
-                <th className="py-3 px-3 border-b border-slate-200 w-24">PatientWeight</th>
-                <th className="py-3 px-3 border-b border-slate-200 min-w-[160px]">CMRDiagnosis</th>
-                <th className="py-3 px-3 border-b border-slate-200 min-w-[160px]">CMRRequest</th>
-                <th className="py-3 px-3 border-b border-slate-200 w-32">CMRScheduledDate</th>
-                <th className="py-3 px-3 border-b border-slate-200 w-32">CMRCallStatus</th>
-                <th className="py-3 px-3 border-b border-slate-200 w-28">CMRDate</th>
-                <th className="py-3 px-3 border-b border-slate-200 min-w-[160px]">CMRResult</th>
+                <th className="py-3 px-3 border-b border-slate-200 w-24">Cân nặng</th>
+                <th className="py-3 px-3 border-b border-slate-200 min-w-[160px]">Chẩn đoán MRI</th>
+                <th className="py-3 px-3 border-b border-slate-200 min-w-[160px]">Yêu cầu MRI</th>
+                <th className="py-3 px-3 border-b border-slate-200 w-32">Ngày dự kiến</th>
+                <th className="py-3 px-3 border-b border-slate-200 w-32">Trạng thái gọi</th>
+                <th className="py-3 px-3 border-b border-slate-200 w-28">Ngày chụp</th>
+                <th className="py-3 px-3 border-b border-slate-200 min-w-[160px]">Kết quả MRI</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-150">
               {displayItems.map((item, index) => {
                 const patient = item.__patient;
                 return (
-                  <tr key={item.CMRKey || `${item.PatientKey}-${index}`} className="hover:bg-indigo-50/45 transition">
+                  <tr
+                    key={item.CMRKey || `${item.PatientKey}-${index}`}
+                    onClick={() => openPreview(item)}
+                    className="hover:bg-indigo-50/45 transition cursor-pointer"
+                  >
                     <td className="py-3 px-3 text-center font-mono text-slate-500">{index + 1}</td>
                     <td className="py-3 px-3">
                       <span className="font-extrabold uppercase text-slate-900 block truncate max-w-[160px]">
@@ -772,7 +881,7 @@ export default function MRIRegisterView({
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Mã chẩn đoán MRI (CMRDiagnosisID) *</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Mã chẩn đoán MRI *</label>
                       <SearchableEnumSelect
                         required
                         value={cmrDiagnosisID}
@@ -786,7 +895,7 @@ export default function MRIRegisterView({
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký (RequestBy)</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký</label>
                       <select
                         value={showAddDocInput ? 'ADD_NEW' : requestBy}
                         onChange={(e) => {
@@ -830,7 +939,7 @@ export default function MRIRegisterView({
                       )}
                     </div>
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa yêu cầu (DepartRequest)</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa yêu cầu</label>
                       <SearchableEnumSelect
                         value={departRequest}
                         options={departmentOptions}
@@ -842,7 +951,7 @@ export default function MRIRegisterView({
                   </div>
 
                   <div>
-                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI (CMRDiagnosis) *</label>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI *</label>
                     <textarea
                       required
                       rows={2}
@@ -852,7 +961,7 @@ export default function MRIRegisterView({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI (CMRRequest) *</label>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI *</label>
                     <textarea
                       required
                       rows={2}
@@ -885,6 +994,264 @@ export default function MRIRegisterView({
           </div>
         </div>
       )}
+
+      {/* PREVIEW / EDIT REGISTRATION MODAL */}
+      {previewItem && (() => {
+        const patient = previewItem.__patient;
+        const isPending = !getFormattedDateKey(previewItem.CMRDate);
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
+                <div className="flex items-center gap-2">
+                  {editMode ? <Pencil className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-indigo-600" />}
+                  <div>
+                    <h3 className="font-extrabold text-sm uppercase text-indigo-900">
+                      {editMode ? 'Sửa đăng ký MRI' : 'Xem trước thông tin MRI'}
+                    </h3>
+                    <p className="text-[10px] text-slate-500 normal-case mt-0.5">
+                      {isPending ? 'Ca đang chờ chụp MRI' : 'Ca đã chụp MRI (chỉ xem)'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePreview}
+                  className="text-slate-400 hover:text-red-600 p-1 bg-white hover:bg-red-50 border border-slate-200 rounded-full transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => e.preventDefault()} className="flex-1 flex flex-col overflow-hidden min-h-0">
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-slate-50/50">
+
+                  {/* Admin info */}
+                  <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm">
+                    <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
+                      Thông tin hành chính
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="col-span-2">
+                        <span className="text-slate-400 block font-bold text-[8px] uppercase">Họ và tên:</span>
+                        <span className="font-extrabold text-slate-900 uppercase text-[11.5px]">{patient?.PatientName || previewItem['Họ và tên'] || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB (ID1):</span>
+                        <span className="font-extrabold font-mono text-slate-800 text-[11px]">{patient?.PatientID1 || previewItem.MBN || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-bold text-[8px] uppercase">Ngày sinh:</span>
+                        <span className="font-bold font-mono text-slate-800">{patient?.PatientDOB ? formatVNTime(patient.PatientDOB) : '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-bold text-[8px] uppercase">Giới tính:</span>
+                        <span className="font-bold text-slate-800">{patient?.PatientSex || '—'}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-400 block font-bold text-[8px] uppercase">Địa chỉ:</span>
+                        <span className="font-bold text-slate-800">{patient?.PatientAddress || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại:</span>
+                        <span className="font-extrabold font-mono text-slate-800">{patient?.PatientPhone1 || '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MRI info */}
+                  <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm space-y-2.5">
+                    <span className="font-extrabold text-[#d2145a] text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5">
+                      Thông tin đăng ký MRI
+                    </span>
+
+                    {!editMode ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 block font-bold text-[8px] uppercase">Cân nặng (kg):</span>
+                          <span className="font-bold text-slate-800">{previewItem.PatientWeight ? `${previewItem.PatientWeight} kg` : '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-bold text-[8px] uppercase">BS đăng ký:</span>
+                          <span className="font-bold text-slate-800">{previewItem.RequestBy || '—'}</span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã chẩn đoán:</span>
+                          <span className="text-[10px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded">{previewItem.CMRDiagnosisID || '—'}</span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 block font-bold text-[8px] uppercase">Chẩn đoán MRI:</span>
+                          <span className="font-semibold text-slate-800 whitespace-pre-wrap">{previewItem.CMRDiagnosis || '—'}</span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 block font-bold text-[8px] uppercase">Yêu cầu MRI:</span>
+                          <span className="font-semibold text-slate-800 whitespace-pre-wrap">{previewItem.CMRRequest || '—'}</span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 block font-bold text-[8px] uppercase">Phương thức chụp:</span>
+                          <span className="font-semibold text-slate-800 whitespace-pre-wrap">{resolveCMRMethod(previewItem.CMRMethod)}</span>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <span className="text-slate-400 block font-bold text-[8px] uppercase">Dự trù dụng cụ:</span>
+                          <span className="font-semibold text-slate-800 whitespace-pre-wrap">{resolveCMRDevice(previewItem.CMRDevice)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Cân nặng (kg) *</label>
+                            <input
+                              type="text"
+                              required
+                              value={String(editForm.PatientWeight || '')}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, PatientWeight: e.target.value }))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Mã chẩn đoán MRI *</label>
+                            <SearchableEnumSelect
+                              required
+                              value={String(editForm.CMRDiagnosisID || '')}
+                              options={diagnosisOptions}
+                              onChange={(value) => setEditForm(prev => ({ ...prev, CMRDiagnosisID: value }))}
+                              allowCreate
+                              createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                              onCreateOption={createDiagnosisSource}
+                              placeholder="-- Chọn ICD --"
+                              searchPlaceholder="Gõ ICD để tìm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký</label>
+                            <select
+                              value={String(editForm.RequestBy || '')}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, RequestBy: e.target.value }))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800"
+                            >
+                              <option value="">-- Chọn BS --</option>
+                              {staffList.map(s => {
+                                const displayName = getShortStaffName(s.StaffName, staffList);
+                                return <option key={s.StaffKey} value={displayName}>{displayName}</option>;
+                              })}
+                              {extraDoctorOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                              {editForm.RequestBy && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === editForm.RequestBy) && !extraDoctorOptions.includes(String(editForm.RequestBy)) && (
+                                <option value={String(editForm.RequestBy)}>{String(editForm.RequestBy)}</option>
+                              )}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa yêu cầu</label>
+                            <SearchableEnumSelect
+                              value={String(editForm.DepartRequest || '')}
+                              options={departmentOptions}
+                              onChange={(value) => setEditForm(prev => ({ ...prev, DepartRequest: value }))}
+                              placeholder="-- Chọn khoa --"
+                              searchPlaceholder="Gõ khoa để tìm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phương thức chụp</label>
+                            <input
+                              type="text"
+                              value={String(editForm.CMRMethod || '')}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, CMRMethod: e.target.value }))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Dự trù dụng cụ</label>
+                            <input
+                              type="text"
+                              value={String(editForm.CMRDevice || '')}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, CMRDevice: e.target.value }))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI *</label>
+                          <textarea
+                            required
+                            rows={2}
+                            value={String(editForm.CMRDiagnosis || '')}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, CMRDiagnosis: e.target.value }))}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI *</label>
+                          <textarea
+                            required
+                            rows={2}
+                            value={String(editForm.CMRRequest || '')}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, CMRRequest: e.target.value }))}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {editMsg && (
+                    <div className={`rounded-xl px-3 py-2 text-[11px] font-bold ${editMsg.includes('thành công') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
+                      {editMsg}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer actions */}
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-2 shrink-0">
+                  {!editMode ? (
+                    <>
+                      {onEditPatientAdmin && (
+                        <button
+                          type="button"
+                          onClick={handleEditAdmin}
+                          className="px-4 py-2 text-xs font-extrabold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-2xl cursor-pointer transition flex items-center gap-2"
+                        >
+                          <UserCog className="w-4 h-4" /> Sửa hành chính
+                        </button>
+                      )}
+                      {isPending && (
+                        <button
+                          type="button"
+                          onClick={() => { editArmedAtRef.current = Date.now(); setEditMode(true); setEditMsg(''); }}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2 rounded-2xl shadow-xs text-xs cursor-pointer transition flex items-center gap-2"
+                        >
+                          <Pencil className="w-4 h-4" /> Sửa đăng ký
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { setEditMode(false); setEditMsg(''); }}
+                        className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-2xl cursor-pointer transition"
+                      >
+                        Quay lại
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEdit()}
+                        disabled={editSaving}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2 rounded-2xl shadow-xs text-xs cursor-pointer transition flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <Save className="w-4 h-4" />
+                        {editSaving ? 'Đang lưu...' : 'Lưu đăng ký'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

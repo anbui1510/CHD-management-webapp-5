@@ -1,4 +1,4 @@
-﻿# Định nghĩa Database Google Sheets và Hướng dẫn Agent (AGENTS.md)
+# Định nghĩa Database Google Sheets và Hướng dẫn Agent (AGENTS.md)
 
 Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ liệu, tên biến và hướng dẫn lập trình cho dự án "Hệ Thống Cơ Sở Dữ Liệu Virtual Google Sheets" (Pediatric Cardiac Patient Management System). Bạn PHẢI tuân thủ các quy tắc trong file này.
 
@@ -147,8 +147,8 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `CMRRequest` | Yêu cầu MRI | LongText | | Bắt buộc | Nội dung cần khảo sát/chỉ định MRI. |
 | `RequestBy` | BS đăng ký MRI | Enum | Danh sách bác sĩ | | Người đăng ký chụp MRI, logic giống `RequestBy` bảng Consult, không bắt buộc. |
 | `DepartRequest` | Khoa yêu cầu | Enum | Ref tới `Source.Department` | | Khoa/phòng đăng ký chụp MRI. |
-| `CMRMethod` | Phương thức chụp | Text | | | Phương thức/kỹ thuật CMR. |
-| `CMRDevice` | Máy/thiết bị MRI | Text | | | Thiết bị hoặc máy MRI dự kiến. |
+| `CMRMethod` | Phương thức chụp | Text | Mặc định: Chụp cộng hưởng từ tim (1.5T) có tiêm thuốc cản quang | | Phương thức/kỹ thuật CMR. |
+| `CMRDevice` | Máy/thiết bị MRI | Text | Mặc định: Dụng cụ cấp cứu cơ bản (dây oxy, bóng, mask, NKQ, hộp chống sốc, an thần) | | Thiết bị/dụng cụ dự trù khi chụp MRI. |
 | `PostDepart` | Khoa sau chụp | Enum | Ref tới `Source.Department` | | Khoa nằm/sau chụp MRI. |
 | `Anesthesia` | Gây mê | Enum | Khám gây mê trước / Không | Bắt buộc | Nhu cầu khám/gây mê khi chụp MRI. |
 | `CMRScheduledDate` | Ngày chụp MRI dự kiến | Date | | Bắt buộc | Định dạng dd/mm/yyyy hoặc yyyy-mm-dd khi lưu nội bộ. |
