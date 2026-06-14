@@ -162,6 +162,12 @@ const CALL_STATUS_OPTIONS = [
   "Loại"
 ];
 
+const DEFAULT_AD_HOC_CHECK_DEVICE: 'Đủ' = 'Đủ';
+const DEFAULT_AD_HOC_CALL_STATUS = 'Đồng ý';
+const DEFAULT_AD_HOC_POST_CATH_DEPART = 'Tim Mạch';
+const DEFAULT_AD_HOC_SCHEDULED_1ST = 'BS. Phụng';
+const DEFAULT_AD_HOC_FUNDING_REQUEST = 'Không tài trợ';
+
 const CONCLUSION_OPTIONS = [
   "Can thiệp thông tim",
   "Chụp chẩn đoán-Đo kháng lực",
@@ -344,29 +350,30 @@ export default function CathLabSchedulerView({
   const [adHocConsultResultID, setAdHocConsultResultID] = useState<string>('Can thiệp thông tim');
   const [adHocPriorityOrder, setAdHocPriorityOrder] = useState<PriorityOrderEnum>('Chương trình');
 
-  const [adHocCheckDevice, setAdHocCheckDevice] = useState<'Đủ' | 'Thiếu' | ''>('');
+  const [adHocCheckDevice, setAdHocCheckDevice] = useState<'Đủ' | 'Thiếu' | ''>(DEFAULT_AD_HOC_CHECK_DEVICE);
   const [adHocPlannedDevice, setAdHocPlannedDevice] = useState('');
   const [adHocPlannedPrice, setAdHocPlannedPrice] = useState('');
   const [adHocSupplyDepFeedback, setAdHocSupplyDepFeedback] = useState('');
   const [adHocOperationFeedback, setAdHocOperationFeedback] = useState('');
 
   const [adHocPlannedCathLabDate, setAdHocPlannedCathLabDate] = useState('');
-  const [adHocCallStatus, setAdHocCallStatus] = useState('');
+  const [adHocCallStatus, setAdHocCallStatus] = useState(DEFAULT_AD_HOC_CALL_STATUS);
   const [adHocCallNote, setAdHocCallNote] = useState('');
-  const [adHocScheduled1st, setAdHocScheduled1st] = useState('');
+  const [adHocScheduled1st, setAdHocScheduled1st] = useState(DEFAULT_AD_HOC_SCHEDULED_1ST);
   const [adHocScheduled2nd, setAdHocScheduled2nd] = useState('');
   const [adHocScheduled3rd, setAdHocScheduled3rd] = useState('');
-  const [adHocPostCathDepart, setAdHocPostCathDepart] = useState('Tim Mạch');
+  const [adHocPostCathDepart, setAdHocPostCathDepart] = useState(DEFAULT_AD_HOC_POST_CATH_DEPART);
   const [adHocPatientMode, setAdHocPatientMode] = useState<'existing' | 'new'>('existing');
   const [adHocSearchQuery, setAdHocSearchQuery] = useState('');
   const [adHocSelectedPatientKey, setAdHocSelectedPatientKey] = useState('');
   const [adHocDetailConsultResult, setAdHocDetailConsultResult] = useState('');
   const [adHocRiskFactor, setAdHocRiskFactor] = useState('3 -SpO2 > 75% ổn định');
-  const [adHocFundingRequest, setAdHocFundingRequest] = useState<string>('');
+  const [adHocFundingRequest, setAdHocFundingRequest] = useState<string>(DEFAULT_AD_HOC_FUNDING_REQUEST);
   const [adHocCheckDeviceDate, setAdHocCheckDeviceDate] = useState<string>('');
   const [adHocCheckDeviceBy, setAdHocCheckDeviceBy] = useState<string>('');
   const [adHocCathMethod, setAdHocCathMethod] = useState<string[]>([]);
   const [adHocPendingConsult, setAdHocPendingConsult] = useState<Consult | null>(null);
+  const [adHocValidationMsg, setAdHocValidationMsg] = useState('');
 
   useEffect(() => {
     if (adHocPatientMode !== 'existing' || !adHocSelectedPatientKey) {
@@ -1362,21 +1369,23 @@ Xin cảm ơn!`;
     setAdHocDetailDiagnosis('');
     setAdHocPlannedDevice('');
     setAdHocPlannedPrice('');
-    setAdHocCheckDevice('');
+    setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
     setAdHocSupplyDepFeedback('');
     setAdHocOperationFeedback('');
     setAdHocPlannedCathLabDate('');
-    setAdHocCallStatus('');
+    setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
     setAdHocCallNote('');
-    setAdHocScheduled1st('');
+    setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
     setAdHocScheduled2nd('');
     setAdHocScheduled3rd('');
     setAdHocDetailConsultResult('');
-    setAdHocFundingRequest('');
+    setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
+    setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
     setAdHocCheckDeviceDate('');
     setAdHocCheckDeviceBy('');
     setAdHocCathMethod([]);
     setAdHocErrors([]);
+    setAdHocValidationMsg('');
   };
 
   const activatePendingConsultForScheduling = async (pendingConsult: Consult) => {
@@ -1573,23 +1582,11 @@ Xin cảm ơn!`;
   const handleSaveAdHoc = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const pendingOverride = resolvePendingConsultForAdHoc();
-    if (pendingOverride) {
-      setActionConfirm({
-        type: 'ad_hoc_override',
-        title: 'Tiếp tục xếp lịch',
-        message: 'Bệnh nhân này có lượt hội chẩn chờ kết luận. Bạn có muốn tiếp tục xếp lịch?',
-        consultToUpdate: pendingOverride
-      });
-      return;
-    }
-
     const errors: string[] = [];
 
     if (adHocPatientMode === 'existing') {
       if (!adHocSelectedPatientKey) {
-        alert('Vui lòng tìm và chọn một bệnh nhi có sẵn dưới đây hoặc chuyển sang "Tạo nhanh bệnh nhi mới"!');
-        return;
+        errors.push('PatientKey');
       }
     } else {
       if (!adHocPatientID1) errors.push('PatientID1');
@@ -1606,9 +1603,34 @@ Xin cảm ơn!`;
     if (!adHocDetailConsultResult) errors.push('DetailConsultResult');
     if (errors.length > 0) {
       setAdHocErrors(errors);
+      setAdHocValidationMsg(`Vui lòng điền đầy đủ các trường bắt buộc: ${errors.map(field => ({
+        PatientKey: 'Bệnh nhi',
+        PatientID1: 'Mã BN',
+        PatientName: 'Họ tên',
+        PatientDOB: 'Ngày sinh',
+        PatientAddress: 'Địa chỉ',
+        ConsultDate: 'Ngày hội chẩn',
+        PatientWeight: 'Cân nặng',
+        RequestBy: 'BS đăng ký',
+        DiagnosisID: 'ICD chẩn đoán',
+        DetailDiagnosis: 'Chẩn đoán chi tiết',
+        DetailConsultResult: 'Kết quả chi tiết'
+      }[field] || field)).join(', ')}`);
       return;
     }
     setAdHocErrors([]);
+    setAdHocValidationMsg('');
+
+    const pendingOverride = resolvePendingConsultForAdHoc();
+    if (pendingOverride) {
+      setActionConfirm({
+        type: 'ad_hoc_override',
+        title: 'Tiếp tục xếp lịch',
+        message: 'Bệnh nhân này có lượt hội chẩn chờ kết luận. Bạn có muốn tiếp tục xếp lịch?',
+        consultToUpdate: pendingOverride
+      });
+      return;
+    }
 
     setSaving(true);
     setSuccessMsg('');
@@ -1663,6 +1685,8 @@ Xin cảm ơn!`;
       Scheduled3rdInterventionist: adHocScheduled3rd,
       PostCathDepart: adHocPostCathDepart,
       FundingRequest: adHocFundingRequest,
+      CheckDeviceDate: adHocCheckDevice ? new Date().toISOString() : '',
+      CheckDeviceBy: adHocCheckDevice ? (currentStaff?.StaffKey || '01378') : '',
       CheckDeviceUpdatedTime: adHocCheckDevice ? new Date().toISOString() : '',
       CheckDeviceUpdatedBy: adHocCheckDevice ? (currentStaff?.StaffKey || '01378') : '',
       CathMethod: adHocCathMethod.join(' + ')
@@ -1675,14 +1699,14 @@ Xin cảm ơn!`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patientData)
         });
-        if (!patRes.ok) throw new Error('Không thể thêm mới hành chính bệnh nhi');
+        if (!patRes.ok) throw new Error(await patRes.text() || 'Không thể thêm mới hành chính bệnh nhi');
       } else {
         const patRes = await fetch(`/api/patients/${adHocSelectedPatientKey}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patientData)
         });
-        if (!patRes.ok) throw new Error('Không thể cập nhật hành chính bệnh nhi');
+        if (!patRes.ok) throw new Error(await patRes.text() || 'Không thể cập nhật hành chính bệnh nhi');
       }
 
       const conRes = await fetch('/api/consults', {
@@ -1690,7 +1714,7 @@ Xin cảm ơn!`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(consultData)
       });
-      if (!conRes.ok) throw new Error('Không thể thêm xếp lịch hội chẩn bổ sung');
+      if (!conRes.ok) throw new Error(await conRes.text() || 'Không thể thêm xếp lịch hội chẩn bổ sung');
 
       setSuccessMsg('Đã thêm mới và xếp lịch bệnh nhi thành công!');
       setShowAdHocModal(false);
@@ -1714,22 +1738,24 @@ Xin cảm ơn!`;
       setAdHocDetailDiagnosis('');
       setAdHocPlannedDevice('');
       setAdHocPlannedPrice('');
-      setAdHocCheckDevice('');
+      setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
       setAdHocSupplyDepFeedback('');
       setAdHocOperationFeedback('');
       setAdHocPlannedCathLabDate('');
-      setAdHocCallStatus('');
+      setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
       setAdHocCallNote('');
-      setAdHocScheduled1st('');
+      setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
       setAdHocScheduled2nd('');
       setAdHocScheduled3rd('');
       setAdHocDetailConsultResult('');
       setAdHocSelectedPatientKey('');
       setAdHocSearchQuery('');
-      setAdHocFundingRequest('');
+      setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
+      setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
       setAdHocCheckDeviceDate('');
       setAdHocCheckDeviceBy('');
       setAdHocCathMethod([]);
+      setAdHocValidationMsg('');
 
       setTimeout(() => {
         setSuccessMsg('');
@@ -1974,9 +2000,9 @@ Xin cảm ơn!`;
     return '';
   };
 
-  const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none focus:bg-white text-[11px] text-slate-800 min-h-[26px]';
+  const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-[13px] text-slate-800 min-h-[34px]';
   const adHocSelectCls = `${adHocInputCls} font-bold`;
-  const adHocLabelCls = 'text-slate-500 font-bold text-[9px] uppercase shrink-0 leading-tight w-[9.5rem]';
+  const adHocLabelCls = 'text-slate-500 font-bold text-[10.5px] uppercase shrink-0 leading-tight w-[11rem]';
 
   const renderAdHocRow = (
     label: string,
@@ -2153,9 +2179,13 @@ Xin cảm ơn!`;
               onClick={() => {
                 setAdHocConsultDate(getTodayIsoDate());
                 setAdHocPlannedCathLabDate('');
-                setAdHocCheckDevice('');
-                setAdHocCallStatus('');
-                setAdHocFundingRequest('');
+                setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
+                setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
+                setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
+                setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
+                setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
+                setAdHocErrors([]);
+                setAdHocValidationMsg('');
                 setShowAdHocModal(true);
               }}
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10.5px] uppercase tracking-wider rounded-xl cursor-pointer transition flex items-center gap-1 shrink-0 shadow-xs"
