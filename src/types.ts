@@ -15,6 +15,10 @@ export interface Staff {
   StaffPhone?: string;
   Password: string;
   Role: 'Admin' | 'User' | string;
+  /** Comma-separated AppModule ids, e.g. "patients,consult-list,results-staff" */
+  Permissions?: string;
+  /** Preset role id from STAFF_ROLE_PRESETS, e.g. "bs-hoi-chan" */
+  StaffRolePreset?: string;
   Email: string;
   FireDate: string; // Empty if still active, otherwise "YYYY-MM-DD"
 }
@@ -215,6 +219,15 @@ export interface CMR {
 
 export interface Source {
   [key: string]: any;
+}
+
+export interface RolePreset {
+  RolePresetID: string;
+  RolePresetLabel: string;
+  RolePresetDescription?: string;
+  Permissions: string;
+  SortOrder?: string | number;
+  IsSystem?: string | boolean;
 }
 
 export function formatVNTime(dateArg: any): string {

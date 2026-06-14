@@ -49,7 +49,7 @@ const provinces = [
 ];
 const doctors = ['BS. Ân', 'BS. Hiếu', 'BS. Tài', 'BS. Hùng', 'BS. Tĩnh', 'BS. Thịnh', 'BS. Lợi', 'BS. Phụng'];
 const departments = ['Ngoại trú', 'Tim Mạch', 'Ngoại LN-TM', 'Hồi Sức Sơ Sinh', 'Hồi Sức Tim', 'HSTC-CĐ', 'Hô hấp', 'Tiêu hóa'];
-const diagnoses = ['VSD', 'ASD', 'PDA', 'TOF', 'CoAo', 'TGA', 'AVSD', 'DORV', 'Pulmonary Stenosis', 'Arrhythmia'];
+const diagnoses = ['VSD', 'ASD', 'PDA', 'TOF', 'CoA', 'TGA', 'AVSD', 'DORV', 'PS', 'SVT'];
 const detailDiagnoses = [
   'Thông liên thất phần quanh màng, shunt trái-phải',
   'Thông liên nhĩ lỗ thứ phát, giãn thất phải',

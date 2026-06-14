@@ -70,7 +70,7 @@ function initializeDatabase() {
   ];
   
   var staffHeaders = [
-    "StaffKey", "StaffName", "Name", "StaffSex", "Avatar", "StaffDOB", "Department", "Career", "StaffPhone", "Password", "Role", "Email", "FireDate"
+    "StaffKey", "StaffName", "Name", "StaffSex", "Avatar", "StaffDOB", "Department", "Career", "StaffPhone", "Password", "Role", "Permissions", "StaffRolePreset", "Email", "FireDate"
   ];
   
   var cathLabHeaders = [
@@ -95,6 +95,10 @@ function initializeDatabase() {
 
   var sourceHeaders = ["DiagnosisID"];
 
+  var rolePresetHeaders = [
+    "RolePresetID", "RolePresetLabel", "RolePresetDescription", "Permissions", "SortOrder", "IsSystem"
+  ];
+
   getOrCreateSheet("Patient", patientHeaders);
   getOrCreateSheet("Consult", consultHeaders);
   getOrCreateSheet("Staff", staffHeaders);
@@ -110,6 +114,8 @@ function initializeDatabase() {
       ss.insertSheet("Source");
     }
   }
+
+  getOrCreateSheet("RolePreset", rolePresetHeaders);
 }
 
 // GET Requests - Returns JSON of all data
@@ -132,6 +138,7 @@ function doGet(e) {
   var operations = readSheetAsJson("Operation");
   var cmrs = readSheetAsJson("CMR");
   var sources = readSheetAsJson("Source");
+  var rolePresets = readSheetAsJson("RolePreset");
 
   // If Staff is completely empty, populate with some default users so admin can login
   if (staff.length === 0) {
@@ -150,7 +157,8 @@ function doGet(e) {
     cathlabs: cathlabs,
     operations: operations,
     cmrs: cmrs,
-    sources: sources
+    sources: sources,
+    rolePresets: rolePresets
   };
 
   return ContentService.createTextOutput(JSON.stringify(responseData))
@@ -179,6 +187,11 @@ function doPost(e) {
 
       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       var keyColumnName = type + "Key";
+      if (type === "RolePreset") {
+        keyColumnName = "RolePresetID";
+      } else if (type === "Source") {
+        keyColumnName = "DiagnosisID";
+      }
       var keyColIndex = headers.indexOf(keyColumnName) + 1;
 
       if (keyColIndex === 0) {

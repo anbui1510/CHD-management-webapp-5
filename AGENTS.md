@@ -127,6 +127,8 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 *   `StaffPhone`: Số điện thoại
 *   `Password`: Mật khẩu đăng nhập
 *   `Role`: Quyền ('Admin' | 'User')
+*   `Permissions`: Danh sách module được phép (Enumlist, mã module cách nhau bởi dấu phẩy). Ví dụ: `patients,consult-list,results-staff`. Admin tự có toàn bộ module.
+*   `StaffRolePreset`: Mã vai trò mẫu phân quyền (ví dụ `bs-hoi-chan`, `dieu-phoi-tt`, `admin-khoa`). Dùng khi gán nhanh bộ quyền trong view Quản lý nhân sự.
 *   `Email`: Địa chỉ email
 *   `FireDate`: Ngày nghỉ việc (Trống nếu còn làm)
 
@@ -166,3 +168,16 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 ### 7. Bảng Source (Cấu hình nguồn và danh mục)
 *   Chứa các danh mục thiết lập, các cột phụ thuộc vào cấu hình người dùng. Hệ thống sẽ tự động quét hết các cột vào mảng.
 *   `DiagnosisID`: Danh mục mã chẩn đoán dùng chung cho `Consult.DiagnosisID`, `CathLab.PostDiagnosisID` và `CMR.CMRDiagnosisID`. Không hard-code danh sách DiagnosisID mới trong component; nếu user thêm mã mới thì lưu vào cột này.
+
+### 8. Bảng RolePreset (Vai trò mẫu phân quyền)
+
+| Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `RolePresetID` | Mã preset | Text | slug | Bắt buộc | Khóa chính, ví dụ `bs-hoi-chan`. |
+| `RolePresetLabel` | Tên vai trò | Text | | Bắt buộc | Hiển thị trên UI. |
+| `RolePresetDescription` | Mô tả | LongText | | | Giải thích ngắn vai trò. |
+| `Permissions` | Module được phép | Text | Mã module, cách nhau dấu phẩy | Bắt buộc | Ví dụ `home,workspace,patients,consult-list`. |
+| `SortOrder` | Thứ tự hiển thị | Number | | | Số nhỏ hiển thị trước. |
+| `IsSystem` | Preset hệ thống | Boolean | true/false | | `admin-khoa`, `tuy-chinh` không được xóa qua UI. |
+
+* Sửa ma trận trên tab **Ma trận vai trò mẫu** (Module 6) hoặc sheet **RolePreset** — không cần deploy code.

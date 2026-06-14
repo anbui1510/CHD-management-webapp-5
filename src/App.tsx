@@ -20,6 +20,7 @@ import {
   Operation,
   CMR,
   Source,
+  RolePreset,
   formatVNTime,
   removeDiacritics,
   findPatientByKey,
@@ -42,9 +43,11 @@ import MRIResultView from './components/MRIResultView';
 import MRICalendarView from './components/MRICalendarView';
 import SurgeryRoomView from './components/SurgeryRoomView';
 import DevelopingFeatureView from './components/DevelopingFeatureView';
+import StaffManagementView from './components/StaffManagementView';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE, getDiagnosisOptions } from './data/source';
+import { AppModule, canAccessModule, canManageStaff, setRuntimeRolePresets } from './auth/permissions';
 
 import { 
   Users, 
@@ -80,6 +83,7 @@ import {
   Undo2,
   Archive,
   LayoutDashboard,
+  UserCog,
   Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -190,6 +194,7 @@ export default function App() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [cmrs, setCmrs] = useState<CMR[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
+  const [rolePresetRecords, setRolePresetRecords] = useState<RolePreset[]>([]);
 
   const diagnosisOptions = useMemo(() => getDiagnosisOptions(sources, [
     ...consults.map(consult => consult.DiagnosisID),
@@ -245,7 +250,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'staff-mgmt'>('home');
   const [archiveInitialTab, setArchiveInitialTab] = useState<'transferred' | 'archive'>('archive');
 
   // Collapsible Sidebar State
@@ -473,6 +478,7 @@ export default function App() {
     fetchOperations();
     fetchCmrs();
     fetchSources();
+    fetchRolePresets();
 
     // Recover logged-in session if exists
     const storedStaff = localStorage.getItem('CurrentStaffKey');
@@ -485,6 +491,22 @@ export default function App() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!currentStaff?.StaffKey || staffList.length === 0) return;
+    const updated = staffList.find(staff => staff.StaffKey === currentStaff.StaffKey);
+    if (updated && JSON.stringify(updated) !== JSON.stringify(currentStaff)) {
+      setCurrentStaff(updated);
+      localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+    }
+  }, [staffList, currentStaff?.StaffKey]);
+
+  useEffect(() => {
+    if (!currentStaff) return;
+    if (!canAccessModule(currentStaff, activeMenu as AppModule)) {
+      setActiveMenu('workspace');
+    }
+  }, [currentStaff, activeMenu]);
 
   useEffect(() => {
     if (bottomScrollRef.current && activeMenu === 'consult-list') {
@@ -517,6 +539,16 @@ export default function App() {
           setLoginStaffKey(data[0].StaffKey);
         }
       });
+  };
+
+  const fetchRolePresets = () => {
+    fetch('/api/role-presets')
+      .then(res => res.json())
+      .then((data: RolePreset[]) => {
+        setRolePresetRecords(data);
+        setRuntimeRolePresets(data);
+      })
+      .catch(err => console.error('Failed to load role presets:', err));
   };
 
   const fetchPatients = () => {
@@ -582,6 +614,15 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('CurrentStaffKey');
     setCurrentStaff(null);
+  };
+
+  const navigateMenu = (menu: typeof activeMenu) => {
+    if (!canAccessModule(currentStaff, menu as AppModule)) {
+      triggerAlert('Bạn không có quyền truy cập module này.', 'Từ chối truy cập');
+      setActiveMenu('workspace');
+      return;
+    }
+    setActiveMenu(menu);
   };
 
   // Auto detect pending consults count
@@ -1389,7 +1430,8 @@ export default function App() {
     { id: 'mri-calendar', label: 'Lịch chụp MRI', icon: <CalendarDays className="w-4 h-4" /> },
     { id: 'google-sheets', label: 'Virtual Google Sheets', icon: <Database className="w-4 h-4" /> },
     { id: 'excel-export', label: 'Bảng Filter_Consult', icon: <Download className="w-4 h-4" /> },
-  ];
+    { id: 'staff-mgmt', label: 'Quản lý nhân sự', icon: <UserCog className="w-4 h-4" /> },
+  ].filter(menu => canAccessModule(currentStaff, menu.id as AppModule));
 
 
 
@@ -1496,6 +1538,12 @@ export default function App() {
           title: "BẢNG FILTER & CONTAINER XUẤT DIRECT BIÊN BẢN",
           subtitle: "",
           icon: <Download className="w-5 h-5 text-pink-200" />
+        };
+      case 'staff-mgmt':
+        return {
+          title: "QUẢN LÝ NHÂN SỰ & PHÂN QUYỀN",
+          subtitle: "Module 6 · Gán vai trò và quyền truy cập",
+          icon: <UserCog className="w-5 h-5 text-pink-200" />
         };
       default:
         return {
@@ -1620,9 +1668,7 @@ export default function App() {
               {primarySideMenus.map((menu) => (
                 <button
                   key={menu.id}
-                  onClick={() => {
-                    setActiveMenu(menu.id as any);
-                  }}
+                  onClick={() => navigateMenu(menu.id as typeof activeMenu)}
                   title={!isSidebarExpanded ? menu.label : undefined}
                   className={`relative w-full flex items-center ${isSidebarExpanded ? 'gap-2.5 px-3' : 'justify-center p-2'} py-2 text-xs font-semibold rounded-2xl transition-all ${
                     activeMenu === menu.id 
@@ -1665,14 +1711,12 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
             <HomeDashboard 
-              onNavigate={(menu) => {
-                setActiveMenu(menu as any);
-              }}
+              onNavigate={(menu) => navigateMenu(menu as typeof activeMenu)}
               patientCount={patients.length}
               pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
               completedConsultCount={consults.filter(c => c.ConsultResultID && !['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
@@ -1692,11 +1736,12 @@ export default function App() {
                 if (menu === 'archive') {
                   setArchiveInitialTab('archive');
                 }
-                setActiveMenu(menu as any);
+                navigateMenu(menu as typeof activeMenu);
               }}
               patientCount={patients.length}
               pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
               pendingMriCount={cmrs.filter(c => !c.CMRScheduledDate).length + consults.filter(c => String(c.ConsultResultID || '').trim().toLowerCase() === 'chụp mri').length}
+              canManageStaff={canManageStaff(currentStaff)}
             />
           )}
 
@@ -2864,6 +2909,19 @@ export default function App() {
               </button>
 
             </div>
+          )}
+
+          {/* STAFF MANAGEMENT */}
+          {activeMenu === 'staff-mgmt' && (
+            <StaffManagementView
+              staffList={staffList}
+              currentStaff={currentStaff}
+              rolePresetRecords={rolePresetRecords}
+              onRefreshData={fetchStaff}
+              onRefreshRolePresets={fetchRolePresets}
+              triggerAlert={triggerAlert}
+              triggerConfirm={triggerConfirm}
+            />
           )}
 
           {/* VIRTUAL GOOGLE SHEETS */}

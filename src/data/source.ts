@@ -26,17 +26,43 @@ export const SOURCE_DIAGNOSIS_ID = [
   'Bệnh cơ tim'
 ];
 
+/** Legacy / mock aliases mapped to canonical Source.DiagnosisID values. */
+export const DIAGNOSIS_ID_ALIASES: Record<string, string> = {
+  coao: 'CoA',
+  'pulmonary stenosis': 'PS',
+  arrhythmia: 'SVT',
+  'bệnh lý mạch mẫu': 'Bệnh lý mạch máu',
+};
+
+export function normalizeDiagnosisID(value: unknown): string {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return '';
+
+  const exact = SOURCE_DIAGNOSIS_ID.find(id => id === trimmed);
+  if (exact) return exact;
+
+  const caseInsensitive = SOURCE_DIAGNOSIS_ID.find(
+    id => id.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (caseInsensitive) return caseInsensitive;
+
+  const alias = DIAGNOSIS_ID_ALIASES[trimmed.toLowerCase()];
+  if (alias) return alias;
+
+  return trimmed;
+}
+
 type SourceLike = { DiagnosisID?: unknown; [key: string]: unknown };
 
 export function getDiagnosisOptions(sources: SourceLike[] = [], extraValues: unknown[] = []): string[] {
   const sourceValues = sources
-    .map(source => String(source.DiagnosisID || '').trim())
+    .map(source => normalizeDiagnosisID(source.DiagnosisID))
     .filter(Boolean);
 
   const baseValues = sourceValues.length > 0 ? sourceValues : SOURCE_DIAGNOSIS_ID;
   const seen = new Set<string>();
 
-  return [...baseValues, ...extraValues.map(value => String(value || '').trim())]
+  return [...baseValues, ...extraValues.map(value => normalizeDiagnosisID(value))]
     .filter(Boolean)
     .filter(value => {
       const key = value.toLowerCase();

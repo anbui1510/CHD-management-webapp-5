@@ -20,7 +20,9 @@ import {
 
   ShieldCheck,
 
-  Scissors
+  Scissors,
+
+  UserCog
 
 } from 'lucide-react';
 
@@ -36,6 +38,8 @@ interface WorkspaceDashboardProps {
 
   pendingMriCount?: number;
 
+  canManageStaff?: boolean;
+
 }
 
 
@@ -48,7 +52,9 @@ export default function WorkspaceDashboard({
 
   pendingConsultCount,
 
-  pendingMriCount = 0
+  pendingMriCount = 0,
+
+  canManageStaff = false
 
 }: WorkspaceDashboardProps) {
 
@@ -461,6 +467,48 @@ export default function WorkspaceDashboard({
         </div>
 
       </div>
+
+
+
+      {/* 6. QUẢN LÝ NHÂN SỰ */}
+
+      {canManageStaff && (
+
+        <div>
+
+          <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+
+            <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 6. QUẢN LÝ NHÂN SỰ
+
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+            <button
+
+              onClick={() => onNavigate('staff-mgmt')}
+
+              className="bg-white border rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition text-left group"
+
+            >
+
+              <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+
+                <UserCog className="w-6 h-6 text-indigo-600" />
+
+              </div>
+
+              <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Phân quyền nhân sự</h3>
+
+              <p className="text-xs text-slate-500">Vai trò mẫu · module · tài khoản</p>
+
+            </button>
+
+          </div>
+
+        </div>
+
+      )}
 
 
 

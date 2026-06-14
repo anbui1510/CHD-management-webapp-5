@@ -1,0 +1,67 @@
+[
+  {
+    "RolePresetID": "admin-khoa",
+    "RolePresetLabel": "Admin khoa",
+    "RolePresetDescription": "Toàn quyền mọi module và quản trị hệ thống",
+    "Permissions": "home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt",
+    "SortOrder": 1,
+    "IsSystem": true
+  },
+  {
+    "RolePresetID": "dang-ky",
+    "RolePresetLabel": "Đăng ký / Lễ tân",
+    "RolePresetDescription": "Tiếp nhận BN, đăng ký hội chẩn",
+    "Permissions": "home,workspace,patients,consult-list,schedule-view,mri-calendar",
+    "SortOrder": 2
+  },
+  {
+    "RolePresetID": "bs-hoi-chan",
+    "RolePresetLabel": "BS hội chẩn",
+    "RolePresetDescription": "Đăng ký và nhập kết quả staff",
+    "Permissions": "home,workspace,patients,consult-list,results-staff",
+    "SortOrder": 3
+  },
+  {
+    "RolePresetID": "dieu-phoi-tt",
+    "RolePresetLabel": "Điều phối thông tim",
+    "RolePresetDescription": "Xếp lịch, dụng cụ, gọi bệnh, lưu trữ",
+    "Permissions": "home,workspace,schedule-tt,schedule-view,archive,patients",
+    "SortOrder": 4
+  },
+  {
+    "RolePresetID": "phong-tt",
+    "RolePresetLabel": "Phòng thông tim (PTV/ĐD TT)",
+    "RolePresetDescription": "Thực hiện và nhập kết quả can thiệp TT",
+    "Permissions": "home,workspace,cathlab-room,schedule-view,patients",
+    "SortOrder": 5
+  },
+  {
+    "RolePresetID": "mri-team",
+    "RolePresetLabel": "Nhóm MRI tim",
+    "RolePresetDescription": "Đăng ký, xếp lịch và nhập KQ MRI",
+    "Permissions": "home,workspace,mri-register,mri-scheduler,mri-result,mri-calendar,patients",
+    "SortOrder": 6
+  },
+  {
+    "RolePresetID": "phong-mo",
+    "RolePresetLabel": "Phòng phẫu thuật",
+    "RolePresetDescription": "Quản lý ca mổ tim",
+    "Permissions": "home,workspace,surgery-room,surgery-scheduler,surgery-schedule-view,patients",
+    "SortOrder": 7
+  },
+  {
+    "RolePresetID": "chi-xem",
+    "RolePresetLabel": "Chỉ xem (Read-only)",
+    "RolePresetDescription": "Xem hồ sơ và các lịch, không sửa dữ liệu nghiệp vụ",
+    "Permissions": "home,workspace,patients,schedule-view,mri-calendar,surgery-schedule-view",
+    "SortOrder": 8
+  },
+  {
+    "RolePresetID": "tuy-chinh",
+    "RolePresetLabel": "Tùy chỉnh thủ công",
+    "RolePresetDescription": "Chọn từng module riêng lẻ bên dưới",
+    "Permissions": "home,workspace",
+    "SortOrder": 99,
+    "IsSystem": true
+  }
+]

@@ -7,7 +7,10 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { Patient, Consult, Staff, CathLab, CMR, Source } from './src/types';
+import { Patient, Consult, Staff, CathLab, CMR, Source, RolePreset } from './src/types';
+import { normalizeDiagnosisID } from './src/data/source';
+import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
+import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -43,6 +46,7 @@ const CATHLABS_FILE = path.join(DB_DIR, 'cathlabs.json');
 const OPERATIONS_FILE = path.join(DB_DIR, 'operations.json');
 const CMRS_FILE = path.join(DB_DIR, 'cmrs.json');
 const SOURCES_FILE = path.join(DB_DIR, 'sources.json');
+const ROLE_PRESETS_FILE = path.join(DB_DIR, 'role-presets.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
 
 // Ensure DB directory exists
@@ -178,7 +182,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
     const data = await response.json() as any;
 
-    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources))) {
+    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources) || Array.isArray(data.rolePresets))) {
       if (Array.isArray(data.patients)) {
         const currentPatients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
         const pMap = new Map();
@@ -303,6 +307,9 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.sources) && data.sources.length > 0) {
         writeDB(SOURCES_FILE, data.sources);
       }
+      if (Array.isArray(data.rolePresets)) {
+        writeDB(ROLE_PRESETS_FILE, resolveRolePresetRecords(data.rolePresets));
+      }
       lastSyncTime = Date.now();
       console.log('Successfully pulling synced and updated local database cache!');
       return true;
@@ -313,7 +320,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   return false;
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'RolePreset', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
@@ -732,11 +739,183 @@ app.post('/api/sync-config/sync', async (req, res) => {
   }
 });
 
+function ensureRolePresetsDB(): RolePreset[] {
+  const existing = readDB<RolePreset>(ROLE_PRESETS_FILE, []);
+  if (existing.length === 0) {
+    const seeded = resolveRolePresetRecords(DEFAULT_ROLE_PRESET_RECORDS);
+    writeDB(ROLE_PRESETS_FILE, seeded);
+    return seeded;
+  }
+  const resolved = resolveRolePresetRecords(existing);
+  if (JSON.stringify(resolved) !== JSON.stringify(existing)) {
+    writeDB(ROLE_PRESETS_FILE, resolved);
+  }
+  return resolved;
+}
+
 // Routes
 app.get('/api/staff', async (req, res) => {
   await syncFromGoogleSheets();
   const staff = readDB<Staff>(STAFF_FILE, defaultStaff);
   res.json(staff);
+});
+
+app.put('/api/staff/:key', async (req, res) => {
+  try {
+    const staff = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const key = req.params.key;
+    const index = staff.findIndex(member => String(member.StaffKey || '') === String(key));
+
+    if (index === -1) {
+      res.status(404).json({ error: 'Staff not found' });
+      return;
+    }
+
+    const updateData = req.body || {};
+    if (updateData.StaffPhone !== undefined && updateData.StaffPhone !== null) {
+      updateData.StaffPhone = cleanSheetText(updateData.StaffPhone);
+    }
+
+    staff[index] = { ...staff[index], ...updateData, StaffKey: staff[index].StaffKey };
+    writeDB<Staff>(STAFF_FILE, staff);
+    markLocalMutation();
+
+    recentLocalEdits.set(`Staff_${staff[index].StaffKey}`, { timestamp: Date.now(), data: staff[index] });
+
+    syncToGoogleSheets('Staff', 'update', staff[index].StaffKey, staff[index]).catch(err => {
+      console.error('Error syncing staff update to google sheets background:', err);
+    });
+
+    res.json(staff[index]);
+  } catch (err) {
+    console.error('Error in PUT /api/staff/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/role-presets', async (req, res) => {
+  await syncFromGoogleSheets();
+  res.json(ensureRolePresetsDB());
+});
+
+app.post('/api/role-presets', async (req, res) => {
+  try {
+    const presets = ensureRolePresetsDB();
+    const body = req.body || {};
+    const label = String(body.RolePresetLabel || '').trim();
+    let presetId = String(body.RolePresetID || '').trim();
+
+    if (!label) {
+      res.status(400).json({ error: 'RolePresetLabel is required' });
+      return;
+    }
+
+    if (!presetId) {
+      presetId = slugifyRolePresetId(label);
+      let suffix = 1;
+      while (presets.some(item => item.RolePresetID === presetId)) {
+        presetId = `${slugifyRolePresetId(label)}-${suffix++}`;
+      }
+    }
+
+    if (presets.some(item => item.RolePresetID === presetId)) {
+      res.status(409).json({ error: 'RolePresetID already exists' });
+      return;
+    }
+
+    const record: RolePreset = {
+      RolePresetID: presetId,
+      RolePresetLabel: label,
+      RolePresetDescription: String(body.RolePresetDescription || '').trim(),
+      Permissions: String(body.Permissions || 'home,workspace').trim(),
+      SortOrder: body.SortOrder ?? presets.length + 1,
+      IsSystem: false,
+    };
+
+    presets.push(record);
+    writeDB(ROLE_PRESETS_FILE, presets);
+    markLocalMutation();
+
+    syncToGoogleSheets('RolePreset', 'insert', record.RolePresetID, record).catch(err => {
+      console.error('Error syncing role preset insert:', err);
+    });
+
+    res.status(201).json(record);
+  } catch (err) {
+    console.error('Error in POST /api/role-presets:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/role-presets/:key', async (req, res) => {
+  try {
+    const presets = ensureRolePresetsDB();
+    const key = req.params.key;
+    const index = presets.findIndex(item => item.RolePresetID === key);
+
+    if (index === -1) {
+      res.status(404).json({ error: 'Role preset not found' });
+      return;
+    }
+
+    const body = req.body || {};
+    const updated: RolePreset = {
+      ...presets[index],
+      ...body,
+      RolePresetID: presets[index].RolePresetID,
+      IsSystem: presets[index].IsSystem,
+    };
+
+    if (body.RolePresetLabel !== undefined) {
+      updated.RolePresetLabel = String(body.RolePresetLabel).trim();
+    }
+    if (body.RolePresetDescription !== undefined) {
+      updated.RolePresetDescription = String(body.RolePresetDescription).trim();
+    }
+    if (body.Permissions !== undefined) {
+      updated.Permissions = String(body.Permissions).trim();
+    }
+
+    presets[index] = updated;
+    writeDB(ROLE_PRESETS_FILE, presets);
+    markLocalMutation();
+
+    syncToGoogleSheets('RolePreset', 'update', updated.RolePresetID, updated).catch(err => {
+      console.error('Error syncing role preset update:', err);
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Error in PUT /api/role-presets/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/role-presets/:key', async (req, res) => {
+  try {
+    const presets = ensureRolePresetsDB();
+    const key = req.params.key;
+
+    if (isSystemRolePresetId(key)) {
+      res.status(403).json({ error: 'Cannot delete system role preset' });
+      return;
+    }
+
+    const index = presets.findIndex(item => item.RolePresetID === key);
+    if (index === -1) {
+      res.status(404).json({ error: 'Role preset not found' });
+      return;
+    }
+
+    presets.splice(index, 1);
+    writeDB(ROLE_PRESETS_FILE, presets);
+    markLocalMutation();
+
+    res.json({ success: true, RolePresetID: key });
+  } catch (err) {
+    console.error('Error in DELETE /api/role-presets/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/patients', async (req, res) => {
@@ -842,7 +1021,7 @@ app.get('/api/cmrs', async (req, res) => {
 
 app.post('/api/cmrs', async (req, res) => {
   const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
-  const newCmr: CMR = req.body;
+  const newCmr: CMR = applyDiagnosisNormalization(req.body, ['CMRDiagnosisID']);
 
   const requestedCmrKey = newCmr.CMRKey || newCmr.CMRkey;
   const cmrKeyExists = requestedCmrKey && cmrs.some(cmr => String(cmr.CMRKey || cmr.CMRkey || '') === String(requestedCmrKey));
@@ -871,7 +1050,10 @@ app.put('/api/cmrs/:key', async (req, res) => {
     );
 
     if (index !== -1) {
-      cmrs[index] = { ...cmrs[index], ...req.body, UpdateTime: newTimestamp() };
+      cmrs[index] = applyDiagnosisNormalization(
+        { ...cmrs[index], ...req.body, UpdateTime: newTimestamp() },
+        ['CMRDiagnosisID']
+      );
       cmrs[index].CMRKey = cmrs[index].CMRKey || cmrs[index].CMRkey || key;
       writeDB<CMR>(CMRS_FILE, cmrs);
       markLocalMutation();
@@ -900,7 +1082,7 @@ app.get('/api/sources', async (req, res) => {
 
 app.post('/api/sources', async (req, res) => {
   const sources = readDB<Source>(SOURCES_FILE, []);
-  const diagnosisID = String(req.body?.DiagnosisID || '').trim();
+  const diagnosisID = normalizeDiagnosisID(req.body?.DiagnosisID);
 
   if (!diagnosisID) {
     res.status(400).json({ error: 'DiagnosisID is required' });
@@ -933,7 +1115,7 @@ app.post('/api/sources', async (req, res) => {
 
 app.post('/api/consults', async (req, res) => {
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
-  const newConsult: Consult = req.body;
+  const newConsult: Consult = applyDiagnosisNormalization(req.body, ['DiagnosisID']);
   
   // Set Key dynamically and guard against client-side duplicate keys.
   const requestedConsultKey = newConsult.ConsultKey;
@@ -964,7 +1146,10 @@ app.put('/api/consults/:key', async (req, res) => {
   
   const index = consults.findIndex(c => c.ConsultKey === key);
   if (index !== -1) {
-    consults[index] = { ...consults[index], ...updateData };
+    consults[index] = applyDiagnosisNormalization(
+      { ...consults[index], ...updateData },
+      ['DiagnosisID']
+    );
     writeDB<Consult>(CONSULTS_FILE, consults);
     markLocalMutation();
     
@@ -990,7 +1175,7 @@ app.get('/api/cathlabs', async (req, res) => {
 
 app.post('/api/cathlabs', async (req, res) => {
   const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
-  const newCathLab: CathLab = req.body;
+  const newCathLab: CathLab = applyDiagnosisNormalization(req.body, ['PostDiagnosisID']);
   
   const requestedCathKey = newCathLab.CathKey;
   const cathKeyExists = requestedCathKey && cathlabs.some(cath => String(cath.CathKey || '') === String(requestedCathKey));
@@ -1015,7 +1200,10 @@ app.put('/api/cathlabs/:key', async (req, res) => {
   const key = req.params.key;
   const index = cathlabs.findIndex(c => c.CathKey === key);
   if (index !== -1) {
-    cathlabs[index] = { ...cathlabs[index], ...req.body };
+    cathlabs[index] = applyDiagnosisNormalization(
+      { ...cathlabs[index], ...req.body },
+      ['PostDiagnosisID']
+    );
     writeDB<CathLab>(CATHLABS_FILE, cathlabs);
     markLocalMutation();
     
@@ -1035,6 +1223,19 @@ app.put('/api/cathlabs/:key', async (req, res) => {
 
 function newTimestamp() {
   return new Date().toISOString();
+}
+
+function applyDiagnosisNormalization<T extends Record<string, unknown>>(
+  record: T,
+  fields: string[]
+): T {
+  const normalized: Record<string, unknown> = { ...record };
+  for (const field of fields) {
+    if (field in normalized && normalized[field]) {
+      normalized[field] = normalizeDiagnosisID(normalized[field]);
+    }
+  }
+  return normalized as T;
 }
 
 // Reset Database API (Useful for testing)
