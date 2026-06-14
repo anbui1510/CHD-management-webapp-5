@@ -4203,21 +4203,21 @@ Xin cảm ơn!`;
 
       {/* AD-HOC SCHEDULING MODAL (XẾP BỔ SUNG) */}
       {showAdHocModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-1.5 overflow-hidden animate-in fade-in duration-200">
-          <div className="bg-slate-50 rounded-2xl shadow-2xl border border-slate-205 w-full max-w-[min(1500px,98vw)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-3 overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-slate-50 rounded-3xl shadow-2xl border border-slate-205 w-full max-w-[min(1800px,99vw)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[94vh]">
             
             {/* Modal Header */}
-            <div className="py-1.5 px-3 bg-indigo-900 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4 text-indigo-300 shrink-0" />
-                <h3 className="font-extrabold text-[11px] uppercase tracking-wider">Đăng ký xếp lịch thông tim bổ sung</h3>
+            <div className="py-3 px-5 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <Plus className="w-5 h-5 text-indigo-300 shrink-0" />
+                <h3 className="font-extrabold text-sm uppercase tracking-wider">Đăng ký xếp lịch thông tim bổ sung</h3>
               </div>
               <button 
                 onClick={() => {
                   setShowAdHocModal(false);
                   handleClearSelectedPatient();
                 }}
-                className="p-1 hover:bg-indigo-950 rounded-lg text-indigo-300 hover:text-white transition text-xs cursor-pointer"
+                className="p-1.5 hover:bg-indigo-950 rounded-lg text-indigo-300 hover:text-white transition text-sm cursor-pointer"
               >
                 ✕
               </button>
@@ -4226,14 +4226,20 @@ Xin cảm ơn!`;
             {/* Modal Form */}
             <form onSubmit={handleSaveAdHoc} className="flex-1 flex flex-col min-h-0 overflow-hidden" noValidate>
               
-              <div className="p-2 overflow-y-auto flex-1 min-h-0">
+              <div className="p-4 overflow-y-auto flex-1 min-h-0">
+                {adHocValidationMsg && (
+                  <div className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-bold text-rose-800 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>{adHocValidationMsg}</span>
+                  </div>
+                )}
                 
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-2 items-start">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
                   
                   {/* COLUMN 1: ĐĂNG KÝ BỆNH NHÂN */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1.5 shadow-sm">
-                      <div className="border-b border-slate-100 pb-1 flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2.5 shadow-sm">
+                      <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+                        <span className="text-xs font-black uppercase text-indigo-800 tracking-wider">
                           1. Đăng ký bệnh nhân
                         </span>
                         <button
@@ -4243,7 +4249,7 @@ Xin cảm ơn!`;
                             handleClearSelectedPatient();
                             setAdHocPendingConsult(null);
                           }}
-                          className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-2 py-0.5 rounded-lg text-[9px] transition flex items-center gap-1 cursor-pointer"
+                          className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-3 py-1 rounded-lg text-[11px] transition flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3 h-3" /> Mới
                         </button>
@@ -4351,14 +4357,14 @@ Xin cảm ơn!`;
                     </div>
 
                   {/* COLUMN 2: THÔNG TIN HỘI CHẨN */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1 shadow-sm">
-                      <div className="border-b border-slate-100 pb-1">
-                        <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-wider">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 shadow-sm">
+                      <div className="border-b border-slate-100 pb-2">
+                        <span className="text-xs font-black uppercase text-[#d2145a] tracking-wider">
                           2. Thông tin hội chẩn
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-1 pt-0.5">
+                      <div className="grid grid-cols-1 gap-2 pt-1">
                         {renderAdHocRow('Kiểu staff *', (
                           <div className="flex gap-1">
                             {(['Staff thông', 'Staff mổ'] as const).map((type) => {
@@ -4368,7 +4374,7 @@ Xin cảm ơn!`;
                                   key={type}
                                   type="button"
                                   onClick={() => setAdHocConsultType(type)}
-                                  className={`flex-1 py-0.5 rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                                  className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
                                     active ? 'bg-[#d2145a] border-[#d2145a] text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
                                   }`}
                                 >
@@ -4407,37 +4413,27 @@ Xin cảm ơn!`;
                           </select>
                         ))}
                         {renderAdHocRow(`Chẩn đoán chi tiết *${adHocErrors.includes('DetailDiagnosis') ? ' !' : ''}`, (
-                          <textarea rows={1} required placeholder="Chẩn đoán chi tiết..." value={adHocDetailDiagnosis} onChange={(e) => setAdHocDetailDiagnosis(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                          <textarea rows={2} required placeholder="Chẩn đoán chi tiết..." value={adHocDetailDiagnosis} onChange={(e) => setAdHocDetailDiagnosis(e.target.value)} className={`${adHocInputCls} resize-y`} />
                         ), { alignTop: true })}
-                        {renderAdHocRow('Nguy cơ', (
-                          <select value={adHocRiskFactor} onChange={(e) => setAdHocRiskFactor(e.target.value)} className={adHocSelectCls}>
-                            <option value="3 -SpO2 > 75% ổn định">3 -SpO2 &gt; 75% ổn định</option>
-                            <option value="1 - Hỗ trợ SHH / NT khó kiểm soát">1 - Hỗ trợ SHH / NT khó kiểm soát</option>
-                            <option value="2 - Không SHH / NT ổn / HF nhiều">2 - Không SHH / NT ổn / HF nhiều</option>
-                            <option value="3 - Không HF, HF độ I-II / có chỉ định mổ">3 - Không HF, HF độ I-II / có chỉ định mổ</option>
-                            <option value="1 - SpO2 < 65% / Huyết động không ổn định">1 - SpO2 &lt; 65% / Huyết động không ổn định</option>
-                            <option value="2- SpO2 65-75% dao động không ổn định">2- SpO2 65-75% dao động không ổn định</option>
-                          </select>
-                        ))}
                         {renderAdHocRow('Kết luận chính *', (
                           <SearchableEnumSelect required options={['Can thiệp thông tim', 'Chụp chẩn đoán +/- can thiệp', 'Chụp chẩn đoán/Đo kháng lực', 'Tiền Glenn', 'Tiền Fontan', 'Điện sinh lý', 'Mổ tim', 'Thêm CĐHA; vđ khác - Staff lại', 'Chưa có chỉ định - Theo dõi tiếp', 'Điều trị nội khoa - Hẹn staff lại', 'Quá chỉ định', 'Không có thông tin']} value={adHocConsultResultID} onChange={setAdHocConsultResultID} direction="up" placeholder="— Chọn kết luận —" searchPlaceholder="Gõ tìm..." />
                         ))}
                         {renderAdHocRow(`Kết quả chi tiết *${adHocErrors.includes('DetailConsultResult') ? ' !' : ''}`, (
-                          <textarea rows={1} placeholder="Kết quả chi tiết..." value={adHocDetailConsultResult} onChange={(e) => setAdHocDetailConsultResult(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                          <textarea rows={2} placeholder="Kết quả chi tiết..." value={adHocDetailConsultResult} onChange={(e) => setAdHocDetailConsultResult(e.target.value)} className={`${adHocInputCls} resize-y`} />
                         ), { alignTop: true })}
 
                       </div>
                     </div>
 
                   {/* COLUMN 3: DỤNG CỤ & XẾP LỊCH */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1 shadow-sm">
-                      <div className="border-b border-slate-100 pb-1">
-                        <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 shadow-sm">
+                      <div className="border-b border-slate-100 pb-2">
+                        <span className="text-xs font-black uppercase text-indigo-800 tracking-wider">
                           3. Dụng cụ & xếp lịch
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-1">
+                      <div className="grid grid-cols-1 gap-2">
                         {renderAdHocRow('Dụng cụ dự kiến', (
                           <textarea rows={1} placeholder="Amplatzer ADOII..." value={adHocPlannedDevice} onChange={(e) => setAdHocPlannedDevice(e.target.value)} className={`${adHocInputCls} font-bold resize-y`} />
                         ), { alignTop: true })}
