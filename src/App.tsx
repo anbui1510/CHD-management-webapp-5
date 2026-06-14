@@ -1758,6 +1758,12 @@ export default function App() {
                 cathlabs={cathlabs}
                 operations={operations}
                 onClose={() => setActiveMenu(profileReturnMenu)}
+                onStaffUpdated={(updated) => {
+                  setCurrentStaff(updated);
+                  localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+                  fetchStaff();
+                }}
+                triggerAlert={triggerAlert}
               />
             </div>
           )}

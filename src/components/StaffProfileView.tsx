@@ -1,18 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Activity,
   CalendarDays,
+  Camera,
   ChevronDown,
   ChevronUp,
   Mail,
+  Pencil,
   Phone,
+  Save,
   Shield,
   User,
   X,
 } from 'lucide-react';
 import type { CathLab, Consult, Operation, Staff } from '../types';
-import { VNDateInput } from './VNDateInput';
+import { formatVNTime } from '../types';
+import { DateFieldWithCalendar, DateRangePickerPopover } from './MiniCalendarPopup';
 import {
   ActivityDateFilter,
   ActivityMetricResult,
@@ -29,7 +33,14 @@ interface StaffProfileViewProps {
   cathlabs: CathLab[];
   operations: Operation[];
   onClose?: () => void;
+  onStaffUpdated?: (updated: Staff) => void;
+  triggerAlert?: (message: string, title?: string) => void;
 }
+
+type AdminDraft = Pick<
+  Staff,
+  'StaffName' | 'Name' | 'Department' | 'Career' | 'StaffDOB' | 'StaffSex' | 'Email' | 'StaffPhone' | 'Avatar'
+>;
 
 const PERIOD_OPTIONS: { id: ActivityPeriodPreset; label: string }[] = [
   { id: 'all', label: 'Tất cả' },
@@ -67,6 +78,27 @@ const METRIC_CARDS: {
     valueColor: 'text-violet-950',
   },
 ];
+
+function resolveAvatarUrl(avatar?: string): string {
+  const raw = String(avatar || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) return raw;
+  return `/${raw.replace(/^\//, '')}`;
+}
+
+function toAdminDraft(staff: Staff): AdminDraft {
+  return {
+    StaffName: staff.StaffName || '',
+    Name: staff.Name || '',
+    Department: staff.Department || '',
+    Career: staff.Career || '',
+    StaffDOB: staff.StaffDOB || '',
+    StaffSex: staff.StaffSex || '',
+    Email: staff.Email || '',
+    StaffPhone: staff.StaffPhone || '',
+    Avatar: staff.Avatar || '',
+  };
+}
 
 function ActivityMetricRow({
   title,
@@ -129,8 +161,11 @@ export default function StaffProfileView({
   cathlabs,
   operations,
   onClose,
+  onStaffUpdated,
+  triggerAlert,
 }: StaffProfileViewProps) {
   const now = new Date();
+  const [profileStaff, setProfileStaff] = useState<Staff>(staff);
   const [filter, setFilter] = useState<ActivityDateFilter>({
     preset: 'year',
     year: now.getFullYear() !== 2026 ? 2026 : now.getFullYear(),
@@ -141,6 +176,16 @@ export default function StaffProfileView({
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [customFrom, setCustomFrom] = useState('2026-01-01');
   const [customTo, setCustomTo] = useState('2026-12-31');
+  const [isEditingAdmin, setIsEditingAdmin] = useState(false);
+  const [adminDraft, setAdminDraft] = useState<AdminDraft>(() => toAdminDraft(staff));
+  const [saving, setSaving] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setProfileStaff(staff);
+    setAdminDraft(toAdminDraft(staff));
+    setIsEditingAdmin(false);
+  }, [staff]);
 
   const activeFilter = useMemo<ActivityDateFilter>(
     () => ({
@@ -153,19 +198,106 @@ export default function StaffProfileView({
   );
 
   const metrics = useMemo(
-    () => computeStaffActivityMetrics(staff, staffList, consults, cathlabs, operations, activeFilter),
-    [staff, staffList, consults, cathlabs, operations, activeFilter]
+    () => computeStaffActivityMetrics(profileStaff, staffList, consults, cathlabs, operations, activeFilter),
+    [profileStaff, staffList, consults, cathlabs, operations, activeFilter]
   );
 
-  const initial = getStaffInitial(staff);
-  const avatarUrl = String(staff.Avatar || '').trim();
+  const initial = getStaffInitial(profileStaff);
+  const avatarUrl = resolveAvatarUrl(profileStaff.Avatar);
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          StaffName: adminDraft.StaffName?.trim(),
+          Name: adminDraft.Name?.trim() || '',
+          Department: adminDraft.Department?.trim() || '',
+          Career: adminDraft.Career?.trim() || '',
+          StaffDOB: adminDraft.StaffDOB || '',
+          StaffSex: adminDraft.StaffSex || '',
+          Email: adminDraft.Email?.trim() || '',
+          StaffPhone: adminDraft.StaffPhone?.trim() || '',
+          Avatar: adminDraft.Avatar || '',
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Không thể lưu hồ sơ');
+      }
+
+      const updated = (await response.json()) as Staff;
+      setProfileStaff(updated);
+      setAdminDraft(toAdminDraft(updated));
+      setIsEditingAdmin(false);
+      onStaffUpdated?.(updated);
+      triggerAlert?.('Đã cập nhật thông tin hành chính.', 'Lưu thành công');
+    } catch (error) {
+      triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu hồ sơ', 'Lỗi');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      triggerAlert?.('Vui lòng chọn file ảnh (JPG, PNG, WEBP...).', 'Không hợp lệ');
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      triggerAlert?.('Ảnh quá lớn. Vui lòng chọn file dưới 1MB.', 'Không hợp lệ');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = String(reader.result || '');
+      const nextDraft = { ...adminDraft, Avatar: dataUrl };
+      setAdminDraft(nextDraft);
+      setProfileStaff(prev => ({ ...prev, Avatar: dataUrl }));
+
+      setSaving(true);
+      try {
+        const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ Avatar: dataUrl }),
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || 'Không thể lưu avatar');
+        }
+        const updated = (await response.json()) as Staff;
+        setProfileStaff(updated);
+        setAdminDraft(toAdminDraft(updated));
+        onStaffUpdated?.(updated);
+        triggerAlert?.('Đã cập nhật avatar.', 'Lưu thành công');
+      } catch (error) {
+        triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu avatar', 'Lỗi');
+      } finally {
+        setSaving(false);
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const cancelAdminEdit = () => {
+    setAdminDraft(toAdminDraft(profileStaff));
+    setIsEditingAdmin(false);
+  };
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50 animate-in fade-in duration-300">
       <div className="shrink-0 flex items-center justify-between gap-3 px-1 pb-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-[#d2145a] mb-1">Hồ sơ cá nhân</p>
-          <h2 className="text-xl font-extrabold text-slate-900">Profile · {staff.StaffName}</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">Profile · {profileStaff.StaffName}</h2>
         </div>
         {onClose && (
           <button
@@ -189,18 +321,17 @@ export default function StaffProfileView({
               </h3>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCustomPicker(prev => !prev)}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-                    showCustomPicker
-                      ? 'bg-pink-50 border-pink-200 text-[#d2145a]'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-pink-200'
-                  }`}
-                >
-                  <CalendarDays className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-                  Tùy chọn
-                </button>
+                <DateRangePickerPopover
+                  from={customFrom}
+                  to={customTo}
+                  active={showCustomPicker}
+                  onToggle={() => setShowCustomPicker(prev => !prev)}
+                  onChange={({ from, to }) => {
+                    setCustomFrom(from);
+                    setCustomTo(to);
+                    setShowCustomPicker(true);
+                  }}
+                />
 
                 <div className="relative">
                   <select
@@ -222,19 +353,11 @@ export default function StaffProfileView({
 
                 {(filter.preset === 'year' || filter.preset === 'month' || filter.preset === 'quarter') && !showCustomPicker && (
                   <div className="flex items-center border border-slate-100 rounded-lg bg-slate-50 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setFilter(prev => ({ ...prev, year: prev.year + 1 }))}
-                      className="text-slate-400 hover:text-[#d2145a] p-0.5"
-                    >
+                    <button type="button" onClick={() => setFilter(prev => ({ ...prev, year: prev.year + 1 }))} className="text-slate-400 hover:text-[#d2145a] p-0.5">
                       <ChevronUp className="w-3 h-3" />
                     </button>
                     <span className="text-[10px] font-extrabold font-mono text-[#d2145a] px-2">{filter.year}</span>
-                    <button
-                      type="button"
-                      onClick={() => setFilter(prev => ({ ...prev, year: prev.year - 1 }))}
-                      className="text-slate-400 hover:text-[#d2145a] p-0.5"
-                    >
+                    <button type="button" onClick={() => setFilter(prev => ({ ...prev, year: prev.year - 1 }))} className="text-slate-400 hover:text-[#d2145a] p-0.5">
                       <ChevronDown className="w-3 h-3" />
                     </button>
                   </div>
@@ -247,9 +370,7 @@ export default function StaffProfileView({
                     className="px-2 py-1.5 rounded-xl text-[11px] font-bold border border-slate-200 bg-white"
                   >
                     {Array.from({ length: 12 }, (_, idx) => idx + 1).map(month => (
-                      <option key={month} value={month}>
-                        Tháng {month}
-                      </option>
+                      <option key={month} value={month}>Tháng {month}</option>
                     ))}
                   </select>
                 )}
@@ -261,25 +382,16 @@ export default function StaffProfileView({
                     className="px-2 py-1.5 rounded-xl text-[11px] font-bold border border-slate-200 bg-white"
                   >
                     {[1, 2, 3, 4].map(quarter => (
-                      <option key={quarter} value={quarter}>
-                        Quý {quarter}
-                      </option>
+                      <option key={quarter} value={quarter}>Quý {quarter}</option>
                     ))}
                   </select>
                 )}
               </div>
             </div>
 
-            {showCustomPicker && (
-              <div className="mb-4 rounded-2xl border border-pink-100 bg-pink-50/40 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-[10px] font-black uppercase text-slate-500">Từ ngày</span>
-                  <VNDateInput value={customFrom} onChange={setCustomFrom} className="mt-1 w-full" />
-                </label>
-                <label className="block">
-                  <span className="text-[10px] font-black uppercase text-slate-500">Đến ngày</span>
-                  <VNDateInput value={customTo} onChange={setCustomTo} className="mt-1 w-full" />
-                </label>
+            {showCustomPicker && customFrom && customTo && (
+              <div className="mb-4 rounded-2xl border border-pink-100 bg-pink-50/40 px-3 py-2 text-[10px] font-bold text-[#d2145a]">
+                Đang lọc: {formatVNTime(customFrom)} → {formatVNTime(customTo)}
               </div>
             )}
 
@@ -302,89 +414,172 @@ export default function StaffProfileView({
         <div className="xl:sticky xl:top-0 h-fit">
           <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-sm">
             <div className="flex flex-col items-center text-center">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={staff.StaffName}
-                  className="w-28 h-28 rounded-3xl object-cover border-4 border-pink-50 shadow-sm"
+              <div className="relative group">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={profileStaff.StaffName}
+                    className="w-28 h-28 rounded-3xl object-cover border-4 border-pink-50 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-pink-500 to-[#d2145a] text-white flex items-center justify-center text-4xl font-black shadow-sm">
+                    {initial}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 w-9 h-9 rounded-2xl bg-white border border-pink-200 text-[#d2145a] shadow-md flex items-center justify-center hover:bg-pink-50 transition"
+                  title="Thay avatar"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarFile}
                 />
-              ) : (
-                <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-pink-500 to-[#d2145a] text-white flex items-center justify-center text-4xl font-black shadow-sm">
-                  {initial}
-                </div>
-              )}
-              <h3 className="mt-4 text-lg font-extrabold text-slate-900">{staff.StaffName}</h3>
-              {staff.Name && staff.Name !== staff.StaffName && (
-                <p className="text-xs font-semibold text-slate-500">{staff.Name}</p>
+              </div>
+              <p className="mt-2 text-[10px] font-bold text-slate-400">Bấm biểu tượng máy ảnh để đổi avatar</p>
+
+              <h3 className="mt-3 text-lg font-extrabold text-slate-900">{profileStaff.StaffName}</h3>
+              {(profileStaff.Name || adminDraft.Name) && (
+                <p className="text-xs font-semibold text-slate-500">{profileStaff.Name || adminDraft.Name}</p>
               )}
               <span className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pink-50 text-[#d2145a] text-[10px] font-black uppercase">
                 <Shield className="w-3 h-3" />
-                {staff.Role}
+                {profileStaff.Role}
               </span>
             </div>
 
             <div className="mt-5 pt-5 border-t border-slate-100 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Thông tin hành chính</p>
-
-              <div className="flex items-start gap-2 text-xs">
-                <User className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Mã nhân viên</p>
-                  <p className="font-extrabold text-slate-800 font-mono">{staff.StaffKey}</p>
-                </div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Thông tin hành chính</p>
+                {!isEditingAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingAdmin(true)}
+                    className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-pink-200 hover:text-[#d2145a] inline-flex items-center gap-1 transition"
+                  >
+                    <Pencil className="w-3 h-3" /> Sửa
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={cancelAdminEdit}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveProfile}
+                      disabled={saving}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[#d2145a] text-white hover:bg-[#b8124e] inline-flex items-center gap-1 disabled:opacity-60"
+                    >
+                      <Save className="w-3 h-3" />
+                      {saving ? 'Đang lưu...' : 'Lưu'}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-start gap-2 text-xs">
-                <Shield className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Khoa / Phòng ban</p>
-                  <p className="font-bold text-slate-800">{staff.Department || '—'}</p>
+              {!isEditingAdmin ? (
+                <>
+                  <AdminInfoRow icon={<User className="w-4 h-4" />} label="Mã nhân viên" value={profileStaff.StaffKey} mono />
+                  <AdminInfoRow icon={<Shield className="w-4 h-4" />} label="Khoa / Phòng ban" value={profileStaff.Department || '—'} />
+                  <AdminInfoRow icon={<Activity className="w-4 h-4" />} label="Chức danh" value={profileStaff.Career || '—'} />
+                  <AdminInfoRow icon={<CalendarDays className="w-4 h-4" />} label="Ngày sinh" value={profileStaff.StaffDOB ? formatVNTime(profileStaff.StaffDOB) : '—'} />
+                  <AdminInfoRow icon={<User className="w-4 h-4" />} label="Giới tính" value={profileStaff.StaffSex || '—'} />
+                  <AdminInfoRow icon={<Mail className="w-4 h-4" />} label="Email" value={profileStaff.Email || '—'} breakAll />
+                  <AdminInfoRow icon={<Phone className="w-4 h-4" />} label="Số điện thoại" value={profileStaff.StaffPhone || '—'} />
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <AdminEditField label="Họ tên hiển thị" value={adminDraft.StaffName || ''} onChange={value => setAdminDraft(prev => ({ ...prev, StaffName: value }))} />
+                  <AdminEditField label="Tên ngắn / BS." value={adminDraft.Name || ''} onChange={value => setAdminDraft(prev => ({ ...prev, Name: value }))} />
+                  <AdminEditField label="Khoa / Phòng ban" value={adminDraft.Department || ''} onChange={value => setAdminDraft(prev => ({ ...prev, Department: value }))} />
+                  <AdminEditField label="Chức danh" value={adminDraft.Career || ''} onChange={value => setAdminDraft(prev => ({ ...prev, Career: value }))} />
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Ngày sinh</span>
+                    <DateFieldWithCalendar
+                      label=""
+                      value={adminDraft.StaffDOB || ''}
+                      onChange={value => setAdminDraft(prev => ({ ...prev, StaffDOB: value }))}
+                    />
+                  </div>
+                  <label className="block">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Giới tính</span>
+                    <select
+                      value={adminDraft.StaffSex || ''}
+                      onChange={e => setAdminDraft(prev => ({ ...prev, StaffSex: e.target.value }))}
+                      className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+                    >
+                      <option value="">—</option>
+                      <option value="Nam">Nam</option>
+                      <option value="Nữ">Nữ</option>
+                    </select>
+                  </label>
+                  <AdminEditField label="Email" value={adminDraft.Email || ''} onChange={value => setAdminDraft(prev => ({ ...prev, Email: value }))} />
+                  <AdminEditField label="Số điện thoại" value={adminDraft.StaffPhone || ''} onChange={value => setAdminDraft(prev => ({ ...prev, StaffPhone: value }))} />
+                  <AdminEditField label="Link avatar (tuỳ chọn)" value={adminDraft.Avatar?.startsWith('data:') ? '' : (adminDraft.Avatar || '')} onChange={value => setAdminDraft(prev => ({ ...prev, Avatar: value }))} placeholder="https://... hoặc NV_Images/..." />
                 </div>
-              </div>
-
-              <div className="flex items-start gap-2 text-xs">
-                <Activity className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Chức danh</p>
-                  <p className="font-bold text-slate-800">{staff.Career || '—'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 text-xs">
-                <CalendarDays className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Ngày sinh</p>
-                  <p className="font-bold text-slate-800">{staff.StaffDOB || '—'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 text-xs">
-                <User className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Giới tính</p>
-                  <p className="font-bold text-slate-800">{staff.StaffSex || '—'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 text-xs">
-                <Mail className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Email</p>
-                  <p className="font-bold text-slate-800 break-all">{staff.Email || '—'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 text-xs">
-                <Phone className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Số điện thoại</p>
-                  <p className="font-bold text-slate-800">{staff.StaffPhone || '—'}</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function AdminInfoRow({
+  icon,
+  label,
+  value,
+  mono,
+  breakAll,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+  breakAll?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <span className="text-slate-400 shrink-0 mt-0.5">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold text-slate-400 uppercase">{label}</p>
+        <p className={`font-bold text-slate-800 ${mono ? 'font-mono font-extrabold' : ''} ${breakAll ? 'break-all' : ''}`}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function AdminEditField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[10px] font-bold text-slate-400 uppercase">{label}</span>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+      />
+    </label>
   );
 }
