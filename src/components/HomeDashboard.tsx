@@ -120,9 +120,15 @@ const isCompletedConsultResult = (consult: Consult) => {
   return !!result && !['nodata', 'no data', '—', '-'].includes(result);
 };
 
+const isDateWithinRange = (dateValue: string | undefined, startDate: string, endDate: string) => {
+  const dateKey = getFormattedDateKey(dateValue);
+  return !!dateKey && dateKey >= startDate && dateKey <= endDate;
+};
+
 const PIE_COLORS = ['#d2145a', '#7c3aed', '#0891b2', '#059669', '#f59e0b', '#2563eb', '#e11d48'];
 
 type PieMetric = 'diagnosis' | 'second_operator' | 'request_by';
+type PiePeriodMode = 'month' | 'quarter' | 'year';
 
 interface PieSegment {
   label: string;
@@ -165,6 +171,13 @@ export default function HomeDashboard({
   const [isConfiguringChartMetric, setIsConfiguringChartMetric] = useState(false);
   const [pieMetric, setPieMetric] = useState<PieMetric>('diagnosis');
   const [hoveredPieSegment, setHoveredPieSegment] = useState<PieSegment | null>(null);
+  const [piePeriodMode, setPiePeriodMode] = useState<PiePeriodMode>('year');
+  const [pieFilterYear, setPieFilterYear] = useState<number>(() => {
+    const year = new Date().getFullYear();
+    return year || 2026;
+  });
+  const [pieFilterMonth, setPieFilterMonth] = useState<number>(() => new Date().getMonth() + 1);
+  const [pieFilterQuarter, setPieFilterQuarter] = useState<number>(() => Math.floor(new Date().getMonth() / 3) + 1);
 
   const allowedShortcuts = useMemo(
     () => SHORTCUTS_POOL.filter(sh => canAccessModule(sh.id as AppModule)),
@@ -382,21 +395,65 @@ export default function HomeDashboard({
     !c.Removed
   ).length;
 
+  const piePeriodRange = useMemo(() => {
+    if (piePeriodMode === 'month') {
+      const month = String(pieFilterMonth).padStart(2, '0');
+      const lastDay = new Date(pieFilterYear, pieFilterMonth, 0).getDate();
+      return {
+        start: `${pieFilterYear}-${month}-01`,
+        end: `${pieFilterYear}-${month}-${String(lastDay).padStart(2, '0')}`,
+        label: `Tháng ${pieFilterMonth}/${pieFilterYear}`
+      };
+    }
+    if (piePeriodMode === 'quarter') {
+      const startMonth = (pieFilterQuarter - 1) * 3 + 1;
+      const endMonth = startMonth + 2;
+      const lastDay = new Date(pieFilterYear, endMonth, 0).getDate();
+      return {
+        start: `${pieFilterYear}-${String(startMonth).padStart(2, '0')}-01`,
+        end: `${pieFilterYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+        label: `Quý ${pieFilterQuarter}/${pieFilterYear}`
+      };
+    }
+    return {
+      start: `${pieFilterYear}-01-01`,
+      end: `${pieFilterYear}-12-31`,
+      label: `Năm ${pieFilterYear}`
+    };
+  }, [piePeriodMode, pieFilterYear, pieFilterMonth, pieFilterQuarter]);
+
+  const pieCathlabs = useMemo(() => {
+    return (cathlabs || []).filter(cath =>
+      isDateWithinRange(cath.CathDate, piePeriodRange.start, piePeriodRange.end)
+    );
+  }, [cathlabs, piePeriodRange.start, piePeriodRange.end]);
+
+  const pieCompletedConsults = useMemo(() => {
+    return (consults || []).filter(c =>
+      isCompletedConsultResult(c) &&
+      isDateWithinRange(c.ConsultDate, piePeriodRange.start, piePeriodRange.end)
+    );
+  }, [consults, piePeriodRange.start, piePeriodRange.end]);
+
   const cathPatientDiagnosisDistribution = useMemo(() => {
     const cathPatientKeys = new Set(
-      (cathlabs || [])
+      pieCathlabs
         .map(cath => normalizePatientKey(cath.PatientKey))
         .filter(Boolean)
     );
 
     const counts: Record<string, number> = {};
     cathPatientKeys.forEach(patientKey => {
-      const latestCathDiagnosis = [...(cathlabs || [])]
+      const latestCathDiagnosis = [...pieCathlabs]
         .filter(cath => normalizePatientKey(cath.PatientKey) === patientKey && String(cath.PostDiagnosisID || '').trim())
         .sort((a, b) => getDateTime(b.CathDate) - getDateTime(a.CathDate))[0]?.PostDiagnosisID;
 
       const fallbackConsultDiagnosis = [...(consults || [])]
-        .filter(c => normalizePatientKey(c.PatientKey) === patientKey && String(c.DiagnosisID || '').trim())
+        .filter(c =>
+          normalizePatientKey(c.PatientKey) === patientKey &&
+          String(c.DiagnosisID || '').trim() &&
+          getFormattedDateKey(c.ConsultDate) <= piePeriodRange.end
+        )
         .sort((a, b) => {
           const dateDiff = getDateTime(b.ConsultDate) - getDateTime(a.ConsultDate);
           if (dateDiff !== 0) return dateDiff;
@@ -411,32 +468,31 @@ export default function HomeDashboard({
       Object.entries(counts).map(([label, value]) => ({ label, value })),
       cathPatientKeys.size
     );
-  }, [cathlabs, consults]);
+  }, [pieCathlabs, consults, piePeriodRange.end]);
 
   const secondOperatorDistribution = useMemo(() => {
     const counts: Record<string, number> = {};
-    (cathlabs || []).forEach(cath => {
+    pieCathlabs.forEach(cath => {
       const operator = String(cath._2ndInterventionist || '').trim() || 'Chưa nhập';
       counts[operator] = (counts[operator] || 0) + 1;
     });
     return buildPieSegments(
       Object.entries(counts).map(([label, value]) => ({ label, value })),
-      (cathlabs || []).length
+      pieCathlabs.length
     );
-  }, [cathlabs]);
+  }, [pieCathlabs]);
 
   const requestByDistribution = useMemo(() => {
-    const validConsults = (consults || []).filter(isCompletedConsultResult);
     const counts: Record<string, number> = {};
-    validConsults.forEach(c => {
+    pieCompletedConsults.forEach(c => {
       const requestBy = String(c.RequestBy || '').trim() || 'Chưa nhập';
       counts[requestBy] = (counts[requestBy] || 0) + 1;
     });
     return buildPieSegments(
       Object.entries(counts).map(([label, value]) => ({ label, value })),
-      validConsults.length
+      pieCompletedConsults.length
     );
-  }, [consults]);
+  }, [pieCompletedConsults]);
 
   const pieConfig = useMemo(() => {
     if (pieMetric === 'second_operator') {
@@ -444,21 +500,20 @@ export default function HomeDashboard({
         title: 'PTV phụ 1',
         subtitle: 'Theo _2ndInterventionist trong CathLab',
         totalLabel: 'ca thông tim',
-        total: (cathlabs || []).length,
+        total: pieCathlabs.length,
         segments: secondOperatorDistribution
       };
     }
     if (pieMetric === 'request_by') {
-      const totalConsults = (consults || []).filter(isCompletedConsultResult).length;
       return {
         title: 'BS đăng ký staff',
         subtitle: '',
         totalLabel: 'ca hội chẩn',
-        total: totalConsults,
+        total: pieCompletedConsults.length,
         segments: requestByDistribution
       };
     }
-    const cathPatientCount = new Set((cathlabs || []).map(cath => normalizePatientKey(cath.PatientKey)).filter(Boolean)).size;
+    const cathPatientCount = new Set(pieCathlabs.map(cath => normalizePatientKey(cath.PatientKey)).filter(Boolean)).size;
     return {
       title: 'ICD bệnh nhân đã thông tim',
       subtitle: 'Mỗi bệnh nhân chỉ tính 1 ICD gần nhất',
@@ -466,7 +521,7 @@ export default function HomeDashboard({
       total: cathPatientCount,
       segments: cathPatientDiagnosisDistribution
     };
-  }, [pieMetric, cathlabs, consults, cathPatientDiagnosisDistribution, secondOperatorDistribution, requestByDistribution]);
+  }, [pieMetric, pieCathlabs, pieCompletedConsults, cathPatientDiagnosisDistribution, secondOperatorDistribution, requestByDistribution]);
 
   // Date and Week scheduling for Weekly Calendar
   const [referenceDate, setReferenceDate] = useState(() => {
@@ -1057,6 +1112,78 @@ export default function HomeDashboard({
                       {label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+                <div className="flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm">
+                  {([
+                    ['month', 'Tháng'],
+                    ['quarter', 'Quý'],
+                    ['year', 'Năm']
+                  ] as Array<[PiePeriodMode, string]>).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setPiePeriodMode(id)}
+                      className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition cursor-pointer ${
+                        piePeriodMode === id
+                          ? 'bg-slate-800 text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {piePeriodMode === 'month' && (
+                    <select
+                      value={pieFilterMonth}
+                      onChange={(e) => setPieFilterMonth(Number(e.target.value))}
+                      className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[9px] font-black text-slate-700 focus:outline-none"
+                    >
+                      {Array.from({ length: 12 }, (_, idx) => idx + 1).map(month => (
+                        <option key={month} value={month}>Tháng {month}</option>
+                      ))}
+                    </select>
+                  )}
+                  {piePeriodMode === 'quarter' && (
+                    <select
+                      value={pieFilterQuarter}
+                      onChange={(e) => setPieFilterQuarter(Number(e.target.value))}
+                      className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[9px] font-black text-slate-700 focus:outline-none"
+                    >
+                      {[1, 2, 3, 4].map(quarter => (
+                        <option key={quarter} value={quarter}>Quý {quarter}</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setPieFilterYear(prev => prev - 1)}
+                      className="p-0.5 text-slate-500 hover:text-[#d2145a] hover:bg-slate-50 cursor-pointer"
+                      title="Năm trước"
+                    >
+                      <ChevronLeft className="w-3 h-3" />
+                    </button>
+                    <span className="px-2 text-[9px] font-black font-mono text-[#d2145a] min-w-[36px] text-center">
+                      {pieFilterYear}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPieFilterYear(prev => prev + 1)}
+                      className="p-0.5 text-slate-500 hover:text-[#d2145a] hover:bg-slate-50 cursor-pointer"
+                      title="Năm sau"
+                    >
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <span className="hidden 2xl:inline-flex text-[9px] font-black text-slate-500 bg-white border border-slate-200 rounded-lg px-2 py-0.5 truncate">
+                    {piePeriodRange.label}
+                  </span>
                 </div>
               </div>
 
