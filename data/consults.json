@@ -102152,15 +102152,28 @@
     "ConsultNote": "",
     "PlannedDevice": "",
     "PlannedPrice": "",
-    "PriorityOrder": "Chương trình",
+    "PriorityOrder": "Làm sớm",
     "RiskFactor": "3 - Không HF, HF độ I-II / có chỉ định mổ",
-    "CheckDevice": "",
+    "CheckDevice": "Đủ",
     "PDFTrigger": false,
     "ConsultMember": [
       "BS. Admin"
     ],
     "ConsultResultUpdatedBy": "11111",
-    "ConsultResultUpdatedTime": "2026-06-13T16:36:08.612Z"
+    "ConsultResultUpdatedTime": "2026-06-13T16:36:08.612Z",
+    "OperationFeedback": "",
+    "SupplyDepFeedback": "",
+    "CallStatus": "Đồng ý",
+    "CallNote": "",
+    "PlannedCathLabDate": "2026-06-19",
+    "CathMethod": "Đóng các lỗ rò động mạch, tĩnh mạch (02.0092.0054)",
+    "PostCathDepart": "Tim Mạch",
+    "Scheduled1stInterventionist": "BS. Phụng",
+    "Scheduled2ndInterventionist": "BS. Ân",
+    "Scheduled3rdInterventionist": "",
+    "CheckDeviceUpdatedBy": "11111",
+    "CheckDeviceUpdatedTime": "2026-06-14T13:39:00.828Z",
+    "TransferredToCathLab": true
   },
   {
     "ConsultKey": "con_1781372138549",
@@ -102250,6 +102263,7 @@
     "CheckDeviceBy": "11111",
     "CheckDeviceUpdatedTime": "2026-06-14T13:15:59.775Z",
     "CheckDeviceUpdatedBy": "11111",
-    "CathMethod": "Đặt coli bít ống động mạch (03.2311.0055)"
+    "CathMethod": "Đặt coli bít ống động mạch (03.2311.0055)",
+    "TransferredToCathLab": true
   }
 ]
