@@ -108,6 +108,47 @@ const getFormattedDateKey = (str: string | undefined): string => {
   return trimmed;
 };
 
+const getDateTime = (dateValue?: string) => {
+  const dateKey = getFormattedDateKey(dateValue);
+  if (!dateKey) return 0;
+  const time = new Date(dateKey).getTime();
+  return Number.isNaN(time) ? 0 : time;
+};
+
+const PIE_COLORS = ['#d2145a', '#7c3aed', '#0891b2', '#059669', '#f59e0b', '#2563eb', '#e11d48'];
+
+type PieMetric = 'diagnosis' | 'second_operator' | 'request_by';
+
+interface PieSegment {
+  label: string;
+  value: number;
+  color: string;
+  percent: number;
+}
+
+const buildPieSegments = (items: Array<{ label: string; value: number }>, total: number): PieSegment[] => {
+  if (total <= 0) return [];
+  return items
+    .filter(item => item.value > 0)
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .map((item, idx) => ({
+      ...item,
+      color: PIE_COLORS[idx % PIE_COLORS.length],
+      percent: (item.value / total) * 100
+    }));
+};
+
+const getDonutBackground = (segments: PieSegment[]) => {
+  if (segments.length === 0) return '#f1f5f9';
+  let cursor = 0;
+  const stops = segments.map(segment => {
+    const start = cursor;
+    cursor += segment.percent;
+    return `${segment.color} ${start}% ${cursor}%`;
+  });
+  return `conic-gradient(${stops.join(', ')})`;
+};
+
 const DEFAULT_SHORTCUT_IDS = ['patients', 'consult-list', 'results-staff', 'cathlab-room'];
 
 export default function HomeDashboard({
@@ -128,6 +169,7 @@ export default function HomeDashboard({
   const [chartMetric, setChartMetric] = useState<'cathlabs' | 'staff_consults' | 'cathlabs_yearly'>('cathlabs');
   const [chartYear, setChartYear] = useState<number>(2026);
   const [isConfiguringChartMetric, setIsConfiguringChartMetric] = useState(false);
+  const [pieMetric, setPieMetric] = useState<PieMetric>('diagnosis');
 
   const allowedShortcuts = useMemo(
     () => SHORTCUTS_POOL.filter(sh => canAccessModule(sh.id as AppModule)),
@@ -223,8 +265,6 @@ export default function HomeDashboard({
       if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) return false;
       const removed = c.Removed === true || String((c as any).Removed || '').trim().toLowerCase() === 'true' || String((c as any).Removed || '').trim().toLowerCase() === 'có' || String((c as any).Removed || '').trim().toLowerCase() === 'yes';
       if (removed) return false;
-      const transferred = (c as any).TransferredToCathLab === true || String((c as any).TransferredToCathLab || '').trim().toLowerCase() === 'true' || String((c as any).TransferredToCathLab || '').trim().toLowerCase() === 'yes' || String((c as any).TransferredToCathLab || '').trim().toLowerCase() === 'có';
-      if (transferred) return false;
       if (!ELIGIBLE_RESULTS.includes(c.ConsultResultID || '')) return false;
 
       if (
