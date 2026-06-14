@@ -44,6 +44,8 @@ import MRICalendarView from './components/MRICalendarView';
 import SurgeryRoomView from './components/SurgeryRoomView';
 import DevelopingFeatureView from './components/DevelopingFeatureView';
 import StaffManagementView from './components/StaffManagementView';
+import StaffAccountMenu from './components/StaffAccountMenu';
+import StaffProfileView from './components/StaffProfileView';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE, getDiagnosisOptions } from './data/source';
@@ -250,7 +252,9 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'staff-mgmt'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'staff-mgmt'>('home');
+  const [profileReturnMenu, setProfileReturnMenu] = useState<typeof activeMenu>('home');
+  const [isStaffAccountMenuOpen, setIsStaffAccountMenuOpen] = useState(false);
   const [archiveInitialTab, setArchiveInitialTab] = useState<'transferred' | 'archive'>('archive');
 
   // Collapsible Sidebar State
@@ -503,6 +507,7 @@ export default function App() {
 
   useEffect(() => {
     if (!currentStaff) return;
+    if (activeMenu === 'profile') return;
     if (!canAccessModule(currentStaff, activeMenu as AppModule)) {
       setActiveMenu('workspace');
     }
@@ -617,12 +622,23 @@ export default function App() {
   };
 
   const navigateMenu = (menu: typeof activeMenu) => {
+    if (menu === 'profile') {
+      setProfileReturnMenu(activeMenu === 'profile' ? 'home' : activeMenu);
+      setActiveMenu('profile');
+      setIsStaffAccountMenuOpen(false);
+      return;
+    }
     if (!canAccessModule(currentStaff, menu as AppModule)) {
       triggerAlert('Bạn không có quyền truy cập module này.', 'Từ chối truy cập');
       setActiveMenu('workspace');
       return;
     }
     setActiveMenu(menu);
+  };
+
+  const openStaffProfile = () => {
+    setProfileReturnMenu(activeMenu === 'profile' ? 'home' : activeMenu);
+    setActiveMenu('profile');
   };
 
   // Auto detect pending consults count
@@ -1443,6 +1459,12 @@ export default function App() {
           subtitle: "",
           icon: <Heart className="w-5 h-5 text-pink-200 animate-pulse fill-pink-500/20" />
         };
+      case 'profile':
+        return {
+          title: "HỒ SƠ CÁ NHÂN",
+          subtitle: currentStaff?.StaffName || '',
+          icon: <UserCog className="w-5 h-5 text-pink-200" />
+        };
       case 'patients':
         return {
           title: "HỒ SƠ BỆNH ÁN",
@@ -1615,17 +1637,14 @@ export default function App() {
             {/* Separator line */}
             <span className="hidden md:block w-px h-5 bg-white/25"></span>
 
-            {/* Circle Admin & Text */}
-            <div className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-xl px-2 py-0.5 select-none shrink-0">
-              <div className="w-5 h-5 rounded-full bg-white text-[#d2145a] font-extrabold text-[10px] flex items-center justify-center uppercase shadow-inner shrink-0">
-                {(() => {
-                  const parts = currentStaff.StaffName.trim().split(/\s+/);
-                  const lastName = parts[parts.length - 1] || '';
-                  return removeDiacritics(lastName.charAt(0)).toUpperCase();
-                })()}
-              </div>
-              <span className="font-extrabold text-xs text-white max-w-[80px] truncate">{currentStaff.StaffName}</span>
-            </div>
+            {/* Staff account menu */}
+            <StaffAccountMenu
+              staff={currentStaff}
+              isOpen={isStaffAccountMenuOpen}
+              onToggle={() => setIsStaffAccountMenuOpen(prev => !prev)}
+              onClose={() => setIsStaffAccountMenuOpen(false)}
+              onViewProfile={openStaffProfile}
+            />
 
             {/* Logout Button */}
             <button
@@ -1711,7 +1730,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -1728,6 +1747,19 @@ export default function App() {
               cathlabs={cathlabs}
               canAccessModule={(module) => canAccessModule(currentStaff, module)}
             />
+          )}
+
+          {activeMenu === 'profile' && currentStaff && (
+            <div className="flex-1 min-h-0 h-full overflow-hidden p-4 sm:p-6">
+              <StaffProfileView
+                staff={currentStaff}
+                staffList={staffList}
+                consults={consults}
+                cathlabs={cathlabs}
+                operations={operations}
+                onClose={() => setActiveMenu(profileReturnMenu)}
+              />
+            </div>
           )}
 
           {/* WORKSPACE DASHBOARD */}
