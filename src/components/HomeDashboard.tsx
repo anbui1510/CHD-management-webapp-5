@@ -668,14 +668,14 @@ export default function HomeDashboard({
           
           {/* BIỂU ĐỒ THỐNG KÊ TIM THEO THÁNG */}
           <div 
-            style={{ height: '130px', width: '538.003px' }} 
+            style={{ height: '180px', width: '538.003px' }} 
             className="bg-white border border-slate-150 rounded-2xl p-3 shadow-sm flex items-center justify-between shrink-0 relative max-w-full z-20"
           >
             {/* Title & Total info */}
             <div className="flex flex-col justify-center shrink-0 pr-3 border-r border-[#f1f5f9] h-full w-[155px]">
               <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-tight flex items-center gap-1 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#d2145a] animate-pulse shrink-0"></span>
-                <span className="truncate">Thống kê {chartMetric === 'cathlabs' ? 'thông tim' : chartMetric === 'cathlabs_yearly' ? 'thông tim năm' : 'staff thông'}</span>
+                <span className="truncate">Thống kê = HISTOGRAM</span>
               </span>
               <div className="mt-1 flex items-baseline gap-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-0.5 max-w-max">
                 <span className="text-[10px] text-slate-500 font-bold">Tổng:</span>
