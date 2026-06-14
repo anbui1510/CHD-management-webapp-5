@@ -115,6 +115,11 @@ const getDateTime = (dateValue?: string) => {
   return Number.isNaN(time) ? 0 : time;
 };
 
+const isCompletedConsultResult = (consult: Consult) => {
+  const result = String(consult.ConsultResultID || '').trim().toLowerCase();
+  return !!result && !['nodata', 'no data', '—', '-'].includes(result);
+};
+
 const PIE_COLORS = ['#d2145a', '#7c3aed', '#0891b2', '#059669', '#f59e0b', '#2563eb', '#e11d48'];
 
 type PieMetric = 'diagnosis' | 'second_operator' | 'request_by';
@@ -421,10 +426,7 @@ export default function HomeDashboard({
   }, [cathlabs]);
 
   const requestByDistribution = useMemo(() => {
-    const validConsults = (consults || []).filter(c => {
-      const removed = c.Removed === true || String((c as any).Removed || '').trim().toLowerCase() === 'true' || String((c as any).Removed || '').trim().toLowerCase() === 'có' || String((c as any).Removed || '').trim().toLowerCase() === 'yes';
-      return !removed;
-    });
+    const validConsults = (consults || []).filter(isCompletedConsultResult);
     const counts: Record<string, number> = {};
     validConsults.forEach(c => {
       const requestBy = String(c.RequestBy || '').trim() || 'Chưa nhập';
@@ -447,13 +449,10 @@ export default function HomeDashboard({
       };
     }
     if (pieMetric === 'request_by') {
-      const totalConsults = (consults || []).filter(c => {
-        const removed = c.Removed === true || String((c as any).Removed || '').trim().toLowerCase() === 'true' || String((c as any).Removed || '').trim().toLowerCase() === 'có' || String((c as any).Removed || '').trim().toLowerCase() === 'yes';
-        return !removed;
-      }).length;
+      const totalConsults = (consults || []).filter(isCompletedConsultResult).length;
       return {
         title: 'BS đăng ký staff',
-        subtitle: 'Theo RequestBy trong Consult',
+        subtitle: '',
         totalLabel: 'ca hội chẩn',
         total: totalConsults,
         segments: requestByDistribution
@@ -899,7 +898,7 @@ export default function HomeDashboard({
         <div className="bg-white border border-slate-150 rounded-2xl p-4 shadow-sm flex flex-col h-full overflow-hidden">
           <div className="flex-1 min-h-0 flex flex-col gap-4">
             {/* WEEKLY CALENDAR SECTION */}
-            <div className="order-2 h-[58%] min-h-[220px] flex flex-col overflow-hidden">
+            <div className="order-2 h-[52%] min-h-[200px] flex flex-col overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 shrink-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <CalendarDays className="w-4 h-4 text-[#d2145a] shrink-0" />
@@ -1013,7 +1012,7 @@ export default function HomeDashboard({
               </div>
             </div>
 
-            <div className="order-1 h-[42%] min-h-[180px] border border-slate-150 rounded-2xl bg-slate-50/60 p-3 flex flex-col overflow-hidden">
+            <div className="order-1 h-[48%] min-h-[220px] border border-slate-150 rounded-2xl bg-slate-50/60 p-3 flex flex-col overflow-hidden">
               <div className="flex items-start justify-between gap-3 shrink-0 mb-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -1025,9 +1024,6 @@ export default function HomeDashboard({
                       {pieConfig.total} {pieConfig.totalLabel}
                     </span>
                   </div>
-                  <p className="text-[9.5px] font-semibold text-slate-400 mt-0.5 truncate">
-                    {pieConfig.subtitle}
-                  </p>
                 </div>
 
                 <div className="flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm shrink-0">
@@ -1052,8 +1048,8 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 grid grid-cols-[150px_1fr] gap-3 items-center overflow-hidden">
-                <div className="relative w-[132px] h-[132px] mx-auto shrink-0" onMouseLeave={() => setHoveredPieSegment(null)}>
+              <div className="flex-1 min-h-0 grid grid-cols-[190px_1fr] gap-3 items-center overflow-hidden">
+                <div className="relative w-[172px] h-[172px] mx-auto shrink-0" onMouseLeave={() => setHoveredPieSegment(null)}>
                   {(() => {
                     const radius = 42;
                     const circumference = 2 * Math.PI * radius;
@@ -1097,11 +1093,11 @@ export default function HomeDashboard({
                       </div>
                     </div>
                   )}
-                  <div className="absolute inset-[24px] rounded-full bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center px-2">
-                    <span className="text-[9px] font-black uppercase text-slate-400 leading-tight">
+                  <div className="absolute inset-[32px] rounded-full bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center px-2">
+                    <span className="text-[9.5px] font-black uppercase text-slate-400 leading-tight">
                       {pieConfig.title}
                     </span>
-                    <span className="text-xl font-black font-mono text-[#d2145a] leading-none mt-1">
+                    <span className="text-3xl font-black font-mono text-[#d2145a] leading-none mt-1">
                       {pieConfig.total}
                     </span>
                   </div>
