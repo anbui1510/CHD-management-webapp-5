@@ -35,6 +35,23 @@ function getOrCreateSheet(sheetName, headers) {
     headerRange.setFontWeight("bold");
     headerRange.setBackground("#E8F5E9"); // light green for Patients, or customize
     sheet.setFrozenRows(1);
+  } else {
+    var existingLastCol = Math.max(sheet.getLastColumn(), 1);
+    var existingHeaders = sheet.getRange(1, 1, 1, existingLastCol).getValues()[0];
+    var changed = false;
+    for (var h = 0; h < headers.length; h++) {
+      if (existingHeaders.indexOf(headers[h]) === -1) {
+        existingHeaders.push(headers[h]);
+        changed = true;
+      }
+    }
+    if (changed) {
+      sheet.getRange(1, 1, 1, existingHeaders.length).setValues([existingHeaders]);
+      var updatedHeaderRange = sheet.getRange(1, 1, 1, existingHeaders.length);
+      updatedHeaderRange.setFontWeight("bold");
+      updatedHeaderRange.setBackground("#E8F5E9");
+      sheet.setFrozenRows(1);
+    }
   }
   
   // Set number format of string columns to Plain Text to preserve leading zeros
@@ -63,10 +80,13 @@ function initializeDatabase() {
     "RequestBy", "DiagnosisID", "DetailDiagnosis", "Department", "ConsultCreateBy",
     "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote",
     "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy",
-    "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback",
+    "ConsultResultCreateTime", "ConsultResultUpdatedBy", "ConsultResultUpdatedTime",
+    "CheckDevice", "OperationFeedback", "SupplyDepFeedback",
     "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate",
-    "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist",
-    "Scheduled2ndInterventionist", "Scheduled3rdInterventionist"
+    "CheckDeviceBy", "CheckDeviceUpdatedTime", "CheckDeviceUpdatedBy", "CathMethod",
+    "PostCathDepart", "Scheduled1stInterventionist",
+    "Scheduled2ndInterventionist", "Scheduled3rdInterventionist", "TransferredToCathLab",
+    "Removed"
   ];
   
   var staffHeaders = [
@@ -144,8 +164,8 @@ function doGet(e) {
   if (staff.length === 0) {
     var staffSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Staff");
     if (staffSheet) {
-      staffSheet.appendRow(["01378", "BS Minh Tuấn (Admin)", "admin", "Admin", "tuan.nguyen@company.com", ""]);
-      staffSheet.appendRow(["11111", "BS Thu Hà (User)", "user", "User", "ha.thu@company.com", ""]);
+      staffSheet.appendRow(["01378", "BS Minh Tuấn (Admin)", "BS Minh Tuấn", "Nam", "", "", "", "", "", "admin", "Admin", "", "admin-khoa", "tuan.nguyen@company.com", ""]);
+      staffSheet.appendRow(["11111", "BS Thu Hà (User)", "BS Thu Hà", "Nữ", "", "", "", "", "", "user", "User", "", "tuy-chinh", "ha.thu@company.com", ""]);
       staff = readSheetAsJson("Staff");
     }
   }
