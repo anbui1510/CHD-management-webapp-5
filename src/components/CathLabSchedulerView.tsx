@@ -2164,7 +2164,7 @@ Xin cảm ơn!`;
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : (isAnyFilterExpanded ? 'hidden md:flex lg:col-span-6 xl:col-span-5' : 'lg:col-span-7 xl:col-span-7')}`}>
+        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : (isAnyFilterExpanded ? 'hidden md:flex lg:col-span-6' : 'lg:col-span-6')}`}>
           
           <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between gap-2">
             <div>
@@ -2422,7 +2422,7 @@ Xin cảm ơn!`;
         </div>
 
         {/* RIGHT COLUMN: Selection Detailed Form Editor OR Preview List */}
-        <div className={`flex flex-col rounded-3xl shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : (isAnyFilterExpanded ? 'lg:col-span-6 xl:col-span-7 bg-white border border-slate-200' : 'lg:col-span-5 xl:col-span-5 bg-white border border-[#e2e8f0]')}`}>
+        <div className={`flex flex-col rounded-3xl shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'}`}>
           {!isAnyFilterExpanded ? (
             <>
               {(!selectedConsult || pureCalendarMode) ? (
