@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
 import { VNDateInput } from './VNDateInput';
-import { SOURCE_PROVINCE, getDiagnosisOptions } from '../data/source';
+import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { 
   ClipboardList, 
@@ -195,12 +195,12 @@ export default function CathLabSchedulerView({
   onTogglePureMode
 }: CathLabSchedulerViewProps) {
   const diagnosisOptions = useMemo(
-    () => getDiagnosisOptions(sources, consults.map(consult => consult.DiagnosisID)),
-    [sources, consults]
+    () => getSourceDiagnosisOptions(sources),
+    [sources]
   );
 
   const createDiagnosisSource = async (DiagnosisID: string) => {
-    const trimmed = DiagnosisID.trim();
+    const trimmed = normalizeDiagnosisID(DiagnosisID);
     if (!trimmed) return;
 
     const response = await fetch('/api/sources', {
@@ -1627,7 +1627,7 @@ Xin cảm ơn!`;
       PatientHeight: adHocPatientHeight ? `${adHocPatientHeight} cm` : '',
       ConsultDate: adHocConsultDate,
       RequestBy: adHocRequestBy || 'system',
-      DiagnosisID: adHocDiagnosisID || 'CHƯA PHÂN LOẠI',
+      DiagnosisID: normalizeDiagnosisID(adHocDiagnosisID) || 'CHƯA PHÂN LOẠI',
       DetailDiagnosis: adHocDetailDiagnosis || 'Không có chẩn đoán chi tiết',
       Department: adHocDepartment,
       ConsultCreateBy: adHocRequestBy || 'system',
@@ -2784,7 +2784,7 @@ Xin cảm ơn!`;
                             <SearchableEnumSelect
                               options={diagnosisOptions}
                               value={schedDiagnosisID}
-                              onChange={setSchedDiagnosisID}
+                              onChange={(value) => setSchedDiagnosisID(normalizeDiagnosisID(value))}
                               allowCreate
                               createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
                               onCreateOption={createDiagnosisSource}
@@ -4356,7 +4356,7 @@ Xin cảm ơn!`;
                           </select>
                         ))}
                         {renderAdHocRow(`ICD chẩn đoán *${adHocErrors.includes('DiagnosisID') ? ' !' : ''}`, (
-                          <SearchableEnumSelect required options={diagnosisOptions} value={adHocDiagnosisID} onChange={setAdHocDiagnosisID} allowCreate createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`} onCreateOption={createDiagnosisSource} placeholder="— Chọn ICD —" searchPlaceholder="Gõ ICD..." />
+                          <SearchableEnumSelect required options={diagnosisOptions} value={adHocDiagnosisID} onChange={(value) => setAdHocDiagnosisID(normalizeDiagnosisID(value))} allowCreate createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`} onCreateOption={createDiagnosisSource} placeholder="— Chọn ICD —" searchPlaceholder="Gõ ICD..." />
                         ))}
                         {renderAdHocRow('Ưu tiên *', (
                           <select value={adHocPriorityOrder} onChange={(e) => setAdHocPriorityOrder(e.target.value as any)} className={`${adHocSelectCls} text-[#d2145a]`}>

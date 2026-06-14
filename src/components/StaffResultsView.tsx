@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Patient, Consult, Source, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
-import { getDiagnosisOptions } from '../data/source';
+import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 
 const conclusionOptions = [
   "Can thiệp thông tim",
@@ -100,12 +100,12 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
   const [successMsg, setSuccessMsg] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const diagnosisOptions = useMemo(
-    () => getDiagnosisOptions(sources, consults.map(consult => consult.DiagnosisID)),
-    [sources, consults]
+    () => getSourceDiagnosisOptions(sources),
+    [sources]
   );
 
   const createDiagnosisSource = async (DiagnosisID: string) => {
-    const trimmed = DiagnosisID.trim();
+    const trimmed = normalizeDiagnosisID(DiagnosisID);
     if (!trimmed) return;
 
     const response = await fetch('/api/sources', {

@@ -24,7 +24,7 @@ import {
   normalizePatientKey
 } from '../types';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
-import { getDiagnosisOptions } from '../data/source';
+import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import {
   DEFAULT_CMR_DEVICE,
   DEFAULT_CMR_METHOD,
@@ -160,12 +160,7 @@ export default function MRIRegisterView({
     return map;
   }, [patients]);
 
-  const diagnosisOptions = useMemo(() => {
-    return getDiagnosisOptions(sources, [
-      ...consults.map(consult => consult.DiagnosisID),
-      ...cmrs.map(cmr => cmr.CMRDiagnosisID || '')
-    ]);
-  }, [sources, consults, cmrs]);
+  const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
 
   const departmentOptions = useMemo(() => {
     return Array.from(new Set(

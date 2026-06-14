@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User } from 'lucide-react';
-import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getDiagnosisOptions } from '../data/source';
+import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
 
@@ -144,13 +144,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortAsc, setSortAsc] = useState(true);
-  const diagnosisOptions = useMemo(() => getDiagnosisOptions(sources, [
-    ...consults.map(consult => consult.DiagnosisID),
-    ...cathlabs.map(cathlab => cathlab.PostDiagnosisID)
-  ]), [sources, consults, cathlabs]);
+  const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
 
   const createDiagnosisSource = async (DiagnosisID: string) => {
-    const trimmed = DiagnosisID.trim();
+    const trimmed = normalizeDiagnosisID(DiagnosisID);
     if (!trimmed) return;
 
     const response = await fetch('/api/sources', {

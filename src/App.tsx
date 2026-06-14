@@ -48,7 +48,7 @@ import StaffAccountMenu from './components/StaffAccountMenu';
 import StaffProfileView from './components/StaffProfileView';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
-import { SOURCE_PROVINCE, getDiagnosisOptions } from './data/source';
+import { SOURCE_PROVINCE, getSourceDiagnosisOptions } from './data/source';
 import { AppModule, canAccessModule, canManageStaff, setRuntimeRolePresets } from './auth/permissions';
 
 import { 
@@ -198,11 +198,7 @@ export default function App() {
   const [sources, setSources] = useState<Source[]>([]);
   const [rolePresetRecords, setRolePresetRecords] = useState<RolePreset[]>([]);
 
-  const diagnosisOptions = useMemo(() => getDiagnosisOptions(sources, [
-    ...consults.map(consult => consult.DiagnosisID),
-    ...cathlabs.map(cathlab => cathlab.PostDiagnosisID),
-    ...cmrs.map(cmr => cmr.CMRDiagnosisID)
-  ]), [sources, consults, cathlabs, cmrs]);
+  const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
 
   // Fast Patients Cache map to optimize O(N*M) lookups down to O(M)
   const patientsMap = useMemo(() => {
