@@ -528,6 +528,13 @@ export default function HomeDashboard({
 
   const todayKey = formatDateToKey(new Date());
 
+  const weeklyScheduledCathCount = useMemo(() => {
+    const weekKeys = new Set(daysOfWeek.map(day => formatDateToKey(day)));
+    return eligibleWaitlist.filter(c =>
+      c.PlannedCathLabDate && weekKeys.has(getFormattedDateKey(c.PlannedCathLabDate))
+    ).length;
+  }, [eligibleWaitlist, referenceDate]);
+
   const getVNMonthDayStr = (date: Date) => {
     const dd = String(date.getDate()).padStart(2, '0');
     const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -905,7 +912,9 @@ export default function HomeDashboard({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 shrink-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <CalendarDays className="w-4 h-4 text-[#d2145a] shrink-0" />
-                  <span className="text-xs font-black text-slate-800 uppercase tracking-tight shrink-0">Lịch can thiệp dự kiến</span>
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-tight shrink-0">
+                    Lịch can thiệp dự kiến ({weeklyScheduledCathCount} ca)
+                  </span>
                   <span className="text-[10px] font-black text-[#d2145a] font-mono bg-pink-100/50 border border-pink-100 px-2 py-0.5 rounded-full shrink-0">
                     {getVNFullDateStr(daysOfWeek[0])} - {getVNFullDateStr(daysOfWeek[6])}
                   </span>
