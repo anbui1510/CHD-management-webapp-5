@@ -128,7 +128,7 @@ const isDateWithinRange = (dateValue: string | undefined, startDate: string, end
 const PIE_COLORS = ['#d2145a', '#7c3aed', '#0891b2', '#059669', '#f59e0b', '#2563eb', '#e11d48'];
 
 type PieMetric = 'diagnosis' | 'second_operator' | 'request_by';
-type PiePeriodMode = 'month' | 'quarter' | 'year';
+type PiePeriodMode = 'all' | 'month' | 'quarter' | 'year';
 
 interface PieSegment {
   label: string;
@@ -171,7 +171,7 @@ export default function HomeDashboard({
   const [isConfiguringChartMetric, setIsConfiguringChartMetric] = useState(false);
   const [pieMetric, setPieMetric] = useState<PieMetric>('diagnosis');
   const [hoveredPieSegment, setHoveredPieSegment] = useState<PieSegment | null>(null);
-  const [piePeriodMode, setPiePeriodMode] = useState<PiePeriodMode>('year');
+  const [piePeriodMode, setPiePeriodMode] = useState<PiePeriodMode>('all');
   const [pieFilterYear, setPieFilterYear] = useState<number>(() => {
     const year = new Date().getFullYear();
     return year || 2026;
@@ -396,6 +396,13 @@ export default function HomeDashboard({
   ).length;
 
   const piePeriodRange = useMemo(() => {
+    if (piePeriodMode === 'all') {
+      return {
+        start: '0000-01-01',
+        end: '9999-12-31',
+        label: 'Tất cả'
+      };
+    }
     if (piePeriodMode === 'month') {
       const month = String(pieFilterMonth).padStart(2, '0');
       const lastDay = new Date(pieFilterYear, pieFilterMonth, 0).getDate();
@@ -1115,9 +1122,10 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+              <div className="flex items-center justify-between gap-2 mb-1.5 -mt-1 shrink-0">
                 <div className="flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm">
                   {([
+                    ['all', 'Tất cả'],
                     ['month', 'Tháng'],
                     ['quarter', 'Quý'],
                     ['year', 'Năm']
@@ -1187,16 +1195,16 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 grid grid-cols-[190px_1fr] gap-3 items-center overflow-hidden">
-                <div className="relative w-[172px] h-[172px] mx-auto shrink-0" onMouseLeave={() => setHoveredPieSegment(null)}>
+              <div className="flex-1 min-h-0 grid grid-cols-[200px_1fr] gap-3 items-center overflow-hidden">
+                <div className="relative w-[176px] h-[176px] mx-auto shrink-0 -translate-y-2" onMouseLeave={() => setHoveredPieSegment(null)}>
                   {(() => {
-                    const radius = 42;
+                    const radius = 38;
                     const circumference = 2 * Math.PI * radius;
                     let cursor = 0;
                     return (
-                      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-sm">
+                      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-sm overflow-visible">
                         {pieConfig.segments.length === 0 ? (
-                          <circle cx="50" cy="50" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="14" />
+                          <circle cx="50" cy="50" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="12" />
                         ) : pieConfig.segments.map(segment => {
                           const dashLength = (segment.percent / 100) * circumference;
                           const dashOffset = -cursor;
@@ -1209,7 +1217,7 @@ export default function HomeDashboard({
                               r={radius}
                               fill="none"
                               stroke={segment.color}
-                              strokeWidth="14"
+                              strokeWidth="12"
                               strokeLinecap="butt"
                               strokeDasharray={`${dashLength} ${circumference - dashLength}`}
                               strokeDashoffset={dashOffset}
