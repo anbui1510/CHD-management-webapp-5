@@ -39,8 +39,8 @@
     "StaffPhone": "0348940432",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,patients,mri-register,cathlab-room,mri-calendar,surgery-schedule-view,schedule-view",
     "View": "Tái khám,\nTái khám,\nLịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nPhòng thông tim,\nPhòng thông tim,\nBN chờ thông tim,\nBN đã thông tim,\nLịch chụp MRI,\nBáo cáo,\nBáo cáo,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nĐăng ký ghép tim,\nĐăng ký ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nCông việc của tôi,\nTask tôi hỗ trợ,\nTask tôi giám sát,\nTask tôi quản lý,\nNhập kết quả staff,\nNhập kết quả staff,\nThống kê hội chẩn,\nThống kê hội chẩn,\nBáo cáo hội chẩn,\nBáo cáo hội chẩn,\nLịch tái khám, \nĐăng ký staff BS",
     "StaffCreateTime": "2022-09-14T12:30:02.000Z",
     "FireDate": "",
@@ -51,7 +51,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "01472",
@@ -93,8 +94,8 @@
     "StaffPhone": "0932051995",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,mri-register,mri-scheduler,mri-result,mri-calendar,patients,surgery-schedule-view,schedule-view",
     "View": "Đăng ký staff BS,\nLịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nLịch MRI dự kiến,\nXếp lịch MRI,\nXếp lịch MRI,\nChờ MRI tim,\nChờ MRI tim,\nLịch chụp MRI,\nLịch chụp MRI,\nNhập KQ MRI,\nNhập KQ MRI,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nTái khám,\nTái khám,\nQuản lý ghép tim,\nQuản lý ghép tim,\nĐăng ký ghép tim,\nĐăng ký ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nCông việc của tôi,\nTask tôi hỗ trợ,\nTask tôi giám sát,\nTask tôi quản lý,\nNhập kết quả staff,\nNhập kết quả staff,\nThống kê hội chẩn,\nThống kê hội chẩn,\nBáo cáo hội chẩn,\nBáo cáo hội chẩn,\nLịch tái khám",
     "StaffCreateTime": "2024-02-28T15:25:11.000Z",
     "FireDate": "",
@@ -105,7 +106,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "01541",
@@ -120,8 +122,8 @@
     "StaffPhone": "0929266273",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,schedule-tt,schedule-view,archive,patients,cathlab-room,mri-register,mri-calendar,surgery-schedule-view",
     "View": "Lịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nNhập kết quả staff,\nNhập kết quả staff,\nDS tái khám,\nDS tái khám,\nQuản lý tái khám,\nQuản lý tái khám,\nPhòng thông tim,\nPhòng thông tim,\nBN chờ thông tim,\nBN đã thông tim,\nLịch chụp MRI,\nLịch chụp MRI,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nTái khám,\nTái khám,\nĐăng ký ghép tim,\nĐăng ký ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nBáo cáo tổng hợp,\nBáo cáo tổng hợp,\nThống kê tổng hợp,\nThống kê tổng hợp,\nLịch tái khám,\nDS chờ staff,\nCheck dụng cụ,\nCheck dụng cụ,\nXếp lịch thông tim,\nXếp lịch thông tim,\nDanh sách chờ,\nLưu trữ,\nĐã chuyển phòng TT,\nChuẩn bị dụng cụ, \nChuẩn bị dụng cụ",
     "StaffCreateTime": "2024-03-10T02:24:28.000Z",
     "FireDate": "",
@@ -132,7 +134,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "00017",
@@ -255,8 +258,8 @@
     "StaffPhone": "0966897564",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,patients,consult-list,results-staff,schedule-view,cathlab-room,mri-calendar,mri-register,surgery-schedule-view",
     "View": "Lịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nNhập kết quả staff,\nNhập kết quả staff,\nDS tái khám,\nDS tái khám,\nQuản lý tái khám,\nQuản lý tái khám,\nPhòng thông tim,\nPhòng thông tim,\nBN chờ thông tim,\nBN đã thông tim,\nLịch chụp MRI,\nLịch chụp MRI,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nTái khám,\nTái khám,\nĐăng ký ghép tim,\nĐăng ký ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nBáo cáo tổng hợp,\nBáo cáo tổng hợp,\nThống kê tổng hợp,\nThống kê tổng hợp,\nLịch tái khám,\nDS chờ staff",
     "StaffCreateTime": "2024-03-19T16:46:15.000Z",
     "FireDate": "",
@@ -267,7 +270,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "01880",
@@ -336,8 +340,8 @@
     "StaffPhone": "0335811844",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "phong-tt",
+    "Permissions": "home,workspace,cathlab-room,schedule-view,patients",
     "View": "Lịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nPhòng thông tim,\nPhòng thông tim,\nBN chờ thông tim,\nBN đã thông tim,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nTái khám,\nTái khám,\nĐăng ký ghép tim,\nĐăng ký ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nCông việc của tôi,\nTask tôi hỗ trợ,\nTask tôi giám sát,\nTask tôi quản lý,\nThống kê hội chẩn,\nThống kê hội chẩn,\nBáo cáo hội chẩn,\nBáo cáo hội chẩn,\nLịch tái khám,\nNhập kết quả staff,\nNhập kết quả staff,",
     "StaffCreateTime": "2024-03-30T07:27:54.000Z",
     "FireDate": "",
@@ -348,7 +352,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "01375",
@@ -363,8 +368,8 @@
     "StaffPhone": "0936915636",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,cathlab-room,schedule-view,patients,surgery-schedule-view",
     "View": "Lịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nPhòng thông tim,\nPhòng thông tim,\nBN chờ thông tim,\nBN đã thông tim,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nTái khám,\nTái khám,\nĐăng ký ghép tim,\nĐăng ký ghép tim\nĐăng ký ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nCông việc của tôi,\nTask tôi hỗ trợ,\nTask tôi giám sát,\nTask tôi quản lý,\nBáo cáo tổng hợp,\nBáo cáo tổng hợp,\nThống kê tổng hợp,\nThống kê tổng hợp,\nLịch tái khám,\nNhập kết quả staff,\nNhập kết quả staff,",
     "StaffCreateTime": "2024-03-30T07:30:24.000Z",
     "FireDate": "",
@@ -375,7 +380,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "00597",
@@ -390,8 +396,8 @@
     "StaffPhone": "0933120490",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,patients,consult-list,cathlab-room,mri-register,schedule-view,surgery-schedule-view,mri-calendar",
     "View": "Lịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nPhòng thông tim,\nPhòng thông tim,\nBN chờ thông tim,\nBN đã thông tim,\nLịch chụp MRI,\nLịch chụp MRI,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nTái khám,\nTái khám,\nĐăng ký ghép tim,\nĐăng ký ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nCông việc của tôi,\nTask tôi hỗ trợ,\nTask tôi giám sát,\nTask tôi quản lý,\nThống kê hội chẩn,\nThống kê hội chẩn,\nBáo cáo hội chẩn,\nBáo cáo hội chẩn,\nLịch tái khám,\nNhập kết quả staff,\nNhập kết quả staff,",
     "StaffCreateTime": "2024-04-01T05:55:31.000Z",
     "FireDate": "",
@@ -402,7 +408,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "01234",
