@@ -36,7 +36,7 @@
   {
     "PatientAddress": "Lai Châu",
     "DiagnosisID": "PDA",
-    "ResultConsultID": "Tiền Glenn",
+    "ResultConsultID": "Chụp chẩn đoán +/- Can thiệp",
     "PriorityOrder": "YC",
     "CallingStatus": "Muốn theo dõi nơi khác",
     "Interventionist": "BS. Hiếu",
@@ -53,7 +53,7 @@
   {
     "PatientAddress": "Lào Cai",
     "DiagnosisID": "PS",
-    "ResultConsultID": "Tiền Fontan",
+    "ResultConsultID": "Tiền Glenn",
     "PriorityOrder": "Ngoại giao",
     "CallingStatus": "Chưa liên lạc được",
     "Interventionist": "BS. Tài",
@@ -70,7 +70,7 @@
   {
     "PatientAddress": "Thái Nguyên",
     "DiagnosisID": "AS",
-    "ResultConsultID": "Điện sinh lý",
+    "ResultConsultID": "Tiền Fontan",
     "PriorityOrder": "",
     "CallingStatus": "Đã làm nơi khác",
     "Interventionist": "BS. Ân",
@@ -87,7 +87,7 @@
   {
     "PatientAddress": "Điện Biên",
     "DiagnosisID": "APSO",
-    "ResultConsultID": "Mổ tim",
+    "ResultConsultID": "Điện sinh lý",
     "PriorityOrder": "",
     "CallingStatus": "Sai số điện thoại",
     "Interventionist": "BS. Hùng",
@@ -104,7 +104,7 @@
   {
     "PatientAddress": "Lạng Sơn",
     "DiagnosisID": "APSI",
-    "ResultConsultID": "Thêm CĐHA; vđ khác - Staff lại",
+    "ResultConsultID": "Mổ tim",
     "PriorityOrder": "",
     "CallingStatus": "",
     "Interventionist": "",
@@ -121,7 +121,7 @@
   {
     "PatientAddress": "Sơn La",
     "DiagnosisID": "CoA",
-    "ResultConsultID": "Chụp MRI",
+    "ResultConsultID": "Thêm CĐHA; vđ khác - Staff lại",
     "PriorityOrder": "",
     "CallingStatus": "",
     "Interventionist": "",
@@ -138,7 +138,7 @@
   {
     "PatientAddress": "Phú Thọ",
     "DiagnosisID": "Đứt đoạn cung ĐMC",
-    "ResultConsultID": "Chưa có chỉ định - Theo dõi tiếp",
+    "ResultConsultID": "Chụp MRI",
     "PriorityOrder": "",
     "CallingStatus": "",
     "Interventionist": "",
@@ -155,7 +155,7 @@
   {
     "PatientAddress": "Bắc Ninh",
     "DiagnosisID": "Dò vành",
-    "ResultConsultID": "Điều trị nội khoa - Hẹn staff lại",
+    "ResultConsultID": "Chưa có chỉ định - Theo dõi tiếp",
     "PriorityOrder": "",
     "CallingStatus": "",
     "Interventionist": "",
@@ -172,7 +172,7 @@
   {
     "PatientAddress": "Quảng Ninh",
     "DiagnosisID": "TOF",
-    "ResultConsultID": "Quá chỉ định",
+    "ResultConsultID": "Điều trị nội khoa - Hẹn staff lại",
     "PriorityOrder": "",
     "CallingStatus": "",
     "Interventionist": "",
@@ -189,7 +189,7 @@
   {
     "PatientAddress": "TP Hà Nội",
     "DiagnosisID": "TBS phức tạp khác",
-    "ResultConsultID": "Không có thông tin",
+    "ResultConsultID": "Quá chỉ định",
     "PriorityOrder": "",
     "CallingStatus": "",
     "Interventionist": "",
@@ -206,7 +206,7 @@
   {
     "PatientAddress": "TP Hải Phòng",
     "DiagnosisID": "AVSD",
-    "ResultConsultID": "",
+    "ResultConsultID": "Không có thông tin",
     "PriorityOrder": "",
     "CallingStatus": "",
     "Interventionist": "",
