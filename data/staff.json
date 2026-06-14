@@ -32,7 +32,7 @@
     "Name": "BS. Ân",
     "StaffSex": "Nam",
     "Avatar": "NV_Images/01378.Avatar.031012.jpg",
-    "StaffDOB": "15/10/1994",
+    "StaffDOB": "1994-10-15",
     "Deparment": "Nội Tim Mạch",
     "Career": "Bác sĩ",
     "Email": "anbui150@gmail.com",
@@ -51,8 +51,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "01472",
@@ -79,8 +78,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "01651",
@@ -107,8 +105,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "01541",
@@ -135,8 +132,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "00017",
@@ -190,8 +186,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "00039",
@@ -272,8 +267,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "01880",
@@ -300,8 +294,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "01429",
@@ -355,8 +348,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "01375",
@@ -383,8 +375,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "00597",
@@ -411,8 +402,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "01234",
@@ -574,8 +564,7 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": "",
-    "Department": ""
+    "View_Mode": ""
   },
   {
     "StaffKey": "00001",
