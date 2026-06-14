@@ -177,8 +177,8 @@
     "StaffPhone": "0779943261",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "dieu-phoi-tt",
+    "Permissions": "home,workspace,schedule-tt,schedule-view,archive,patients",
     "View": "",
     "StaffCreateTime": "2024-03-18T14:41:49.000Z",
     "FireDate": "",
@@ -189,7 +189,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "00039",
@@ -286,8 +287,8 @@
     "StaffPhone": "0374742658",
     "Password": "1111",
     "Role": "User",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,patients,consult-list,results-staff,schedule-view,mri-register,mri-calendar,surgery-schedule-view",
     "View": "Lịch tái khám,\nLịch tái khám,\nHồ sơ bệnh án,\nHồ sơ bệnh án,\nLịch thông dự kiến,\nLịch thông dự kiến,\nLịch chụp MRI,\nLịch chụp MRI,\nTái khám tuần này,\nĐã quá hạn,\nSắp tái khám,\nTái khám,\nTái khám,\nĐăng ký ghép tim,\nĐăng ký ghép tim,\nQuản lý ghép tim,\nQuản lý ghép tim,\nDự án của tôi,\nTôi quản lý,\nTôi hỗ trợ,\nTôi giám sát,\nCông việc của tôi,\nTask tôi hỗ trợ,\nTask tôi giám sát,\nTask tôi quản lý,\nNhập kết quả staff,\nNhập kết quả staff,\nThống kê hội chẩn,\nThống kê hội chẩn,\nBáo cáo hội chẩn,\nBáo cáo hội chẩn,\nLịch tái khám",
     "StaffCreateTime": "2024-03-29T15:35:40.000Z",
     "FireDate": "",
@@ -298,7 +299,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "01429",
@@ -559,8 +561,8 @@
     "StaffPhone": "",
     "Password": "1111",
     "Role": "Viewer\n",
-    "StaffRolePreset": "",
-    "Permissions": "",
+    "StaffRolePreset": "tuy-chinh",
+    "Permissions": "home,workspace,patients",
     "View": "",
     "StaffCreateTime": "",
     "FireDate": "",
@@ -571,7 +573,8 @@
     "Filter_Dept": "",
     "Filter_Doctor": "",
     "Filter_Result": "",
-    "View_Mode": ""
+    "View_Mode": "",
+    "Department": ""
   },
   {
     "StaffKey": "00001",
