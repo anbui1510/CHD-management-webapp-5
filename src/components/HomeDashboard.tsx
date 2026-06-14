@@ -674,7 +674,6 @@ export default function HomeDashboard({
             {/* Title & Total info */}
             <div className="flex flex-col justify-center shrink-0 pr-3 border-r border-[#f1f5f9] h-full w-[155px]">
               <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-tight flex items-center gap-1 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#d2145a] animate-pulse shrink-0"></span>
                 <span className="leading-tight whitespace-normal break-words">
                   {chartMetric === 'staff_consults'
                     ? 'Histogram ca hội chẩn'
