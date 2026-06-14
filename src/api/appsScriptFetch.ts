@@ -12,6 +12,7 @@ type SheetData = {
 type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'RolePreset';
 
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
+const viteEnv = (import.meta as any).env || {};
 const EMPTY_DATA: SheetData = {
   patients: [],
   consults: [],
@@ -37,7 +38,9 @@ const endpointMap: Record<string, { type: SheetType; collection: keyof SheetData
 let cache: SheetData | null = null;
 let pendingLoad: Promise<SheetData> | null = null;
 
-const getScriptUrl = () => localStorage.getItem(SCRIPT_URL_STORAGE_KEY) || '';
+const getScriptUrl = () =>
+  localStorage.getItem(SCRIPT_URL_STORAGE_KEY) ||
+  String(viteEnv.VITE_GOOGLE_SCRIPT_URL || '').trim();
 
 const isLocalHost = () => ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
 
