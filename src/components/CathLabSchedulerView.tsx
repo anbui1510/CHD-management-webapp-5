@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import { Patient, Consult, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
+import { Patient, Consult, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getDiagnosisOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -75,6 +75,10 @@ const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
 };
 
 type SchedulingFormSnapshot = {
+  diagnosisID: string;
+  detailDiagnosis: string;
+  consultResultID: string;
+  detailConsultResult: string;
   plannedDevice: string;
   plannedPrice: string;
   checkDevice: string;
@@ -148,12 +152,28 @@ const CALL_STATUS_OPTIONS = [
   "Loại"
 ];
 
-const PRIORITY_OPTIONS: ('Cấp cứu' | 'Chương trình' | 'YC' | 'Ngoại giao')[] = [
-  'Cấp cứu',
-  'Chương trình',
-  'YC',
-  'Ngoại giao'
+const CONCLUSION_OPTIONS = [
+  "Can thiệp thông tim",
+  "Chụp chẩn đoán-Đo kháng lực",
+  "Chụp chẩn đoán +/- can thiệp",
+  "Tiền Glenn",
+  "Tiền Fontan",
+  "Điện sinh lý",
+  "Mổ tim",
+  "Thêm CĐHA; vđ khác - Staff lại",
+  "Chụp MRI",
+  "Chưa có chỉ định - Theo dõi tiếp",
+  "Điều trị nội khoa - Hẹn staff lại",
+  "Quá chỉ định",
+  "Không có thông tin"
 ];
+
+const getPriorityBadgeClass = (priority: string) => {
+  const normalized = normalizePriorityOrder(priority);
+  if (normalized === 'Cấp cứu') return 'bg-rose-100 text-rose-850 border-rose-200';
+  if (normalized === 'Làm sớm') return 'bg-amber-100 text-amber-900 border-amber-200';
+  return 'bg-indigo-100 text-indigo-850 border-indigo-200';
+};
 
 export default function CathLabSchedulerView({
   patients,
@@ -201,7 +221,7 @@ export default function CathLabSchedulerView({
   };
   
   // Tab states for waitlist
-  const [activeTab, setActiveTab] = useState<'unscheduled' | 'scheduled'>('unscheduled');
+  const [activeTab, setActiveTab] = useState<'unscheduled' | 'scheduled' | 'all'>('unscheduled');
   
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
@@ -267,7 +287,11 @@ export default function CathLabSchedulerView({
   const [supplyDepFeedback, setSupplyDepFeedback] = useState('');
   const [callStatus, setCallStatus] = useState('');
   const [callNote, setCallNote] = useState('');
-  const [priorityOrder, setPriorityOrder] = useState<'Cấp cứu' | 'Chương trình' | 'YC' | 'Ngoại giao'>('Chương trình');
+  const [priorityOrder, setPriorityOrder] = useState<PriorityOrderEnum>('Chương trình');
+  const [schedDiagnosisID, setSchedDiagnosisID] = useState('');
+  const [schedDetailDiagnosis, setSchedDetailDiagnosis] = useState('');
+  const [schedConsultResultID, setSchedConsultResultID] = useState('');
+  const [schedDetailConsultResult, setSchedDetailConsultResult] = useState('');
   const [plannedCathLabDate, setPlannedCathLabDate] = useState('');
   const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
   const [postCathDepart, setPostCathDepart] = useState('');
@@ -307,7 +331,7 @@ export default function CathLabSchedulerView({
   const [adHocDetailDiagnosis, setAdHocDetailDiagnosis] = useState('');
   const [adHocDepartment, setAdHocDepartment] = useState('Tim Mạch');
   const [adHocConsultResultID, setAdHocConsultResultID] = useState<string>('Can thiệp thông tim');
-  const [adHocPriorityOrder, setAdHocPriorityOrder] = useState<'Cấp cứu' | 'Chương trình' | 'YC' | 'Ngoại giao'>('Chương trình');
+  const [adHocPriorityOrder, setAdHocPriorityOrder] = useState<PriorityOrderEnum>('Chương trình');
 
   const [adHocCheckDevice, setAdHocCheckDevice] = useState<'Đủ' | 'Thiếu' | ''>('');
   const [adHocPlannedDevice, setAdHocPlannedDevice] = useState('');
@@ -402,6 +426,10 @@ export default function CathLabSchedulerView({
     }
     const autoPtv2 = getAutoScheduled2nd(c.RequestBy || '');
     return {
+      diagnosisID: c.DiagnosisID || '',
+      detailDiagnosis: c.DetailDiagnosis || '',
+      consultResultID: c.ConsultResultID || '',
+      detailConsultResult: c.DetailConsultResult || '',
       plannedDevice: c.PlannedDevice || '',
       plannedPrice: c.PlannedPrice || '',
       checkDevice: c.CheckDevice || '',
@@ -409,7 +437,7 @@ export default function CathLabSchedulerView({
       supplyDepFeedback: c.SupplyDepFeedback || '',
       callStatus: c.CallStatus || '',
       callNote: c.CallNote || '',
-      priorityOrder: c.PriorityOrder || 'Chương trình',
+      priorityOrder: normalizePriorityOrder(c.PriorityOrder),
       plannedCathLabDate: c.PlannedCathLabDate ? getFormattedDateKey(c.PlannedCathLabDate) : '',
       selectedMethods: methods,
       postCathDepart: c.PostCathDepart || '',
@@ -604,7 +632,8 @@ Xin cảm ơn!`;
 
     return {
       unscheduled: sortedUnscheduled,
-      scheduled: sortedScheduled
+      scheduled: sortedScheduled,
+      all: [...sortedUnscheduled, ...sortedScheduled]
     };
   }, [allEligibleWaitlist]);
 
@@ -1229,7 +1258,11 @@ Xin cảm ơn!`;
 
   // Apply search and sort filtering on current active list tab
   const displayWaitlist = useMemo(() => {
-    const activeList = activeTab === 'unscheduled' ? segmentedWaitlist.unscheduled : segmentedWaitlist.scheduled;
+    const activeList = activeTab === 'unscheduled'
+      ? segmentedWaitlist.unscheduled
+      : activeTab === 'scheduled'
+        ? segmentedWaitlist.scheduled
+        : segmentedWaitlist.all;
     let result = activeList;
     
     const q = removeDiacritics(searchQuery).toLowerCase().trim();
@@ -1359,6 +1392,10 @@ Xin cảm ơn!`;
 
   // Setup form fields on consult selection
   const buildCurrentFormSnapshot = (): SchedulingFormSnapshot => ({
+    diagnosisID: schedDiagnosisID,
+    detailDiagnosis: schedDetailDiagnosis,
+    consultResultID: schedConsultResultID,
+    detailConsultResult: schedDetailConsultResult,
     plannedDevice,
     plannedPrice,
     checkDevice,
@@ -1422,6 +1459,10 @@ Xin cảm ơn!`;
 
   const applySelectConsult = (c: Consult) => {
     setSelectedConsult(c);
+    setSchedDiagnosisID(c.DiagnosisID || '');
+    setSchedDetailDiagnosis(c.DetailDiagnosis || '');
+    setSchedConsultResultID(c.ConsultResultID || '');
+    setSchedDetailConsultResult(c.DetailConsultResult || '');
     setPlannedDevice(c.PlannedDevice || '');
     setPlannedPrice(c.PlannedPrice || '');
     setCheckDevice(c.CheckDevice || '');
@@ -1429,7 +1470,7 @@ Xin cảm ơn!`;
     setSupplyDepFeedback(c.SupplyDepFeedback || '');
     setCallStatus(c.CallStatus || '');
     setCallNote(c.CallNote || '');
-    setPriorityOrder(c.PriorityOrder || 'Chương trình');
+    setPriorityOrder(normalizePriorityOrder(c.PriorityOrder));
     
     const formattedDate = c.PlannedCathLabDate ? getFormattedDateKey(c.PlannedCathLabDate) : '';
     setPlannedCathLabDate(formattedDate);
@@ -1512,11 +1553,10 @@ Xin cảm ơn!`;
 
     const pendingOverride = resolvePendingConsultForAdHoc();
     if (pendingOverride) {
-      const bnLabel = adHocPatientID1.trim() || adHocPatientName.trim() || 'BN';
       setActionConfirm({
         type: 'ad_hoc_override',
-        title: 'Lượt hội chẩn chờ kết luận',
-        message: `${bnLabel} có lượt hội chẩn đang chờ kết luận. Bạn có muốn tiếp tục? Hệ thống sẽ kích hoạt lượt hội chẩn hiện tại với kết luận "Can thiệp thông tim" và mở form Xếp lịch.`,
+        title: 'Tiếp tục xếp lịch',
+        message: 'Bệnh nhân này có lượt hội chẩn chờ kết luận. Bạn có muốn tiếp tục xếp lịch?',
         consultToUpdate: pendingOverride
       });
       return;
@@ -1681,6 +1721,10 @@ Xin cảm ơn!`;
   const getCurrentFormData = (): Partial<Consult> => {
     const finalScheduled2nd = scheduled2nd || getAutoScheduled2nd(selectedConsult?.RequestBy || '');
     return {
+      DiagnosisID: schedDiagnosisID,
+      DetailDiagnosis: schedDetailDiagnosis,
+      ConsultResultID: schedConsultResultID as Consult['ConsultResultID'],
+      DetailConsultResult: schedDetailConsultResult,
       PlannedDevice: plannedDevice,
       PlannedPrice: plannedPrice,
       CheckDevice: checkDevice,
@@ -1907,6 +1951,45 @@ Xin cảm ơn!`;
     return '';
   };
 
+  const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none focus:bg-white text-[11px] text-slate-800 min-h-[26px]';
+  const adHocSelectCls = `${adHocInputCls} font-bold`;
+  const adHocLabelCls = 'text-slate-500 font-bold text-[9px] uppercase shrink-0 leading-tight w-[9.5rem]';
+
+  const renderAdHocRow = (
+    label: string,
+    control: React.ReactNode,
+    opts?: { span?: 1 | 2 | 3; alignTop?: boolean; labelWidth?: string }
+  ) => (
+    <div
+      className={`flex gap-1.5 ${opts?.alignTop ? 'items-start' : 'items-center'} ${
+        opts?.span === 2 ? 'xl:col-span-2' : opts?.span === 3 ? 'xl:col-span-3' : ''
+      }`}
+    >
+      <label
+        className={`${adHocLabelCls} ${opts?.alignTop ? 'pt-1' : ''}`}
+        style={opts?.labelWidth ? { width: opts.labelWidth } : undefined}
+      >
+        {label}
+      </label>
+      <div className="flex-1 min-w-0">{control}</div>
+    </div>
+  );
+
+  const renderAdHocDatePicker = (value: string, onChange: (val: string) => void) => (
+    <div className="relative w-full">
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+      />
+      <div className={`${adHocInputCls} font-mono font-bold flex items-center justify-between`}>
+        <span>{value ? formatVNTime(value) : 'dd/mm/yyyy'}</span>
+        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+      </div>
+    </div>
+  );
+
   // Calendar rendering helper calculation list (Month View)
   const calendarCells = useMemo(() => {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
@@ -2032,7 +2115,7 @@ Xin cảm ơn!`;
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : (isAnyFilterExpanded ? 'hidden md:flex lg:col-span-5 xl:col-span-4' : 'lg:col-span-5 xl:col-span-5')}`}>
+        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : (isAnyFilterExpanded ? 'hidden md:flex lg:col-span-6 xl:col-span-5' : 'lg:col-span-7 xl:col-span-7')}`}>
           
           <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between gap-2">
             <div>
@@ -2063,18 +2146,18 @@ Xin cảm ơn!`;
             </button>
           </div>
 
-          {/* Subtabs for "Chưa xếp lịch" vs "Đã xếp lịch" with Count badges */}
+          {/* Subtabs for "Chưa xếp lịch" / "Đã xếp lịch" / "Tất cả" with Count badges */}
           <div className="px-4 py-2 bg-slate-50/75 border-b border-slate-150 flex gap-2 shrink-0">
             <button
               onClick={() => setActiveTab('unscheduled')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+              className={`flex-1 py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'unscheduled'
                   ? 'bg-[#d2145a] text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
               }`}
             >
               Chưa xếp lịch
-              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
                 activeTab === 'unscheduled' ? 'bg-pink-100 text-[#d2145a]' : 'bg-slate-100 text-slate-600'
               }`}>
                 {segmentedWaitlist.unscheduled.length}
@@ -2082,17 +2165,32 @@ Xin cảm ơn!`;
             </button>
             <button
               onClick={() => setActiveTab('scheduled')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+              className={`flex-1 py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'scheduled'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
               }`}
             >
               Đã xếp lịch
-              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
                 activeTab === 'scheduled' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
               }`}>
                 {segmentedWaitlist.scheduled.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`flex-1 py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                activeTab === 'all'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
+              }`}
+            >
+              Tất cả
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                activeTab === 'all' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {segmentedWaitlist.all.length}
               </span>
             </button>
           </div>
@@ -2141,6 +2239,7 @@ Xin cảm ơn!`;
                     )}
                     <th className="py-3 px-3 border-b border-slate-200">Họ và tên</th>
                     <th className="py-3 px-2 border-b border-slate-200">ICD</th>
+                    <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>
                     <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>
                     <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>
                     <th className="py-3 px-2 border-b border-slate-200 text-center">Lịch mổ dự kiến</th>
@@ -2191,6 +2290,11 @@ Xin cảm ơn!`;
                         <td className="py-3.5 px-2">
                           <span className="bg-slate-100 text-slate-800 font-extrabold px-1.5 py-0.5 rounded text-[9px] font-mono select-all">
                             {c.DiagnosisID || '—'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-2 text-center">
+                          <span className={`font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full inline-block border ${getPriorityBadgeClass(c.PriorityOrder || '')}`}>
+                            {normalizePriorityOrder(c.PriorityOrder)}
                           </span>
                         </td>
                         <td className="py-3.5 px-2 font-semibold text-slate-600">
@@ -2269,7 +2373,7 @@ Xin cảm ơn!`;
         </div>
 
         {/* RIGHT COLUMN: Selection Detailed Form Editor OR Preview List */}
-        <div className={`flex flex-col rounded-3xl shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : (isAnyFilterExpanded ? 'lg:col-span-7 xl:col-span-8 bg-white border border-slate-200' : 'lg:col-span-7 xl:col-span-7 bg-white border border-[#e2e8f0]')}`}>
+        <div className={`flex flex-col rounded-3xl shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : (isAnyFilterExpanded ? 'lg:col-span-6 xl:col-span-7 bg-white border border-slate-200' : 'lg:col-span-5 xl:col-span-5 bg-white border border-[#e2e8f0]')}`}>
           {!isAnyFilterExpanded ? (
             <>
               {(!selectedConsult || pureCalendarMode) ? (
@@ -2596,6 +2700,10 @@ Xin cảm ơn!`;
                           {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
                         </span>
                       </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                        {/* Cột trái: hành chính, đăng ký HC, kết quả HC */}
+                        <div className="space-y-4">
                       
                       {/* Part 1: Administrative Details */}
                       <div className="bg-white border border-slate-150 p-3.5 rounded-2xl shadow-xs">
@@ -2659,40 +2767,84 @@ Xin cảm ơn!`;
                         </div>
                       </div>
 
-                      {/* Part 3: Findings/Audit of consultation results */}
-                      <div className="bg-indigo-50/60 border border-indigo-120 p-3.5 rounded-2xl flex flex-col gap-1.5 text-[11px] shadow-xs">
+                      {/* Part 3: Kết quả Hội chẩn — có thể chỉnh sửa */}
+                      <div className="bg-indigo-50/60 border border-indigo-120 p-3.5 rounded-2xl flex flex-col gap-2 text-[11px] shadow-xs">
                         <span className="text-indigo-900 font-black uppercase text-[10px] tracking-wider block border-b border-indigo-100 pb-1.5 mb-1">
                           Kết quả Hội chẩn
                         </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div className="grid grid-cols-1 gap-2.5">
                           <div>
-                            <span className="text-slate-400 font-bold text-[8px] uppercase">ICD (DiagnosisID):</span>
-                            <span className="font-extrabold text-indigo-950 font-mono block select-all text-sm mt-0.5">{selectedConsult.DiagnosisID || '—'}</span>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">ICD (DiagnosisID)</label>
+                            <SearchableEnumSelect
+                              options={diagnosisOptions}
+                              value={schedDiagnosisID}
+                              onChange={setSchedDiagnosisID}
+                              allowCreate
+                              createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                              onCreateOption={createDiagnosisSource}
+                              placeholder="— Chọn ICD —"
+                              searchPlaceholder="Gõ ICD..."
+                            />
                           </div>
                           <div>
-                            <span className="text-slate-400 font-bold text-[8px] uppercase">Kết luận chính (ConsultResultID):</span>
-                            <span className="font-extrabold text-[#d2145a] block uppercase text-[11px] mt-0.5">{selectedConsult.ConsultResultID || '—'}</span>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Kết luận chính (ConsultResultID)</label>
+                            <SearchableEnumSelect
+                              options={CONCLUSION_OPTIONS}
+                              value={schedConsultResultID}
+                              onChange={setSchedConsultResultID}
+                              placeholder="— Chọn kết luận —"
+                              searchPlaceholder="Gõ tìm kết luận..."
+                            />
                           </div>
-                          <div className="sm:col-span-2">
-                            <span className="text-slate-400 font-bold block text-[8px] uppercase mb-0.5">Chẩn đoán chi tiết:</span>
-                            <p className="bg-white p-2.5 rounded-xl border border-indigo-100 leading-relaxed font-semibold text-slate-700 text-[10.5px]">
-                              {selectedConsult.DetailDiagnosis || '—'}
-                            </p>
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Ưu tiên (PriorityOrder)</label>
+                            <div className="flex gap-1.5">
+                              {PRIORITY_OPTIONS.map((opt) => {
+                                const isSel = priorityOrder === opt;
+                                return (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => setPriorityOrder(opt)}
+                                    className={`flex-1 py-1 px-1.5 rounded-xl border text-[10px] font-bold transition text-center cursor-pointer ${
+                                      isSel
+                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs font-extrabold ring-1 ring-indigo-400'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="sm:col-span-2">
-                            <span className="text-slate-400 font-bold block text-[8px] uppercase mb-0.5">Kết quả Hội chẩn chi tiết:</span>
-                            <p className="bg-white p-2.5 rounded-xl border border-indigo-100 leading-relaxed font-semibold text-slate-700 text-[10.5px]">
-                              {selectedConsult.DetailConsultResult || '—'}
-                            </p>
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Chẩn đoán chi tiết</label>
+                            <textarea
+                              rows={2.5}
+                              value={schedDetailDiagnosis}
+                              onChange={(e) => setSchedDetailDiagnosis(e.target.value)}
+                              placeholder="Nhập chẩn đoán chi tiết..."
+                              className="w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-[10.5px] text-slate-700 leading-relaxed resize-y"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Kết quả Hội chẩn chi tiết</label>
+                            <textarea
+                              rows={2.5}
+                              value={schedDetailConsultResult}
+                              onChange={(e) => setSchedDetailConsultResult(e.target.value)}
+                              placeholder="Nhập kết quả hội chẩn chi tiết..."
+                              className="w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-[10.5px] text-slate-700 leading-relaxed resize-y"
+                            />
                           </div>
                         </div>
                       </div>
 
-                    </div>
-                  );
-                })()}
+                        </div>
 
-                {/* Part 4: CHUẨN BỊ DỤNG CỤ */}
+                        {/* Cột phải: chuẩn bị dụng cụ, xếp lịch */}
+                        <div className="space-y-4">
                 <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs space-y-4">
                   <span className="font-extrabold text-[#d2145a] text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1.5">
                     CHUẨN BỊ DỤNG CỤ
@@ -2850,30 +3002,6 @@ Xin cảm ơn!`;
                       {/* Show scheduling controls ONLY if callStatus === 'Đồng ý' */}
                       {callStatus === 'Đồng ý' && (
                         <>
-                          {/* Priority Order - Enum toggle buttons */}
-                          <div className="md:col-span-2">
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Thứ tự ưu tiên *</label>
-                            <div className="flex gap-2">
-                              {PRIORITY_OPTIONS.map((opt) => {
-                                const isSel = priorityOrder === opt;
-                                return (
-                                  <button
-                                    key={opt}
-                                    type="button"
-                                    onClick={() => setPriorityOrder(opt)}
-                                    className={`flex-1 py-1 px-2 rounded-xl border text-[10px] font-bold transition text-center cursor-pointer ${
-                                      isSel 
-                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs font-extrabold ring-1 ring-indigo-400' 
-                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                    }`}
-                                  >
-                                    {opt}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-
                           {/* Planned Cath Date (type="date") */}
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Ngày thông dự kiến</label>
@@ -2994,6 +3122,12 @@ Xin cảm ơn!`;
                     </div>
                   </div>
                 )}
+
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Inline Errors & Successes inside details view */}
                 {errorMsg && (
@@ -4020,14 +4154,14 @@ Xin cảm ơn!`;
 
       {/* AD-HOC SCHEDULING MODAL (XẾP BỔ SUNG) */}
       {showAdHocModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-2 overflow-hidden animate-in fade-in duration-200">
-          <div className="bg-slate-50 rounded-3xl shadow-2xl border border-slate-205 w-full max-w-[1280px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[98vh]">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-1.5 overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-slate-50 rounded-2xl shadow-2xl border border-slate-205 w-full max-w-[min(1500px,98vw)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[90vh]">
             
             {/* Modal Header */}
-            <div className="py-2.5 px-4 bg-indigo-900 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-2.5">
-                <Plus className="w-5 h-5 text-indigo-300 shrink-0 bg-indigo-950 p-1.5 rounded-lg" />
-                <h3 className="font-extrabold text-[12px] uppercase tracking-wider">Đăng ký xếp lịch thông tim bổ sung</h3>
+            <div className="py-1.5 px-3 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2">
+                <Plus className="w-4 h-4 text-indigo-300 shrink-0" />
+                <h3 className="font-extrabold text-[11px] uppercase tracking-wider">Đăng ký xếp lịch thông tim bổ sung</h3>
               </div>
               <button 
                 onClick={() => {
@@ -4041,48 +4175,40 @@ Xin cảm ơn!`;
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveAdHoc} className="flex-1 flex flex-col overflow-hidden" noValidate>
+            <form onSubmit={handleSaveAdHoc} className="flex-1 flex flex-col min-h-0 overflow-hidden" noValidate>
               
-              <div className="p-2.5 lg:p-3 overflow-visible flex-1">
+              <div className="p-2 overflow-y-auto flex-1 min-h-0">
                 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 lg:gap-3 items-start">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-2 items-start">
                   
-                  {/* LEFT COLUMN: 1. ĐĂNG KÝ STAFF & BỆNH NHI */}
-                  <div className="space-y-2.5">
-                    <div className="bg-white border border-slate-200 rounded-2xl p-2.5 md:p-3 space-y-2.5 shadow-sm">
-                      <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
-                        <span className="text-[11.5px] font-black uppercase text-indigo-800 tracking-wider flex items-center gap-1.5">
+                  {/* COLUMN 1: ĐĂNG KÝ BỆNH NHÂN */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1.5 shadow-sm">
+                      <div className="border-b border-slate-100 pb-1 flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider">
                           1. Đăng ký bệnh nhân
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdHocPatientMode('new');
+                            handleClearSelectedPatient();
+                            setAdHocPendingConsult(null);
+                          }}
+                          className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-2 py-0.5 rounded-lg text-[9px] transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" /> Mới
+                        </button>
                       </div>
 
-                         <div className="flex items-center justify-between mb-3">
-                            <label className="block text-[#d2145a] font-extrabold uppercase text-[10px]">
-                              Chọn Bệnh nhi cần đăng ký *
-                            </label>
-                            <button
-                               type="button"
-                               onClick={() => {
-                                 setAdHocPatientMode('new');
-                                 handleClearSelectedPatient();
-                                 setAdHocPendingConsult(null);
-                               }} 
-                               className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-3 py-1 rounded-lg text-[10px] transition flex items-center gap-1 cursor-pointer"
-                            >
-                               <Plus className="w-3 h-3" /> Mới
-                            </button>
-                         </div>
-
-                         {/* Search Bar / Selected summary */}
-                         {adHocPatientMode === 'existing' && !adHocSelectedPatientKey && (
-                            <div className="relative">
-                              <input
-                                type="text"
-                                placeholder="🔍 Nhập tên hoặc mã ID1 của bệnh nhi..."
-                                value={adHocSearchQuery}
-                                onChange={(e) => setAdHocSearchQuery(e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none placeholder-slate-400 font-semibold"
-                              />
+                      {adHocPatientMode === 'existing' && !adHocSelectedPatientKey && (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="🔍 Tên hoặc mã ID1..."
+                            value={adHocSearchQuery}
+                            onChange={(e) => setAdHocSearchQuery(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] focus:outline-none placeholder-slate-400 font-semibold"
+                          />
 
                               {/* Search Dropdown Result List */}
                               {adHocSearchQuery.trim() && filteredSearchPatients.length > 0 && (
@@ -4111,345 +4237,131 @@ Xin cảm ơn!`;
                             </div>
                          )}
 
-                         {/* Selected Patient details complex card */}
                          {adHocPatientMode === 'existing' && adHocSelectedPatientKey && (
-                            <div className="bg-pink-50/70 border border-pink-100 rounded-2xl p-4 text-xs text-slate-800 relative shadow-sm mt-2">
+                            <div className="bg-pink-50/70 border border-pink-100 rounded-lg p-2 text-[11px] text-slate-800 relative">
                               <button
                                 onClick={handleClearSelectedPatient}
-                                className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 p-1.5 rounded-full transition cursor-pointer"
+                                className="absolute top-1.5 right-1.5 text-slate-400 hover:text-slate-600 p-1 rounded-full transition cursor-pointer"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-3.5 h-3.5" />
                               </button>
-                              
-                              <div className="flex items-start justify-between">
-                                <div className="space-y-2 w-full">
-                                  <h4 className="font-black text-sm uppercase text-[#d2145a] flex items-center gap-2">
-                                    <span>👤 {adHocPatientName}</span>
-                                    <span className="bg-white border border-pink-200 text-[#d2145a] text-[10px] px-2 py-0.5 rounded-full font-mono normal-case">{adHocPatientSex}</span>
-                                  </h4>
-                                  
-                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2.5">
-                                    <div>
-                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Mã ID1:</span>
-                                      <span className="font-mono text-[11px] font-bold text-slate-800">{adHocPatientID1}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Mã ID2:</span>
-                                      <span className="font-mono text-[11px] font-bold text-slate-800">{adHocPatientID2 || '—'}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Ngày sinh:</span>
-                                      <span className="font-bold text-slate-800 font-mono">{adHocPatientDOB ? adHocPatientDOB.split('-').reverse().join('/') : ''}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">SĐT liên hệ:</span>
-                                      <span className="font-bold text-slate-800 font-mono">{adHocPatientPhone1 || adHocPatientPhone2 || '—'}</span>
-                                    </div>
-                                    <div className="col-span-2">
-                                      <span className="font-extrabold text-slate-400 uppercase text-[9px] block">Địa chỉ thường trú:</span>
-                                      <span className="font-bold text-slate-800">{adHocPatientAddress || '—'}</span>
-                                    </div>
-                                  </div>
-                                </div>
+                              <p className="font-black text-[11px] uppercase text-[#d2145a] pr-6 leading-tight">
+                                {adHocPatientName} <span className="text-[9px] font-mono normal-case text-slate-500">({adHocPatientSex})</span>
+                              </p>
+                              <div className="mt-1 space-y-0.5 text-[10px]">
+                                <p><span className="text-slate-400 font-bold">ID1:</span> <span className="font-mono font-bold">{adHocPatientID1}</span> {adHocPatientID2 && <><span className="text-slate-400 font-bold ml-1">ID2:</span> <span className="font-mono">{adHocPatientID2}</span></>}</p>
+                                <p><span className="text-slate-400 font-bold">NS:</span> <span className="font-mono">{adHocPatientDOB ? adHocPatientDOB.split('-').reverse().join('/') : ''}</span> <span className="text-slate-400 font-bold ml-1">SĐT:</span> <span className="font-mono">{adHocPatientPhone1 || adHocPatientPhone2 || '—'}</span></p>
+                                <p className="truncate" title={adHocPatientAddress}><span className="text-slate-400 font-bold">ĐC:</span> {adHocPatientAddress || '—'}</p>
                               </div>
                             </div>
                          )}
 
                          {adHocPendingConsult && (
-                            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
-                              <p className="font-extrabold uppercase tracking-wide">Lượt hội chẩn chờ kết luận</p>
-                              <p className="mt-1 font-semibold">
-                                BN có lượt hội chẩn (mã {adHocPendingConsult.ConsultKey}) đang chờ kết luận staff.
-                                Nhấn &quot;Lưu kết quả xếp lịch&quot; để kích hoạt và mở form Xếp lịch — không tạo bản ghi trùng.
-                              </p>
+                            <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-900 leading-snug font-semibold">
+                              Bệnh nhân này có lượt hội chẩn chờ kết luận. Bạn có muốn tiếp tục xếp lịch?
                             </div>
                          )}
 
-                         {/* Demographics Area */}
                          {adHocPatientMode === 'new' && (
-                           <div className="mt-2 space-y-3">
-                              <div className="flex justify-between items-center bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
-                                 <span className="text-rose-600 font-bold text-[11px] uppercase">📝 Tạo Bệnh Nhi Mới</span>
-                                 <button 
-                                    type="button" 
-                                    className="text-xs font-bold text-slate-500 hover:text-slate-700 underline cursor-pointer" 
-                                    onClick={() => setAdHocPatientMode('existing')}
-                                 >
+                           <div className="space-y-1">
+                              <div className="flex justify-between items-center bg-rose-50 px-2 py-1 rounded-lg border border-rose-100">
+                                 <span className="text-rose-600 font-bold text-[10px] uppercase">Tạo bệnh nhi mới</span>
+                                 <button type="button" className="text-[10px] font-bold text-slate-500 hover:text-slate-700 underline cursor-pointer" onClick={() => setAdHocPatientMode('existing')}>
                                     Quay lại tìm kiếm
                                  </button>
                                </div>
-                              <div className="border-t border-slate-100 pt-3.5 space-y-3.5 animate-in fade-in slide-in-from-top-2">
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                                Mã bệnh nhân *
-                                {adHocErrors.includes('PatientID1') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                              </label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="Nhập mã NB / ID1..."
-                                value={adHocPatientID1}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setAdHocPatientID1(val);
-                                  const dup = patients.find(
-                                    p => String(p.PatientID1 || '').trim().toLowerCase() === val.trim().toLowerCase()
-                                  );
-                                  setAdHocPendingConsult(dup ? getPendingConsultForPatient(dup.PatientKey) || null : null);
-                                }}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                                Họ và tên bệnh nhi *
-                                {adHocErrors.includes('PatientName') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                              </label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="Nhập họ và tên đầy đủ..."
-                                value={adHocPatientName}
-                                onChange={(e) => setAdHocPatientName(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-850 font-black"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                                Ngày sinh *
-                                {adHocErrors.includes('PatientDOB') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                              </label>
-                              <VNDateInput
-                                required
-                                value={adHocPatientDOB}
-                                onChange={(val) => setAdHocPatientDOB(val)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-mono font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Giới tính *</label>
-                              <div className="flex gap-1.5">
-                                {(['Nam', 'Nữ'] as const).map((gender) => {
-                                  const active = adHocPatientSex === gender;
-                                  return (
-                                    <button
-                                      key={gender}
-                                      type="button"
-                                      onClick={() => setAdHocPatientSex(gender)}
-                                      className={`flex-1 py-1.5 rounded-xl border text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                        active 
-                                          ? 'bg-indigo-50 border-indigo-300 text-indigo-800 font-extrabold' 
-                                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                                      }`}
-                                    >
-                                      <span>{gender}</span>
-                                    </button>
-                                  );
-                                })}
+                              <div className="grid grid-cols-1 gap-1">
+                                {renderAdHocRow(`Mã BN *${adHocErrors.includes('PatientID1') ? ' !' : ''}`, (
+                                  <input type="text" required placeholder="ID1..." value={adHocPatientID1} onChange={(e) => { const val = e.target.value; setAdHocPatientID1(val); const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === val.trim().toLowerCase()); setAdHocPendingConsult(dup ? getPendingConsultForPatient(dup.PatientKey) || null : null); }} className={`${adHocInputCls} font-bold`} />
+                                ))}
+                                {renderAdHocRow(`Họ tên *${adHocErrors.includes('PatientName') ? ' !' : ''}`, (
+                                  <input type="text" required placeholder="Họ tên..." value={adHocPatientName} onChange={(e) => setAdHocPatientName(e.target.value)} className={`${adHocInputCls} font-black`} />
+                                ))}
+                                {renderAdHocRow(`Ngày sinh *${adHocErrors.includes('PatientDOB') ? ' !' : ''}`, (
+                                  <VNDateInput required value={adHocPatientDOB} onChange={(val) => setAdHocPatientDOB(val)} className={`${adHocInputCls} font-mono font-bold`} />
+                                ))}
+                                {renderAdHocRow('Giới tính *', (
+                                  <div className="flex gap-1">
+                                    {(['Nam', 'Nữ'] as const).map((gender) => (
+                                      <button key={gender} type="button" onClick={() => setAdHocPatientSex(gender)} className={`flex-1 py-0.5 rounded-lg border text-[10px] font-bold cursor-pointer ${adHocPatientSex === gender ? 'bg-indigo-50 border-indigo-300 text-indigo-800' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{gender}</button>
+                                    ))}
+                                  </div>
+                                ))}
+                                {renderAdHocRow(`Địa chỉ *${adHocErrors.includes('PatientAddress') ? ' !' : ''}`, (
+                                  <SearchableEnumSelect required options={SOURCE_PROVINCE} value={adHocPatientAddress} onChange={setAdHocPatientAddress} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." />
+                                ))}
+                                {renderAdHocRow('SĐT 1', (
+                                  <input type="text" placeholder="ĐT..." value={adHocPatientPhone1} onChange={(e) => setAdHocPatientPhone1(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />
+                                ))}
+                                {renderAdHocRow('SĐT 2', (
+                                  <input type="text" placeholder="ĐT phụ..." value={adHocPatientPhone2} onChange={(e) => setAdHocPatientPhone2(e.target.value)} className={`${adHocInputCls} font-mono`} />
+                                ))}
                               </div>
-                            </div>
-                            <div className="col-span-2">
-                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                                Địa chỉ thường trú *
-                                {adHocErrors.includes('PatientAddress') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                              </label>
-                              <SearchableEnumSelect
-                                required
-                                options={SOURCE_PROVINCE}
-                                value={adHocPatientAddress}
-                                onChange={setAdHocPatientAddress}
-                                placeholder="-- Chọn tỉnh/thành --"
-                                searchPlaceholder="Gõ tỉnh/thành để tìm..."
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                                Số ĐT 1
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="ĐT liên lạc..."
-                                value={adHocPatientPhone1}
-                                onChange={(e) => setAdHocPatientPhone1(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-mono font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Số ĐT 2</label>
-                              <input
-                                type="text"
-                                placeholder="ĐT phụ (nếu có)..."
-                                value={adHocPatientPhone2}
-                                onChange={(e) => setAdHocPatientPhone2(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-mono"
-                              />
-                            </div>
-                          </div>
-                         </div>
-                        </div>
+                           </div>
                        )}
                     </div>
 
-                    <div className="bg-white border border-slate-200 rounded-2xl p-2.5 md:p-3 space-y-2.5 shadow-sm">
-                      <div className="border-b border-slate-100 pb-2">
-                        <span className="text-[11.5px] font-black uppercase text-[#d2145a] tracking-wider">
-                          2. THÔNG TIN HỘI CHẨN
+                  {/* COLUMN 2: THÔNG TIN HỘI CHẨN */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1 shadow-sm">
+                      <div className="border-b border-slate-100 pb-1">
+                        <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-wider">
+                          2. Thông tin hội chẩn
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 pt-1">
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">KIỂU STAFF *</label>
-                            <div className="flex gap-1.5">
-                              {(['Staff thông', 'Staff mổ'] as const).map((type) => {
-                                const active = adHocConsultType === type;
-                                return (
-                                  <button
-                                    key={type}
-                                    type="button"
-                                    onClick={() => setAdHocConsultType(type)}
-                                    className={`flex-1 py-1.5 rounded-xl border text-[10.5px] font-bold transition flex items-center justify-center cursor-pointer ${
-                                      active 
-                                        ? 'bg-[#d2145a] border-[#d2145a] text-white font-extrabold' 
-                                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                                    }`}
-                                  >
-                                    <span>{type}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                      <div className="grid grid-cols-1 gap-1 pt-0.5">
+                        {renderAdHocRow('Kiểu staff *', (
+                          <div className="flex gap-1">
+                            {(['Staff thông', 'Staff mổ'] as const).map((type) => {
+                              const active = adHocConsultType === type;
+                              return (
+                                <button
+                                  key={type}
+                                  type="button"
+                                  onClick={() => setAdHocConsultType(type)}
+                                  className={`flex-1 py-0.5 rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                                    active ? 'bg-[#d2145a] border-[#d2145a] text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                  }`}
+                                >
+                                  {type}
+                                </button>
+                              );
+                            })}
                           </div>
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                              NGÀY HỘI CHẨN *
-                              {adHocErrors.includes('ConsultDate') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                            </label>
-                            <div className="relative w-full">
-                              <input
-                                type="date"
-                                required
-                                value={adHocConsultDate}
-                                onChange={(e) => setAdHocConsultDate(e.target.value)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                              />
-                              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-mono font-bold flex items-center justify-between">
-                                <span>{adHocConsultDate ? formatVNTime(adHocConsultDate) : 'dd/mm/yyyy'}</span>
-                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                              </div>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                              CÂN NẶNG (KG) *
-                              {adHocErrors.includes('PatientWeight') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              placeholder="Ví dụ: 12.5..."
-                              value={adHocPatientWeight}
-                              onChange={(e) => setAdHocPatientWeight(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">CHIỀU CAO (CM)</label>
-                            <input
-                              type="text"
-                              placeholder="Ví dụ: 95..."
-                              value={adHocPatientHeight}
-                              onChange={(e) => setAdHocPatientHeight(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                              BS ĐĂNG KÝ *
-                              {adHocErrors.includes('RequestBy') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                            </label>
-                            <select
-                              required
-                              value={adHocRequestBy}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setAdHocRequestBy(val);
-                                setAdHocScheduled2nd(getAutoScheduled2nd(val));
-                              }}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
-                            >
-                              <option value="">— Hãy chọn bác sĩ —</option>
-                              {staffList.filter(s => !s.FireDate).map((st) => (
-                                <option key={st.StaffKey} value={formatShortDoctorName(st.StaffName)}>{formatShortDoctorName(st.StaffName)}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">KHOA NỘI TRÚ *</label>
-                            <select
-                              value={adHocDepartment}
-                              onChange={(e) => setAdHocDepartment(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
-                            >
-                              {DEPARTMENTS_LIST.map((dept) => (
-                                <option key={dept} value={dept}>{dept}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                        {/* Additional fields moved from section 2 */}
-                        <div className="col-span-2 border-t border-slate-100 pt-3 opacity-0 my-[-6px]"></div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                            ICD CHẨN ĐOÁN CHÍNH *
-                            {adHocErrors.includes('DiagnosisID') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                          </label>
-                          <SearchableEnumSelect
-                            required
-                            options={diagnosisOptions}
-                            value={adHocDiagnosisID}
-                            onChange={setAdHocDiagnosisID}
-                            allowCreate
-                            createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
-                            onCreateOption={createDiagnosisSource}
-                            placeholder="— Chọn mã ICD —"
-                            searchPlaceholder="Gõ ICD để tìm..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">ƯU TIÊN *</label>
-                          <select
-                            value={adHocPriorityOrder}
-                            onChange={(e) => setAdHocPriorityOrder(e.target.value as any)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-[#d2145a] font-extrabold"
-                          >
-                            {PRIORITY_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                        {renderAdHocRow(`Ngày hội chẩn *${adHocErrors.includes('ConsultDate') ? ' !' : ''}`, renderAdHocDatePicker(adHocConsultDate, setAdHocConsultDate))}
+                        {renderAdHocRow(`Cân nặng (kg) *${adHocErrors.includes('PatientWeight') ? ' !' : ''}`, (
+                          <input type="text" required placeholder="12.5" value={adHocPatientWeight} onChange={(e) => setAdHocPatientWeight(e.target.value)} className={`${adHocInputCls} font-bold`} />
+                        ))}
+                        {renderAdHocRow('Chiều cao (cm)', (
+                          <input type="text" placeholder="95" value={adHocPatientHeight} onChange={(e) => setAdHocPatientHeight(e.target.value)} className={adHocInputCls} />
+                        ))}
+                        {renderAdHocRow(`BS đăng ký *${adHocErrors.includes('RequestBy') ? ' !' : ''}`, (
+                          <select required value={adHocRequestBy} onChange={(e) => { const val = e.target.value; setAdHocRequestBy(val); setAdHocScheduled2nd(getAutoScheduled2nd(val)); }} className={adHocSelectCls}>
+                            <option value="">— Chọn BS —</option>
+                            {staffList.filter(s => !s.FireDate).map((st) => (
+                              <option key={st.StaffKey} value={formatShortDoctorName(st.StaffName)}>{formatShortDoctorName(st.StaffName)}</option>
                             ))}
                           </select>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                            CHẨN ĐOÁN CHI TIẾT *
-                            {adHocErrors.includes('DetailDiagnosis') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                          </label>
-                          <textarea
-                            rows={1.5}
-                            required
-                            placeholder="Nhập thông tin chẩn đoán chính, tình trạng bệnh lý mạch, van tim, shunt..."
-                            value={adHocDetailDiagnosis}
-                            onChange={(e) => setAdHocDetailDiagnosis(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1 font-black">NGUY CƠ</label>
-                          <select
-                            value={adHocRiskFactor}
-                            onChange={(e) => setAdHocRiskFactor(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-semibold"
-                          >
+                        ))}
+                        {renderAdHocRow('Khoa nội trú *', (
+                          <select value={adHocDepartment} onChange={(e) => setAdHocDepartment(e.target.value)} className={adHocSelectCls}>
+                            {DEPARTMENTS_LIST.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
+                          </select>
+                        ))}
+                        {renderAdHocRow(`ICD chẩn đoán *${adHocErrors.includes('DiagnosisID') ? ' !' : ''}`, (
+                          <SearchableEnumSelect required options={diagnosisOptions} value={adHocDiagnosisID} onChange={setAdHocDiagnosisID} allowCreate createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`} onCreateOption={createDiagnosisSource} placeholder="— Chọn ICD —" searchPlaceholder="Gõ ICD..." />
+                        ))}
+                        {renderAdHocRow('Ưu tiên *', (
+                          <select value={adHocPriorityOrder} onChange={(e) => setAdHocPriorityOrder(e.target.value as any)} className={`${adHocSelectCls} text-[#d2145a]`}>
+                            {PRIORITY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ))}
+                        {renderAdHocRow(`Chẩn đoán chi tiết *${adHocErrors.includes('DetailDiagnosis') ? ' !' : ''}`, (
+                          <textarea rows={1} required placeholder="Chẩn đoán chi tiết..." value={adHocDetailDiagnosis} onChange={(e) => setAdHocDetailDiagnosis(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                        ), { alignTop: true })}
+                        {renderAdHocRow('Nguy cơ', (
+                          <select value={adHocRiskFactor} onChange={(e) => setAdHocRiskFactor(e.target.value)} className={adHocSelectCls}>
                             <option value="3 -SpO2 > 75% ổn định">3 -SpO2 &gt; 75% ổn định</option>
                             <option value="1 - Hỗ trợ SHH / NT khó kiểm soát">1 - Hỗ trợ SHH / NT khó kiểm soát</option>
                             <option value="2 - Không SHH / NT ổn / HF nhiều">2 - Không SHH / NT ổn / HF nhiều</option>
@@ -4457,272 +4369,111 @@ Xin cảm ơn!`;
                             <option value="1 - SpO2 < 65% / Huyết động không ổn định">1 - SpO2 &lt; 65% / Huyết động không ổn định</option>
                             <option value="2- SpO2 65-75% dao động không ổn định">2- SpO2 65-75% dao động không ổn định</option>
                           </select>
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">KẾT LUẬN CHÍNH *</label>
-                          <SearchableEnumSelect
-                            required
-                            options={[
-                              'Can thiệp thông tim',
-                              'Chụp chẩn đoán +/- can thiệp',
-                              'Chụp chẩn đoán/Đo kháng lực',
-                              'Tiền Glenn',
-                              'Tiền Fontan',
-                              'Điện sinh lý',
-                              'Mổ tim',
-                              'Thêm CĐHA; vđ khác - Staff lại',
-                              'Chưa có chỉ định - Theo dõi tiếp',
-                              'Điều trị nội khoa - Hẹn staff lại',
-                              'Quá chỉ định',
-                              'Không có thông tin'
-                            ]}
-                            value={adHocConsultResultID}
-                            onChange={setAdHocConsultResultID}
-                            direction="up"
-                            placeholder="— Chọn kết luận —"
-                            searchPlaceholder="Gõ tìm kết luận..."
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                            KẾT QUẢ CHI TIẾT *
-                            {adHocErrors.includes('DetailConsultResult') && <span className="text-red-500 normal-case ml-1 font-semibold">*Thông tin này bắt buộc điền!</span>}
-                          </label>
-                          <textarea
-                            rows={1.5}
-                            placeholder="Nhập phác đồ, chi tiết kết quả hoặc phương án xử trí chi tiết của hội đồng..."
-                            value={adHocDetailConsultResult}
-                            onChange={(e) => setAdHocDetailConsultResult(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium"
-                          />
-                        </div>
+                        ))}
+                        {renderAdHocRow('Kết luận chính *', (
+                          <SearchableEnumSelect required options={['Can thiệp thông tim', 'Chụp chẩn đoán +/- can thiệp', 'Chụp chẩn đoán/Đo kháng lực', 'Tiền Glenn', 'Tiền Fontan', 'Điện sinh lý', 'Mổ tim', 'Thêm CĐHA; vđ khác - Staff lại', 'Chưa có chỉ định - Theo dõi tiếp', 'Điều trị nội khoa - Hẹn staff lại', 'Quá chỉ định', 'Không có thông tin']} value={adHocConsultResultID} onChange={setAdHocConsultResultID} direction="up" placeholder="— Chọn kết luận —" searchPlaceholder="Gõ tìm..." />
+                        ))}
+                        {renderAdHocRow(`Kết quả chi tiết *${adHocErrors.includes('DetailConsultResult') ? ' !' : ''}`, (
+                          <textarea rows={1} placeholder="Kết quả chi tiết..." value={adHocDetailConsultResult} onChange={(e) => setAdHocDetailConsultResult(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                        ), { alignTop: true })}
 
                       </div>
                     </div>
-                  </div>
 
-                  {/* RIGHT COLUMN: 3. DỤNG CỤ & XẾP LỊCH */}
-                  <div className="space-y-2.5">
-                    <div className="bg-white border border-slate-200 rounded-2xl p-2.5 md:p-3 space-y-2.5 shadow-sm">
-                      <div className="border-b border-slate-100 pb-2">
-                        <span className="text-[11.5px] font-black uppercase text-indigo-800 tracking-wider">
-                          3. DỤNG CỤ & XẾP LỊCH
+                  {/* COLUMN 3: DỤNG CỤ & XẾP LỊCH */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1 shadow-sm">
+                      <div className="border-b border-slate-100 pb-1">
+                        <span className="text-[10px] font-black uppercase text-indigo-800 tracking-wider">
+                          3. Dụng cụ & xếp lịch
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="col-span-2">
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">DỤNG CỤ DỰ KIẾN</label>
-                          <textarea
-                            rows={2}
-                            placeholder="ví dụ: Amplatzer ADOII 4-4, Sheath 5Fr..."
-                            value={adHocPlannedDevice}
-                            onChange={(e) => setAdHocPlannedDevice(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold resize-y"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">DỰ TRÚ KINH PHÍ (VNĐ)</label>
-                          <input
-                            type="text"
-                            placeholder="Ví dụ: 45,000,000..."
-                            value={adHocPlannedPrice}
-                            onChange={(e) => setAdHocPlannedPrice(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-mono font-bold"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                            KIỂM TRA DỤNG CỤ
-                          </label>
-                          <select
-                            value={adHocCheckDevice}
-                            onChange={(e) => setAdHocCheckDevice(e.target.value as any)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
-                          >
+                      <div className="grid grid-cols-1 gap-1">
+                        {renderAdHocRow('Dụng cụ dự kiến', (
+                          <textarea rows={1} placeholder="Amplatzer ADOII..." value={adHocPlannedDevice} onChange={(e) => setAdHocPlannedDevice(e.target.value)} className={`${adHocInputCls} font-bold resize-y`} />
+                        ), { alignTop: true })}
+                        {renderAdHocRow('Dự trù kinh phí', (
+                          <input type="text" placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />
+                        ))}
+                        {renderAdHocRow('Kiểm tra dụng cụ', (
+                          <select value={adHocCheckDevice} onChange={(e) => setAdHocCheckDevice(e.target.value as any)} className={adHocSelectCls}>
                             <option value="">— Chưa kiểm —</option>
                             <option value="Đủ">Đủ</option>
                             <option value="Thiếu">Thiếu</option>
                           </select>
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Phòng mổ phản hồi</label>
-                          <textarea
-                            rows={1.5}
-                            placeholder="Chuyển xếp phòng mổ phản hồi..."
-                            value={adHocOperationFeedback}
-                            onChange={(e) => setAdHocOperationFeedback(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium resize-y"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Phòng vật tư phản hồi</label>
-                          <textarea
-                            rows={1.5}
-                            placeholder="Vật tư cung ứng nhập ý kiến..."
-                            value={adHocSupplyDepFeedback}
-                            onChange={(e) => setAdHocSupplyDepFeedback(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none focus:bg-white text-xs text-slate-800 font-medium resize-y"
-                          />
-                        </div>
-                        
-                        <div className="col-span-2 border-t border-slate-100 pt-3 opacity-0"></div>
-                        <div className="col-span-2 -mt-7">
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                            Trạng thái gọi bệnh
-                          </label>
-                          <select
-                            value={adHocCallStatus}
-                            onChange={(e) => setAdHocCallStatus(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-[#d2145a] font-black"
-                          >
+                        ))}
+                        {renderAdHocRow('Phòng mổ phản hồi', (
+                          <textarea rows={1} placeholder="Phòng mổ phản hồi..." value={adHocOperationFeedback} onChange={(e) => setAdHocOperationFeedback(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                        ), { alignTop: true })}
+                        {renderAdHocRow('Phòng vật tư phản hồi', (
+                          <textarea rows={1} placeholder="Phòng vật tư phản hồi..." value={adHocSupplyDepFeedback} onChange={(e) => setAdHocSupplyDepFeedback(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                        ), { alignTop: true })}
+                        {renderAdHocRow('Trạng thái gọi bệnh', (
+                          <select value={adHocCallStatus} onChange={(e) => setAdHocCallStatus(e.target.value)} className={`${adHocSelectCls} text-[#d2145a]`}>
                             <option value="">— Chưa gọi —</option>
-                            {CALL_STATUS_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
+                            {CALL_STATUS_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Ghi chú gọi bệnh</label>
-                          <textarea
-                            rows={1.5}
-                            placeholder="Ví dụ: Đã liên hệ mẹ, đồng ý nhập viện ngày mai..."
-                            value={adHocCallNote}
-                            onChange={(e) => setAdHocCallNote(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none focus:bg-white text-xs text-slate-800 font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Ngày thông tim dự kiến</label>
-                          <div className="relative w-full">
-                            <input
-                              type="date"
-                              value={adHocPlannedCathLabDate}
-                              onChange={(e) => setAdHocPlannedCathLabDate(e.target.value)}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                            />
-                            <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-mono font-bold flex items-center justify-between">
-                              <span>{adHocPlannedCathLabDate ? formatVNTime(adHocPlannedCathLabDate) : 'dd/mm/yyyy'}</span>
-                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Hỗ trợ tài chính</label>
-                          <select
-                            value={adHocFundingRequest}
-                            onChange={(e) => setAdHocFundingRequest(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
-                          >
+                        ))}
+                        {renderAdHocRow('Ghi chú gọi bệnh', (
+                          <textarea rows={1} placeholder="Ghi chú gọi bệnh..." value={adHocCallNote} onChange={(e) => setAdHocCallNote(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                        ), { alignTop: true })}
+                        {renderAdHocRow('Ngày thông tim dự kiến', renderAdHocDatePicker(adHocPlannedCathLabDate, setAdHocPlannedCathLabDate))}
+                        {renderAdHocRow('Hỗ trợ tài chính', (
+                          <select value={adHocFundingRequest} onChange={(e) => setAdHocFundingRequest(e.target.value)} className={adHocSelectCls}>
                             <option value="">— Chưa chọn —</option>
                             <option value="Không tài trợ">Không tài trợ</option>
                             <option value="Chờ duyệt">Chờ duyệt</option>
                             <option value="Đã duyệt">Đã duyệt</option>
                           </select>
-                        </div>
-                        <div className="col-span-2 relative">
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Phương pháp can thiệp</label>
-                            <SearchableEnumSelect
-                              multiple
-                              options={METHOD_OPTIONS}
-                              values={adHocCathMethod}
-                              onMultiChange={setAdHocCathMethod}
-                              placeholder="Click chọn phương pháp..."
-                              searchPlaceholder="Gõ phương pháp để tìm..."
-                              direction="up"
-                            />
-                        </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Khoá nằm sau thủ thuật</label>
-                          <select
-                            value={adHocPostCathDepart}
-                            onChange={(e) => setAdHocPostCathDepart(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-bold"
-                          >
-                            {DEPARTMENTS_LIST.map((dept) => (
-                              <option key={dept} value={dept}>{dept}</option>
-                            ))}
+                        ))}
+                        {renderAdHocRow('Phương pháp can thiệp', (
+                          <SearchableEnumSelect multiple options={METHOD_OPTIONS} values={adHocCathMethod} onMultiChange={setAdHocCathMethod} placeholder="Chọn phương pháp..." searchPlaceholder="Gõ tìm..." direction="up" />
+                        ))}
+                        {renderAdHocRow('Khoa sau thủ thuật', (
+                          <select value={adHocPostCathDepart} onChange={(e) => setAdHocPostCathDepart(e.target.value)} className={adHocSelectCls}>
+                            {DEPARTMENTS_LIST.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
                           </select>
-                        </div>
-                        <div className="col-span-2 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">PTV chính</label>
-                            <select
-                              value={adHocScheduled1st}
-                              onChange={(e) => setAdHocScheduled1st(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-800 font-extrabold"
-                            >
-                              <option value="">— Chọn PTV —</option>
-                              <option value="BS. Phụng">BS. Phụng</option>
-                              <option value="BS. Lợi">BS. Lợi</option>
-                              <option value="BS. Thịnh">BS. Thịnh</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">PTV phụ 1</label>
-                            <select
-                              value={adHocScheduled2nd}
-                              onChange={(e) => setAdHocScheduled2nd(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-indigo-950 font-bold"
-                            >
-                              <option value="">— Chọn PTV phụ 1 —</option>
-                              {CATH_INTERVENTIONIST_DOCTORS.map((doc) => (
-                                <option key={doc} value={doc}>{doc}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">PTV phụ 2</label>
-                            <select
-                              value={adHocScheduled3rd}
-                              onChange={(e) => setAdHocScheduled3rd(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:bg-white text-xs text-slate-700 font-bold"
-                            >
-                              <option value="">— Chọn PTV phụ 2 —</option>
-                              <option value="BS. Ân">BS. Ân</option>
-                              <option value="BS. Tài">BS. Tài</option>
-                              <option value="BS. Hiếu">BS. Hiếu</option>
-                              <option value="BS. Hùng">BS. Hùng</option>
-                              <option value="BS. Tĩnh">BS. Tĩnh</option>
-                              <option value="BS. Thịnh">BS. Thịnh</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 mt-2 pt-3 border-t border-slate-100">
-                          <div>
-                            <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase">Người xếp lịch/check DC</label>
-                            <input
-                              type="text"
-                              disabled
-                              value={(() => {
-                                const editorId = currentStaff?.StaffKey;
-                                return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
-                              })()}
-                              className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default" title="CheckDeviceUpdatedTime">Cập nhật lúc</label>
-                            <input
-                              type="text"
-                              disabled
-                              value={formatDateTime(new Date().toISOString())}
-                              className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-mono cursor-default"
-                            />
-                          </div>
-                        </div>
+                        ))}
+                        {renderAdHocRow('PTV chính', (
+                          <select value={adHocScheduled1st} onChange={(e) => setAdHocScheduled1st(e.target.value)} className={adHocSelectCls}>
+                            <option value="">— Chọn PTV —</option>
+                            <option value="BS. Phụng">BS. Phụng</option>
+                            <option value="BS. Lợi">BS. Lợi</option>
+                            <option value="BS. Thịnh">BS. Thịnh</option>
+                          </select>
+                        ))}
+                        {renderAdHocRow('PTV phụ 1', (
+                          <select value={adHocScheduled2nd} onChange={(e) => setAdHocScheduled2nd(e.target.value)} className={`${adHocSelectCls} text-indigo-950`}>
+                            <option value="">— Chọn PTV phụ 1 —</option>
+                            {CATH_INTERVENTIONIST_DOCTORS.map((doc) => <option key={doc} value={doc}>{doc}</option>)}
+                          </select>
+                        ))}
+                        {renderAdHocRow('PTV phụ 2', (
+                          <select value={adHocScheduled3rd} onChange={(e) => setAdHocScheduled3rd(e.target.value)} className={adHocSelectCls}>
+                            <option value="">— Chọn PTV phụ 2 —</option>
+                            <option value="BS. Ân">BS. Ân</option>
+                            <option value="BS. Tài">BS. Tài</option>
+                            <option value="BS. Hiếu">BS. Hiếu</option>
+                            <option value="BS. Hùng">BS. Hùng</option>
+                            <option value="BS. Tĩnh">BS. Tĩnh</option>
+                            <option value="BS. Thịnh">BS. Thịnh</option>
+                          </select>
+                        ))}
+                        {renderAdHocRow('Người xếp lịch', (
+                          <input type="text" disabled value={staffList.find(s => s.StaffKey === currentStaff?.StaffKey)?.StaffName || currentStaff?.StaffKey || '01378'} className={`${adHocInputCls} text-slate-400`} />
+                        ))}
+                        {renderAdHocRow('Cập nhật lúc', (
+                          <input type="text" disabled value={formatDateTime(new Date().toISOString())} className={`${adHocInputCls} font-mono text-slate-400`} />
+                        ))}
                       </div>
                     </div>
-                  </div>
 
                 </div>
 
               </div>
 
               {/* Form Save Footer Bar for Ad-hoc Scheduling */}
-              <div className="p-2.5 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 shrink-0 rounded-b-3xl">
+              <div className="py-1.5 px-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -4738,7 +4489,9 @@ Xin cảm ơn!`;
                   disabled={saving}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-2 rounded-xl shadow-md text-xs cursor-pointer transition flex items-center gap-2 disabled:opacity-50 uppercase tracking-wide"
                 >
-                  {saving ? 'Đang lưu trữ...' : 'Lưu kết quả xếp lịch'}
+                  {saving
+                    ? (adHocPendingConsult ? 'Đang thực hiện...' : 'Đang lưu trữ...')
+                    : (adHocPendingConsult ? 'Tiếp tục xếp lịch' : 'Lưu kết quả xếp lịch')}
                 </button>
               </div>
 

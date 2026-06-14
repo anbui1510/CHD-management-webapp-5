@@ -52,7 +52,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `ConsultNote` | Lưu ý staff khác | LongText| | | |
 | `PlannedDevice` | Dụng cụ dự kiến | LongText| | Bắt buộc | |
 | `PlannedPrice` | Giá tiền dự kiến | Text | | | |
-| `PriorityOrder` | Ưu tiên | Enum | Cấp cứu / Chương trình / Ngoại giao / YC | | |
+| `PriorityOrder` | Ưu tiên | Enum | Cấp cứu / Làm sớm / Chương trình | | |
 | `RiskFactor` | Nguy cơ | Enumlist| 1 - Hỗ trợ SHH / NT khó kiểm soát... | | |
 | `ConsultResultCreateBy`| Người nhập kết quả | Ref | | | Liên kết Staff |
 | `ConsultResultCreateTime`| Ngày tạo kết quả | DateTime| | | |

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics } from '../types';
+import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User } from 'lucide-react';
 import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getDiagnosisOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -22,6 +22,91 @@ const CATH_METHODS_SPECIAL = [
   "Đặt máy tạo nhịp", 
   "Nong mạch/đặt stent mạch các loại"
 ];
+
+const SCHEDULING_ELIGIBLE_RESULTS = [
+  'Can thiệp thông tim',
+  'Chụp chẩn đoán +/- can thiệp',
+  'Chụp chẩn đoán-Đo kháng lực',
+  'Chụp chẩn đoán/Đo kháng lực',
+  'Tiền Glenn',
+  'Tiền Fontan',
+  'Điện sinh lý'
+];
+
+const buildLatestConsultsMap = (consults: Consult[]) => {
+  const map = new Map<string, string>();
+  const sorted = [...consults].sort((a, b) => {
+    const aDate = a.ConsultDate || '';
+    const bDate = b.ConsultDate || '';
+    if (aDate !== bDate) return bDate.localeCompare(aDate);
+    return (b.ConsultCreateTime || '').localeCompare(a.ConsultCreateTime || '');
+  });
+  sorted.forEach(c => {
+    if (!c.PatientKey) return;
+    const patientKey = normalizePatientKey(c.PatientKey);
+    if (!map.has(patientKey)) map.set(patientKey, c.ConsultKey);
+  });
+  return map;
+};
+
+const isConsultInSchedulingWaitlist = (
+  c: Consult,
+  latestMap: Map<string, string>,
+  patients: Patient[]
+) => {
+  const normalized = normalizePatientKey(c.PatientKey);
+  if (!normalized || latestMap.get(normalized) !== c.ConsultKey) return false;
+  if (!c.ConsultDate) return false;
+
+  const isRemoved = c.Removed === true
+    || String(c.Removed).toUpperCase() === 'TRUE'
+    || String(c.Removed).toLowerCase() === 'có'
+    || String(c.Removed).toLowerCase() === 'yes';
+  if (isRemoved) return false;
+
+  const isTransferred = c.TransferredToCathLab === true
+    || String(c.TransferredToCathLab).trim().toLowerCase() === 'true'
+    || String(c.TransferredToCathLab).trim().toLowerCase() === 'yes'
+    || String(c.TransferredToCathLab).trim().toLowerCase() === 'có';
+  if (isTransferred) return false;
+
+  const resID = (c.ConsultResultID || '').trim();
+  const normalizedResults = SCHEDULING_ELIGIBLE_RESULTS.map(e => e.trim().toLowerCase());
+  const matchRes = SCHEDULING_ELIGIBLE_RESULTS.includes(resID)
+    || normalizedResults.includes(resID.toLowerCase());
+  if (!matchRes) return false;
+
+  const callSt = String(c.CallStatus || '').trim().toLowerCase();
+  if (
+    callSt === 'đã can thiệp/mổ'
+    || callSt === 'loại'
+    || callSt === 'đã làm nơi khác'
+    || callSt === 'muốn theo dõi nơi khác'
+  ) return false;
+
+  const pat = findPatientByKey(patients, c.PatientKey);
+  if (!pat) return false;
+
+  const pOut = String(pat.Outcome || '').toLowerCase().trim();
+  if (pOut === 'tử vong' || pOut === 'nặng xin về') return false;
+
+  return true;
+};
+
+const getSchedulingWaitlistConsult = (
+  patientKey: string,
+  consults: Consult[],
+  patients: Patient[]
+): Consult | undefined => {
+  const latestMap = buildLatestConsultsMap(consults);
+  const normalized = normalizePatientKey(patientKey);
+  if (!normalized) return undefined;
+  const latestKey = latestMap.get(normalized);
+  if (!latestKey) return undefined;
+  const consult = consults.find(c => c.ConsultKey === latestKey);
+  if (!consult || !isConsultInSchedulingWaitlist(consult, latestMap, patients)) return undefined;
+  return consult;
+};
 
 const parseCathMethods = (methodStr: any): string[] => {
   if (Array.isArray(methodStr)) return methodStr.map(String);
@@ -210,6 +295,58 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     setIsAdHocModalOpen(true);
   };
 
+  const activateEmergencyTransferFromScheduling = async (consult: Consult, patient: Patient) => {
+    const today = new Date().toISOString().split('T')[0];
+    const payload = {
+      CheckDevice: 'Đủ' as const,
+      CallStatus: 'Đồng ý',
+      PlannedCathLabDate: today,
+      TransferredToCathLab: true,
+      PriorityOrder: 'Cấp cứu' as const,
+      CheckDeviceUpdatedBy: loggedInStaffId,
+      CheckDeviceUpdatedTime: new Date().toISOString()
+    };
+
+    const response = await fetch(`/api/consults/${consult.ConsultKey}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error('Không thể cập nhật trạng thái chuyển phòng thông tim');
+    }
+
+    const mergedConsult: Consult = { ...consult, ...payload };
+    setIsAdHocModalOpen(false);
+    setAdHocSelectedPatientKey('');
+    setAdHocSearchQuery('');
+    onRefreshData();
+    setActiveTab('pending');
+    openPendingForm(mergedConsult, patient);
+  };
+
+  const handleAdHocPatientSelect = (patient: Patient) => {
+    const waitlistConsult = getSchedulingWaitlistConsult(patient.PatientKey, consults, patients);
+    if (waitlistConsult) {
+      triggerConfirm(
+        'BN này đang chờ trong view Xếp lịch. Bạn có muốn tiếp tục chuyển phòng thông tim?',
+        () => {
+          activateEmergencyTransferFromScheduling(waitlistConsult, patient).catch((err) => {
+            console.error(err);
+            alert(err.message || 'Không thể chuyển phòng thông tim. Vui lòng thử lại.');
+          });
+        },
+        'Chuyển phòng thông tim'
+      );
+      return;
+    }
+
+    setAdHocSelectedPatientKey(patient.PatientKey);
+    setAdHocPatientName(patient.PatientName);
+    setAdHocSearchQuery('');
+  };
+
   const saveAdHocCathLab = async () => {
      const safeCathMethod = parseCathMethods(formData.CathMethod);
      if (!formData.CathDate || !formData.PostDiagnosisID || !formData.CathResultID || safeCathMethod.length === 0 || !formData.CathPlan || !formData._1stInterventionist || !formData._2ndInterventionist) {
@@ -220,6 +357,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      if (adHocPatientMode === 'existing' && !adHocSelectedPatientKey) {
         alert("Vui lòng chọn bệnh nhân.");
         return;
+     }
+
+     if (adHocPatientMode === 'existing' && adHocSelectedPatientKey) {
+        const waitlistConsult = getSchedulingWaitlistConsult(adHocSelectedPatientKey, consults, patients);
+        const patient = findPatientByKey(patients, adHocSelectedPatientKey);
+        if (waitlistConsult && patient) {
+          triggerConfirm(
+            'BN này đang chờ trong view Xếp lịch. Bạn có muốn tiếp tục chuyển phòng thông tim?',
+            () => {
+              activateEmergencyTransferFromScheduling(waitlistConsult, patient).catch((err) => {
+                console.error(err);
+                alert(err.message || 'Không thể chuyển phòng thông tim. Vui lòng thử lại.');
+              });
+            },
+            'Chuyển phòng thông tim'
+          );
+          return;
+        }
      }
 
      if (adHocPatientMode === 'new' && (!adHocPatientID1 || !adHocPatientName || !adHocPatientDOB || !adHocPatientAddress)) {
@@ -609,11 +764,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                                   <button
                                     key={p.PatientKey}
                                     type="button"
-                                    onClick={() => {
-                                      setAdHocSelectedPatientKey(p.PatientKey);
-                                      setAdHocPatientName(p.PatientName);
-                                      setAdHocSearchQuery('');
-                                    }}
+                                    onClick={() => handleAdHocPatientSelect(p)}
                                     className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"
                                   >
                                     <div>

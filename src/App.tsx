@@ -13,6 +13,8 @@ import {
   DepartmentEnum, 
   ConsultResultEnum, 
   PriorityOrderEnum, 
+  PRIORITY_OPTIONS,
+  normalizePriorityOrder,
   RiskFactorEnum,
   CathLab,
   Operation,
@@ -362,6 +364,7 @@ export default function App() {
     DiagnosisID: '',
     DetailDiagnosis: '',
     ConsultMember: [] as string[],
+    PriorityOrder: 'Chương trình' as PriorityOrderEnum,
     ConsultResultUpdatedBy: '',
     ConsultResultUpdatedTime: ''
   });
@@ -852,7 +855,8 @@ export default function App() {
       RequestBy: c.RequestBy || '',
       DiagnosisID: c.DiagnosisID || '',
       DetailDiagnosis: c.DetailDiagnosis || '',
-      ConsultMember: normalizedMembers
+      ConsultMember: normalizedMembers,
+      PriorityOrder: normalizePriorityOrder(c.PriorityOrder),
     });
   };
 
@@ -2692,8 +2696,8 @@ export default function App() {
 
           {/* ARCHIVE PANEL (includes transferred cathlab tab) */}
           {activeMenu === 'archive' && (
+             <div key={archiveInitialTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
              <ArchiveView 
-               key={archiveInitialTab}
                consults={consults}
                patients={patients}
                initialTab={archiveInitialTab}
@@ -2703,6 +2707,7 @@ export default function App() {
                }}
                triggerConfirm={triggerConfirm}
              />
+             </div>
           )}
 
           {/* XẾP LỊCH THÔNG TIM PANEL (FULL - có danh sách chờ, bộ lọc) */}
@@ -3167,6 +3172,11 @@ export default function App() {
                                   <p><span className="text-slate-400">ICD:</span> {resultUpdateData.DiagnosisID ? <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-mono ml-1">{resultUpdateData.DiagnosisID}</span> : ''}</p>
                                   <p><span className="text-slate-400">Kết luận chính:</span> {resultUpdateData.ConsultResultID ? <span className="font-extrabold text-[#d2145a] ml-1">{resultUpdateData.ConsultResultID}</span> : ''}</p>
                                 </div>
+
+                                <p>
+                                  <span className="text-slate-400">Ưu tiên:</span>{' '}
+                                  <span className="font-extrabold text-indigo-800 ml-1">{resultUpdateData.PriorityOrder || 'Chương trình'}</span>
+                                </p>
                                 
                                 <div>
                                   <span className="text-slate-400 block mb-0.5">Chẩn đoán chi tiết:</span>
@@ -3220,6 +3230,29 @@ export default function App() {
                                       placeholder="-- Chọn Kết luận chính --"
                                       searchPlaceholder="Gõ tìm kết luận..."
                                     />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Ưu tiên</label>
+                                  <div className="flex gap-2">
+                                    {PRIORITY_OPTIONS.map((opt) => {
+                                      const isSel = resultUpdateData.PriorityOrder === opt;
+                                      return (
+                                        <button
+                                          key={opt}
+                                          type="button"
+                                          onClick={() => setResultUpdateData(prev => ({ ...prev, PriorityOrder: opt }))}
+                                          className={`flex-1 py-1.5 px-2 rounded-xl border text-[11px] font-bold transition text-center cursor-pointer ${
+                                            isSel
+                                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm font-extrabold ring-1 ring-indigo-400'
+                                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                          }`}
+                                        >
+                                          {opt}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
 
@@ -3327,7 +3360,8 @@ export default function App() {
                                   RequestBy: edc.RequestBy || '',
                                   DiagnosisID: edc.DiagnosisID || '',
                                   DetailDiagnosis: edc.DetailDiagnosis || '',
-                                  ConsultMember: edc.ConsultMember || []
+                                  ConsultMember: edc.ConsultMember || [],
+                                  PriorityOrder: normalizePriorityOrder(edc.PriorityOrder),
                                 });
                                 setIsDrawerEditing(false);
                               }}

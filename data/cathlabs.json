@@ -235,5 +235,22 @@
     "ConsultKey": "con_1781321310736",
     "PatientKey": "pat_1781278554274",
     "CathKey": "cath_1781321658611_xovfx1"
+  },
+  {
+    "CathDate": "2026-06-13",
+    "PostDiagnosisID": "AVSD",
+    "PostDiagnosis": "Kênh nhĩ thất bán phần",
+    "CathResultID": "Thành công",
+    "CathMethod": "Bít lỗ thông liên nhĩ/liên thất/ống động mạch (03.2270.0054)",
+    "CathPlan": "Tái khám thường",
+    "CathNote": "",
+    "_1stInterventionist": "BS. Phụng",
+    "_2ndInterventionist": "BS. Ân",
+    "_3rdInterventionist": "BS. Tài",
+    "_4thInterventionist": "",
+    "PlannedFollowUpDate": "",
+    "ConsultKey": "MOCK2025_CON_096",
+    "PatientKey": "MOCK2025_PAT_096",
+    "CathKey": "cath_1781374273930_cp7dry"
   }
 ]

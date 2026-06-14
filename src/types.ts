@@ -67,7 +67,16 @@ export type ConsultResultEnum =
   | 'Không có thông tin'
   | '';
 
-export type PriorityOrderEnum = 'Cấp cứu' | 'Chương trình' | 'Ngoại giao' | 'YC';
+export type PriorityOrderEnum = 'Cấp cứu' | 'Làm sớm' | 'Chương trình';
+
+export const PRIORITY_OPTIONS: PriorityOrderEnum[] = ['Cấp cứu', 'Làm sớm', 'Chương trình'];
+
+export const normalizePriorityOrder = (value?: string): PriorityOrderEnum => {
+  if (value === 'YC') return 'Làm sớm';
+  if (value === 'Ngoại giao') return 'Chương trình';
+  if (value === 'Cấp cứu' || value === 'Làm sớm' || value === 'Chương trình') return value;
+  return 'Chương trình';
+};
 
 export type CathPlanEnum = 'Tái khám thường' | 'Theo dõi sát' | 'Cần thông tim can thiệp lại' | 'Đăng ký staff nội-ngoại khoa' | 'Mổ khẩn';
 

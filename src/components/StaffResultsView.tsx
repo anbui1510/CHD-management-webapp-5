@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Patient, Consult, Source, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey } from '../types';
+import { Patient, Consult, Source, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getDiagnosisOptions } from '../data/source';
@@ -159,6 +159,7 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
   const [plannedDevice, setPlannedDevice] = useState<string>('');
   const [plannedPrice, setPlannedPrice] = useState<string>('');
   const [checkDevice, setCheckDevice] = useState<'Đủ' | 'Thiếu' | 'Thừa'>('Đủ');
+  const [priorityOrder, setPriorityOrder] = useState<PriorityOrderEnum>('Chương trình');
 
   const getLatestPriorDetailDiagnosis = (patientKey: any, beforeDate?: string) => {
     const normalizedKey = normalizePatientKey(patientKey);
@@ -217,6 +218,7 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
     setPlannedDevice('');
     setPlannedPrice('');
     setCheckDevice('Đủ');
+    setPriorityOrder('Chương trình');
     setSuccessMsg('');
     setErrorMsg('');
   };
@@ -332,7 +334,7 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
         ConsultNote: '',
         PlannedDevice: plannedDevice,
         PlannedPrice: plannedPrice,
-        PriorityOrder: 'Chương trình',
+        PriorityOrder: priorityOrder,
         RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
         CheckDevice: checkDevice,
         ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
@@ -1357,6 +1359,29 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
                         placeholder="-- Chọn Kết luận chính --"
                         searchPlaceholder="Gõ tìm kết luận..."
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ưu tiên</label>
+                      <div className="flex gap-1.5">
+                        {PRIORITY_OPTIONS.map((opt) => {
+                          const isSel = priorityOrder === opt;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setPriorityOrder(opt)}
+                              className={`flex-1 py-1 px-1.5 rounded-xl border text-[10px] font-bold transition text-center cursor-pointer ${
+                                isSel
+                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs font-extrabold ring-1 ring-indigo-400'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div>
