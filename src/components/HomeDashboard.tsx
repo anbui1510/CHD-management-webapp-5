@@ -675,7 +675,11 @@ export default function HomeDashboard({
             <div className="flex flex-col justify-center shrink-0 pr-3 border-r border-[#f1f5f9] h-full w-[155px]">
               <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-tight flex items-center gap-1 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#d2145a] animate-pulse shrink-0"></span>
-                <span className="truncate">Thống kê = HISTOGRAM</span>
+                <span className="leading-tight whitespace-normal break-words">
+                  {chartMetric === 'staff_consults'
+                    ? 'Histogram ca hội chẩn'
+                    : 'Histogram ca thông tim'}
+                </span>
               </span>
               <div className="mt-1 flex items-baseline gap-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-0.5 max-w-max">
                 <span className="text-[10px] text-slate-500 font-bold">Tổng:</span>
