@@ -387,6 +387,98 @@ export default function HomeDashboard({
     !c.Removed
   ).length;
 
+  const cathPatientDiagnosisDistribution = useMemo(() => {
+    const cathPatientKeys = new Set(
+      (cathlabs || [])
+        .map(cath => normalizePatientKey(cath.PatientKey))
+        .filter(Boolean)
+    );
+
+    const counts: Record<string, number> = {};
+    cathPatientKeys.forEach(patientKey => {
+      const latestCathDiagnosis = [...(cathlabs || [])]
+        .filter(cath => normalizePatientKey(cath.PatientKey) === patientKey && String(cath.PostDiagnosisID || '').trim())
+        .sort((a, b) => getDateTime(b.CathDate) - getDateTime(a.CathDate))[0]?.PostDiagnosisID;
+
+      const fallbackConsultDiagnosis = [...(consults || [])]
+        .filter(c => normalizePatientKey(c.PatientKey) === patientKey && String(c.DiagnosisID || '').trim())
+        .sort((a, b) => {
+          const dateDiff = getDateTime(b.ConsultDate) - getDateTime(a.ConsultDate);
+          if (dateDiff !== 0) return dateDiff;
+          return String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || ''));
+        })[0]?.DiagnosisID;
+
+      const diagnosis = String(latestCathDiagnosis || fallbackConsultDiagnosis || 'Chưa phân loại').trim();
+      counts[diagnosis] = (counts[diagnosis] || 0) + 1;
+    });
+
+    return buildPieSegments(
+      Object.entries(counts).map(([label, value]) => ({ label, value })),
+      cathPatientKeys.size
+    );
+  }, [cathlabs, consults]);
+
+  const secondOperatorDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    (cathlabs || []).forEach(cath => {
+      const operator = String(cath._2ndInterventionist || '').trim() || 'Chưa nhập';
+      counts[operator] = (counts[operator] || 0) + 1;
+    });
+    return buildPieSegments(
+      Object.entries(counts).map(([label, value]) => ({ label, value })),
+      (cathlabs || []).length
+    );
+  }, [cathlabs]);
+
+  const requestByDistribution = useMemo(() => {
+    const validConsults = (consults || []).filter(c => {
+      const removed = c.Removed === true || String((c as any).Removed || '').trim().toLowerCase() === 'true' || String((c as any).Removed || '').trim().toLowerCase() === 'có' || String((c as any).Removed || '').trim().toLowerCase() === 'yes';
+      return !removed;
+    });
+    const counts: Record<string, number> = {};
+    validConsults.forEach(c => {
+      const requestBy = String(c.RequestBy || '').trim() || 'Chưa nhập';
+      counts[requestBy] = (counts[requestBy] || 0) + 1;
+    });
+    return buildPieSegments(
+      Object.entries(counts).map(([label, value]) => ({ label, value })),
+      validConsults.length
+    );
+  }, [consults]);
+
+  const pieConfig = useMemo(() => {
+    if (pieMetric === 'second_operator') {
+      return {
+        title: 'PTV phụ 1',
+        subtitle: 'Theo _2ndInterventionist trong CathLab',
+        totalLabel: 'ca thông tim',
+        total: (cathlabs || []).length,
+        segments: secondOperatorDistribution
+      };
+    }
+    if (pieMetric === 'request_by') {
+      const totalConsults = (consults || []).filter(c => {
+        const removed = c.Removed === true || String((c as any).Removed || '').trim().toLowerCase() === 'true' || String((c as any).Removed || '').trim().toLowerCase() === 'có' || String((c as any).Removed || '').trim().toLowerCase() === 'yes';
+        return !removed;
+      }).length;
+      return {
+        title: 'BS đăng ký staff',
+        subtitle: 'Theo RequestBy trong Consult',
+        totalLabel: 'ca hội chẩn',
+        total: totalConsults,
+        segments: requestByDistribution
+      };
+    }
+    const cathPatientCount = new Set((cathlabs || []).map(cath => normalizePatientKey(cath.PatientKey)).filter(Boolean)).size;
+    return {
+      title: 'ICD bệnh nhân đã thông tim',
+      subtitle: 'Mỗi bệnh nhân chỉ tính 1 ICD gần nhất',
+      totalLabel: 'bệnh nhân',
+      total: cathPatientCount,
+      segments: cathPatientDiagnosisDistribution
+    };
+  }, [pieMetric, cathlabs, consults, cathPatientDiagnosisDistribution, secondOperatorDistribution, requestByDistribution]);
+
   // Date and Week scheduling for Weekly Calendar
   const [referenceDate, setReferenceDate] = useState(() => {
     const today = new Date();
@@ -815,9 +907,9 @@ export default function HomeDashboard({
 
         {/* STATS COUNT DASHBOARD SECTION */}
         <div className="bg-white border border-slate-150 rounded-2xl p-4 shadow-sm flex flex-col h-full overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 flex flex-col gap-4">
             {/* WEEKLY CALENDAR SECTION */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="h-[58%] min-h-[220px] flex flex-col overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 shrink-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <CalendarDays className="w-4 h-4 text-[#d2145a] shrink-0" />
@@ -928,6 +1020,98 @@ export default function HomeDashboard({
                     );
                   });
                 })()}
+              </div>
+            </div>
+
+            <div className="h-[42%] min-h-[180px] border border-slate-150 rounded-2xl bg-slate-50/60 p-3 flex flex-col overflow-hidden">
+              <div className="flex items-start justify-between gap-3 shrink-0 mb-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Database className="w-4 h-4 text-[#d2145a] shrink-0" />
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-tight truncate">
+                      Thống kê tỷ lệ
+                    </span>
+                    <span className="text-[10px] font-black text-[#d2145a] font-mono bg-pink-100/50 border border-pink-100 px-2 py-0.5 rounded-full shrink-0">
+                      {pieConfig.total} {pieConfig.totalLabel}
+                    </span>
+                  </div>
+                  <p className="text-[9.5px] font-semibold text-slate-400 mt-0.5 truncate">
+                    {pieConfig.subtitle}
+                  </p>
+                </div>
+
+                <div className="flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm shrink-0">
+                  {([
+                    ['diagnosis', 'ICD'],
+                    ['second_operator', 'PTV phụ 1'],
+                    ['request_by', 'BS đăng ký']
+                  ] as Array<[PieMetric, string]>).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setPieMetric(id)}
+                      className={`px-2 py-1 rounded-lg text-[9px] font-black transition cursor-pointer ${
+                        pieMetric === id
+                          ? 'bg-[#d2145a] text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 grid grid-cols-[150px_1fr] gap-3 items-center">
+                <div className="relative w-[132px] h-[132px] mx-auto shrink-0">
+                  <div
+                    className="absolute inset-0 rounded-full shadow-inner border border-white"
+                    style={{ background: getDonutBackground(pieConfig.segments) }}
+                  />
+                  <div className="absolute inset-[24px] rounded-full bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center px-2">
+                    <span className="text-[9px] font-black uppercase text-slate-400 leading-tight">
+                      {pieConfig.title}
+                    </span>
+                    <span className="text-xl font-black font-mono text-[#d2145a] leading-none mt-1">
+                      {pieConfig.total}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="min-h-0 overflow-y-auto pr-1 space-y-1.5">
+                  {pieConfig.segments.length === 0 ? (
+                    <div className="h-full min-h-[100px] flex items-center justify-center text-center">
+                      <span className="text-[10px] text-slate-400 font-semibold italic">
+                        Chưa có dữ liệu để thống kê
+                      </span>
+                    </div>
+                  ) : (
+                    pieConfig.segments.map(segment => (
+                      <div key={segment.label} className="bg-white border border-slate-100 rounded-xl px-2.5 py-1.5 shadow-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: segment.color }} />
+                            <span className="text-[10.5px] font-black text-slate-700 truncate" title={segment.label}>
+                              {segment.label}
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-1 shrink-0">
+                            <span className="text-[10px] font-black font-mono text-slate-800">{segment.value}</span>
+                            <span className="text-[9px] font-black font-mono text-[#d2145a]">
+                              {segment.percent.toFixed(segment.percent >= 10 ? 0 : 1)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${segment.percent}%`, backgroundColor: segment.color }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>
