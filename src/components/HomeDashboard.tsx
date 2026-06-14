@@ -138,17 +138,6 @@ const buildPieSegments = (items: Array<{ label: string; value: number }>, total:
     }));
 };
 
-const getDonutBackground = (segments: PieSegment[]) => {
-  if (segments.length === 0) return '#f1f5f9';
-  let cursor = 0;
-  const stops = segments.map(segment => {
-    const start = cursor;
-    cursor += segment.percent;
-    return `${segment.color} ${start}% ${cursor}%`;
-  });
-  return `conic-gradient(${stops.join(', ')})`;
-};
-
 const DEFAULT_SHORTCUT_IDS = ['patients', 'consult-list', 'results-staff', 'cathlab-room'];
 
 export default function HomeDashboard({
@@ -170,6 +159,7 @@ export default function HomeDashboard({
   const [chartYear, setChartYear] = useState<number>(2026);
   const [isConfiguringChartMetric, setIsConfiguringChartMetric] = useState(false);
   const [pieMetric, setPieMetric] = useState<PieMetric>('diagnosis');
+  const [hoveredPieSegment, setHoveredPieSegment] = useState<PieSegment | null>(null);
 
   const allowedShortcuts = useMemo(
     () => SHORTCUTS_POOL.filter(sh => canAccessModule(sh.id as AppModule)),
@@ -909,7 +899,7 @@ export default function HomeDashboard({
         <div className="bg-white border border-slate-150 rounded-2xl p-4 shadow-sm flex flex-col h-full overflow-hidden">
           <div className="flex-1 min-h-0 flex flex-col gap-4">
             {/* WEEKLY CALENDAR SECTION */}
-            <div className="h-[58%] min-h-[220px] flex flex-col overflow-hidden">
+            <div className="order-2 h-[58%] min-h-[220px] flex flex-col overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 shrink-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <CalendarDays className="w-4 h-4 text-[#d2145a] shrink-0" />
@@ -1023,7 +1013,7 @@ export default function HomeDashboard({
               </div>
             </div>
 
-            <div className="h-[42%] min-h-[180px] border border-slate-150 rounded-2xl bg-slate-50/60 p-3 flex flex-col overflow-hidden">
+            <div className="order-1 h-[42%] min-h-[180px] border border-slate-150 rounded-2xl bg-slate-50/60 p-3 flex flex-col overflow-hidden">
               <div className="flex items-start justify-between gap-3 shrink-0 mb-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -1062,12 +1052,51 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 grid grid-cols-[150px_1fr] gap-3 items-center">
-                <div className="relative w-[132px] h-[132px] mx-auto shrink-0">
-                  <div
-                    className="absolute inset-0 rounded-full shadow-inner border border-white"
-                    style={{ background: getDonutBackground(pieConfig.segments) }}
-                  />
+              <div className="flex-1 min-h-0 grid grid-cols-[150px_1fr] gap-3 items-center overflow-hidden">
+                <div className="relative w-[132px] h-[132px] mx-auto shrink-0" onMouseLeave={() => setHoveredPieSegment(null)}>
+                  {(() => {
+                    const radius = 42;
+                    const circumference = 2 * Math.PI * radius;
+                    let cursor = 0;
+                    return (
+                      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-sm">
+                        {pieConfig.segments.length === 0 ? (
+                          <circle cx="50" cy="50" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="14" />
+                        ) : pieConfig.segments.map(segment => {
+                          const dashLength = (segment.percent / 100) * circumference;
+                          const dashOffset = -cursor;
+                          cursor += dashLength;
+                          return (
+                            <circle
+                              key={segment.label}
+                              cx="50"
+                              cy="50"
+                              r={radius}
+                              fill="none"
+                              stroke={segment.color}
+                              strokeWidth="14"
+                              strokeLinecap="butt"
+                              strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                              strokeDashoffset={dashOffset}
+                              transform="rotate(-90 50 50)"
+                              className="cursor-pointer transition-opacity hover:opacity-80"
+                              onMouseEnter={() => setHoveredPieSegment(segment)}
+                            >
+                              <title>{`${segment.label}: ${segment.value} ca (${segment.percent.toFixed(segment.percent >= 10 ? 0 : 1)}%)`}</title>
+                            </circle>
+                          );
+                        })}
+                      </svg>
+                    );
+                  })()}
+                  {hoveredPieSegment && (
+                    <div className="absolute left-1/2 -translate-x-1/2 -top-3 z-20 bg-slate-900 text-white rounded-lg px-2.5 py-1.5 shadow-xl text-center pointer-events-none min-w-[128px]">
+                      <div className="text-[9px] font-black uppercase tracking-wide truncate">{hoveredPieSegment.label}</div>
+                      <div className="text-[10px] font-mono font-black text-pink-100">
+                        {hoveredPieSegment.value} ca ({hoveredPieSegment.percent.toFixed(hoveredPieSegment.percent >= 10 ? 0 : 1)}%)
+                      </div>
+                    </div>
+                  )}
                   <div className="absolute inset-[24px] rounded-full bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center px-2">
                     <span className="text-[9px] font-black uppercase text-slate-400 leading-tight">
                       {pieConfig.title}
@@ -1078,7 +1107,7 @@ export default function HomeDashboard({
                   </div>
                 </div>
 
-                <div className="min-h-0 overflow-y-auto pr-1 space-y-1.5">
+                <div className="h-full max-h-full min-h-0 self-stretch overflow-y-scroll custom-scrollbar pr-1.5 space-y-1.5">
                   {pieConfig.segments.length === 0 ? (
                     <div className="h-full min-h-[100px] flex items-center justify-center text-center">
                       <span className="text-[10px] text-slate-400 font-semibold italic">
