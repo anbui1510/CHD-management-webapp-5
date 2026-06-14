@@ -69,6 +69,14 @@ const getAutoScheduled2nd = (requestBy: string) => {
   return found || '';
 };
 
+const getTodayIsoDate = (): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
   if (!ptvPhu?.trim()) return patientName;
   return `${patientName} - PTV phụ: ${ptvPhu}`;
@@ -325,7 +333,7 @@ export default function CathLabSchedulerView({
   const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
   const [adHocPatientWeight, setAdHocPatientWeight] = useState('');
   const [adHocPatientHeight, setAdHocPatientHeight] = useState('');
-  const [adHocConsultDate, setAdHocConsultDate] = useState('2026-06-06');
+  const [adHocConsultDate, setAdHocConsultDate] = useState(getTodayIsoDate);
   const [adHocRequestBy, setAdHocRequestBy] = useState('');
   const [adHocDiagnosisID, setAdHocDiagnosisID] = useState('');
   const [adHocDetailDiagnosis, setAdHocDetailDiagnosis] = useState('');
@@ -1334,6 +1342,7 @@ Xin cảm ơn!`;
   };
 
   const resetAdHocFormFields = () => {
+    setAdHocConsultDate(getTodayIsoDate());
     setAdHocPatientWeight('');
     setAdHocPatientHeight('');
     setAdHocDiagnosisID('');
@@ -1687,6 +1696,7 @@ Xin cảm ơn!`;
       setAdHocOutcome('');
       setAdHocPatientWeight('');
       setAdHocPatientHeight('');
+      setAdHocConsultDate(getTodayIsoDate());
       setAdHocDiagnosisID('');
       setAdHocDetailDiagnosis('');
       setAdHocPlannedDevice('');
@@ -2128,11 +2138,7 @@ Xin cảm ơn!`;
             </div>
             <button
               onClick={() => {
-                const y = activeDate.getFullYear();
-                const m = String(activeDate.getMonth() + 1).padStart(2, '0');
-                const d = String(activeDate.getDate()).padStart(2, '0');
-                const formattedDate = `${y}-${m}-${d}`;
-                setAdHocConsultDate(formattedDate);
+                setAdHocConsultDate(getTodayIsoDate());
                 setAdHocPlannedCathLabDate('');
                 setAdHocCheckDevice('');
                 setAdHocCallStatus('');
