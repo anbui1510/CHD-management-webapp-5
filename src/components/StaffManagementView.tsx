@@ -284,7 +284,7 @@ export default function StaffManagementView({
           </p>
           <h2 className="text-xl font-extrabold text-slate-900">Phân quyền module & tài khoản</h2>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-            Gán vai trò mẫu hoặc chọn từng module. Sidebar và Không gian làm việc sẽ ẩn/hiện theo quyền đã lưu.
+            Gán vai trò mẫu hoặc chọn từng module. Sidebar, Không gian làm việc và Truy cập nhanh (Home) sẽ ẩn/hiện theo quyền đã lưu.
           </p>
         </div>
         <div className="flex items-center gap-2">

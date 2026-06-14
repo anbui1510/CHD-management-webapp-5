@@ -1726,6 +1726,7 @@ export default function App() {
               patients={patients}
               consults={consults}
               cathlabs={cathlabs}
+              canAccessModule={(module) => canAccessModule(currentStaff, module)}
             />
           )}
 
@@ -1741,7 +1742,7 @@ export default function App() {
               patientCount={patients.length}
               pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
               pendingMriCount={cmrs.filter(c => !c.CMRScheduledDate).length + consults.filter(c => String(c.ConsultResultID || '').trim().toLowerCase() === 'chụp mri').length}
-              canManageStaff={canManageStaff(currentStaff)}
+              canAccessModule={(module) => canAccessModule(currentStaff, module)}
             />
           )}
 

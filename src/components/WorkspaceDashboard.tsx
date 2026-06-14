@@ -1,521 +1,238 @@
-import React from 'react';
-
+import React, { useMemo } from 'react';
 import {
-
   Heart,
-
   ClipboardList,
-
   PenTool,
-
   SlidersHorizontal,
-
   Archive,
-
   Calendar,
-
   Activity,
-
-  Clock,
-
   ShieldCheck,
-
   Scissors,
-
-  UserCog
-
+  UserCog,
 } from 'lucide-react';
-
-
+import type { AppModule } from '../auth/permissions';
 
 interface WorkspaceDashboardProps {
-
   onNavigate: (menu: string) => void;
-
   patientCount: number;
-
   pendingConsultCount: number;
-
   pendingMriCount?: number;
-
-  canManageStaff?: boolean;
-
+  canAccessModule: (module: AppModule) => boolean;
 }
 
+type WorkspaceTile = {
+  module: AppModule;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  highlight?: boolean;
+};
 
+type WorkspaceSection = {
+  title: string;
+  tiles: WorkspaceTile[];
+};
 
 export default function WorkspaceDashboard({
-
   onNavigate,
-
   patientCount,
-
   pendingConsultCount,
-
   pendingMriCount = 0,
-
-  canManageStaff = false
-
+  canAccessModule,
 }: WorkspaceDashboardProps) {
+  const sections = useMemo<WorkspaceSection[]>(() => {
+    const all: WorkspaceSection[] = [
+      {
+        title: '1. QUẢN LÝ BỆNH NHÂN - LỊCH HẸN',
+        tiles: [
+          {
+            module: 'patients',
+            label: 'Hồ sơ bệnh án',
+            description: `${patientCount} BN trong hệ thống`,
+            icon: <Heart className="w-6 h-6 text-[#d2145a]" />,
+            iconBg: 'bg-pink-50',
+          },
+          {
+            module: 'schedule-view',
+            label: 'Lịch thông tim dự kiến',
+            description: 'Lịch phòng Cathlab',
+            icon: <Calendar className="w-6 h-6 text-[#d2145a]" />,
+            iconBg: 'bg-rose-50',
+          },
+          {
+            module: 'mri-calendar',
+            label: 'Lịch chụp MRI tim',
+            description: 'Lịch các ca dự kiến chụp MRI',
+            icon: <Calendar className="w-6 h-6 text-purple-600" />,
+            iconBg: 'bg-purple-50',
+          },
+        ],
+      },
+      {
+        title: '2. QUẢN LÝ HỘI CHẨN',
+        tiles: [
+          {
+            module: 'consult-list',
+            label: 'Hội chẩn',
+            description: `${pendingConsultCount} lượt staff hoàn tất`,
+            icon: <ClipboardList className="w-6 h-6 text-teal-600" />,
+            iconBg: 'bg-teal-50',
+            highlight: true,
+          },
+          {
+            module: 'results-staff',
+            label: 'Nhập kết quả staff',
+            description: 'Ca đang đợi nhận định',
+            icon: <PenTool className="w-6 h-6 text-blue-600" />,
+            iconBg: 'bg-blue-50',
+          },
+        ],
+      },
+      {
+        title: '3. QUẢN LÝ THÔNG TIM',
+        tiles: [
+          {
+            module: 'schedule-tt',
+            label: 'Xếp lịch & Dụng cụ',
+            description: 'Phân ca can thiệp',
+            icon: <SlidersHorizontal className="w-6 h-6 text-emerald-600" />,
+            iconBg: 'bg-emerald-50',
+          },
+          {
+            module: 'cathlab-room',
+            label: 'Phòng thông tim',
+            description: 'Kiểm soát ca thủ thuật',
+            icon: <ShieldCheck className="w-6 h-6 text-teal-600" />,
+            iconBg: 'bg-teal-50',
+          },
+          {
+            module: 'archive',
+            label: 'Lưu trữ',
+            description: 'Đã chuyển phòng TT & ca lưu trữ',
+            icon: <Archive className="w-6 h-6 text-slate-500" />,
+            iconBg: 'bg-slate-50',
+          },
+        ],
+      },
+      {
+        title: '4. QUẢN LÝ PHẪU THUẬT',
+        tiles: [
+          {
+            module: 'surgery-room',
+            label: 'Phòng phẫu thuật',
+            description: 'Kiểm soát ca phẫu thuật tim',
+            icon: <Scissors className="w-6 h-6 text-rose-600" />,
+            iconBg: 'bg-rose-50',
+          },
+          {
+            module: 'surgery-scheduler',
+            label: 'Xếp lịch phẫu thuật',
+            description: 'Phân ca mổ tim',
+            icon: <SlidersHorizontal className="w-6 h-6 text-rose-600" />,
+            iconBg: 'bg-rose-50',
+          },
+          {
+            module: 'surgery-schedule-view',
+            label: 'Lịch phẫu thuật dự kiến',
+            description: 'Lịch phòng mổ tim',
+            icon: <Calendar className="w-6 h-6 text-rose-600" />,
+            iconBg: 'bg-rose-50',
+          },
+        ],
+      },
+      {
+        title: '5. QUẢN LÝ MRI TIM',
+        tiles: [
+          {
+            module: 'mri-register',
+            label: 'Đăng ký MRI tim',
+            description: 'Danh sách đăng ký chụp MRI',
+            icon: <Activity className="w-6 h-6 text-purple-600" />,
+            iconBg: 'bg-purple-50',
+          },
+          {
+            module: 'mri-scheduler',
+            label: 'Xếp lịch MRI',
+            description: `${pendingMriCount} ca MRI cần theo dõi`,
+            icon: <Activity className="w-6 h-6 text-purple-600" />,
+            iconBg: 'bg-purple-50',
+          },
+          {
+            module: 'mri-result',
+            label: 'Điền KQ MRI tim',
+            description: 'Danh sách chờ điền kết quả MRI tim',
+            icon: <PenTool className="w-6 h-6 text-purple-600" />,
+            iconBg: 'bg-purple-50',
+          },
+        ],
+      },
+      {
+        title: '6. QUẢN LÝ NHÂN SỰ',
+        tiles: [
+          {
+            module: 'staff-mgmt',
+            label: 'Phân quyền nhân sự',
+            description: 'Vai trò mẫu · module · tài khoản',
+            icon: <UserCog className="w-6 h-6 text-indigo-600" />,
+            iconBg: 'bg-indigo-50',
+          },
+        ],
+      },
+    ];
 
+    return all
+      .map(section => ({
+        ...section,
+        tiles: section.tiles.filter(tile => canAccessModule(tile.module)),
+      }))
+      .filter(section => section.tiles.length > 0);
+  }, [canAccessModule, patientCount, pendingConsultCount, pendingMriCount]);
 
+  if (sections.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-12 animate-in fade-in duration-300">
+        <div className="max-w-md text-center bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+          <p className="text-sm font-bold text-slate-500">
+            Tài khoản chưa được cấp quyền module nào. Liên hệ Admin để được phân quyền.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-
     <div className="space-y-8 animate-in fade-in duration-300 p-2 sm:p-4">
-
-
-
-      {/* 1. QUẢN LÝ BỆNH NHÂN - LỊCH HẸN */}
-
-      <div>
-
-        <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-
-          <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 1. QUẢN LÝ BỆNH NHÂN - LỊCH HẸN
-
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          <button
-
-            onClick={() => onNavigate('patients')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-pink-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-pink-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Heart className="w-6 h-6 text-[#d2145a]" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Hồ sơ bệnh án</h3>
-
-            <p className="text-xs text-slate-500">{patientCount} BN trong hệ thống</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('schedule-view')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-rose-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Calendar className="w-6 h-6 text-[#d2145a]" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Lịch thông tim dự kiến</h3>
-
-            <p className="text-xs text-slate-500">Lịch phòng Cathlab</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('mri-calendar')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Calendar className="w-6 h-6 text-purple-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Lịch chụp MRI tim</h3>
-
-            <p className="text-xs text-slate-500">Lịch các ca dự kiến chụp MRI</p>
-
-          </button>
-
-
-
-          <button className="bg-white border rounded-2xl p-5 opacity-60 cursor-not-allowed text-left">
-
-            <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center mb-4">
-
-              <Clock className="w-6 h-6 text-amber-500" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-amber-600 mb-1">Lịch tái khám</h3>
-
-            <p className="text-xs text-slate-500">Theo dõi ngoại trú</p>
-
-          </button>
-
-        </div>
-
-      </div>
-
-
-
-      {/* 2. QUẢN LÝ HỘI CHẨN */}
-
-      <div>
-
-        <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-
-          <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 2. QUẢN LÝ HỘI CHẨN
-
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          <button
-
-            onClick={() => onNavigate('consult-list')}
-
-            className="bg-white border border-pink-500 shadow-sm rounded-2xl p-5 hover:bg-pink-50 transition text-left group relative"
-
-          >
-
-            <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <ClipboardList className="w-6 h-6 text-teal-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Hội chẩn</h3>
-
-            <p className="text-xs text-slate-500">{pendingConsultCount} lượt staff hoàn tất</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('results-staff')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-blue-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <PenTool className="w-6 h-6 text-blue-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Nhập kết quả staff</h3>
-
-            <p className="text-xs text-slate-500">Ca đang đợi nhận định</p>
-
-          </button>
-
-        </div>
-
-      </div>
-
-
-
-      {/* 3. QUẢN LÝ THÔNG TIM */}
-
-      <div>
-
-        <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-
-          <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 3. QUẢN LÝ THÔNG TIM
-
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          <button
-
-            onClick={() => onNavigate('schedule-tt')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-emerald-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <SlidersHorizontal className="w-6 h-6 text-emerald-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Xếp lịch &amp; Dụng cụ</h3>
-
-            <p className="text-xs text-slate-500">Phân ca can thiệp</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('cathlab-room')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-teal-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <ShieldCheck className="w-6 h-6 text-teal-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Phòng thông tim</h3>
-
-            <p className="text-xs text-slate-500">Kiểm soát ca thủ thuật</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('archive')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-slate-400 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Archive className="w-6 h-6 text-slate-500" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Lưu trữ</h3>
-
-            <p className="text-xs text-slate-500">Đã chuyển phòng TT &amp; ca lưu trữ</p>
-
-          </button>
-
-        </div>
-
-      </div>
-
-
-
-      {/* 4. QUẢN LÝ PHẪU THUẬT */}
-
-      <div>
-
-        <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-
-          <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 4. QUẢN LÝ PHẪU THUẬT
-
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          <button
-
-            onClick={() => onNavigate('surgery-room')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-rose-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Scissors className="w-6 h-6 text-rose-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Phòng phẫu thuật</h3>
-
-            <p className="text-xs text-slate-500">Kiểm soát ca phẫu thuật tim</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('surgery-scheduler')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-rose-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <SlidersHorizontal className="w-6 h-6 text-rose-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Xếp lịch phẫu thuật</h3>
-
-            <p className="text-xs text-slate-500">Phân ca mổ tim</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('surgery-schedule-view')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-rose-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Calendar className="w-6 h-6 text-rose-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Lịch phẫu thuật dự kiến</h3>
-
-            <p className="text-xs text-slate-500">Lịch phòng mổ tim</p>
-
-          </button>
-
-        </div>
-
-      </div>
-
-
-
-      {/* 5. QUẢN LÝ MRI TIM */}
-
-      <div>
-
-        <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-
-          <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 5. QUẢN LÝ MRI TIM
-
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          <button
-
-            onClick={() => onNavigate('mri-register')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Activity className="w-6 h-6 text-purple-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Đăng ký MRI tim</h3>
-
-            <p className="text-xs text-slate-500">Danh sách đăng ký chụp MRI</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('mri-scheduler')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <Activity className="w-6 h-6 text-purple-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Xếp lịch MRI</h3>
-
-            <p className="text-xs text-slate-500">{pendingMriCount} ca MRI cần theo dõi</p>
-
-          </button>
-
-
-
-          <button
-
-            onClick={() => onNavigate('mri-result')}
-
-            className="bg-white border rounded-2xl p-5 hover:border-purple-300 hover:shadow-md transition text-left group"
-
-          >
-
-            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-              <PenTool className="w-6 h-6 text-purple-600" />
-
-            </div>
-
-            <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Điền KQ MRI tim</h3>
-
-            <p className="text-xs text-slate-500">Danh sách chờ điền kết quả MRI tim</p>
-
-          </button>
-
-        </div>
-
-      </div>
-
-
-
-      {/* 6. QUẢN LÝ NHÂN SỰ */}
-
-      {canManageStaff && (
-
-        <div>
-
+      {sections.map(section => (
+        <div key={section.title}>
           <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-
-            <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> 6. QUẢN LÝ NHÂN SỰ
-
+            <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> {section.title}
           </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-            <button
-
-              onClick={() => onNavigate('staff-mgmt')}
-
-              className="bg-white border rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition text-left group"
-
-            >
-
-              <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-
-                <UserCog className="w-6 h-6 text-indigo-600" />
-
-              </div>
-
-              <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">Phân quyền nhân sự</h3>
-
-              <p className="text-xs text-slate-500">Vai trò mẫu · module · tài khoản</p>
-
-            </button>
-
+            {section.tiles.map(tile => (
+              <button
+                key={tile.module}
+                type="button"
+                onClick={() => onNavigate(tile.module)}
+                className={`bg-white border rounded-2xl p-5 hover:shadow-md transition text-left group ${
+                  tile.highlight
+                    ? 'border-pink-500 shadow-sm hover:bg-pink-50'
+                    : 'hover:border-pink-300'
+                }`}
+              >
+                <div
+                  className={`w-12 h-12 ${tile.iconBg} rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}
+                >
+                  {tile.icon}
+                </div>
+                <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">{tile.label}</h3>
+                <p className="text-xs text-slate-500">{tile.description}</p>
+              </button>
+            ))}
           </div>
-
         </div>
-
-      )}
-
-
-
+      ))}
     </div>
-
   );
-
 }
-
-

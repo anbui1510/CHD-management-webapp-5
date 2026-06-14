@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { AppModule } from '../auth/permissions';
 import { motion } from 'motion/react';
 import { 
   Users, 
@@ -34,6 +35,7 @@ interface HomeDashboardProps {
   patients?: Patient[];
   consults?: Consult[];
   cathlabs?: CathLab[];
+  canAccessModule: (module: AppModule) => boolean;
 }
 
 const SHORTCUTS_POOL = [
@@ -42,10 +44,19 @@ const SHORTCUTS_POOL = [
   { id: 'consult-list', label: 'Đăng ký Hội chẩn', desc: 'Đăng ký staff mới', iconName: 'ClipboardList', color: 'amber' },
   { id: 'results-staff', label: 'KQ Hội chẩn', desc: 'Duyệt chỉ định & nhập kết quả', iconName: 'emerald' },
   { id: 'schedule-tt', label: 'Xếp lịch & Dụng cụ', desc: 'Xem tuần, kiểm dụng cụ', iconName: 'CalendarDays', color: 'rose' },
+  { id: 'schedule-view', label: 'Lịch thông tim dự kiến', desc: 'Xem lịch cathlab', iconName: 'CalendarDays', color: 'rose' },
   { id: 'cathlab-room', label: 'Phòng Thông tim', desc: 'Lịch can thiệp trực tiếp', iconName: 'Activity', color: 'blue' },
+  { id: 'archive', label: 'Lưu trữ', desc: 'Danh sách hồ sơ hoãn/mổ', iconName: 'Archive', color: 'slate' },
+  { id: 'mri-register', label: 'Đăng ký MRI', desc: 'Đăng ký chụp MRI tim', iconName: 'Activity', color: 'violet' },
+  { id: 'mri-scheduler', label: 'Xếp lịch MRI', desc: 'Phân ca chụp MRI', iconName: 'CalendarDays', color: 'violet' },
+  { id: 'mri-result', label: 'Điền KQ MRI', desc: 'Nhập kết quả MRI tim', iconName: 'FileText', color: 'violet' },
+  { id: 'mri-calendar', label: 'Lịch chụp MRI', desc: 'Lịch các ca MRI dự kiến', iconName: 'CalendarDays', color: 'violet' },
+  { id: 'surgery-room', label: 'Phòng phẫu thuật', desc: 'Nhập kết quả mổ tim', iconName: 'Activity', color: 'rose' },
+  { id: 'surgery-scheduler', label: 'Xếp lịch phẫu thuật', desc: 'Phân ca mổ tim', iconName: 'CalendarDays', color: 'rose' },
+  { id: 'surgery-schedule-view', label: 'Lịch mổ dự kiến', desc: 'Xem lịch phòng mổ', iconName: 'CalendarDays', color: 'rose' },
   { id: 'google-sheets', label: 'Google Sheets', desc: 'Cơ sở dữ liệu virtual', iconName: 'Database', color: 'violet' },
   { id: 'excel-export', label: 'Bảng Filter & Xuất', desc: 'Xuất biên bản hàng loạt', iconName: 'Download', color: 'cyan' },
-  { id: 'archive', label: 'Lưu trữ', desc: 'Danh sách hồ sơ hoãn/mổ', iconName: 'Archive', color: 'slate' },
+  { id: 'staff-mgmt', label: 'Quản lý nhân sự', desc: 'Phân quyền module & tài khoản', iconName: 'LayoutDashboard', color: 'indigo' },
 ];
 
 const renderIcon = (name: string, className: string) => {
@@ -97,6 +108,8 @@ const getFormattedDateKey = (str: string | undefined): string => {
   return trimmed;
 };
 
+const DEFAULT_SHORTCUT_IDS = ['patients', 'consult-list', 'results-staff', 'cathlab-room'];
+
 export default function HomeDashboard({
   onNavigate,
   patientCount,
@@ -107,26 +120,48 @@ export default function HomeDashboard({
   currentStaffName,
   patients = [],
   consults = [],
-  cathlabs = []
+  cathlabs = [],
+  canAccessModule,
 }: HomeDashboardProps) {
   
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [chartMetric, setChartMetric] = useState<'cathlabs' | 'staff_consults' | 'cathlabs_yearly'>('cathlabs');
   const [chartYear, setChartYear] = useState<number>(2026);
   const [isConfiguringChartMetric, setIsConfiguringChartMetric] = useState(false);
+
+  const allowedShortcuts = useMemo(
+    () => SHORTCUTS_POOL.filter(sh => canAccessModule(sh.id as AppModule)),
+    [canAccessModule]
+  );
+
+  const allowedShortcutIds = useMemo(
+    () => allowedShortcuts.map(sh => sh.id),
+    [allowedShortcuts]
+  );
+
   const [selectedShortcutIds, setSelectedShortcutIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('home_quick_shortcuts');
+    let ids: string[] = DEFAULT_SHORTCUT_IDS;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, 4);
+        if (Array.isArray(parsed) && parsed.length > 0) ids = parsed.slice(0, 4);
       } catch (e) {
         console.error(e);
       }
     }
-    // Default 4 shortcuts
-    return ['patients', 'consult-list', 'results-staff', 'cathlab-room'];
+    return ids;
   });
+
+  useEffect(() => {
+    setSelectedShortcutIds(prev => {
+      const next = prev.filter(id => allowedShortcutIds.includes(id));
+      const fallback = DEFAULT_SHORTCUT_IDS.filter(id => allowedShortcutIds.includes(id)).slice(0, 4);
+      const resolved = (next.length > 0 ? next : fallback).slice(0, 4);
+      localStorage.setItem('home_quick_shortcuts', JSON.stringify(resolved));
+      return resolved;
+    });
+  }, [allowedShortcutIds.join(',')]);
 
   const handleToggleShortcut = (id: string) => {
     if (selectedShortcutIds.includes(id)) {
@@ -676,7 +711,7 @@ export default function HomeDashboard({
                       <span className="text-[10px] text-pink-600 font-bold font-mono">Đã chọn {selectedShortcutIds.length}/4</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {SHORTCUTS_POOL.map(sh => {
+                      {allowedShortcuts.map(sh => {
                         const isSelected = selectedShortcutIds.includes(sh.id);
                         const colDef = getColorClasses(sh.color || 'slate');
                         return (
@@ -706,10 +741,16 @@ export default function HomeDashboard({
                       })}
                     </div>
                   </div>
+                ) : allowedShortcuts.length === 0 ? (
+                  <div className="flex items-center justify-center h-full min-h-[120px] text-center px-4">
+                    <p className="text-[11px] font-semibold text-slate-400">
+                      Chưa có module nào được phân quyền cho phím tắt truy cập nhanh.
+                    </p>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     {selectedShortcutIds.map(sid => {
-                      const sh = SHORTCUTS_POOL.find(x => x.id === sid);
+                      const sh = allowedShortcuts.find(x => x.id === sid);
                       if (!sh) return null;
                       const colDef = getColorClasses(sh.color || 'slate');
                       return (
