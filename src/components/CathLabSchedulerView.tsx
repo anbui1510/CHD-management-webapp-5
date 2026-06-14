@@ -334,7 +334,7 @@ export default function CathLabSchedulerView({
   const [adHocOutcome, setAdHocOutcome] = useState<'Tử vong' | 'Nặng xin về' | 'Đã mổ' | 'Đã thông' | ''>('');
 
   const [adHocConsultType, setAdHocConsultType] = useState<'Staff mổ' | 'Staff thông'>('Staff thông');
-  const [actionConfirm, setActionConfirm] = useState<{type: 'loai'|'transfer'|'undo_scheduled'|'transfer_row'|'ad_hoc_override', title: string, message: string, consultToUpdate?: Consult} | null>(null);
+  const [actionConfirm, setActionConfirm] = useState<{type: 'save_schedule'|'loai'|'transfer'|'undo_scheduled'|'transfer_row'|'ad_hoc_override', title: string, message: string, consultToUpdate?: Consult} | null>(null);
   const [actionAlert, setActionAlert] = useState<string>('');
   const [formSnapshot, setFormSnapshot] = useState<SchedulingFormSnapshot | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
@@ -384,6 +384,12 @@ export default function CathLabSchedulerView({
       getLatestPriorDetailDiagnosis(adHocSelectedPatientKey, consults, cathlabs, adHocConsultDate)
     );
   }, [adHocPatientMode, adHocSelectedPatientKey, adHocConsultDate, consults, cathlabs]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    const timer = window.setTimeout(() => setSuccessMsg(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [successMsg]);
 
   // Summary copyable modal states
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -608,9 +614,6 @@ Xin cảm ơn!`;
 
       const isRemoved = c.Removed === true || String(c.Removed).toUpperCase() === 'TRUE' || String(c.Removed).toLowerCase() === 'có' || String(c.Removed).toLowerCase() === 'yes';
       if (isRemoved) { return false; }
-
-      const isTransferred = (c as any).TransferredToCathLab === true || String((c as any).TransferredToCathLab).toUpperCase() === 'TRUE' || String((c as any).TransferredToCathLab).toLowerCase() === 'yes' || String((c as any).TransferredToCathLab).toLowerCase() === 'có';
-      if (isTransferred) { return false; }
 
       const resID = (c.ConsultResultID || '').trim();
       let matchRes = false;
@@ -1802,12 +1805,14 @@ Xin cảm ơn!`;
       setErrorMsg(`Vui lòng điền đầy đủ: ${missing.join(', ')}`);
       return;
     }
-    
-    setSaving(true);
+
     setSuccessMsg('');
     setErrorMsg('');
-
-    await executeSave(getCurrentFormData());
+    setActionConfirm({
+      type: 'save_schedule',
+      title: 'Xác nhận lưu thông tin',
+      message: 'Bạn có muốn lưu thông tin xếp lịch cho bệnh nhân này không?'
+    });
   };
 
   const handleExitSave = async () => {
@@ -1842,7 +1847,7 @@ Xin cảm ơn!`;
          const d = await response.json();
          throw new Error(d.error || 'Failed to update consult');
       }
-      setSuccessMsg('Đánh dấu lưu thành công!');
+      setSuccessMsg('Đã lưu thông tin xếp lịch thành công!');
       onRefreshData();
       
       const merged = { ...selectedConsult, ...updatedData };
@@ -1852,11 +1857,11 @@ Xin cảm ơn!`;
       if (closeOnSuccess) {
         setTimeout(() => {
           setSuccessMsg('');
-          if (updatedData.CallStatus === 'Loại' || updatedData.TransferredToCathLab) {
+          if (updatedData.CallStatus === 'Loại') {
              setSelectedConsult(null);
              setFormSnapshot(null);
           }
-        }, 1000);
+        }, 3000);
       }
       return true;
     } catch (err: any) {
@@ -1892,7 +1897,7 @@ Xin cảm ơn!`;
     setActionConfirm({
       type: 'transfer',
       title: 'Chuyển phòng thông tim',
-      message: 'Chuyển phòng thông tim. Bệnh nhân sẽ ẩn khỏi view Xếp lịch. Bạn có chắc chắn không?'
+      message: 'Bạn có muốn chuyển bệnh nhân sang phòng Thông tim không? Ca này vẫn được giữ trong Lịch thông tim dự kiến.'
     });
   };
 
@@ -1925,7 +1930,9 @@ Xin cảm ơn!`;
   const handleExecuteActionConfirm = async () => {
     if (!actionConfirm) return;
     setSaving(true);
-    if (actionConfirm.type === 'loai') {
+    if (actionConfirm.type === 'save_schedule') {
+      await executeSave(getCurrentFormData());
+    } else if (actionConfirm.type === 'loai') {
       setCallStatus('Loại');
       await executeSave({ ...getCurrentFormData(), CallStatus: 'Loại' });
     } else if (actionConfirm.type === 'transfer') {
@@ -1942,9 +1949,13 @@ Xin cảm ơn!`;
            if (selectedConsult && selectedConsult.ConsultKey === actionConfirm.consultToUpdate.ConsultKey) {
               setPlannedCathLabDate('');
            }
+           setSuccessMsg('Đã rút ca về danh sách Chưa xếp lịch.');
+        } else {
+          throw new Error('Không thể rút ca về danh sách Chưa xếp lịch');
         }
       } catch (e) {
         console.error(e);
+        setErrorMsg(e instanceof Error ? e.message : 'Không thể rút ca về danh sách Chưa xếp lịch');
       }
     } else if (actionConfirm.type === 'transfer_row' && actionConfirm.consultToUpdate) {
       try {
@@ -1955,12 +1966,13 @@ Xin cảm ơn!`;
         });
         if (response.ok) {
            onRefreshData();
-           if (selectedConsult && selectedConsult.ConsultKey === actionConfirm.consultToUpdate.ConsultKey) {
-             setSelectedConsult(null);
-           }
+           setSuccessMsg('Đã chuyển phòng thông tim. Ca vẫn được giữ trong Lịch thông tim dự kiến.');
+        } else {
+          throw new Error('Không thể chuyển phòng thông tim');
         }
       } catch (e) {
         console.error(e);
+        setErrorMsg(e instanceof Error ? e.message : 'Không thể chuyển phòng thông tim');
       }
     } else if (actionConfirm.type === 'ad_hoc_override' && actionConfirm.consultToUpdate) {
       try {
@@ -3258,7 +3270,7 @@ Xin cảm ơn!`;
                     type="button"
                     onClick={handleActionTransfer}
                     className={`bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shadow-xs ${isTransferEnabled() ? 'hover:bg-sky-100 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
-                    title="Chuyển phòng thông tim. Bệnh nhân sẽ ẩn khỏi view Xếp lịch"
+                    title="Chuyển phòng thông tim. Ca vẫn được giữ trong Lịch thông tim dự kiến"
                   >
                      Chuyển phòng TT
                   </button>
@@ -3658,9 +3670,9 @@ Xin cảm ơn!`;
       {actionConfirm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
-            <div className={`py-3 px-4 flex items-center gap-2 ${actionConfirm.type === 'loai' ? 'bg-rose-50 border-b border-rose-100' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-50 border-b border-indigo-100' : 'bg-sky-50 border-b border-sky-100'}`}>
-               <AlertTriangle className={`w-5 h-5 ${actionConfirm.type === 'loai' ? 'text-rose-600' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-600' : 'text-sky-600'}`} />
-               <h3 className={`font-extrabold text-[13px] uppercase tracking-wide ${actionConfirm.type === 'loai' ? 'text-rose-900' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-900' : 'text-sky-900'}`}>{actionConfirm.title}</h3>
+            <div className={`py-3 px-4 flex items-center gap-2 ${actionConfirm.type === 'loai' ? 'bg-rose-50 border-b border-rose-100' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-50 border-b border-emerald-100' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-50 border-b border-indigo-100' : 'bg-sky-50 border-b border-sky-100'}`}>
+               <AlertTriangle className={`w-5 h-5 ${actionConfirm.type === 'loai' ? 'text-rose-600' : actionConfirm.type === 'save_schedule' ? 'text-emerald-600' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-600' : 'text-sky-600'}`} />
+               <h3 className={`font-extrabold text-[13px] uppercase tracking-wide ${actionConfirm.type === 'loai' ? 'text-rose-900' : actionConfirm.type === 'save_schedule' ? 'text-emerald-900' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-900' : 'text-sky-900'}`}>{actionConfirm.title}</h3>
             </div>
             <div className="p-5">
               <p className="text-sm font-semibold text-slate-700">{actionConfirm.message}</p>
@@ -3669,11 +3681,18 @@ Xin cảm ơn!`;
                <button onClick={() => setActionConfirm(null)} className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer">
                   Hủy bỏ
                </button>
-               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' ? 'bg-[#d2145a] hover:bg-rose-700' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
-                  {saving ? 'Đang thực hiện...' : 'Đồng ý'}
+               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' ? 'bg-[#d2145a] hover:bg-rose-700' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-600 hover:bg-emerald-700' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
+                  {saving ? 'Đang thực hiện...' : actionConfirm.type === 'save_schedule' ? 'Đồng ý lưu' : 'Đồng ý'}
                </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="fixed top-5 right-5 z-[80] max-w-sm rounded-2xl border border-emerald-200 bg-white shadow-xl px-4 py-3 text-sm font-bold text-emerald-800 flex items-start gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <span>{successMsg}</span>
         </div>
       )}
 
