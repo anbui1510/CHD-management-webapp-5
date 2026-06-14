@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import { Patient, Consult, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
+import { Patient, Consult, CathLab, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
+import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -38,6 +39,7 @@ import {
 interface CathLabSchedulerViewProps {
   patients: Patient[];
   consults: Consult[];
+  cathlabs?: CathLab[];
   sources?: Source[];
   staffList: Staff[];
   currentStaff?: Staff | null;
@@ -186,6 +188,7 @@ const getPriorityBadgeClass = (priority: string) => {
 export default function CathLabSchedulerView({
   patients,
   consults,
+  cathlabs = [],
   sources = [],
   staffList,
   currentStaff,
@@ -364,6 +367,16 @@ export default function CathLabSchedulerView({
   const [adHocCheckDeviceBy, setAdHocCheckDeviceBy] = useState<string>('');
   const [adHocCathMethod, setAdHocCathMethod] = useState<string[]>([]);
   const [adHocPendingConsult, setAdHocPendingConsult] = useState<Consult | null>(null);
+
+  useEffect(() => {
+    if (adHocPatientMode !== 'existing' || !adHocSelectedPatientKey) {
+      setAdHocDetailDiagnosis('');
+      return;
+    }
+    setAdHocDetailDiagnosis(
+      getLatestPriorDetailDiagnosis(adHocSelectedPatientKey, consults, cathlabs, adHocConsultDate)
+    );
+  }, [adHocPatientMode, adHocSelectedPatientKey, adHocConsultDate, consults, cathlabs]);
 
   // Summary copyable modal states
   const [showSummaryModal, setShowSummaryModal] = useState(false);

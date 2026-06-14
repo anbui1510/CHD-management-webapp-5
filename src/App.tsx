@@ -2795,6 +2795,7 @@ export default function App() {
             <CathLabSchedulerView 
               patients={patients}
               consults={consults}
+              cathlabs={cathlabs}
               sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
@@ -2802,6 +2803,7 @@ export default function App() {
               onRefreshData={() => {
                 fetchPatients();
                 fetchConsults();
+                fetchCathlabs();
                 fetchStaff();
                 fetchSources();
               }}
@@ -2817,6 +2819,7 @@ export default function App() {
             <CathLabSchedulerView 
               patients={patients}
               consults={consults}
+              cathlabs={cathlabs}
               sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
@@ -2824,6 +2827,7 @@ export default function App() {
               onRefreshData={() => {
                 fetchPatients();
                 fetchConsults();
+                fetchCathlabs();
                 fetchStaff();
                 fetchSources();
               }}
