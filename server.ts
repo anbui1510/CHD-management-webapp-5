@@ -7,7 +7,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { Patient, Consult, Staff, CathLab, CMR, Source, RolePreset } from './src/types';
+import { Patient, Consult, Staff, CathLab, CMR, Source, RolePreset, Operation } from './src/types';
 import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
@@ -752,6 +752,20 @@ function ensureRolePresetsDB(): RolePreset[] {
   }
   return resolved;
 }
+
+app.get('/api/all', async (_req, res) => {
+  await syncFromGoogleSheets();
+  res.json({
+    patients: readDB<Patient>(PATIENTS_FILE, defaultPatients),
+    consults: readDB<Consult>(CONSULTS_FILE, defaultConsults),
+    staff: readDB<Staff>(STAFF_FILE, defaultStaff),
+    cathlabs: readDB<CathLab>(CATHLABS_FILE, defaultCathlabs),
+    operations: readDB<Operation>(OPERATIONS_FILE, []),
+    cmrs: readDB<CMR>(CMRS_FILE, defaultCmrs),
+    sources: readDB<Source>(SOURCES_FILE, []),
+    rolePresets: ensureRolePresetsDB()
+  });
+});
 
 // Routes
 app.get('/api/staff', async (req, res) => {

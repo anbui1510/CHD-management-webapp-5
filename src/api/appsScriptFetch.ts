@@ -119,7 +119,47 @@ const loadAllData = async (force = false): Promise<SheetData> => {
   return pendingLoad;
 };
 
-const postToScript = async (payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any }) => {
+const findCachedRecord = (
+  endpoint: string,
+  key: string | undefined,
+  config: (typeof endpointMap)[string]
+) => {
+  if (!key || !cache) return undefined;
+  const collection = cache[config.collection] as any[];
+  return collection.find(item =>
+    String(getRecordKey(item, config) || '').trim().toLowerCase() === String(key).trim().toLowerCase() ||
+    (endpoint === 'patients' && String(item.PatientID1 || '').trim().toLowerCase() === String(key).trim().toLowerCase())
+  );
+};
+
+const upsertCachedRecord = (config: (typeof endpointMap)[string], record: any, isInsert: boolean) => {
+  if (!cache) {
+    cache = { ...EMPTY_DATA };
+  }
+  const collection = [...(cache[config.collection] as any[])];
+  const recordKey = String(getRecordKey(record, config) || '').trim().toLowerCase();
+  const index = collection.findIndex(item =>
+    String(getRecordKey(item, config) || '').trim().toLowerCase() === recordKey
+  );
+  if (index >= 0) {
+    collection[index] = record;
+  } else if (isInsert) {
+    collection.push(record);
+  } else {
+    collection.push(record);
+  }
+  cache = {
+    ...cache,
+    [config.collection]: collection
+  };
+};
+
+const postToScript = async (
+  payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any },
+  config: (typeof endpointMap)[string],
+  record: any,
+  isInsert: boolean
+) => {
   const scriptUrl = getScriptUrl();
   if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
 
@@ -136,7 +176,7 @@ const postToScript = async (payload: { type: SheetType; action: 'insert' | 'upda
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu');
   }
-  cache = null;
+  upsertCachedRecord(config, record, isInsert);
   return result;
 };
 
@@ -170,17 +210,14 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   if (!config) return jsonResponse({ error: `Unsupported endpoint: ${endpoint}` }, { status: 404 });
 
   const incoming = await parseBody(init);
-  const current = await loadAllData();
-  const collection = current[config.collection] as any[];
-
   const isUpdate = method === 'PUT' || method === 'PATCH';
   const key = keyFromPath ? decodeURIComponent(keyFromPath) : getRecordKey(incoming, config);
-  const existing = key
-    ? collection.find(item =>
-        String(getRecordKey(item, config) || '').trim().toLowerCase() === String(key).trim().toLowerCase() ||
-        (endpoint === 'patients' && String(item.PatientID1 || '').trim().toLowerCase() === String(key).trim().toLowerCase())
-      )
-    : undefined;
+
+  let existing = findCachedRecord(endpoint, key, config);
+  if (isUpdate && !existing && !cache) {
+    await loadAllData();
+    existing = findCachedRecord(endpoint, key, config);
+  }
 
   let record = isUpdate
     ? { ...(existing || {}), ...incoming }
@@ -194,12 +231,18 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   const finalKey = getRecordKey(record, config) || key || createKey(config.prefix);
   record[config.keyField] = finalKey;
 
-  await postToScript({
-    type: config.type,
-    action: existing || isUpdate ? 'update' : 'insert',
-    key: String(finalKey),
-    data: record
-  });
+  const isInsert = !(existing || isUpdate);
+  await postToScript(
+    {
+      type: config.type,
+      action: existing || isUpdate ? 'update' : 'insert',
+      key: String(finalKey),
+      data: record
+    },
+    config,
+    record,
+    isInsert
+  );
 
   return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
 };
@@ -241,6 +284,15 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
 
   if (endpoint === 'reset') {
     return jsonResponse({ message: 'Reset local database không khả dụng khi chạy bằng Apps Script.' }, { status: 400 });
+  }
+
+  if (endpoint === 'all' && method === 'GET') {
+    if (!scriptUrl) {
+      if (isLocalHost()) return null;
+      return jsonResponse(EMPTY_DATA);
+    }
+    const allData = await loadAllData();
+    return jsonResponse(allData);
   }
 
   if (endpoint === 'proxy' && parts[1] === 'drive-export') {

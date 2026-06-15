@@ -36,6 +36,7 @@ interface StaffManagementViewProps {
   rolePresetRecords: RolePreset[];
   onRefreshData: () => void;
   onRefreshRolePresets: () => void;
+  onPatchStaff?: (staffKey: string, patch: Partial<Staff>) => void;
   triggerAlert?: (message: string, title?: string) => void;
   triggerConfirm?: (message: string, onConfirm: () => void, title?: string) => void;
 }
@@ -64,6 +65,7 @@ export default function StaffManagementView({
   rolePresetRecords,
   onRefreshData,
   onRefreshRolePresets,
+  onPatchStaff,
   triggerAlert,
   triggerConfirm,
 }: StaffManagementViewProps) {
@@ -198,42 +200,44 @@ export default function StaffManagementView({
     }
 
     setSaving(true);
-    try {
-      const payload: Partial<Staff> = {
-        StaffName: draft.StaffName?.trim(),
-        Name: draft.Name?.trim() || '',
-        Department: draft.Department?.trim() || '',
-        Career: draft.Career?.trim() || '',
-        Email: draft.Email?.trim() || '',
-        StaffPhone: draft.StaffPhone?.trim() || '',
-        Password: draft.Password,
-        Role: draft.Role || 'User',
-        FireDate: draft.FireDate || '',
-        StaffRolePreset: isAdminStaff({ ...selectedStaff, Role: draft.Role }) ? 'admin-khoa' : draft.StaffRolePreset,
-        Permissions: isAdminStaff({ ...selectedStaff, Role: draft.Role })
-          ? serializePermissions(ALL_APP_MODULES)
-          : serializePermissions(draft.moduleSet),
-      };
 
-      const response = await fetch(`/api/staff/${encodeURIComponent(draft.StaffKey)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    const payload: Partial<Staff> = {
+      StaffName: draft.StaffName?.trim(),
+      Name: draft.Name?.trim() || '',
+      Department: draft.Department?.trim() || '',
+      Career: draft.Career?.trim() || '',
+      Email: draft.Email?.trim() || '',
+      StaffPhone: draft.StaffPhone?.trim() || '',
+      Password: draft.Password,
+      Role: draft.Role || 'User',
+      FireDate: draft.FireDate || '',
+      StaffRolePreset: isAdminStaff({ ...selectedStaff, Role: draft.Role }) ? 'admin-khoa' : draft.StaffRolePreset,
+      Permissions: isAdminStaff({ ...selectedStaff, Role: draft.Role })
+        ? serializePermissions(ALL_APP_MODULES)
+        : serializePermissions(draft.moduleSet),
+    };
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Không thể lưu nhân sự');
-      }
+    onPatchStaff?.(draft.StaffKey, payload);
+    triggerAlert?.('Đã cập nhật nhân sự và phân quyền thành công!', 'Lưu thành công');
 
-      triggerAlert?.('Đã cập nhật nhân sự và phân quyền thành công!', 'Lưu thành công');
-      onRefreshData();
-    } catch (error) {
-      console.error(error);
-      triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu nhân sự', 'Lỗi');
-    } finally {
-      setSaving(false);
-    }
+    fetch(`/api/staff/${encodeURIComponent(draft.StaffKey)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then(async response => {
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || 'Không thể lưu nhân sự');
+        }
+        onRefreshData();
+      })
+      .catch(error => {
+        console.error(error);
+        triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu nhân sự', 'Lỗi');
+        onRefreshData();
+      })
+      .finally(() => setSaving(false));
   };
 
   const handleToggleActive = () => {

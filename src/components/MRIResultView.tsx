@@ -24,6 +24,7 @@ interface MRIResultViewProps {
   staffList?: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
+  onPatchCmr?: (cmrKey: string, patch: Partial<CMR>) => void;
   onEditPatientAdmin?: (patient: Patient) => void;
 }
 
@@ -58,6 +59,7 @@ export default function MRIResultView({
   patients,
   cmrs,
   onRefreshData,
+  onPatchCmr,
   onEditPatientAdmin
 }: MRIResultViewProps) {
   const [activeTab, setActiveTab] = useState<ResultTab>('pending');
@@ -194,24 +196,24 @@ export default function MRIResultView({
     };
     delete (payload as any).__patient;
 
-    setSaving(true);
-    setMessage('');
-    try {
-      const res = await fetch(`/api/cmrs/${encodeURIComponent(key)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    onPatchCmr?.(key, payload);
+    closeItem();
+
+    fetch(`/api/cmrs/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Không lưu được kết quả MRI (server trả lỗi)');
+        onRefreshData();
+      })
+      .catch((err: any) => {
+        console.error(err);
+        const msg = err?.message || '';
+        alert(msg.includes('Failed to fetch') ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.' : (msg || 'Có lỗi khi lưu kết quả MRI.'));
+        onRefreshData();
       });
-      if (!res.ok) throw new Error('Không lưu được kết quả MRI (server trả lỗi)');
-      setMessage('Đã lưu kết quả MRI thành công!');
-      await onRefreshData();
-      setTimeout(() => closeItem(), 1200);
-    } catch (err: any) {
-      const msg = err?.message || '';
-      setMessage(msg.includes('Failed to fetch') ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.' : (msg || 'Có lỗi khi lưu kết quả MRI.'));
-    } finally {
-      setSaving(false);
-    }
   };
 
   const isDoneSelected = selectedItem ? !!String(selectedItem.CMRResult || '').trim() : false;

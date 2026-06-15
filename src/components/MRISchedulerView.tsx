@@ -32,6 +32,9 @@ interface MRISchedulerViewProps {
   staffList?: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
+  onPatchCmr?: (cmrKey: string, patch: Partial<CMR>) => void;
+  onAddCmr?: (cmr: CMR) => void;
+  onAddPatient?: (patient: Patient) => void;
 }
 
 const ADDRESS_OPTIONS = [
@@ -136,7 +139,10 @@ export default function MRISchedulerView({
   sources,
   staffList = [],
   currentStaff,
-  onRefreshData
+  onRefreshData,
+  onPatchCmr,
+  onAddCmr,
+  onAddPatient
 }: MRISchedulerViewProps) {
   const [activeTab, setActiveTab] = useState<MriTab>('unscheduled');
 
@@ -656,6 +662,18 @@ export default function MRISchedulerView({
 
     setSaving(true);
     setMessage('');
+
+    const savedItem = { ...payload, __patient: patient, __consult: selectedItem.__consult };
+    if (selectedItem.__isSynthetic) {
+      onAddCmr?.(payload);
+    } else {
+      onPatchCmr?.(payload.CMRKey || payload.CMRkey || '', payload);
+    }
+    setSelectedItem(savedItem);
+    setFormSnapshot(JSON.stringify(formData));
+    setMessage(`Đã lưu lịch MRI${currentStaff?.StaffName ? ` bởi ${currentStaff.StaffName}` : ''}.`);
+    setTimeout(() => setMessage(''), 3500);
+
     try {
       const method = selectedItem.__isSynthetic ? 'POST' : 'PUT';
       const url = selectedItem.__isSynthetic
@@ -671,12 +689,7 @@ export default function MRISchedulerView({
         throw new Error('Không lưu được lịch MRI (server trả lỗi)');
       }
 
-      setMessage(`Đã lưu lịch MRI${currentStaff?.StaffName ? ` bởi ${currentStaff.StaffName}` : ''}.`);
-      const savedItem = { ...payload, __patient: patient, __consult: selectedItem.__consult };
-      setSelectedItem(savedItem);
-      setFormSnapshot(JSON.stringify(formData));
-      await onRefreshData();
-      setTimeout(() => setMessage(''), 3500);
+      onRefreshData();
       return true;
     } catch (error: any) {
       const msg = error?.message || '';
@@ -684,6 +697,7 @@ export default function MRISchedulerView({
         ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.'
         : (msg || 'Có lỗi khi lưu lịch MRI.');
       if (confirmMode) setConfirmError(friendly); else setMessage(friendly);
+      onRefreshData();
       return false;
     } finally {
       setSaving(false);
@@ -805,7 +819,7 @@ export default function MRISchedulerView({
           return;
         }
         finalPatientKey = `pat_${Date.now()}`;
-        const patientPayload = {
+        const patientPayload: Patient = {
           PatientKey: finalPatientKey,
           PatientID1: adHocNewPatID1.trim(),
           PatientID2: adHocNewPatID2.trim(),
@@ -817,15 +831,11 @@ export default function MRISchedulerView({
           PatientPhone1: adHocNewPatPhone || '',
           PatientPhone2: '',
           PatientCreateBy: currentStaff?.StaffKey || '01378',
-          PatientCreateTime: new Date().toISOString()
+          PatientCreateTime: new Date().toISOString(),
+          Outcome: ''
         };
-        const patRes = await fetch('/api/patients', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patientPayload)
-        });
-        if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
-        finalPatient = patientPayload as unknown as Patient;
+        onAddPatient?.(patientPayload);
+        finalPatient = patientPayload;
       } else {
         if (!finalPatientKey) {
           setAdHocError('Vui lòng tìm và chọn bệnh nhi sẵn có hoặc đổi sang chế độ tạo mới!');
@@ -860,19 +870,47 @@ export default function MRISchedulerView({
         UpdateTime: new Date().toISOString()
       };
 
-      const res = await fetch('/api/cmrs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cmrPayload)
-      });
-      if (!res.ok) throw new Error('Không thể xếp bổ sung MRI');
-
+      onAddCmr?.(cmrPayload);
       setAdHocSuccess('Đã xếp bổ sung MRI thành công!');
-      setTimeout(() => {
-        setShowAdHoc(false);
-        resetAdHoc();
+      setShowAdHoc(false);
+      resetAdHoc();
+      setAdHocLoading(false);
+
+      const persist = async () => {
+        if (adHocPatientMode === 'create') {
+          const patRes = await fetch('/api/patients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              PatientKey: finalPatientKey,
+              PatientID1: adHocNewPatID1.trim(),
+              PatientID2: adHocNewPatID2.trim(),
+              PatientName: adHocNewPatName,
+              OtherPatientName: adHocNewPatName,
+              PatientDOB: adHocNewPatDOB || '2020-01-01',
+              PatientSex: adHocNewPatSex,
+              PatientAddress: adHocNewPatAddress || 'TP Hà Nội',
+              PatientPhone1: adHocNewPatPhone || '',
+              PatientPhone2: '',
+              PatientCreateBy: currentStaff?.StaffKey || '01378',
+              PatientCreateTime: new Date().toISOString()
+            })
+          });
+          if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
+        }
+        const res = await fetch('/api/cmrs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cmrPayload)
+        });
+        if (!res.ok) throw new Error('Không thể xếp bổ sung MRI');
         onRefreshData();
-      }, 1500);
+      };
+
+      persist().catch((error: any) => {
+        setAdHocError(`Đã xảy ra lỗi: ${error.message || error}`);
+        onRefreshData();
+      });
     } catch (error: any) {
       setAdHocError(`Đã xảy ra lỗi: ${error.message || error}`);
     } finally {

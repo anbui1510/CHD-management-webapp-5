@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   Staff, 
   Patient, 
@@ -46,6 +46,8 @@ import DevelopingFeatureView from './components/DevelopingFeatureView';
 import StaffManagementView from './components/StaffManagementView';
 import StaffAccountMenu from './components/StaffAccountMenu';
 import StaffProfileView from './components/StaffProfileView';
+import ResultStaffDrawer from './components/ResultStaffDrawer';
+import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions } from './data/source';
@@ -354,25 +356,69 @@ export default function App() {
 
   // Consult Outcome Results Form State (TRẦN MINH PHÚC style drawer, screenshot 9)
   const [editingConsultKey, setEditingConsultKey] = useState<string | null>(null);
-  const [isDrawerEditing, setIsDrawerEditing] = useState<boolean>(false);
-  const [resultUpdateData, setResultUpdateData] = useState({
-    ConsultResultID: '' as ConsultResultEnum,
-    DetailConsultResult: '',
-    PlannedDevice: '',
-    PlannedPrice: '',
-    CheckDevice: '' as 'Đủ' | 'Thiếu' | '',
-    PatientWeight: '',
-    PatientHeight: '',
-    ConsultType: 'Staff mổ' as ConsultTypeEnum,
-    ConsultDate: '',
-    RequestBy: '',
-    DiagnosisID: '',
-    DetailDiagnosis: '',
-    ConsultMember: [] as string[],
-    PriorityOrder: 'Chương trình' as PriorityOrderEnum,
-    ConsultResultUpdatedBy: '',
-    ConsultResultUpdatedTime: ''
-  });
+
+  const medicalDataSetters = useMemo(
+    () => ({
+      setPatients,
+      setConsults,
+      setStaffList,
+      setCathlabs,
+      setOperations,
+      setCmrs,
+      setSources,
+      setRolePresetRecords,
+      setRuntimeRolePresets
+    }),
+    []
+  );
+
+  const refreshMedicalData = useRefreshMedicalData(medicalDataSetters);
+
+  const patchConsult = useCallback((consultKey: string, patch: Partial<Consult>) => {
+    setConsults(prev => prev.map(c => (c.ConsultKey === consultKey ? { ...c, ...patch } : c)));
+  }, []);
+
+  const patchPatient = useCallback((patientKey: string, patch: Partial<Patient>) => {
+    setPatients(prev =>
+      prev.map(p =>
+        normalizePatientKey(p.PatientKey) === normalizePatientKey(patientKey) ? { ...p, ...patch } : p
+      )
+    );
+  }, []);
+
+  const addPatient = useCallback((patient: Patient) => {
+    setPatients(prev => [...prev, patient]);
+  }, []);
+
+  const addConsult = useCallback((consult: Consult) => {
+    setConsults(prev => [...prev, consult]);
+  }, []);
+
+  const patchCmr = useCallback((cmrKey: string, patch: Partial<CMR>) => {
+    const normalized = cmrKey.trim().toLowerCase();
+    setCmrs(prev =>
+      prev.map(c => {
+        const key = String(c.CMRKey || c.CMRkey || '').trim().toLowerCase();
+        return key === normalized ? { ...c, ...patch } : c;
+      })
+    );
+  }, []);
+
+  const addCmr = useCallback((cmr: CMR) => {
+    setCmrs(prev => [...prev, cmr]);
+  }, []);
+
+  const patchCathlab = useCallback((cathKey: string, patch: Partial<CathLab>) => {
+    setCathlabs(prev => prev.map(c => (c.CathKey === cathKey ? { ...c, ...patch } : c)));
+  }, []);
+
+  const addCathlab = useCallback((cath: CathLab) => {
+    setCathlabs(prev => [...prev, cath]);
+  }, []);
+
+  const patchStaffMember = useCallback((staffKey: string, patch: Partial<Staff>) => {
+    setStaffList(prev => prev.map(s => (s.StaffKey === staffKey ? { ...s, ...patch } : s)));
+  }, []);
 
   // State for editing registration (Sửa Đăng ký staff)
   const [editingRegConsultKey, setEditingRegConsultKey] = useState<string | null>(null);
@@ -467,18 +513,31 @@ export default function App() {
       throw new Error('Không thể thêm DiagnosisID vào Source');
     }
 
-    fetchSources();
+    refreshConsultData();
   };
 
+  const refreshClinicalData = useCallback(() => {
+    void refreshMedicalData('clinical');
+  }, [refreshMedicalData]);
+
+  const refreshConsultData = useCallback(() => {
+    void refreshMedicalData('consult');
+  }, [refreshMedicalData]);
+
+  const refreshStaffData = useCallback(() => {
+    void refreshMedicalData('staff');
+  }, [refreshMedicalData]);
+
+  const refreshMriData = useCallback(() => {
+    void refreshMedicalData('mri');
+  }, [refreshMedicalData]);
+
+  const refreshFullData = useCallback((force = false) => {
+    void refreshMedicalData('full', force);
+  }, [refreshMedicalData]);
+
   useEffect(() => {
-    fetchStaff();
-    fetchPatients();
-    fetchConsults();
-    fetchCathlabs();
-    fetchOperations();
-    fetchCmrs();
-    fetchSources();
-    fetchRolePresets();
+    void refreshMedicalData('full', true);
 
     // Recover logged-in session if exists
     const storedStaff = localStorage.getItem('CurrentStaffKey');
@@ -681,8 +740,9 @@ export default function App() {
     );
 
     const proceedSave = () => {
+      const patientKey = editingPatientKey || `pat_${Date.now()}`;
       const payload: Patient = {
-        PatientKey: editingPatientKey || `pat_${Date.now()}`,
+        PatientKey: patientKey,
         PatientID1: String(newPatientData.PatientID1 || '').trim(),
         PatientID2: String(newPatientData.PatientID2 || '').trim(),
         PatientName: newPatientData.PatientName,
@@ -698,33 +758,46 @@ export default function App() {
       };
 
       const isEdit = !!editingPatientKey;
-      const url = isEdit ? `/api/patients/${editingPatientKey}` : '/api/patients';
+      if (isEdit) {
+        patchPatient(patientKey, payload);
+      } else {
+        addPatient(payload);
+      }
+
+      setShowAddPatient(false);
+      setEditingPatientKey(null);
+      setNewPatientData({
+        PatientID1: '',
+        PatientID2: '',
+        PatientName: '',
+        OtherPatientName: '',
+        PatientDOB: '',
+        PatientSex: 'Nam',
+        PatientAddress: 'Hà Nội',
+        PatientPhone1: '',
+        PatientPhone2: '',
+        Outcome: ''
+      });
+      setFormSuccessMessage(isEdit ? 'Cập nhật hồ sơ hành chính thành công!' : 'Thêm bệnh nhi CHD mới thành công!');
+      setTimeout(() => setFormSuccessMessage(''), 3000);
+
+      const url = isEdit ? `/api/patients/${patientKey}` : '/api/patients';
       const method = isEdit ? 'PUT' : 'POST';
 
       fetch(url, {
-        method: method,
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-        .then(res => res.json())
-        .then(() => {
-          fetchPatients();
-          setShowAddPatient(false);
-          setEditingPatientKey(null);
-          setNewPatientData({
-            PatientID1: '',
-            PatientID2: '',
-            PatientName: '',
-            OtherPatientName: '',
-            PatientDOB: '',
-            PatientSex: 'Nam',
-            PatientAddress: 'Hà Nội',
-            PatientPhone1: '',
-            PatientPhone2: '',
-            Outcome: ''
-          });
-          setFormSuccessMessage(isEdit ? 'Cập nhật hồ sơ hành chính thành công!' : 'Thêm bệnh nhi CHD mới thành công!');
-          setTimeout(() => setFormSuccessMessage(''), 3000);
+        .then(res => {
+          if (!res.ok) throw new Error('Không thể lưu hồ sơ bệnh nhi');
+          return res.json();
+        })
+        .then(() => refreshConsultData())
+        .catch(err => {
+          console.error(err);
+          triggerAlert(err instanceof Error ? err.message : 'Không thể lưu hồ sơ bệnh nhi', 'Lỗi lưu');
+          refreshConsultData();
         });
     };
 
@@ -805,35 +878,42 @@ export default function App() {
         PDFTrigger: false
       };
 
+      addConsult(payload);
+      setNewConsultData(prev => ({
+        ...prev,
+        PatientKey: '',
+        PatientWeight: '',
+        PatientHeight: '',
+        DetailDiagnosis: '',
+        ConsultNote: '',
+        PlannedDevice: '',
+        PlannedPrice: '',
+        Department: 'Tim Mạch'
+      }));
+      setShowAddDeptInput(false);
+      setCustomDeptVal('');
+      setShowAddDocInput(false);
+      setCustomDocVal('');
+      setPendingConsultsCount(0);
+      setFormSuccessMessage('Đã gửi thông tin đăng ký Hội chẩn thành công lên hệ thống!');
+      setShowAddConsult(false);
+      setActiveMenu('consult-list');
+      setTimeout(() => setFormSuccessMessage(''), 4000);
+
       fetch('/api/consults', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-        .then(res => res.json())
-        .then(() => {
-          fetchConsults();
-          // Reset state
-          setNewConsultData(prev => ({
-            ...prev,
-            PatientKey: '',
-            PatientWeight: '',
-            PatientHeight: '',
-            DetailDiagnosis: '',
-            ConsultNote: '',
-            PlannedDevice: '',
-            PlannedPrice: '',
-            Department: 'Tim Mạch'
-          }));
-          setShowAddDeptInput(false);
-          setCustomDeptVal('');
-          setShowAddDocInput(false);
-          setCustomDocVal('');
-          setPendingConsultsCount(0);
-          setFormSuccessMessage('Đã gửi thông tin đăng ký Hội chẩn thành công lên hệ thống!');
-          setShowAddConsult(false);
-          setActiveMenu('consult-list');
-          setTimeout(() => setFormSuccessMessage(''), 4000);
+        .then(res => {
+          if (!res.ok) throw new Error('Không thể đăng ký hội chẩn');
+          return res.json();
+        })
+        .then(() => refreshConsultData())
+        .catch(err => {
+          console.error(err);
+          triggerAlert(err instanceof Error ? err.message : 'Không thể đăng ký hội chẩn', 'Lỗi lưu');
+          refreshConsultData();
         });
     };
 
@@ -864,115 +944,30 @@ export default function App() {
     e.preventDefault();
     if (!editingRegConsultKey) return;
 
-    fetch(`/api/consults/${editingRegConsultKey}`, {
+    const consultKey = editingRegConsultKey;
+    patchConsult(consultKey, editConsultData);
+    setEditingRegConsultKey(null);
+    triggerAlert('Đã cập nhật thông tin đăng ký staff thành công!', 'Cập nhật thành công');
+
+    fetch(`/api/consults/${consultKey}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editConsultData)
     })
-      .then(res => res.json())
-      .then(() => {
-        fetchConsults();
-        setEditingRegConsultKey(null);
-        triggerAlert('Đã cập nhật thông tin đăng ký staff thành công!', 'Cập nhật thành công');
+      .then(res => {
+        if (!res.ok) throw new Error('Không thể cập nhật đăng ký staff');
+        return res.json();
+      })
+      .then(() => refreshConsultData())
+      .catch(err => {
+        console.error(err);
+        triggerAlert(err instanceof Error ? err.message : 'Không thể cập nhật đăng ký staff', 'Lỗi lưu');
+        refreshConsultData();
       });
   };
 
-  // Prepare result update
   const makeResultEdit = (c: Consult) => {
     setEditingConsultKey(c.ConsultKey);
-    setIsDrawerEditing(false);
-    
-    // Safety check for ConsultMember which might be a comma-separated string or an array
-    let normalizedMembers: string[] = [];
-    if (c.ConsultMember) {
-      if (Array.isArray(c.ConsultMember)) {
-        normalizedMembers = c.ConsultMember;
-      } else if (typeof c.ConsultMember === 'string') {
-        normalizedMembers = (c.ConsultMember as string)
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean);
-      }
-    }
-
-    setResultUpdateData({
-      ConsultResultID: c.ConsultResultID || '' as ConsultResultEnum,
-      DetailConsultResult: c.DetailConsultResult || '',
-      PlannedDevice: c.PlannedDevice || '',
-      PlannedPrice: c.PlannedPrice || '',
-      CheckDevice: c.CheckDevice || '',
-      PatientWeight: c.PatientWeight || '',
-      PatientHeight: c.PatientHeight || '',
-      ConsultType: c.ConsultType || 'Staff mổ',
-      ConsultDate: c.ConsultDate || '',
-      RequestBy: c.RequestBy || '',
-      DiagnosisID: c.DiagnosisID || '',
-      DetailDiagnosis: c.DetailDiagnosis || '',
-      ConsultMember: normalizedMembers,
-      PriorityOrder: normalizePriorityOrder(c.PriorityOrder),
-    });
-  };
-
-  // Submit clinical result update
-  const submitResultUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingConsultKey) return;
-    
-    if (!resultUpdateData.DiagnosisID) {
-      triggerAlert('Vui lòng chọn ICD (DiagnosisID)!', 'Thiếu thông tin');
-      return;
-    }
-
-    if (!resultUpdateData.ConsultResultID) {
-      triggerAlert('Vui lòng chọn Kết luận chính (ConsultResultID)!', 'Thiếu thông tin');
-      return;
-    }
-
-    if (!resultUpdateData.ConsultMember || resultUpdateData.ConsultMember.length === 0) {
-      triggerAlert('Vui lòng chọn ít nhất một Thành viên duyệt hội chẩn!', 'Thiếu thông tin');
-      return;
-    }
-
-    const currentConsult = consults.find(c => c.ConsultKey === editingConsultKey);
-    const patKey = currentConsult?.PatientKey;
-    
-    const finalData = {
-      ...resultUpdateData,
-      ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
-      ConsultResultUpdatedTime: new Date().toISOString()
-    };
-
-    fetch(`/api/consults/${editingConsultKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(finalData)
-    })
-      .then(res => res.json())
-      .then(() => {
-        // Automatically sync patient outcome based on result!
-        let automaticOutcome: OutcomeType = '';
-        if (resultUpdateData.ConsultResultID === 'Can thiệp thông tim') {
-          automaticOutcome = 'Đã thông';
-        } else if (resultUpdateData.ConsultResultID === 'Phẫu thuật tim hở' || resultUpdateData.ConsultResultID === 'Mổ tim' as any) {
-          automaticOutcome = 'Đã mổ';
-        }
-        
-        if (patKey && automaticOutcome) {
-          fetch(`/api/patients/${patKey}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ Outcome: automaticOutcome })
-          })
-          .then(() => {
-            fetchPatients();
-          });
-        }
-
-        fetchConsults();
-        setIsDrawerEditing(false);
-        setEditingConsultKey(null);
-        triggerAlert('Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi thành công!', 'Cập nhật thành công');
-      });
   };
 
   // Emulate AppSheet Google Cloud Bot A4 PDF Generation Task
@@ -986,7 +981,7 @@ export default function App() {
     })
     .then(res => res.json())
     .then(() => {
-      fetchConsults();
+      refreshConsultData();
       setTimeout(() => {
         fetch(`/api/consults/${consultKey}`, {
           method: 'PUT',
@@ -998,7 +993,7 @@ export default function App() {
         })
         .then(res => res.json())
         .then(() => {
-          fetchConsults();
+          refreshConsultData();
           setPdfBotRunning(null);
         });
       }, 1500);
@@ -1268,9 +1263,8 @@ export default function App() {
         fetch('/api/reset', { method: 'POST' })
           .then(res => res.json())
           .then(() => {
-            fetchPatients();
-            fetchConsults();
-            fetchStaff();
+            refreshConsultData();
+            refreshFullData();
             triggerAlert('Khôi phục cơ sở dữ liệu về mặc định thành công!', 'Thành công');
           });
       },
@@ -1612,12 +1606,7 @@ export default function App() {
             
             {/* Sync trigger icon */}
             <button 
-              onClick={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchStaff();
-                fetchCmrs();
-              }}
+              onClick={() => refreshFullData(true)}
               className="hover:bg-white/10 p-1.5 rounded-xl transition flex items-center gap-1 text-xs shrink-0"
               title="Đồng bộ lại"
             >
@@ -1757,7 +1746,7 @@ export default function App() {
                 onStaffUpdated={(updated) => {
                   setCurrentStaff(updated);
                   localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
-                  fetchStaff();
+                  refreshStaffData();
                 }}
                 triggerAlert={triggerAlert}
               />
@@ -2723,12 +2712,10 @@ export default function App() {
               staffList={staffList}
               currentStaff={currentStaff}
               onSelectConsult={(c) => makeResultEdit(c)}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchStaff();
-                fetchSources();
-              }}
+              onRefreshData={refreshConsultData}
+              onAddPatient={addPatient}
+              onPatchPatient={patchPatient}
+              onAddConsult={addConsult}
             />
           )}
 
@@ -2740,14 +2727,13 @@ export default function App() {
               cathlabs={cathlabs}
               sources={sources}
               staffList={staffList}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchCathlabs();
-                fetchStaff();
-                fetchSources();
-              }}
+              onRefreshData={refreshClinicalData}
               triggerConfirm={triggerConfirm}
+              onPatchConsult={patchConsult}
+              onPatchCathlab={patchCathlab}
+              onAddCathlab={addCathlab}
+              onAddConsult={addConsult}
+              onAddPatient={addPatient}
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');
                 setSelectedPatientForDetail(pat);
@@ -2781,10 +2767,8 @@ export default function App() {
                consults={consults}
                patients={patients}
                initialTab={archiveInitialTab}
-               onRefreshData={() => {
-                 fetchPatients();
-                 fetchConsults();
-               }}
+               onRefreshData={refreshConsultData}
+               onPatchConsult={patchConsult}
                triggerConfirm={triggerConfirm}
              />
              </div>
@@ -2800,13 +2784,11 @@ export default function App() {
               staffList={staffList}
               currentStaff={currentStaff}
               pureCalendarMode={false}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchCathlabs();
-                fetchStaff();
-                fetchSources();
-              }}
+              onRefreshData={refreshClinicalData}
+              onPatchConsult={patchConsult}
+              onPatchPatient={patchPatient}
+              onAddPatient={addPatient}
+              onAddConsult={addConsult}
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');
                 setSelectedPatientForDetail(pat);
@@ -2824,13 +2806,11 @@ export default function App() {
               staffList={staffList}
               currentStaff={currentStaff}
               pureCalendarMode={true}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchCathlabs();
-                fetchStaff();
-                fetchSources();
-              }}
+              onRefreshData={refreshClinicalData}
+              onPatchConsult={patchConsult}
+              onPatchPatient={patchPatient}
+              onAddPatient={addPatient}
+              onAddConsult={addConsult}
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');
                 setSelectedPatientForDetail(pat);
@@ -2847,12 +2827,10 @@ export default function App() {
               sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchCmrs();
-                fetchSources();
-              }}
+              onRefreshData={refreshMriData}
+              onPatchCmr={patchCmr}
+              onAddCmr={addCmr}
+              onAddPatient={addPatient}
             />
           )}
 
@@ -2865,12 +2843,10 @@ export default function App() {
               sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchCmrs();
-                fetchSources();
-              }}
+              onRefreshData={refreshMriData}
+              onPatchCmr={patchCmr}
+              onAddCmr={addCmr}
+              onAddPatient={addPatient}
               onEditPatientAdmin={handleEditPatientAdmin}
             />
           )}
@@ -2883,12 +2859,8 @@ export default function App() {
               cmrs={cmrs}
               staffList={staffList}
               currentStaff={currentStaff}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchCmrs();
-                fetchSources();
-              }}
+              onRefreshData={refreshMriData}
+              onPatchCmr={patchCmr}
               onEditPatientAdmin={handleEditPatientAdmin}
             />
           )}
@@ -2956,8 +2928,9 @@ export default function App() {
               staffList={staffList}
               currentStaff={currentStaff}
               rolePresetRecords={rolePresetRecords}
-              onRefreshData={fetchStaff}
-              onRefreshRolePresets={fetchRolePresets}
+              onRefreshData={refreshStaffData}
+              onRefreshRolePresets={refreshFullData}
+              onPatchStaff={patchStaffMember}
               triggerAlert={triggerAlert}
               triggerConfirm={triggerConfirm}
             />
@@ -2973,15 +2946,7 @@ export default function App() {
               operations={operations}
               cmrs={cmrs}
               sources={sources}
-              onRefreshData={() => {
-                fetchPatients();
-                fetchConsults();
-                fetchStaff();
-                fetchCathlabs();
-                fetchOperations();
-                fetchCmrs();
-                fetchSources();
-              }}
+              onRefreshData={refreshFullData}
             />
           )}
 
@@ -3016,475 +2981,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Slide-over Outcome Decision Input Drawer (TRẦN MINH PHÚC style, Screenshot 9) */}
-      <AnimatePresence>
-        {editingConsultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div 
-              className="absolute inset-0" 
-              onClick={() => {
-                setEditingConsultKey(null);
-                setIsDrawerEditing(false);
-              }}
-            ></div>
-            <div className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[96vh]">
-              
-              <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
-                <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                  <Stethoscope className="w-5 h-5 text-white" /> Điền kết quả staff
-                </h3>
-                <button 
-                  onClick={() => {
-                    setEditingConsultKey(null);
-                    setIsDrawerEditing(false);
-                  }}
-                  className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors font-bold text-lg leading-none"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Output Form Frame */}
-              <form 
-                onSubmit={submitResultUpdate} 
-                className="flex-1 overflow-y-auto p-6 text-xs text-slate-700 leading-relaxed font-sans"
-              >
-                
-                {(() => {
-                  const edc = consults.find(c => c.ConsultKey === editingConsultKey);
-                  const edp = edc ? getPatientByKey(edc.PatientKey) : null;
-                  if (!edp || !edc) return null;
-
-                  const conclusionOptions = [
-                    "Can thiệp thông tim",
-                    "Chụp chẩn đoán-Đo kháng lực",
-                    "Chụp chẩn đoán +/- can thiệp",
-                    "Tiền Glenn",
-                    "Tiền Fontan",
-                    "Điện sinh lý",
-                    "Mổ tim",
-                    "Thêm CĐHA; vđ khác - Staff lại",
-                    "Chụp MRI",
-                    "Chưa có chỉ định - Theo dõi tiếp",
-                    "Điều trị nội khoa - Hẹn staff lại",
-                    "Quá chỉ định",
-                    "Không có thông tin"
-                  ];
-
-                  return (
-                    <div className="space-y-6">
-                      
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch animate-in fade-in duration-300">
-                        
-                        {/* Khung 1: Bệnh nhi đang hội chẩn (Hành chính) */}
-                        <div className="lg:col-span-3 flex flex-col">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4.5 space-y-3 relative shadow-sm h-full flex flex-col justify-between">
-                            <div>
-                              <div className="flex items-center border-b border-slate-100 pb-2">
-                                <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-slate-400">Bệnh nhi đang hội chẩn</span>
-                              </div>
-                              
-                              <h4 className="text-sm font-black text-[#d2145a] uppercase leading-tight mt-3">{edp.PatientName}</h4>
-                              {edp.OtherPatientName && (
-                                <p className="text-[10px] text-slate-400 font-medium italic mt-1">Tên khác: {edp.OtherPatientName}</p>
-                              )}
-                              
-                              <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium pt-3 border-t border-slate-100 mt-3">
-                                <p><span className="text-slate-400">Mã BN 1:</span> <span className="font-bold text-slate-800 font-mono">{edp.PatientID1 || ''}</span></p>
-                                {edp.PatientID2 && <p><span className="text-slate-400">Mã BN 2:</span> <span className="font-bold text-slate-800 font-mono">{edp.PatientID2}</span></p>}
-                                <p><span className="text-slate-400">Ngày sinh:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(edp.PatientDOB)}</span></p>
-                                <p><span className="text-slate-400">Tuổi:</span> <span className="font-bold text-rose-600 font-mono">{getExcelAgeHelper(edp.PatientDOB)}</span></p>
-                                <p><span className="text-slate-400">Giới tính:</span> <span className="font-bold text-slate-800">{edp.PatientSex}</span></p>
-                                {edp.PatientAddress && <p className="col-span-1"><span className="text-slate-400">Địa chỉ:</span> <span className="font-bold text-slate-800 leading-tight">{edp.PatientAddress}</span></p>}
-                                {edp.PatientPhone1 && <p><span className="text-slate-400">Số ĐT 1:</span> <span className="font-bold text-slate-800 font-mono">{edp.PatientPhone1}</span></p>}
-                                {edp.PatientPhone2 && <p><span className="text-slate-400">Số ĐT 2:</span> <span className="font-bold text-slate-800 font-mono">{edp.PatientPhone2}</span></p>}
-                              </div>
-                            </div>
-
-                            <div className="space-y-4">
-                               <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100">
-                                  {!isDrawerEditing ? (
-                                    <>
-                                      {resultUpdateData.PatientHeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Chiều cao:</span> <span className="font-bold text-slate-800 font-mono">{resultUpdateData.PatientHeight} cm</span></p>}
-                                      {resultUpdateData.PatientWeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Cân nặng:</span> <span className="font-bold text-slate-800 font-mono">{resultUpdateData.PatientWeight} kg</span></p>}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div>
-                                        <label className="block text-slate-500 font-bold text-[10px] mb-1">Chiều cao (cm)</label>
-                                        <input
-                                          type="text"
-                                          placeholder="vd: 110"
-                                          value={resultUpdateData.PatientHeight}
-                                          onChange={(e) => setResultUpdateData(prev => ({ ...prev, PatientHeight: e.target.value }))}
-                                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-slate-500 font-bold text-[10px] mb-1">Cân nặng (kg)</label>
-                                        <input
-                                          type="text"
-                                          placeholder="vd: 12"
-                                          value={resultUpdateData.PatientWeight}
-                                          onChange={(e) => setResultUpdateData(prev => ({ ...prev, PatientWeight: e.target.value }))}
-                                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium"
-                                        />
-                                      </div>
-                                    </>
-                                  )}
-                               </div>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingConsultKey(null);
-                                  setEditingPatientKey(edp.PatientKey);
-                                  setNewPatientData({
-                                    PatientID1: edp.PatientID1,
-                                    PatientID2: edp.PatientID2 || '',
-                                    PatientName: edp.PatientName,
-                                    OtherPatientName: edp.OtherPatientName || '',
-                                    PatientDOB: edp.PatientDOB,
-                                    PatientSex: edp.PatientSex,
-                                    PatientAddress: edp.PatientAddress || (edp as any).PatientAddress || '',
-                                    PatientPhone1: edp.PatientPhone1,
-                                    PatientPhone2: edp.PatientPhone2 || '',
-                                    Outcome: edp.Outcome || ''
-                                  });
-                                  setShowAddPatient(true);
-                                }}
-                                className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase text-[10px] px-3 py-2.5 rounded-xl transition-transform hover:scale-[1.02] shrink-0 shadow-sm"
-                              >
-                                ✏ Sửa hành chính
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Khung 2: Thông tin hội chẩn */}
-                        <div className="lg:col-span-3 flex flex-col">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4.5 space-y-3 shadow-sm h-full flex flex-col justify-start">
-                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 block border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
-                            
-                            {!isDrawerEditing ? (
-                              <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium pt-1">
-                                <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(resultUpdateData.ConsultDate)}</span></p>
-                                <p><span className="text-slate-400">Kiểu staff:</span> <span className="font-bold text-[#d2145a]">{resultUpdateData.ConsultType || ''}</span></p>
-                                <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{resultUpdateData.RequestBy || ''}</span></p>
-                                {resultUpdateData.ConsultMember && (Array.isArray(resultUpdateData.ConsultMember) ? resultUpdateData.ConsultMember : [String(resultUpdateData.ConsultMember)]).length > 0 && (
-                                  <p>
-                                    <span className="text-slate-400">Thành viên duyệt HC:</span>{' '}
-                                    <span className="font-bold text-slate-800">
-                                      {(Array.isArray(resultUpdateData.ConsultMember) 
-                                        ? resultUpdateData.ConsultMember 
-                                        : String(resultUpdateData.ConsultMember).split(',').map(s => s.trim()).filter(Boolean)
-                                      ).join(', ')}
-                                    </span>
-                                  </p>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-3 pt-1 flex-1">
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Ngày hội chẩn</label>
-                                  <VNDateInput
-                                    required
-                                    value={resultUpdateData.ConsultDate}
-                                    onChange={(val) => setResultUpdateData(prev => ({ ...prev, ConsultDate: val }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium font-sans"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Kiểu staff</label>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {(['Staff thông', 'Staff mổ'] as ConsultTypeEnum[]).map(type => (
-                                      <button
-                                        key={type}
-                                        type="button"
-                                        onClick={() => setResultUpdateData(prev => ({ ...prev, ConsultType: type }))}
-                                        className={`rounded-xl px-2.5 py-1.5 text-xs font-extrabold border transition ${
-                                          resultUpdateData.ConsultType === type
-                                            ? 'bg-[#d2145a] text-white border-[#d2145a] shadow-sm'
-                                            : 'bg-white text-slate-600 border-slate-200 hover:border-[#d2145a]/40'
-                                        }`}
-                                      >
-                                        {type}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">BS đăng ký</label>
-                                  <select
-                                    required
-                                    value={resultUpdateData.RequestBy || ''}
-                                    onChange={(e) => setResultUpdateData(prev => ({ ...prev, RequestBy: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
-                                  >
-                                    <option value="">-- Chọn BS --</option>
-                                    {staffList.map(s => {
-                                      const displayName = getShortStaffName(s.StaffName, staffList);
-                                      return (
-                                        <option key={s.StaffKey} value={displayName}>
-                                          {displayName}
-                                        </option>
-                                      );
-                                    })}
-                                    {Array.from(new Set(consults.map(c => String(c.RequestBy || '')))).filter((d: string) => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d)).map((d: string) => (
-                                      <option key={d} value={d}>{d}</option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className="pb-2">
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                                  <SearchableEnumSelect
-                                    multiple
-                                    required
-                                    options={[
-                                      ...staffList.map(s => getShortStaffName(s.StaffName, staffList)),
-                                      ...Array.from(new Set(consults.flatMap(c => Array.isArray(c.ConsultMember) ? c.ConsultMember : String(c.ConsultMember || '').split(',').map(s => s.trim()).filter(Boolean))))
-                                    ]}
-                                    values={resultUpdateData.ConsultMember || []}
-                                    onMultiChange={(members) => setResultUpdateData(prev => ({ ...prev, ConsultMember: members }))}
-                                    placeholder="-- Bấm hoặc tìm để chọn bác sĩ --"
-                                    searchPlaceholder="Gõ tìm bác sĩ..."
-                                  />
-                                </div>
-
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Khung 3: Kết quả hội chẩn */}
-                        <div className="lg:col-span-6 flex flex-col">
-                          <div className="bg-indigo-50/20 border border-slate-200 rounded-3xl p-4.5 space-y-3 shadow-sm h-full">
-                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2">Kết quả hội chẩn</span>
-                            
-                            {!isDrawerEditing ? (
-                              <div className="space-y-3 text-[11px] text-slate-600 font-medium pt-1">
-                                <div className="grid grid-cols-2 gap-3.5">
-                                  <p><span className="text-slate-400">ICD:</span> {resultUpdateData.DiagnosisID ? <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-mono ml-1">{resultUpdateData.DiagnosisID}</span> : ''}</p>
-                                  <p><span className="text-slate-400">Kết luận chính:</span> {resultUpdateData.ConsultResultID ? <span className="font-extrabold text-[#d2145a] ml-1">{resultUpdateData.ConsultResultID}</span> : ''}</p>
-                                </div>
-
-                                <p>
-                                  <span className="text-slate-400">Ưu tiên:</span>{' '}
-                                  <span className="font-extrabold text-indigo-800 ml-1">{resultUpdateData.PriorityOrder || 'Chương trình'}</span>
-                                </p>
-                                
-                                <div>
-                                  <span className="text-slate-400 block mb-0.5">Chẩn đoán chi tiết:</span>
-                                  {resultUpdateData.DetailDiagnosis ? (
-                                    <p className="bg-white border border-slate-100 p-2.5 rounded-xl text-slate-700 italic font-semibold leading-normal">{resultUpdateData.DetailDiagnosis}</p>
-                                  ) : ''}
-                                </div>
-
-                                <div>
-                                  <span className="text-slate-400 block mb-0.5">Kết luận hội chẩn chi tiết:</span>
-                                  {resultUpdateData.DetailConsultResult ? (
-                                    <p className="bg-white border border-slate-100 p-2.5 rounded-xl text-slate-700 font-semibold whitespace-pre-wrap leading-normal">{resultUpdateData.DetailConsultResult}</p>
-                                  ) : ''}
-                                </div>
-
-                                <div>
-                                  <span className="text-slate-400 block mb-0.5">Dụng cụ dự kiến:</span>
-                                  {resultUpdateData.PlannedDevice ? (
-                                    <p className="bg-white border border-slate-100 p-2.5 rounded-xl text-slate-700 font-semibold leading-normal">{resultUpdateData.PlannedDevice}</p>
-                                  ) : ''}
-                                </div>
-
-                                <div>
-                                  <p><span className="text-slate-400">Số tiền dự kiến:</span> {resultUpdateData.PlannedPrice ? <span className="font-bold text-emerald-700 font-mono ml-1">{resultUpdateData.PlannedPrice}</span> : ''}</p>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-3.5 pt-1">
-                                <div className="grid grid-cols-2 gap-3.5">
-                                  <div>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
-                                    <SearchableEnumSelect
-                                      required
-                                      options={diagnosisOptions}
-                                      value={resultUpdateData.DiagnosisID}
-                                      onChange={(value) => setResultUpdateData(prev => ({ ...prev, DiagnosisID: value }))}
-                                      allowCreate
-                                      createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
-                                      onCreateOption={createDiagnosisSource}
-                                      placeholder="-- Chọn ICD --"
-                                      searchPlaceholder="Gõ ICD để tìm..."
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1 font-sans">Kết luận chính <span className="text-red-500">*</span></label>
-                                    <SearchableEnumSelect
-                                      required
-                                      options={conclusionOptions}
-                                      value={resultUpdateData.ConsultResultID}
-                                      onChange={(value) => setResultUpdateData(prev => ({ ...prev, ConsultResultID: value as any }))}
-                                      placeholder="-- Chọn Kết luận chính --"
-                                      searchPlaceholder="Gõ tìm kết luận..."
-                                    />
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Ưu tiên</label>
-                                  <div className="flex gap-2">
-                                    {PRIORITY_OPTIONS.map((opt) => {
-                                      const isSel = resultUpdateData.PriorityOrder === opt;
-                                      return (
-                                        <button
-                                          key={opt}
-                                          type="button"
-                                          onClick={() => setResultUpdateData(prev => ({ ...prev, PriorityOrder: opt }))}
-                                          className={`flex-1 py-1.5 px-2 rounded-xl border text-[11px] font-bold transition text-center cursor-pointer ${
-                                            isSel
-                                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm font-extrabold ring-1 ring-indigo-400'
-                                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                          }`}
-                                        >
-                                          {opt}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Chẩn đoán chi tiết</label>
-                                  <textarea
-                                    rows={2}
-                                    value={resultUpdateData.DetailDiagnosis}
-                                    onChange={(e) => setResultUpdateData(prev => ({ ...prev, DetailDiagnosis: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs italic font-semibold leading-relaxed"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Kết luận hội chẩn chi tiết</label>
-                                  <textarea
-                                    rows={2}
-                                    required
-                                    placeholder="vd: Thống nhất chỉ định mổ tim hở..."
-                                    value={resultUpdateData.DetailConsultResult}
-                                    onChange={(e) => setResultUpdateData(prev => ({ ...prev, DetailConsultResult: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-bold leading-relaxed"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Dụng cụ dự kiến</label>
-                                  <textarea
-                                    rows={2}
-                                    placeholder="vd: Vá thông liên thất..."
-                                    value={resultUpdateData.PlannedDevice}
-                                    onChange={(e) => setResultUpdateData(prev => ({ ...prev, PlannedDevice: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold leading-relaxed"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Số tiền dự kiến (VND / text)</label>
-                                  <input
-                                    type="text"
-                                    placeholder="vd: 45.000.000đ"
-                                    value={resultUpdateData.PlannedPrice}
-                                    onChange={(e) => setResultUpdateData(prev => ({ ...prev, PlannedPrice: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-bold font-mono"
-                                  />
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-indigo-100">
-                                  <div>
-                                    <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase">Người điền KQ</label>
-                                    <input
-                                      type="text"
-                                      disabled
-                                      value={(() => {
-                                        const editorId = currentStaff?.StaffKey;
-                                        return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
-                                      })()}
-                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default" title="ConsultResultUpdatedTime">Điền lúc</label>
-                                    <input
-                                      type="text"
-                                      disabled
-                                      value={formatDateTime(new Date().toISOString())}
-                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-mono cursor-default"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* Action buttons area */}
-                      <div className="pt-2 border-t border-slate-100 flex justify-end gap-3 shrink-0">
-                        {!isDrawerEditing ? (
-                          <div className="w-full flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => setIsDrawerEditing(true)}
-                              className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-6 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer text-xs flex items-center justify-center gap-1.5 font-sans"
-                            >
-                              <ClipboardList className="w-4 h-4" />
-                              {edc.ConsultResultID ? "Sửa kết quả hội chẩn" : "Điền kết quả hội chẩn"}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="w-full grid grid-cols-2 lg:flex lg:justify-end gap-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setResultUpdateData({
-                                  ConsultResultID: edc.ConsultResultID || '' as ConsultResultEnum,
-                                  DetailConsultResult: edc.DetailConsultResult || '',
-                                  PlannedDevice: edc.PlannedDevice || '',
-                                  PlannedPrice: edc.PlannedPrice || '',
-                                  CheckDevice: edc.CheckDevice || '',
-                                  PatientWeight: edc.PatientWeight || '',
-                                  PatientHeight: edc.PatientHeight || '',
-                                  ConsultType: edc.ConsultType || 'Staff mổ',
-                                  ConsultDate: edc.ConsultDate || '',
-                                  RequestBy: edc.RequestBy || '',
-                                  DiagnosisID: edc.DiagnosisID || '',
-                                  DetailDiagnosis: edc.DetailDiagnosis || '',
-                                  ConsultMember: edc.ConsultMember || [],
-                                  PriorityOrder: normalizePriorityOrder(edc.PriorityOrder),
-                                });
-                                setIsDrawerEditing(false);
-                              }}
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-6 rounded-2xl transition cursor-pointer text-xs font-sans text-center lg:w-48"
-                            >
-                              Hủy chỉnh sửa
-                            </button>
-                            <button
-                              type="submit"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-6 rounded-2xl shadow-md transition cursor-pointer text-xs font-sans text-center font-bold lg:w-48"
-                            >
-                              ✓ Lưu kết quả
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                    </div>
-                  );
-                })()}
-
-              </form>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
+      <ResultStaffDrawer
+        consultKey={editingConsultKey}
+        consults={consults}
+        patients={patients}
+        staffList={staffList}
+        sources={sources}
+        currentStaff={currentStaff}
+        onClose={() => setEditingConsultKey(null)}
+        onPatchConsult={patchConsult}
+        onPatchPatient={patchPatient}
+        onRefreshData={refreshConsultData}
+        onEditPatientAdmin={handleEditPatientAdmin}
+        createDiagnosisSource={createDiagnosisSource}
+        triggerAlert={triggerAlert}
+      />
 
       {/* Centered Registration Edit Modal Dialog (Sửa Đăng ký staff) */}
       <AnimatePresence>

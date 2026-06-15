@@ -8,6 +8,7 @@ interface ArchiveViewProps {
   consults: any[];
   patients: any[];
   onRefreshData: () => void;
+  onPatchConsult?: (consultKey: string, patch: Partial<any>) => void;
   triggerConfirm?: (msg: string, onConfirm: () => void, title?: string) => void;
   initialTab?: ArchiveTab;
 }
@@ -18,6 +19,7 @@ export default function ArchiveView({
   consults,
   patients,
   onRefreshData,
+  onPatchConsult,
   triggerConfirm,
   initialTab = 'archive'
 }: ArchiveViewProps) {
@@ -73,40 +75,50 @@ export default function ArchiveView({
 
   const handleUndoTransferred = (c: any) => {
     if (!triggerConfirm) return;
-    triggerConfirm('Bạn có chắc chắn muốn hoàn tác chuyển ca này không?', async () => {
-      try {
-        const response = await fetch(`/api/consults/${c.ConsultKey}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ TransferredToCathLab: false })
+    triggerConfirm('Bạn có chắc chắn muốn hoàn tác chuyển ca này không?', () => {
+      const patch = { TransferredToCathLab: false };
+      onPatchConsult?.(c.ConsultKey, patch);
+      fetch(`/api/consults/${c.ConsultKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Không thể hoàn tác');
+          onRefreshData();
+        })
+        .catch(err => {
+          console.error(err);
+          onRefreshData();
         });
-        if (response.ok) onRefreshData();
-      } catch (err) {
-        console.error(err);
-      }
     }, 'Hoàn tác');
   };
 
   const handleUndoArchive = (c: any) => {
     if (!triggerConfirm) return;
-    triggerConfirm('Đưa ca này về lại view "Xếp lịch & Dụng cụ" và xóa trạng thái lưu trữ/xếp lịch?', async () => {
-      try {
-        const response = await fetch(`/api/consults/${c.ConsultKey}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            CallStatus: '',
-            CallNote: '',
-            CheckDevice: '',
-            PlannedCathLabDate: '',
-            TransferredToCathLab: false,
-            Removed: false
-          })
+    triggerConfirm('Đưa ca này về lại view "Xếp lịch & Dụng cụ" và xóa trạng thái lưu trữ/xếp lịch?', () => {
+      const patch = {
+        CallStatus: '',
+        CallNote: '',
+        CheckDevice: '',
+        PlannedCathLabDate: '',
+        TransferredToCathLab: false,
+        Removed: false
+      };
+      onPatchConsult?.(c.ConsultKey, patch);
+      fetch(`/api/consults/${c.ConsultKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Không thể hoàn tác lưu trữ');
+          onRefreshData();
+        })
+        .catch(err => {
+          console.error(err);
+          onRefreshData();
         });
-        if (response.ok) onRefreshData();
-      } catch (err) {
-        console.error(err);
-      }
     }, 'Hoàn tác Lưu trữ');
   };
 

@@ -14,6 +14,11 @@ interface Props {
   onRefreshData: () => void;
   triggerConfirm: (msg: string, onConfirm: () => void, title?: string) => void;
   onViewPatientRecord: (pat: Patient) => void;
+  onPatchConsult?: (consultKey: string, patch: Partial<Consult>) => void;
+  onPatchCathlab?: (cathKey: string, patch: Partial<CathLab>) => void;
+  onAddCathlab?: (cath: CathLab) => void;
+  onAddConsult?: (consult: Consult) => void;
+  onAddPatient?: (patient: Patient) => void;
 }
 
 const CATH_METHODS_SPECIAL = [
@@ -139,7 +144,7 @@ const removeVietnameseTones = (str: any): string => {
   return removeDiacritics(str);
 };
 
-export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord }: Props) {
+export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient }: Props) {
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
@@ -304,23 +309,29 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       CheckDeviceUpdatedTime: new Date().toISOString()
     };
 
-    const response = await fetch(`/api/consults/${consult.ConsultKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error('Không thể cập nhật trạng thái chuyển phòng thông tim');
-    }
+    onPatchConsult?.(consult.ConsultKey, payload);
 
     const mergedConsult: Consult = { ...consult, ...payload };
     setIsAdHocModalOpen(false);
     setAdHocSelectedPatientKey('');
     setAdHocSearchQuery('');
-    onRefreshData();
     setActiveTab('pending');
     openPendingForm(mergedConsult, patient);
+
+    fetch(`/api/consults/${consult.ConsultKey}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Không thể cập nhật trạng thái chuyển phòng thông tim');
+        onRefreshData();
+      })
+      .catch(err => {
+        console.error(err);
+        alert(err instanceof Error ? err.message : 'Không thể chuyển phòng thông tim. Vui lòng thử lại.');
+        onRefreshData();
+      });
   };
 
   const handleAdHocPatientSelect = (patient: Patient) => {
@@ -390,68 +401,95 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         if (pat) pName = pat.PatientName;
      }
 
-     try {
-       if (adHocPatientMode === 'new') {
-         await fetch('/api/patients', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              PatientKey: patientKey,
-              PatientID1: adHocPatientID1,
-              PatientID2: adHocPatientID2,
-              PatientName: adHocPatientName,
-              PatientDOB: adHocPatientDOB,
-              PatientSex: adHocPatientSex,
-              PatientAddress: adHocPatientAddress,
-              PatientPhone1: adHocPatientPhone1,
-              PatientPhone2: adHocPatientPhone2,
-              PatientCreateBy: loggedInStaffId,
-              PatientCreateTime: new Date().toISOString()
-            })
-         });
-       }
+     const cathPayload: CathLab = {
+       ...formData,
+       CathKey: cathKey,
+       ConsultKey: consultKey,
+       PatientKey: patientKey,
+       CathMethod: safeCathMethod.join(' + ')
+     } as CathLab;
 
-       await fetch('/api/consults', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify({
-               ConsultKey: consultKey,
-               PatientKey: patientKey,
-               ConsultType: 'Staff thông',
-               ConsultDate: formData.CathDate,
-               RequestBy: loggedInStaff?.StaffName || '',
-               DiagnosisID: formData.PostDiagnosisID,
-               DetailDiagnosis: formData.PostDiagnosis,
-               ConsultCreateBy: loggedInStaffId,
-               ConsultCreateTime: new Date().toISOString(),
-               ConsultResultID: 'Can thiệp thông tim',
-               DetailConsultResult: 'Cấp cứu thông tim',
-               PriorityOrder: 'Cấp cứu',
-               PlannedCathLabDate: formData.CathDate,
-               TransferredToCathLab: true,
-               Scheduled1stInterventionist: formData._1stInterventionist,
-               Scheduled2ndInterventionist: formData._2ndInterventionist,
-               Scheduled3rdInterventionist: formData._3rdInterventionist
-             })
-       });
+     const consultPayload: Consult = {
+       ConsultKey: consultKey,
+       PatientKey: patientKey,
+       ConsultType: 'Staff thông',
+       ConsultDate: formData.CathDate,
+       RequestBy: loggedInStaff?.StaffName || '',
+       DiagnosisID: formData.PostDiagnosisID,
+       DetailDiagnosis: formData.PostDiagnosis,
+       ConsultCreateBy: loggedInStaffId,
+       ConsultCreateTime: new Date().toISOString(),
+       ConsultResultID: 'Can thiệp thông tim',
+       DetailConsultResult: 'Cấp cứu thông tim',
+       PriorityOrder: 'Cấp cứu',
+       PlannedCathLabDate: formData.CathDate,
+       TransferredToCathLab: true,
+       Scheduled1stInterventionist: formData._1stInterventionist,
+       Scheduled2ndInterventionist: formData._2ndInterventionist,
+       Scheduled3rdInterventionist: formData._3rdInterventionist
+     } as Consult;
 
-       await fetch('/api/cathlabs', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify({
-               ...formData,
-               CathKey: cathKey,
-               PatientKey: patientKey,
-               ConsultKey: consultKey,
-               CathMethod: safeCathMethod.join(' + ')
-             })
-       });
-
-       onRefreshData();
-       closeModal();
-     } catch(e) {
-       console.error(e);
+     if (adHocPatientMode === 'new') {
+       onAddPatient?.({
+         PatientKey: patientKey,
+         PatientID1: adHocPatientID1,
+         PatientID2: adHocPatientID2,
+         PatientName: adHocPatientName,
+         PatientDOB: adHocPatientDOB,
+         PatientSex: adHocPatientSex,
+         PatientAddress: adHocPatientAddress,
+         PatientPhone1: adHocPatientPhone1,
+         PatientPhone2: adHocPatientPhone2,
+         PatientCreateBy: loggedInStaffId,
+         PatientCreateTime: new Date().toISOString(),
+         Outcome: ''
+       } as Patient);
      }
+     onAddConsult?.(consultPayload);
+     onAddCathlab?.(cathPayload);
+     closeModal();
+
+     const persist = async () => {
+       if (adHocPatientMode === 'new') {
+         const patRes = await fetch('/api/patients', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({
+             PatientKey: patientKey,
+             PatientID1: adHocPatientID1,
+             PatientID2: adHocPatientID2,
+             PatientName: adHocPatientName,
+             PatientDOB: adHocPatientDOB,
+             PatientSex: adHocPatientSex,
+             PatientAddress: adHocPatientAddress,
+             PatientPhone1: adHocPatientPhone1,
+             PatientPhone2: adHocPatientPhone2,
+             PatientCreateBy: loggedInStaffId,
+             PatientCreateTime: new Date().toISOString()
+           })
+         });
+         if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
+       }
+       const conRes = await fetch('/api/consults', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(consultPayload)
+       });
+       if (!conRes.ok) throw new Error('Không thể tạo hội chẩn cấp cứu');
+       const cathRes = await fetch('/api/cathlabs', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(cathPayload)
+       });
+       if (!cathRes.ok) throw new Error('Không thể lưu kết quả thông tim');
+       onRefreshData();
+     };
+
+     persist().catch(e => {
+       console.error(e);
+       alert(e instanceof Error ? e.message : 'Không thể lưu ca cấp cứu thông tim');
+       onRefreshData();
+     });
   };
 
   // Logic: Auto fill CathPlan based on CathMethod
@@ -497,17 +535,27 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        CathMethod: safeCathMethod.join(' + ')
      };
 
-     try {
-       await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-       });
-       onRefreshData();
-       closeModal();
-     } catch (e) {
-       console.error(e);
+     if (isEdit && formData.CathKey) {
+       onPatchCathlab?.(formData.CathKey, payload);
+     } else {
+       onAddCathlab?.(payload as CathLab);
      }
+     closeModal();
+
+     fetch(url, {
+       method,
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify(payload)
+     })
+       .then(res => {
+         if (!res.ok) throw new Error('Không thể lưu kết quả thông tim');
+         onRefreshData();
+       })
+       .catch(e => {
+         console.error(e);
+         alert(e instanceof Error ? e.message : 'Không thể lưu kết quả thông tim');
+         onRefreshData();
+       });
   };
 
   const handlePostpone = (action: 'return' | 'remove') => {
@@ -517,38 +565,44 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        return;
      }
 
-     triggerConfirm(`Xác nhận ${action === 'return' ? 'chuyển về Xếp lịch' : 'Loại ca này'} với lý do nãy?`, async () => {
-       try {
-         const payload = action === 'return'
-           ? {
-               TransferredToCathLab: false,
-               PlannedCathLabDate: '',
-               CheckDevice: '',
-               CallStatus: '',
-               CallNote: callNote,
-               Scheduled1stInterventionist: '',
-               Scheduled2ndInterventionist: '',
-               Scheduled3rdInterventionist: ''
-             }
-           : {
-               TransferredToCathLab: false,
-               Removed: false,
-               CallStatus: 'Loại',
-               CallNote: callNote,
-               PlannedCathLabDate: '',
-               CheckDevice: ''
-             };
+     triggerConfirm(`Xác nhận ${action === 'return' ? 'chuyển về Xếp lịch' : 'Loại ca này'} với lý do nãy?`, () => {
+       const payload: Partial<Consult> = action === 'return'
+         ? {
+             TransferredToCathLab: false,
+             PlannedCathLabDate: '',
+             CheckDevice: '' as Consult['CheckDevice'],
+             CallStatus: '' as Consult['CallStatus'],
+             CallNote: callNote,
+             Scheduled1stInterventionist: '',
+             Scheduled2ndInterventionist: '',
+             Scheduled3rdInterventionist: ''
+           }
+         : {
+             TransferredToCathLab: false,
+             Removed: false,
+             CallStatus: 'Loại',
+             CallNote: callNote,
+             PlannedCathLabDate: '',
+             CheckDevice: '' as Consult['CheckDevice']
+           };
 
-         await fetch(`/api/consults/${selectedPending.c.ConsultKey}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
+       onPatchConsult?.(selectedPending.c.ConsultKey, payload);
+       closeModal();
+
+       fetch(`/api/consults/${selectedPending.c.ConsultKey}`, {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(payload)
+       })
+         .then(res => {
+           if (!res.ok) throw new Error('Không thể cập nhật trạng thái ca');
+           onRefreshData();
+         })
+         .catch(err => {
+           console.error(err);
+           alert(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái ca');
+           onRefreshData();
          });
-         onRefreshData();
-         closeModal();
-       } catch (err) {
-         console.error(err);
-       }
      });
   };
 

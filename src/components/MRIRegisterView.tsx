@@ -40,6 +40,9 @@ interface MRIRegisterViewProps {
   staffList?: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
+  onPatchCmr?: (cmrKey: string, patch: Partial<CMR>) => void;
+  onAddCmr?: (cmr: CMR) => void;
+  onAddPatient?: (patient: Patient) => void;
   onEditPatientAdmin?: (patient: Patient) => void;
 }
 
@@ -108,6 +111,9 @@ export default function MRIRegisterView({
   staffList = [],
   currentStaff,
   onRefreshData,
+  onPatchCmr,
+  onAddCmr,
+  onAddPatient,
   onEditPatientAdmin
 }: MRIRegisterViewProps) {
   const [activeTab, setActiveTab] = useState<RegisterTab>('pending');
@@ -302,7 +308,7 @@ export default function MRIRegisterView({
         }
 
         finalPatientKey = `pat_${Date.now()}`;
-        const patientPayload = {
+        const patientPayload: Patient = {
           PatientKey: finalPatientKey,
           PatientID1: newPatID1.trim(),
           PatientID2: newPatID2.trim(),
@@ -314,17 +320,11 @@ export default function MRIRegisterView({
           PatientPhone1: newPatPhone || '',
           PatientPhone2: '',
           PatientCreateBy: currentStaff?.StaffKey || '01378',
-          PatientCreateTime: new Date().toISOString()
+          PatientCreateTime: new Date().toISOString(),
+          Outcome: ''
         };
-        const patRes = await fetch('/api/patients', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patientPayload)
-        });
-        if (!patRes.ok) {
-          throw new Error('Không thể tạo bệnh nhi mới');
-        }
-        finalPatient = patientPayload as unknown as Patient;
+        onAddPatient?.(patientPayload);
+        finalPatient = patientPayload;
       } else {
         if (!finalPatientKey) {
           setErrorMsg('Vui lòng tìm và chọn bệnh nhi sẵn có hoặc đổi sang chế độ tạo mới!');
@@ -360,21 +360,47 @@ export default function MRIRegisterView({
         UpdateTime: new Date().toISOString()
       };
 
-      const res = await fetch('/api/cmrs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cmrPayload)
-      });
-      if (!res.ok) {
-        throw new Error('Không thể đăng ký chụp MRI');
-      }
-
+      onAddCmr?.(cmrPayload);
       setSuccessMsg('Đã đăng ký chụp MRI thành công!');
-      setTimeout(() => {
-        setShowForm(false);
-        resetForm();
+      setShowForm(false);
+      resetForm();
+      setSubmitLoading(false);
+
+      const persist = async () => {
+        if (patientMode === 'create') {
+          const patRes = await fetch('/api/patients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              PatientKey: finalPatientKey,
+              PatientID1: newPatID1.trim(),
+              PatientID2: newPatID2.trim(),
+              PatientName: newPatName,
+              OtherPatientName: newPatName,
+              PatientDOB: newPatDOB || '2020-01-01',
+              PatientSex: newPatSex,
+              PatientAddress: newPatAddress || 'TP Hà Nội',
+              PatientPhone1: newPatPhone || '',
+              PatientPhone2: '',
+              PatientCreateBy: currentStaff?.StaffKey || '01378',
+              PatientCreateTime: new Date().toISOString()
+            })
+          });
+          if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
+        }
+        const res = await fetch('/api/cmrs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cmrPayload)
+        });
+        if (!res.ok) throw new Error('Không thể đăng ký chụp MRI');
         onRefreshData();
-      }, 1500);
+      };
+
+      persist().catch((err: any) => {
+        setErrorMsg(`Đã xảy ra lỗi: ${err.message || err}`);
+        onRefreshData();
+      });
     } catch (err: any) {
       setErrorMsg(`Đã xảy ra lỗi: ${err.message || err}`);
     } finally {
@@ -445,24 +471,24 @@ export default function MRIRegisterView({
     };
     delete (payload as any).__patient;
 
-    setEditSaving(true);
-    setEditMsg('');
-    try {
-      const res = await fetch(`/api/cmrs/${encodeURIComponent(key)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    onPatchCmr?.(key, payload);
+    closePreview();
+
+    fetch(`/api/cmrs/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Không cập nhật được đăng ký MRI (server trả lỗi)');
+        onRefreshData();
+      })
+      .catch((err: any) => {
+        console.error(err);
+        const msg = err?.message || '';
+        alert(msg.includes('Failed to fetch') ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.' : (msg || 'Có lỗi khi cập nhật đăng ký MRI.'));
+        onRefreshData();
       });
-      if (!res.ok) throw new Error('Không cập nhật được đăng ký MRI (server trả lỗi)');
-      setEditMsg('Đã cập nhật đăng ký MRI thành công!');
-      await onRefreshData();
-      setTimeout(() => closePreview(), 1200);
-    } catch (err: any) {
-      const msg = err?.message || '';
-      setEditMsg(msg.includes('Failed to fetch') ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.' : (msg || 'Có lỗi khi cập nhật đăng ký MRI.'));
-    } finally {
-      setEditSaving(false);
-    }
   };
 
   return (

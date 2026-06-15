@@ -44,6 +44,10 @@ interface CathLabSchedulerViewProps {
   staffList: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
+  onPatchConsult?: (consultKey: string, patch: Partial<Consult>) => void;
+  onPatchPatient?: (patientKey: string, patch: Partial<Patient>) => void;
+  onAddPatient?: (patient: Patient) => void;
+  onAddConsult?: (consult: Consult) => void;
   onViewPatientRecord?: (patient: Patient) => void;
   pureCalendarMode?: boolean;
   onTogglePureMode?: () => void;
@@ -199,6 +203,10 @@ export default function CathLabSchedulerView({
   staffList,
   currentStaff,
   onRefreshData,
+  onPatchConsult,
+  onPatchPatient,
+  onAddPatient,
+  onAddConsult,
   onViewPatientRecord,
   pureCalendarMode = false,
   onTogglePureMode
@@ -1695,7 +1703,17 @@ Xin cảm ơn!`;
       CathMethod: adHocCathMethod.join(' + ')
     };
 
-    try {
+    if (adHocPatientMode === 'new') {
+      onAddPatient?.(patientData);
+    } else {
+      onPatchPatient?.(patientKey, patientData);
+    }
+    onAddConsult?.(consultData);
+
+    setSuccessMsg('Đã thêm mới và xếp lịch bệnh nhi thành công!');
+    setShowAdHocModal(false);
+
+    const persist = async () => {
       if (adHocPatientMode === 'new') {
         const patRes = await fetch('/api/patients', {
           method: 'POST',
@@ -1718,56 +1736,57 @@ Xin cảm ơn!`;
         body: JSON.stringify(consultData)
       });
       if (!conRes.ok) throw new Error(await conRes.text() || 'Không thể thêm xếp lịch hội chẩn bổ sung');
-
-      setSuccessMsg('Đã thêm mới và xếp lịch bệnh nhi thành công!');
-      setShowAdHocModal(false);
       onRefreshData();
+    };
 
-      // Reset form fields
-      setAdHocPatientID1('');
-      setAdHocPatientID2('');
-      setAdHocPatientName('');
-      setAdHocOtherPatientName('');
-      setAdHocPatientDOB('2018-01-01');
-      setAdHocPatientSex('Nam');
-      setAdHocPatientAddress('');
-      setAdHocPatientPhone1('');
-      setAdHocPatientPhone2('');
-      setAdHocOutcome('');
-      setAdHocPatientWeight('');
-      setAdHocPatientHeight('');
-      setAdHocConsultDate(getTodayIsoDate());
-      setAdHocDiagnosisID('');
-      setAdHocDetailDiagnosis('');
-      setAdHocPlannedDevice('');
-      setAdHocPlannedPrice('');
-      setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
-      setAdHocSupplyDepFeedback('');
-      setAdHocOperationFeedback('');
-      setAdHocPlannedCathLabDate('');
-      setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
-      setAdHocCallNote('');
-      setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
-      setAdHocScheduled2nd('');
-      setAdHocScheduled3rd('');
-      setAdHocDetailConsultResult('');
-      setAdHocSelectedPatientKey('');
-      setAdHocSearchQuery('');
-      setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
-      setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
-      setAdHocCheckDeviceDate('');
-      setAdHocCheckDeviceBy('');
-      setAdHocCathMethod([]);
-      setAdHocValidationMsg('');
+    persist()
+      .catch(err => {
+        console.error(err);
+        setErrorMsg(err instanceof Error ? err.message : 'Không thể lưu xếp lịch bổ sung');
+        onRefreshData();
+      })
+      .finally(() => setSaving(false));
 
-      setTimeout(() => {
-        setSuccessMsg('');
-      }, 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi xảy ra khi thêm mới xếp bổ sung');
-    } finally {
-      setSaving(false);
-    }
+    // Reset form fields
+    setAdHocPatientID1('');
+    setAdHocPatientID2('');
+    setAdHocPatientName('');
+    setAdHocOtherPatientName('');
+    setAdHocPatientDOB('2018-01-01');
+    setAdHocPatientSex('Nam');
+    setAdHocPatientAddress('');
+    setAdHocPatientPhone1('');
+    setAdHocPatientPhone2('');
+    setAdHocOutcome('');
+    setAdHocPatientWeight('');
+    setAdHocPatientHeight('');
+    setAdHocConsultDate(getTodayIsoDate());
+    setAdHocDiagnosisID('');
+    setAdHocDetailDiagnosis('');
+    setAdHocPlannedDevice('');
+    setAdHocPlannedPrice('');
+    setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
+    setAdHocSupplyDepFeedback('');
+    setAdHocOperationFeedback('');
+    setAdHocPlannedCathLabDate('');
+    setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
+    setAdHocCallNote('');
+    setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
+    setAdHocScheduled2nd('');
+    setAdHocScheduled3rd('');
+    setAdHocDetailConsultResult('');
+    setAdHocSelectedPatientKey('');
+    setAdHocSearchQuery('');
+    setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
+    setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
+    setAdHocCheckDeviceDate('');
+    setAdHocCheckDeviceBy('');
+    setAdHocCathMethod([]);
+    setAdHocValidationMsg('');
+
+    setTimeout(() => {
+      setSuccessMsg('');
+    }, 3000);
   };
 
   const getCurrentFormData = (): Partial<Consult> => {
@@ -1837,6 +1856,23 @@ Xin cảm ơn!`;
   ): Promise<boolean> => {
     if (!selectedConsult) return false;
     const closeOnSuccess = options?.closeOnSuccess !== false;
+    const merged = { ...selectedConsult, ...updatedData };
+
+    onPatchConsult?.(selectedConsult.ConsultKey, updatedData);
+    setSelectedConsult(merged);
+    setFormSnapshot(buildSnapshotFromConsult(merged));
+    setSuccessMsg('Đã lưu thông tin xếp lịch thành công!');
+
+    if (closeOnSuccess) {
+      setTimeout(() => {
+        setSuccessMsg('');
+        if (updatedData.CallStatus === 'Loại') {
+          setSelectedConsult(null);
+          setFormSnapshot(null);
+        }
+      }, 3000);
+    }
+
     try {
       const response = await fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
         method: 'PUT',
@@ -1844,25 +1880,10 @@ Xin cảm ơn!`;
         body: JSON.stringify(updatedData)
       });
       if (!response.ok) {
-         const d = await response.json();
-         throw new Error(d.error || 'Failed to update consult');
+        const d = await response.json();
+        throw new Error(d.error || 'Failed to update consult');
       }
-      setSuccessMsg('Đã lưu thông tin xếp lịch thành công!');
       onRefreshData();
-      
-      const merged = { ...selectedConsult, ...updatedData };
-      setSelectedConsult(merged);
-      setFormSnapshot(buildSnapshotFromConsult(merged));
-
-      if (closeOnSuccess) {
-        setTimeout(() => {
-          setSuccessMsg('');
-          if (updatedData.CallStatus === 'Loại') {
-             setSelectedConsult(null);
-             setFormSnapshot(null);
-          }
-        }, 3000);
-      }
       return true;
     } catch (err: any) {
       const msg = err.message || 'Error saving data';
@@ -1871,6 +1892,7 @@ Xin cảm ơn!`;
       } else {
         setErrorMsg(msg);
       }
+      onRefreshData();
       return false;
     } finally {
       setSaving(false);
@@ -1929,24 +1951,41 @@ Xin cảm ơn!`;
 
   const handleExecuteActionConfirm = async () => {
     if (!actionConfirm) return;
-    setSaving(true);
-    if (actionConfirm.type === 'save_schedule') {
+    const currentAction = actionConfirm;
+    setActionConfirm(null);
+
+    if (currentAction.type === 'save_schedule') {
+      setSaving(true);
       await executeSave(getCurrentFormData());
-    } else if (actionConfirm.type === 'loai') {
+      return;
+    }
+
+    if (currentAction.type === 'loai') {
       setCallStatus('Loại');
+      setSaving(true);
       await executeSave({ ...getCurrentFormData(), CallStatus: 'Loại' });
-    } else if (actionConfirm.type === 'transfer') {
+      return;
+    }
+
+    if (currentAction.type === 'transfer') {
+      setSaving(true);
       await executeSave({ ...getCurrentFormData(), TransferredToCathLab: true });
-    } else if (actionConfirm.type === 'undo_scheduled' && actionConfirm.consultToUpdate) {
+      return;
+    }
+
+    setSaving(true);
+    if (currentAction.type === 'undo_scheduled' && currentAction.consultToUpdate) {
       try {
-        const response = await fetch(`/api/consults/${actionConfirm.consultToUpdate.ConsultKey}`, {
+        const patch = { PlannedCathLabDate: '', TransferredToCathLab: false };
+        onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
+        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ PlannedCathLabDate: '', TransferredToCathLab: false })
+          body: JSON.stringify(patch)
         });
         if (response.ok) {
            onRefreshData();
-           if (selectedConsult && selectedConsult.ConsultKey === actionConfirm.consultToUpdate.ConsultKey) {
+           if (selectedConsult && selectedConsult.ConsultKey === currentAction.consultToUpdate.ConsultKey) {
               setPlannedCathLabDate('');
            }
            setSuccessMsg('Đã rút ca về danh sách Chưa xếp lịch.');
@@ -1956,13 +1995,16 @@ Xin cảm ơn!`;
       } catch (e) {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể rút ca về danh sách Chưa xếp lịch');
+        onRefreshData();
       }
-    } else if (actionConfirm.type === 'transfer_row' && actionConfirm.consultToUpdate) {
+    } else if (currentAction.type === 'transfer_row' && currentAction.consultToUpdate) {
       try {
-        const response = await fetch(`/api/consults/${actionConfirm.consultToUpdate.ConsultKey}`, {
+        const patch = { TransferredToCathLab: true };
+        onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
+        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ TransferredToCathLab: true })
+          body: JSON.stringify(patch)
         });
         if (response.ok) {
            onRefreshData();
@@ -1973,17 +2015,17 @@ Xin cảm ơn!`;
       } catch (e) {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể chuyển phòng thông tim');
+        onRefreshData();
       }
-    } else if (actionConfirm.type === 'ad_hoc_override' && actionConfirm.consultToUpdate) {
+    } else if (currentAction.type === 'ad_hoc_override' && currentAction.consultToUpdate) {
       try {
-        await activatePendingConsultForScheduling(actionConfirm.consultToUpdate);
+        await activatePendingConsultForScheduling(currentAction.consultToUpdate);
       } catch (err: any) {
         console.error(err);
         setErrorMsg(err.message || 'Không thể kích hoạt lượt hội chẩn');
       }
     }
     setSaving(false);
-    setActionConfirm(null);
   };
 
   const getAgeDescription = (dobStr: string) => {

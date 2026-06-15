@@ -77,9 +77,12 @@ interface StaffResultsViewProps {
   currentStaff?: Staff | null;
   onSelectConsult: (consult: Consult) => void;
   onRefreshData?: () => void;
+  onAddPatient?: (patient: Patient) => void;
+  onPatchPatient?: (patientKey: string, patch: Partial<Patient>) => void;
+  onAddConsult?: (consult: Consult) => void;
 }
 
-export default function StaffResultsView({ patients, consults, sources = [], staffList = [], currentStaff, onSelectConsult, onRefreshData }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, sources = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult }: StaffResultsViewProps) {
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -269,7 +272,7 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
         }
 
         finalPatientKey = `pat_${Date.now()}`;
-        const patientPayload = {
+        const patientPayload: Patient = {
           PatientKey: finalPatientKey,
           PatientID1: String(newPatID1 || '').trim(),
           PatientID2: String(newPatID2 || '').trim(),
@@ -284,15 +287,7 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
           PatientCreateTime: new Date().toISOString(),
           Outcome: automaticOutcome
         };
-
-        const patRes = await fetch('/api/patients', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patientPayload)
-        });
-        if (!patRes.ok) {
-          throw new Error('Không thể đăng ký thông tự do nhi mới');
-        }
+        onAddPatient?.(patientPayload);
       } else {
         // Select mode: selected patient must be chose
         if (!finalPatientKey) {
@@ -301,13 +296,8 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
           return;
         }
 
-        // Sync patient outcome if needed
         if (automaticOutcome) {
-          await fetch(`/api/patients/${finalPatientKey}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ Outcome: automaticOutcome })
-          });
+          onPatchPatient?.(finalPatientKey, { Outcome: automaticOutcome });
         }
       }
 
@@ -315,7 +305,7 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
       const chosenDept = showAddDeptInput ? customDeptVal : department;
       const chosenDoc = showAddDocInput ? customDocVal : requestBy;
 
-      const consultPayload = {
+      const consultPayload: Consult = {
         ConsultKey: `con_${Date.now()}`,
         PatientKey: finalPatientKey,
         ConsultType: consultType,
@@ -342,25 +332,55 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
         PDFTrigger: false
       };
 
-      const conRes = await fetch('/api/consults', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(consultPayload)
-      });
-
-      if (!conRes.ok) {
-        throw new Error('Không thể đăng ký kết quả hội chẩn');
-      }
-
-      // Success
+      onAddConsult?.(consultPayload);
       setSuccessMsg('Đã đăng ký và nhập thành công kết quả staff bổ sung!');
-      setTimeout(() => {
-        setShowCombinedForm(false);
-        resetForm();
-        if (onRefreshData) {
-          onRefreshData();
+      setShowCombinedForm(false);
+      resetForm();
+      setSubmitLoading(false);
+
+      const persist = async () => {
+        if (patientMode === 'create') {
+          const patRes = await fetch('/api/patients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              PatientKey: finalPatientKey,
+              PatientID1: String(newPatID1 || '').trim(),
+              PatientID2: String(newPatID2 || '').trim(),
+              PatientName: newPatName,
+              OtherPatientName: newPatName,
+              PatientDOB: newPatDOB || '2020-01-01',
+              PatientSex: newPatSex,
+              PatientAddress: newPatAddress || 'TP Hà Nội',
+              PatientPhone1: newPatPhone || '',
+              PatientPhone2: '',
+              PatientCreateBy: currentStaff?.StaffKey || '01378',
+              PatientCreateTime: new Date().toISOString(),
+              Outcome: automaticOutcome
+            })
+          });
+          if (!patRes.ok) throw new Error('Không thể đăng ký bệnh nhi mới');
+        } else if (automaticOutcome) {
+          const patRes = await fetch(`/api/patients/${finalPatientKey}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Outcome: automaticOutcome })
+          });
+          if (!patRes.ok) throw new Error('Không thể cập nhật trạng thái bệnh nhi');
         }
-      }, 1500);
+        const conRes = await fetch('/api/consults', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(consultPayload)
+        });
+        if (!conRes.ok) throw new Error('Không thể đăng ký kết quả hội chẩn');
+        onRefreshData?.();
+      };
+
+      persist().catch((err: any) => {
+        setErrorMsg(`Đã xảy ra lỗi: ${err.message || err}`);
+        onRefreshData?.();
+      });
 
     } catch (err: any) {
       setErrorMsg(`Đã xảy ra lỗi: ${err.message || err}`);
