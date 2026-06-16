@@ -5897,5 +5897,22 @@
     "IsRead": false,
     "CreatedTime": "2026-06-16T03:42:02.498Z",
     "ReadTime": ""
+  },
+  {
+    "NotificationKey": "notif_1781608124508_wbbesy",
+    "StaffKey": "01442",
+    "StaffName": "Lưu Lâm Thắng Tài",
+    "Title": "Chưa có kết quả hội chẩn",
+    "Message": "BN 2603006442 của Không rõ đăng ký chưa có KQ hội chẩn.",
+    "Severity": "warning",
+    "RelatedEntityType": "Consult",
+    "RelatedEntityKey": "03fef048",
+    "PatientKey": "260613163541",
+    "PatientID": "2603006442",
+    "PatientName": "NGUYỄN PHAN MINH ĐỨC",
+    "DedupKey": "notif:pending-staff-result:03fef048:01442",
+    "IsRead": false,
+    "CreatedTime": "2026-06-16T11:08:44.508Z",
+    "ReadTime": ""
   }
 ]

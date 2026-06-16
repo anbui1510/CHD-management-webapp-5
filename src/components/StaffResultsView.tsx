@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Patient, Consult, Source, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS } from '../types';
+import { Patient, Consult, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
+import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 
 const conclusionOptions = [
   "Can thiệp thông tim",
@@ -73,6 +74,7 @@ interface StaffResultsViewProps {
   patients: Patient[];
   consults: Consult[];
   sources?: Source[];
+  deviceTemplates?: DeviceTemplate[];
   staffList?: Staff[];
   currentStaff?: Staff | null;
   onSelectConsult: (consult: Consult) => void;
@@ -82,7 +84,7 @@ interface StaffResultsViewProps {
   onAddConsult?: (consult: Consult) => void;
 }
 
-export default function StaffResultsView({ patients, consults, sources = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, sources = [], deviceTemplates = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult }: StaffResultsViewProps) {
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -1416,16 +1418,16 @@ export default function StaffResultsView({ patients, consults, sources = [], sta
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Dụng cụ dự kiến</label>
-                      <textarea
-                        rows={2}
-                        placeholder="vd: Amplatzer ADOII..."
-                        value={plannedDevice}
-                        onChange={(e) => setPlannedDevice(e.target.value)}
-                        className="w-full h-[46px] bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold focus:outline-none text-xs text-slate-800 font-mono resize-y"
-                      />
-                    </div>
+                    <PlannedDeviceSuggestBox
+                      diagnosisID={diagnosisID}
+                      value={plannedDevice}
+                      onChange={setPlannedDevice}
+                      deviceTemplates={deviceTemplates}
+                      consults={consults}
+                      rows={2}
+                      placeholder="vd: Amplatzer ADOII..."
+                      textareaClassName="w-full h-[46px] bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold focus:outline-none text-xs text-slate-800 font-mono resize-y"
+                    />
 
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Dự trù kinh phí (VNĐ)</label>

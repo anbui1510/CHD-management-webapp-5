@@ -39,6 +39,7 @@ export interface Patient {
   PatientCreateBy: string; // StaffKey
   PatientCreateTime: string; // DateTime ISO
   Outcome: OutcomeType;
+  PatientAddressDefaultWarning?: string;
 }
 
 export type ConsultTypeEnum = 'Staff mổ' | 'Staff thông';
@@ -219,6 +220,17 @@ export interface CMR {
 }
 
 export interface Source {
+  [key: string]: any;
+}
+
+export interface DeviceTemplate {
+  DiagnosisID: string;
+  "PHƯƠNG PHÁP PHẪU THUẬT"?: string;
+  DeviceName: string;
+  FullDeviceName?: string;
+  Size?: string;
+  Price?: string;
+  bhyt?: string;
   [key: string]: any;
 }
 

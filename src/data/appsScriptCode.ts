@@ -72,7 +72,7 @@ function initializeDatabase() {
   var patientHeaders = [
     "PatientKey", "PatientID1", "PatientID2", "PatientName", "OtherPatientName",
     "PatientDOB", "PatientSex", "PatientAddress", "PatientPhone1", "PatientPhone2",
-    "PatientCreateBy", "PatientCreateTime", "Outcome"
+    "PatientCreateBy", "PatientCreateTime", "Outcome", "PatientAddressDefaultWarning"
   ];
   
   var consultHeaders = [
@@ -115,6 +115,10 @@ function initializeDatabase() {
 
   var sourceHeaders = ["DiagnosisID"];
 
+  var deviceTemplateHeaders = [
+    "DiagnosisID", "PHƯƠNG PHÁP PHẪU THUẬT", "DeviceName", "FullDeviceName", "Size", "Price", "bhyt"
+  ];
+
   var rolePresetHeaders = [
     "RolePresetID", "RolePresetLabel", "RolePresetDescription", "Permissions", "SortOrder", "IsSystem"
   ];
@@ -147,6 +151,8 @@ function initializeDatabase() {
     }
   }
 
+  getOrCreateSheet("DeviceTemplate", deviceTemplateHeaders);
+
   getOrCreateSheet("RolePreset", rolePresetHeaders);
   getOrCreateSheet("Notification", notificationHeaders);
   getOrCreateSheet("DoctorPerformanceMark", doctorPerformanceMarkHeaders);
@@ -172,6 +178,7 @@ function doGet(e) {
   var operations = readSheetAsJson("Operation");
   var cmrs = readSheetAsJson("CMR");
   var sources = readSheetAsJson("Source");
+  var deviceTemplates = readSheetAsJson("DeviceTemplate");
   var rolePresets = readSheetAsJson("RolePreset");
   var notifications = readSheetAsJson("Notification");
   var doctorPerformanceMarks = readSheetAsJson("DoctorPerformanceMark");
@@ -194,6 +201,7 @@ function doGet(e) {
     operations: operations,
     cmrs: cmrs,
     sources: sources,
+    deviceTemplates: deviceTemplates,
     rolePresets: rolePresets,
     notifications: notifications,
     doctorPerformanceMarks: doctorPerformanceMarks
@@ -229,6 +237,8 @@ function doPost(e) {
         keyColumnName = "RolePresetID";
       } else if (type === "Source") {
         keyColumnName = "DiagnosisID";
+      } else if (type === "DeviceTemplate") {
+        keyColumnName = "DeviceName";
       } else if (type === "Notification") {
         keyColumnName = "NotificationKey";
       } else if (type === "DoctorPerformanceMark") {

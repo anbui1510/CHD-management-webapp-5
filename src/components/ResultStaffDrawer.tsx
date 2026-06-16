@@ -9,6 +9,7 @@ import {
   Patient,
   PRIORITY_OPTIONS,
   Source,
+  DeviceTemplate,
   Staff,
   formatVNTime,
   findPatientByKey,
@@ -19,6 +20,7 @@ import { VNDateInput } from './VNDateInput';
 import { getSourceDiagnosisOptions } from '../data/source';
 import { getShortStaffName } from '../utils/staffNameMatch';
 import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
+import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -82,6 +84,7 @@ export interface ResultStaffDrawerProps {
   patients: Patient[];
   staffList: Staff[];
   sources: Source[];
+  deviceTemplates?: DeviceTemplate[];
   currentStaff: Staff | null;
   onClose: () => void;
   onPatchConsult: (consultKey: string, patch: Partial<Consult>) => void;
@@ -98,6 +101,7 @@ export default function ResultStaffDrawer({
   patients,
   staffList,
   sources,
+  deviceTemplates = [],
   currentStaff,
   onClose,
   onPatchConsult,
@@ -516,16 +520,16 @@ export default function ResultStaffDrawer({
                                   />
                                 </div>
 
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Dụng cụ dự kiến</label>
-                                  <textarea
-                                    rows={2}
-                                    placeholder="vd: Vá thông liên thất..."
-                                    value={formData.PlannedDevice}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, PlannedDevice: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold leading-relaxed"
-                                  />
-                                </div>
+                                <PlannedDeviceSuggestBox
+                                  diagnosisID={formData.DiagnosisID}
+                                  value={formData.PlannedDevice}
+                                  onChange={(nextValue) => setFormData(prev => ({ ...prev, PlannedDevice: nextValue }))}
+                                  deviceTemplates={deviceTemplates}
+                                  consults={consults}
+                                  rows={2}
+                                  placeholder="vd: Vá thông liên thất..."
+                                  textareaClassName="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold leading-relaxed"
+                                />
 
                                 <div>
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Số tiền dự kiến (VND / text)</label>

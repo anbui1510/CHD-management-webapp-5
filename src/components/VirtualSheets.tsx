@@ -16,11 +16,12 @@ interface VirtualSheetsProps {
   operations?: any[];
   cmrs?: any[];
   sources?: any[];
+  deviceTemplates?: any[];
   onRefreshData?: () => void;
 }
 
-export default function VirtualSheets({ patients, consults, staff, cathlabs = [], operations = [], cmrs = [], sources = [], onRefreshData }: VirtualSheetsProps) {
-  const [activeTab, setActiveTab] = useState<'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source'>('Patient');
+export default function VirtualSheets({ patients, consults, staff, cathlabs = [], operations = [], cmrs = [], sources = [], deviceTemplates = [], onRefreshData }: VirtualSheetsProps) {
+  const [activeTab, setActiveTab] = useState<'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate'>('Patient');
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -184,9 +185,10 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
       case 'Operation': return operations;
       case 'CMR': return cmrs;
       case 'Source': return sources;
+      case 'DeviceTemplate': return deviceTemplates;
       default: return [];
     }
-  }, [activeTab, patients, consults, staff, cathlabs, operations, cmrs, sources]);
+  }, [activeTab, patients, consults, staff, cathlabs, operations, cmrs, sources, deviceTemplates]);
   
   const totalPages = Math.ceil(currentData.length / rowsPerPage) || 1;
   
@@ -447,7 +449,7 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
             <span className="font-bold text-xs uppercase tracking-wider">Trình xem nhanh Google Sheets Database</span>
           </div>
           <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-            Total records: {patients.length + consults.length + staff.length + cathlabs.length + operations.length + cmrs.length + sources.length} entries
+            Total records: {patients.length + consults.length + staff.length + cathlabs.length + operations.length + cmrs.length + sources.length + deviceTemplates.length} entries
           </span>
         </div>
 
@@ -529,6 +531,17 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
           >
             <Table className="w-3.5 h-3.5" />
             Bảng 7: Source ({sources.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('DeviceTemplate')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold uppercase tracking-wider border-r border-gray-300 transition-colors ${
+              activeTab === 'DeviceTemplate'
+                ? 'bg-white text-emerald-700 border-t-2 border-t-emerald-600'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Table className="w-3.5 h-3.5" />
+            Bảng 8: DeviceTemplate ({deviceTemplates.length})
           </button>
         </div>
 

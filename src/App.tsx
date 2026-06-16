@@ -20,6 +20,7 @@ import {
   Operation,
   CMR,
   Source,
+  DeviceTemplate,
   RolePreset,
   Notification as WorkflowNotification,
   DoctorPerformanceMark,
@@ -208,6 +209,7 @@ export default function App() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [cmrs, setCmrs] = useState<CMR[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
+  const [deviceTemplates, setDeviceTemplates] = useState<DeviceTemplate[]>([]);
   const [rolePresetRecords, setRolePresetRecords] = useState<RolePreset[]>([]);
   const [notifications, setNotifications] = useState<WorkflowNotification[]>([]);
   const [doctorPerformanceMarks, setDoctorPerformanceMarks] = useState<DoctorPerformanceMark[]>([]);
@@ -380,6 +382,7 @@ export default function App() {
       setOperations,
       setCmrs,
       setSources,
+      setDeviceTemplates,
       setRolePresetRecords,
       setRuntimeRolePresets,
       setNotifications,
@@ -1665,6 +1668,8 @@ export default function App() {
             <BellNotificationMenu
               staff={currentStaff}
               notifications={notifications}
+              patients={patients}
+              consults={consults}
               isOpen={isNotificationMenuOpen}
               onToggle={() => {
                 setIsNotificationMenuOpen(prev => !prev);
@@ -1794,6 +1799,7 @@ export default function App() {
               <StaffProfileView
                 staff={currentStaff}
                 staffList={staffList}
+                patients={patients}
                 consults={consults}
                 cathlabs={cathlabs}
                 operations={operations}
@@ -2776,6 +2782,7 @@ export default function App() {
               patients={patients}
               consults={consults}
               sources={sources}
+              deviceTemplates={deviceTemplates}
               staffList={staffList}
               currentStaff={currentStaff}
               onSelectConsult={(c) => makeResultEdit(c)}
@@ -2848,6 +2855,7 @@ export default function App() {
               consults={consults}
               cathlabs={cathlabs}
               sources={sources}
+              deviceTemplates={deviceTemplates}
               staffList={staffList}
               currentStaff={currentStaff}
               pureCalendarMode={false}
@@ -2870,6 +2878,7 @@ export default function App() {
               consults={consults}
               cathlabs={cathlabs}
               sources={sources}
+              deviceTemplates={deviceTemplates}
               staffList={staffList}
               currentStaff={currentStaff}
               pureCalendarMode={true}
@@ -3015,6 +3024,7 @@ export default function App() {
               operations={operations}
               cmrs={cmrs}
               sources={sources}
+              deviceTemplates={deviceTemplates}
               onRefreshData={refreshFullData}
             />
           )}
@@ -3056,6 +3066,7 @@ export default function App() {
         patients={patients}
         staffList={staffList}
         sources={sources}
+        deviceTemplates={deviceTemplates}
         currentStaff={currentStaff}
         onClose={() => setEditingConsultKey(null)}
         onPatchConsult={patchConsult}

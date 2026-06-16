@@ -137,7 +137,7 @@
   },
   {
     "PatientAddress": "Phú Thọ",
-    "DiagnosisID": "Đứt đoạn cung ĐMC",
+    "DiagnosisID": "IAA",
     "ResultConsultID": "Chụp MRI",
     "PriorityOrder": "",
     "CallingStatus": "",
@@ -426,7 +426,7 @@
   },
   {
     "PatientAddress": "Lâm Đồng",
-    "DiagnosisID": "",
+    "DiagnosisID": "APW",
     "ResultConsultID": "",
     "PriorityOrder": "",
     "CallingStatus": "",
@@ -443,7 +443,7 @@
   },
   {
     "PatientAddress": "Đồng Nai",
-    "DiagnosisID": "",
+    "DiagnosisID": "ALCAPA",
     "ResultConsultID": "",
     "PriorityOrder": "",
     "CallingStatus": "",
@@ -460,7 +460,7 @@
   },
   {
     "PatientAddress": "Tây Ninh",
-    "DiagnosisID": "",
+    "DiagnosisID": "MR",
     "ResultConsultID": "",
     "PriorityOrder": "",
     "CallingStatus": "",
@@ -477,7 +477,7 @@
   },
   {
     "PatientAddress": "TP Hồ Chí Minh",
-    "DiagnosisID": "",
+    "DiagnosisID": "Ngoại tâm thu thất",
     "ResultConsultID": "",
     "PriorityOrder": "",
     "CallingStatus": "",
@@ -494,7 +494,7 @@
   },
   {
     "PatientAddress": "Đồng Tháp",
-    "DiagnosisID": "",
+    "DiagnosisID": "WPW",
     "ResultConsultID": "",
     "PriorityOrder": "",
     "CallingStatus": "",

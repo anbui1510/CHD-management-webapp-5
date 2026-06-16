@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
-import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User } from 'lucide-react';
+import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User, Upload } from 'lucide-react';
 import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
@@ -144,6 +145,79 @@ const removeVietnameseTones = (str: any): string => {
   return removeDiacritics(str);
 };
 
+const DEFAULT_HIS_PATIENT_ADDRESS = 'TP Hồ Chí Minh';
+const HIS_ADDRESS_WARNING = 'BN được tạo tự động từ import HIS, địa chỉ đang mặc định là TP Hồ Chí Minh. Cần cập nhật lại địa chỉ hành chính chính xác.';
+
+const normalizeHisText = (value: any): string => String(value ?? '').trim().replace(/\s+/g, ' ');
+
+const normalizeHisHeader = (value: any): string =>
+  removeVietnameseTones(normalizeHisText(value)).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const normalizeHisKey = (value: any): string =>
+  normalizeHisText(value).toLowerCase();
+
+const parseHisDateOnly = (value: any): string => {
+  if (!value) return '';
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().split('T')[0];
+  }
+  if (typeof value === 'number') {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) {
+      const month = String(parsed.m).padStart(2, '0');
+      const day = String(parsed.d).padStart(2, '0');
+      return `${parsed.y}-${month}-${day}`;
+    }
+  }
+
+  const raw = normalizeHisText(value).split(/\s+/)[0];
+  const rawFull = normalizeHisText(value);
+  const numericValue = Number(rawFull);
+  if (/^\d+(\.\d+)?$/.test(rawFull) && numericValue > 20000) {
+    const parsed = XLSX.SSF.parse_date_code(numericValue);
+    if (parsed) {
+      const month = String(parsed.m).padStart(2, '0');
+      const day = String(parsed.d).padStart(2, '0');
+      return `${parsed.y}-${month}-${day}`;
+    }
+  }
+  if (/[a-zA-Z]/.test(rawFull)) {
+    const parsedTime = Date.parse(rawFull);
+    if (!Number.isNaN(parsedTime)) return new Date(parsedTime).toISOString().split('T')[0];
+  }
+  const parts = raw.includes('/') ? raw.split('/') : raw.split('-');
+  if (parts.length !== 3) return raw;
+
+  const [first, second, third] = parts.map(part => part.trim());
+  if (first.length === 4) {
+    return `${first}-${second.padStart(2, '0')}-${third.padStart(2, '0')}`;
+  }
+  return `${third}-${second.padStart(2, '0')}-${first.padStart(2, '0')}`;
+};
+
+const normalizeHisSex = (value: any): 'Nam' | 'Nữ' => {
+  const normalized = removeVietnameseTones(normalizeHisText(value)).toLowerCase();
+  return normalized.includes('nu') ? 'Nữ' : 'Nam';
+};
+
+const normalizeHisDoctor = (value: any): string => {
+  const cleaned = normalizeHisText(value)
+    .replace(/\([^)]*\)/g, '')
+    .replace(/^(bsckii|bscki|ths|th\.s|ts|bs|bác sĩ)\.?\s+/i, '')
+    .trim();
+  if (!cleaned) return '';
+  const parts = cleaned.split(/\s+/);
+  return `BS. ${parts[parts.length - 1]}`;
+};
+
+const getHisCell = (row: any[], headerMap: Map<string, number>, aliases: string[]): string => {
+  for (const alias of aliases) {
+    const index = headerMap.get(alias);
+    if (index !== undefined) return normalizeHisText(row[index]);
+  }
+  return '';
+};
+
 export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient }: Props) {
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
@@ -216,6 +290,9 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [selectedPending, setSelectedPending] = useState<{c: Consult, p: Patient} | null>(null);
   const [selectedDone, setSelectedDone] = useState<{p: Patient, cath: CathLab} | null>(null);
   const [isAdHocModalOpen, setIsAdHocModalOpen] = useState(false);
+  const [hisImporting, setHisImporting] = useState(false);
+  const [hisImportStatus, setHisImportStatus] = useState('');
+  const hisImportInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
   const [formData, setFormData] = useState<Partial<CathLab>>(INIT_CATHLAB);
@@ -295,6 +372,198 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     setAdHocPatientPhone1('');
     setAdHocPatientPhone2('');
     setIsAdHocModalOpen(true);
+  };
+
+  const findPatientByHisId = (patientId: string, patientList: Patient[] = patients): Patient | undefined => {
+    const normalizedId = normalizeHisKey(patientId);
+    if (!normalizedId) return undefined;
+    return patientList.find(patient => {
+      const id1 = normalizeHisKey(patient.PatientID1);
+      const id2Values = String(patient.PatientID2 || '')
+        .split('-')
+        .map(part => normalizeHisKey(part))
+        .filter(Boolean);
+      return id1 === normalizedId || id2Values.includes(normalizedId);
+    });
+  };
+
+  const getLatestConsultForPatient = (patientKey: string): Consult | undefined => {
+    return [...consults]
+      .filter(consult => normalizePatientKey(consult.PatientKey) === normalizePatientKey(patientKey))
+      .sort((a, b) => String(b.ConsultDate || '').localeCompare(String(a.ConsultDate || '')) || String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || '')))[0];
+  };
+
+  const buildCathImportKey = (patientId: string, cathDate: string, cathMethod: string) =>
+    `${normalizeHisKey(patientId)}|${cathDate}|${removeVietnameseTones(cathMethod).toLowerCase().trim()}`;
+
+  const buildExistingCathImportKeys = (patientList: Patient[] = patients, cathList: CathLab[] = cathlabs) => {
+    const keys = new Set<string>();
+    cathList.forEach(cath => {
+      const patient = findPatientByKey(patientList, cath.PatientKey);
+      const patientIds = [
+        patient?.PatientID1,
+        ...(String(patient?.PatientID2 || '').split('-'))
+      ].map(id => normalizeHisText(id)).filter(Boolean);
+      const cathMethods = parseCathMethods(cath.CathMethod).length > 0 ? parseCathMethods(cath.CathMethod) : [String(cath.CathMethod || '')];
+      patientIds.forEach(patientId => {
+        cathMethods.forEach(method => {
+          if (patientId && cath.CathDate && method) {
+            keys.add(buildCathImportKey(patientId, parseHisDateOnly(cath.CathDate), method));
+          }
+        });
+      });
+    });
+    return keys;
+  };
+
+  const handleHisImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setHisImporting(true);
+    setHisImportStatus('Đang đọc file HIS...');
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+      const headerRowIndex = rows.findIndex(row => {
+        const normalized = row.map(normalizeHisHeader);
+        return normalized.includes('manb') && normalized.includes('tendichvu');
+      });
+
+      if (headerRowIndex === -1) {
+        throw new Error('Không tìm thấy dòng tiêu đề có cột "Mã NB" và "Tên dịch vụ".');
+      }
+
+      const headerMap = new Map<string, number>();
+      rows[headerRowIndex].forEach((header, index) => {
+        const normalized = normalizeHisHeader(header);
+        if (normalized) headerMap.set(normalized, index);
+      });
+
+      const currentPatients = [...patients];
+      const patientsToCreate: Patient[] = [];
+      const cathlabsToCreate: CathLab[] = [];
+      const importedSummaries: string[] = [];
+      const existingCathKeys = buildExistingCathImportKeys(currentPatients, cathlabs);
+      const importedKeys = new Set<string>();
+      let skippedExisting = 0;
+      let skippedInvalid = 0;
+
+      rows.slice(headerRowIndex + 1).forEach((row, index) => {
+        const patientId = getHisCell(row, headerMap, ['manb']);
+        const patientName = getHisCell(row, headerMap, ['hovatennb', 'hotennb', 'hovatenbn']);
+        const cathMethod = getHisCell(row, headerMap, ['tendichvu']);
+        const cathDate = parseHisDateOnly(getHisCell(row, headerMap, ['thoigianbatdaupttt']));
+        const preDiagnosis = getHisCell(row, headerMap, ['chandoantruocttt']);
+        const postDiagnosis = getHisCell(row, headerMap, ['chandoansaupttt']) || preDiagnosis;
+
+        if (!patientId || !cathMethod || !cathDate) {
+          skippedInvalid++;
+          return;
+        }
+
+        const importKey = buildCathImportKey(patientId, cathDate, cathMethod);
+        if (existingCathKeys.has(importKey) || importedKeys.has(importKey)) {
+          skippedExisting++;
+          return;
+        }
+
+        let patient = findPatientByHisId(patientId, currentPatients);
+        if (!patient) {
+          patient = {
+            PatientKey: `pat_his_${Date.now()}_${index}`,
+            PatientID1: patientId,
+            PatientID2: '',
+            PatientName: patientName || patientId,
+            OtherPatientName: '',
+            PatientDOB: parseHisDateOnly(getHisCell(row, headerMap, ['ngaysinh'])),
+            PatientSex: normalizeHisSex(getHisCell(row, headerMap, ['gioitinh'])),
+            PatientAddress: DEFAULT_HIS_PATIENT_ADDRESS,
+            PatientPhone1: '',
+            PatientPhone2: '',
+            PatientCreateBy: loggedInStaffId || 'HIS_IMPORT',
+            PatientCreateTime: new Date().toISOString(),
+            Outcome: 'Đã thông',
+            PatientAddressDefaultWarning: HIS_ADDRESS_WARNING
+          };
+          currentPatients.push(patient);
+          patientsToCreate.push(patient);
+        }
+
+        const latestConsult = getLatestConsultForPatient(patient.PatientKey);
+        const cathPayload: CathLab = {
+          CathKey: `cath_his_${Date.now()}_${index}`,
+          PatientKey: patient.PatientKey,
+          ConsultKey: latestConsult?.ConsultKey || '',
+          CathDate: cathDate,
+          DiagnosisID: latestConsult?.DiagnosisID || '',
+          PostDiagnosisID: latestConsult?.DiagnosisID || '',
+          PostDiagnosis: postDiagnosis,
+          CathResultID: 'Thành công',
+          CathMethod: cathMethod as any,
+          CathPlan: 'Tái khám thường',
+          CathNote: 'Import từ file thủ thuật HIS',
+          _1stInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptvchinh'])),
+          _2ndInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptv1'])),
+          _3rdInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptv2'])),
+          _4thInterventionist: '',
+          PlannedFollowUpDate: '',
+          CathUpdatedBy: loggedInStaffId,
+          CathUpdatedTime: new Date().toISOString()
+        };
+
+        cathlabsToCreate.push(cathPayload);
+        importedSummaries.push(`${patient.PatientName || patientName || patientId} - ${postDiagnosis || 'Không có chẩn đoán'} - ${cathMethod} - ${formatVNTime(cathDate)}`);
+        importedKeys.add(importKey);
+      });
+
+      if (patientsToCreate.length === 0 && cathlabsToCreate.length === 0) {
+        setHisImportStatus(`Không có ca mới. Bỏ qua ${skippedExisting} ca đã có.`);
+        alert(`Không có ca mới để import.\nĐã bỏ qua: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}`);
+        return;
+      }
+
+      setHisImportStatus(`Đang lưu ${cathlabsToCreate.length} ca HIS...`);
+      patientsToCreate.forEach(patient => onAddPatient?.(patient));
+      cathlabsToCreate.forEach(cath => onAddCathlab?.(cath));
+
+      for (const patient of patientsToCreate) {
+        const response = await fetch('/api/patients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patient)
+        });
+        if (!response.ok) throw new Error(`Không thể tạo BN ${patient.PatientID1}`);
+      }
+
+      for (const cath of cathlabsToCreate) {
+        const response = await fetch('/api/cathlabs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cath)
+        });
+        if (!response.ok) throw new Error(`Không thể import CathLab ${cath.CathKey}`);
+      }
+
+      setActiveTab('done');
+      const summaryText = importedSummaries.slice(0, 20).map((summary, idx) => `${idx + 1}. ${summary}`).join('\n');
+      const truncatedNote = importedSummaries.length > 20 ? `\n... và ${importedSummaries.length - 20} ca khác` : '';
+      setHisImportStatus(`Đã import ${cathlabsToCreate.length} ca. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
+      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${cathlabsToCreate.length}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
+      onRefreshData();
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : 'Không thể import file HIS';
+      setHisImportStatus(message);
+      alert(message);
+      onRefreshData();
+    } finally {
+      setHisImporting(false);
+      event.target.value = '';
+    }
   };
 
   const activateEmergencyTransferFromScheduling = async (consult: Consult, patient: Patient) => {
@@ -639,6 +908,21 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                 />
              </div>
              <button
+                onClick={() => hisImportInputRef.current?.click()}
+                disabled={hisImporting}
+                className="font-extrabold text-[13px] px-4 py-2.5 rounded-2xl transition flex items-center gap-2 bg-white text-rose-700 border border-rose-200 shadow-sm hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+                <Upload className="w-4 h-4" />
+                {hisImporting ? 'Đang import HIS...' : 'Import HIS'}
+             </button>
+             <input
+                ref={hisImportInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleHisImportFile}
+             />
+             <button
                 onClick={openAdHocForm}
                 className="font-extrabold text-[13px] px-5 py-2.5 rounded-2xl transition flex items-center gap-2 bg-rose-600 text-white shadow-md hover:bg-rose-700 ml-2"
              >
@@ -647,6 +931,11 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
              </button>
           </div>
        </div>
+       {hisImportStatus && (
+         <div className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-100 rounded-2xl px-3 py-2">
+           {hisImportStatus}
+         </div>
+       )}
 
        {activeTab === 'pending' && (
          <div className="flex-1 overflow-hidden bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col">

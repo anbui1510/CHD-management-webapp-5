@@ -1,4 +1,4 @@
-import type { CathLab, CMR, Consult, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff } from '../types';
+import type { CathLab, CMR, Consult, DeviceTemplate, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff } from '../types';
 
 export type MedicalDataBundle = {
   patients: Patient[];
@@ -8,6 +8,7 @@ export type MedicalDataBundle = {
   operations: Operation[];
   cmrs: CMR[];
   sources: Source[];
+  deviceTemplates: DeviceTemplate[];
   rolePresets: RolePreset[];
   notifications: Notification[];
   doctorPerformanceMarks: DoctorPerformanceMark[];
@@ -23,6 +24,7 @@ const EMPTY_BUNDLE: MedicalDataBundle = {
   operations: [],
   cmrs: [],
   sources: [],
+  deviceTemplates: [],
   rolePresets: [],
   notifications: [],
   doctorPerformanceMarks: []
@@ -43,6 +45,7 @@ export async function fetchMedicalDataBundle(): Promise<MedicalDataBundle> {
     operations: Array.isArray(data.operations) ? data.operations : EMPTY_BUNDLE.operations,
     cmrs: Array.isArray(data.cmrs) ? data.cmrs : EMPTY_BUNDLE.cmrs,
     sources: Array.isArray(data.sources) ? data.sources : EMPTY_BUNDLE.sources,
+    deviceTemplates: Array.isArray(data.deviceTemplates) ? data.deviceTemplates : EMPTY_BUNDLE.deviceTemplates,
     rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : EMPTY_BUNDLE.rolePresets,
     notifications: Array.isArray(data.notifications) ? data.notifications : EMPTY_BUNDLE.notifications,
     doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks) ? data.doctorPerformanceMarks : EMPTY_BUNDLE.doctorPerformanceMarks
@@ -57,6 +60,7 @@ export type MedicalDataSetters = {
   setOperations: (value: Operation[]) => void;
   setCmrs: (value: CMR[]) => void;
   setSources: (value: Source[]) => void;
+  setDeviceTemplates: (value: DeviceTemplate[]) => void;
   setRolePresetRecords: (value: RolePreset[]) => void;
   setRuntimeRolePresets: (value: RolePreset[]) => void;
   setNotifications: (value: Notification[]) => void;
@@ -76,6 +80,7 @@ export function applyMedicalDataBundle(bundle: MedicalDataBundle, scope: Refresh
 
   if (scope === 'consult') {
     setters.setSources(bundle.sources);
+    setters.setDeviceTemplates(bundle.deviceTemplates);
     return;
   }
 
@@ -87,6 +92,7 @@ export function applyMedicalDataBundle(bundle: MedicalDataBundle, scope: Refresh
 
   setters.setCathlabs(bundle.cathlabs);
   setters.setSources(bundle.sources);
+  setters.setDeviceTemplates(bundle.deviceTemplates);
 
   if (scope === 'full') {
     setters.setOperations(bundle.operations);

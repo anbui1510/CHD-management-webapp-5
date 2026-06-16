@@ -6,10 +6,11 @@ type SheetData = {
   operations: any[];
   cmrs: any[];
   sources: any[];
+  deviceTemplates: any[];
   rolePresets: any[];
 };
 
-type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'RolePreset';
+type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset';
 
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
 const viteEnv = (import.meta as any).env || {};
@@ -21,6 +22,7 @@ const EMPTY_DATA: SheetData = {
   operations: [],
   cmrs: [],
   sources: [],
+  deviceTemplates: [],
   rolePresets: []
 };
 
@@ -32,6 +34,7 @@ const endpointMap: Record<string, { type: SheetType; collection: keyof SheetData
   operations: { type: 'Operation', collection: 'operations', keyField: 'SurgKey', prefix: 'surg' },
   cmrs: { type: 'CMR', collection: 'cmrs', keyField: 'CMRKey', prefix: 'cmr' },
   sources: { type: 'Source', collection: 'sources', keyField: 'DiagnosisID', prefix: 'source' },
+  'device-templates': { type: 'DeviceTemplate', collection: 'deviceTemplates', keyField: 'DeviceName', prefix: 'device' },
   'role-presets': { type: 'RolePreset', collection: 'rolePresets', keyField: 'RolePresetID', prefix: 'preset' }
 };
 
@@ -91,6 +94,7 @@ const normalizeData = (data: Partial<SheetData>): SheetData => ({
   operations: Array.isArray(data.operations) ? data.operations : [],
   cmrs: Array.isArray(data.cmrs) ? data.cmrs : [],
   sources: Array.isArray(data.sources) ? data.sources : [],
+  deviceTemplates: Array.isArray(data.deviceTemplates) ? data.deviceTemplates : [],
   rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : []
 });
 

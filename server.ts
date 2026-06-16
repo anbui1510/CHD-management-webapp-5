@@ -7,7 +7,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { Patient, Consult, Staff, CathLab, CMR, Source, RolePreset, Operation, Notification, DoctorPerformanceMark } from './src/types';
+import { Patient, Consult, Staff, CathLab, CMR, Source, DeviceTemplate, RolePreset, Operation, Notification, DoctorPerformanceMark } from './src/types';
 import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
@@ -47,6 +47,7 @@ const CATHLABS_FILE = path.join(DB_DIR, 'cathlabs.json');
 const OPERATIONS_FILE = path.join(DB_DIR, 'operations.json');
 const CMRS_FILE = path.join(DB_DIR, 'cmrs.json');
 const SOURCES_FILE = path.join(DB_DIR, 'sources.json');
+const DEVICE_TEMPLATES_FILE = path.join(DB_DIR, 'device-templates.json');
 const ROLE_PRESETS_FILE = path.join(DB_DIR, 'role-presets.json');
 const NOTIFICATIONS_FILE = path.join(DB_DIR, 'notifications.json');
 const DOCTOR_MARKS_FILE = path.join(DB_DIR, 'doctor-performance-marks.json');
@@ -185,7 +186,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
     const data = await response.json() as any;
 
-    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources) || Array.isArray(data.rolePresets) || Array.isArray(data.notifications) || Array.isArray(data.doctorPerformanceMarks))) {
+    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources) || Array.isArray(data.deviceTemplates) || Array.isArray(data.rolePresets) || Array.isArray(data.notifications) || Array.isArray(data.doctorPerformanceMarks))) {
       if (Array.isArray(data.patients)) {
         const currentPatients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
         const pMap = new Map();
@@ -310,6 +311,9 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.sources) && data.sources.length > 0) {
         writeDB(SOURCES_FILE, data.sources);
       }
+      if (Array.isArray(data.deviceTemplates)) {
+        writeDB(DEVICE_TEMPLATES_FILE, data.deviceTemplates);
+      }
       if (Array.isArray(data.rolePresets)) {
         writeDB(ROLE_PRESETS_FILE, resolveRolePresetRecords(data.rolePresets));
       }
@@ -357,7 +361,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   return false;
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
@@ -1121,6 +1125,7 @@ app.get('/api/all', async (_req, res) => {
     operations: readDB<Operation>(OPERATIONS_FILE, []),
     cmrs: readDB<CMR>(CMRS_FILE, defaultCmrs),
     sources: readDB<Source>(SOURCES_FILE, []),
+    deviceTemplates: readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []),
     rolePresets: ensureRolePresetsDB(),
     notifications: readDB<Notification>(NOTIFICATIONS_FILE, []),
     doctorPerformanceMarks: readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, [])
@@ -1508,6 +1513,12 @@ app.get('/api/sources', async (req, res) => {
   await syncFromGoogleSheets();
   const sources = readDB<Source>(SOURCES_FILE, []);
   res.json(sources);
+});
+
+app.get('/api/device-templates', async (req, res) => {
+  await syncFromGoogleSheets();
+  const deviceTemplates = readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []);
+  res.json(deviceTemplates);
 });
 
 app.post('/api/sources', async (req, res) => {

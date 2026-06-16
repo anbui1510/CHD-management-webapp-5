@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import { Patient, Consult, CathLab, Source, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
+import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
+import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { 
   ClipboardList, 
   Search, 
@@ -41,6 +42,7 @@ interface CathLabSchedulerViewProps {
   consults: Consult[];
   cathlabs?: CathLab[];
   sources?: Source[];
+  deviceTemplates?: DeviceTemplate[];
   staffList: Staff[];
   currentStaff?: Staff | null;
   onRefreshData: () => void;
@@ -205,6 +207,7 @@ export default function CathLabSchedulerView({
   consults,
   cathlabs = [],
   sources = [],
+  deviceTemplates = [],
   staffList,
   currentStaff,
   onRefreshData,
@@ -2807,10 +2810,17 @@ Xin cảm ơn!`;
                     <div className="space-y-4">
 
                       {/* Patient name highlight — tách khỏi ô hành chính */}
-                      <div className="bg-white border-2 border-[#d2145a] rounded-2xl px-4 py-3 shadow-sm">
-                        <span className="font-black text-slate-900 uppercase text-sm sm:text-base tracking-wide block whitespace-normal break-words leading-snug">
-                          {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="bg-[#d2145a] border-2 border-[#d2145a] rounded-2xl px-4 py-3 shadow-sm">
+                          <span className="font-black text-white uppercase text-sm sm:text-base tracking-wide block whitespace-normal break-words leading-snug">
+                            {pat.PatientName}
+                          </span>
+                        </div>
+                        {ptvPhu1Display?.trim() && (
+                          <span className="text-slate-700 uppercase text-sm sm:text-base tracking-wide leading-snug">
+                            PTV phụ: {ptvPhu1Display}
+                          </span>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
@@ -2886,7 +2896,7 @@ Xin cảm ơn!`;
                         </span>
                         <div className="grid grid-cols-1 gap-2.5">
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">ICD (DiagnosisID)</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Bệnh chính</label>
                             <SearchableEnumSelect
                               options={diagnosisOptions}
                               value={schedDiagnosisID}
@@ -2899,7 +2909,17 @@ Xin cảm ơn!`;
                             />
                           </div>
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Kết luận chính (ConsultResultID)</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Chẩn đoán chi tiết</label>
+                            <textarea
+                              rows={2.5}
+                              value={schedDetailDiagnosis}
+                              onChange={(e) => setSchedDetailDiagnosis(e.target.value)}
+                              placeholder="Nhập chẩn đoán chi tiết..."
+                              className="w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-[10.5px] text-slate-700 leading-relaxed resize-y"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Kết luận chính</label>
                             <SearchableEnumSelect
                               options={CONCLUSION_OPTIONS}
                               value={schedConsultResultID}
@@ -2909,7 +2929,7 @@ Xin cảm ơn!`;
                             />
                           </div>
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Ưu tiên (PriorityOrder)</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Ưu tiên</label>
                             <div className="flex gap-1.5">
                               {PRIORITY_OPTIONS.map((opt) => {
                                 const isSel = priorityOrder === opt;
@@ -2929,16 +2949,6 @@ Xin cảm ơn!`;
                                 );
                               })}
                             </div>
-                          </div>
-                          <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Chẩn đoán chi tiết</label>
-                            <textarea
-                              rows={2.5}
-                              value={schedDetailDiagnosis}
-                              onChange={(e) => setSchedDetailDiagnosis(e.target.value)}
-                              placeholder="Nhập chẩn đoán chi tiết..."
-                              className="w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-[10.5px] text-slate-700 leading-relaxed resize-y"
-                            />
                           </div>
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Kết quả Hội chẩn chi tiết</label>
@@ -2966,13 +2976,13 @@ Xin cảm ơn!`;
                   
                     {/* Planned Device */}
                     <div className="md:col-span-2">
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Dụng cụ dự kiến</label>
-                      <textarea
-                        rows={2.5}
-                        placeholder="Nhập chi tiết dụng cụ dự kiến đầy đủ..."
+                      <PlannedDeviceSuggestBox
+                        diagnosisID={schedDiagnosisID}
                         value={plannedDevice}
-                        onChange={(e) => setPlannedDevice(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800 leading-normal resize-y"
+                        onChange={setPlannedDevice}
+                        deviceTemplates={deviceTemplates}
+                        consults={consults}
+                        rows={3}
                       />
                     </div>
 
@@ -4505,7 +4515,17 @@ Xin cảm ơn!`;
 
                       <div className="grid grid-cols-1 gap-2">
                         {renderAdHocRow('Dụng cụ dự kiến', (
-                          <textarea rows={1} placeholder="Amplatzer ADOII..." value={adHocPlannedDevice} onChange={(e) => setAdHocPlannedDevice(e.target.value)} className={`${adHocInputCls} font-bold resize-y`} />
+                          <PlannedDeviceSuggestBox
+                            diagnosisID={adHocDiagnosisID}
+                            value={adHocPlannedDevice}
+                            onChange={setAdHocPlannedDevice}
+                            deviceTemplates={deviceTemplates}
+                            consults={consults}
+                            label=""
+                            rows={2}
+                            placeholder="Amplatzer ADOII..."
+                            textareaClassName={`${adHocInputCls} font-bold resize-y`}
+                          />
                         ), { alignTop: true })}
                         {renderAdHocRow('Dự trù kinh phí', (
                           <input type="text" placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />

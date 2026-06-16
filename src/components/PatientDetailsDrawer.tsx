@@ -16,6 +16,7 @@ import {
   ClipboardCheck,
   FileText,
   Activity,
+  AlertTriangle,
   CalendarDays,
   Scissors
 } from 'lucide-react';
@@ -189,6 +190,13 @@ export default function PatientDetailsDrawer({
               )}
             </div>
           </div>
+
+          {patient.PatientAddressDefaultWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2 text-xs font-bold text-amber-900">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>{patient.PatientAddressDefaultWarning}</span>
+            </div>
+          )}
 
           {latestDiagnosis && (
             <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-4 shadow-sm">

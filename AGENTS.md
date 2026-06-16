@@ -29,6 +29,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `PatientCreateBy` | Người tạo thông tin BN | Ref | | | Liên kết đến bảng Staff thông qua StaffKey |
 | `PatientCreateTime`| Ngày tạo thông tin BN | DateTime | | | |
 | `Outcome` | Trạng thái cuối cùng của BN | Enum | Tử vong / Nặng xin về / Đã mổ / Đã thông / Chờ chỉ định | | |
+| `PatientAddressDefaultWarning` | Cảnh báo địa chỉ mặc định | Text | | | Dùng cho BN được tạo tự động từ import HIS khi chưa có địa chỉ thật; nếu có giá trị thì Hồ sơ BN phải cảnh báo cần cập nhật địa chỉ. |
 
 ### 2. Bảng Consult (Lịch trình / Biên bản hội chẩn)
 
@@ -170,7 +171,22 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 *   Chứa các danh mục thiết lập, các cột phụ thuộc vào cấu hình người dùng. Hệ thống sẽ tự động quét hết các cột vào mảng.
 *   `DiagnosisID`: Danh mục mã chẩn đoán dùng chung cho `Consult.DiagnosisID`, `CathLab.PostDiagnosisID` và `CMR.CMRDiagnosisID`. Không hard-code danh sách DiagnosisID mới trong component; nếu user thêm mã mới thì lưu vào cột này.
 
-### 8. Bảng RolePreset (Vai trò mẫu phân quyền)
+### 8. Bảng DeviceTemplate (Gợi ý dụng cụ can thiệp)
+
+| Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `DiagnosisID` | Bệnh chính | Text | Ref tới `Source.DiagnosisID` | Bắt buộc | Dùng để lọc gợi ý dụng cụ theo mã bệnh trong `Consult.DiagnosisID`. |
+| `PHƯƠNG PHÁP PHẪU THUẬT` | Phương pháp phẫu thuật/thủ thuật | Text | | | Giữ đúng tên cột có dấu và khoảng trắng theo Google Sheets. |
+| `DeviceName` | Tên dụng cụ ngắn | Text | | Bắt buộc | Tên hiển thị nhanh trong dropdown/chip gợi ý. |
+| `FullDeviceName` | Tên dụng cụ đầy đủ | LongText | | | Nội dung ưu tiên để điền vào `Consult.PlannedDevice`. |
+| `Size` | Kích thước | Text | | | Kích thước dụng cụ nếu có. |
+| `Price` | Giá | Text | | | Giá tiền dự kiến nếu có. |
+| `bhyt` | BHYT | Text | | | Thông tin BHYT/ghi chú thanh toán nếu có, giữ đúng chữ thường `bhyt`. |
+
+* Gợi ý `PlannedDevice` trong các popup staff/xếp lịch lấy từ bảng này theo `DiagnosisID`, đồng thời có thể trộn thêm lịch sử `Consult.PlannedDevice` cùng mã bệnh.
+* Khi bấm nhiều gợi ý, nội dung điền vào `PlannedDevice` được nối bằng dấu chấm.
+
+### 9. Bảng RolePreset (Vai trò mẫu phân quyền)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |

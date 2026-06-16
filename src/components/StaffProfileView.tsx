@@ -16,7 +16,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import type { CathLab, Consult, DoctorPerformanceMark, Operation, Staff } from '../types';
+import type { CathLab, Consult, DoctorPerformanceMark, Operation, Patient, Staff } from '../types';
 import { formatVNTime } from '../types';
 import { DateFieldWithCalendar, DateRangePickerPopover } from './MiniCalendarPopup';
 import {
@@ -32,6 +32,7 @@ import { getStaffInitial } from '../utils/staffNameMatch';
 interface StaffProfileViewProps {
   staff: Staff;
   staffList: Staff[];
+  patients: Patient[];
   consults: Consult[];
   cathlabs: CathLab[];
   operations: Operation[];
@@ -179,6 +180,7 @@ function ActivityMetricRow({
 export default function StaffProfileView({
   staff,
   staffList,
+  patients,
   consults,
   cathlabs,
   operations,
@@ -234,6 +236,60 @@ export default function StaffProfileView({
   }, [doctorPerformanceMarks, profileStaff.StaffKey, activeFilter]);
 
   const totalMarkScore = filteredMarks.reduce((sum, mark) => sum + Number(mark.Score || 1), 0);
+
+  const getMarkPatientContext = (mark: DoctorPerformanceMark) => {
+    const relatedConsult = consults.find(consult =>
+      String(consult.ConsultKey || '') === String(mark.RelatedEntityKey || '') ||
+      String(consult.PatientKey || '') === String(mark.PatientKey || '')
+    );
+    const patient = patients.find(item =>
+      String(item.PatientKey || '') === String(mark.PatientKey || '') ||
+      String(item.PatientID1 || '') === String(mark.PatientID || '') ||
+      String(item.PatientID2 || '') === String(mark.PatientID || '')
+    );
+
+    return {
+      patientName: mark.PatientName || patient?.PatientName || patient?.OtherPatientName || '',
+      patientId: mark.PatientID || patient?.PatientID1 || '',
+      diagnosisID: relatedConsult?.DiagnosisID || ''
+    };
+  };
+
+  const getMarkPatientLabel = (mark: DoctorPerformanceMark) => {
+    const context = getMarkPatientContext(mark);
+    const patientName = String(context.patientName || '').trim().toUpperCase();
+    const diagnosisID = String(context.diagnosisID || '').trim();
+    if (patientName && diagnosisID) return `BN ${patientName} - ${diagnosisID}`;
+    if (patientName) return `BN ${patientName}`;
+    if (context.patientId) return `BN ${context.patientId}`;
+    return '';
+  };
+
+  const formatMarkReason = (mark: DoctorPerformanceMark) => {
+    const patientLabel = getMarkPatientLabel(mark);
+    if (!patientLabel) return mark.Reason;
+
+    const rawReason = String(mark.Reason || '').trim();
+    if (!rawReason) return patientLabel;
+
+    const context = getMarkPatientContext(mark);
+    const patientTokens = [
+      context.patientId,
+      context.patientName,
+      mark.PatientID,
+      mark.PatientName,
+      mark.PatientKey
+    ].map(value => String(value || '').trim()).filter(Boolean);
+
+    for (const token of patientTokens) {
+      const pattern = new RegExp(`^BN\\s+${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+      if (pattern.test(rawReason)) {
+        return rawReason.replace(pattern, patientLabel);
+      }
+    }
+
+    return rawReason.startsWith('BN ') ? rawReason : `${patientLabel} ${rawReason}`;
+  };
 
   const initial = getStaffInitial(profileStaff);
   const avatarUrl = resolveAvatarUrl(profileStaff.Avatar);
@@ -463,22 +519,40 @@ export default function StaffProfileView({
                 Không có sẹo workflow trong kỳ đang xem.
               </div>
             ) : (
-              <div className="space-y-2">
-                {filteredMarks.slice(0, 8).map(mark => (
-                  <div key={mark.MarkKey} className="rounded-2xl border border-red-50 bg-red-50/40 px-3 py-2.5 flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-xs font-black text-slate-800 leading-snug">{mark.Label}</p>
-                        <span className="text-[10px] font-black font-mono text-red-700">-{Number(mark.Score || 1)}</span>
-                      </div>
-                      <p className="text-[11px] font-semibold text-slate-600 leading-snug mt-1">{mark.Reason}</p>
-                      <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">
-                        {formatVNTime(mark.CreatedTime)} {mark.PatientID ? `· ${mark.PatientID}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-hidden rounded-2xl border border-red-50">
+                <div className="max-h-[520px] overflow-y-auto">
+                  <table className="w-full text-left text-[11px]">
+                    <thead className="sticky top-0 z-10 bg-red-50 text-[9px] uppercase tracking-wider text-red-500">
+                      <tr>
+                        <th className="px-3 py-2 font-black w-44">Lỗi</th>
+                        <th className="px-3 py-2 font-black">Nội dung</th>
+                        <th className="px-3 py-2 font-black w-24">Ngày</th>
+                        <th className="px-3 py-2 font-black text-right w-12">Điểm</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-red-50">
+                      {filteredMarks.map(mark => (
+                        <tr key={mark.MarkKey} className="bg-red-50/30 hover:bg-red-50/70 transition">
+                          <td className="px-3 py-2 align-top">
+                            <div className="flex items-start gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                              <span className="font-black text-slate-800 leading-snug">{mark.Label}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 align-top font-semibold text-slate-650 leading-snug">
+                            {formatMarkReason(mark)}
+                          </td>
+                          <td className="px-3 py-2 align-top font-mono font-bold text-slate-400 whitespace-nowrap">
+                            {formatVNTime(mark.CreatedTime)}
+                          </td>
+                          <td className="px-3 py-2 align-top text-right font-mono font-black text-red-700">
+                            -{Number(mark.Score || 1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
