@@ -21,6 +21,8 @@ import {
   CMR,
   Source,
   RolePreset,
+  Notification as WorkflowNotification,
+  DoctorPerformanceMark,
   formatVNTime,
   removeDiacritics,
   findPatientByKey,
@@ -45,6 +47,7 @@ import SurgeryRoomView from './components/SurgeryRoomView';
 import DevelopingFeatureView from './components/DevelopingFeatureView';
 import StaffManagementView from './components/StaffManagementView';
 import StaffAccountMenu from './components/StaffAccountMenu';
+import BellNotificationMenu from './components/BellNotificationMenu';
 import StaffProfileView from './components/StaffProfileView';
 import ResultStaffDrawer from './components/ResultStaffDrawer';
 import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
@@ -206,6 +209,8 @@ export default function App() {
   const [cmrs, setCmrs] = useState<CMR[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [rolePresetRecords, setRolePresetRecords] = useState<RolePreset[]>([]);
+  const [notifications, setNotifications] = useState<WorkflowNotification[]>([]);
+  const [doctorPerformanceMarks, setDoctorPerformanceMarks] = useState<DoctorPerformanceMark[]>([]);
 
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
 
@@ -260,6 +265,8 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'staff-mgmt'>('home');
   const [profileReturnMenu, setProfileReturnMenu] = useState<typeof activeMenu>('home');
   const [isStaffAccountMenuOpen, setIsStaffAccountMenuOpen] = useState(false);
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
+  const [staffManagementInitialTab, setStaffManagementInitialTab] = useState<'edit' | 'matrix' | 'marks'>('edit');
   const [archiveInitialTab, setArchiveInitialTab] = useState<'transferred' | 'archive'>('archive');
 
   // Collapsible Sidebar State
@@ -374,7 +381,9 @@ export default function App() {
       setCmrs,
       setSources,
       setRolePresetRecords,
-      setRuntimeRolePresets
+      setRuntimeRolePresets,
+      setNotifications,
+      setDoctorPerformanceMarks
     }),
     []
   );
@@ -543,6 +552,23 @@ export default function App() {
     void refreshMedicalData('full', force);
   }, [refreshMedicalData]);
 
+  const markNotificationRead = useCallback((notificationKey: string) => {
+    setNotifications(prev =>
+      prev.map(item =>
+        item.NotificationKey === notificationKey
+          ? { ...item, IsRead: true, ReadTime: item.ReadTime || new Date().toISOString() }
+          : item
+      )
+    );
+    fetch(`/api/notifications/${encodeURIComponent(notificationKey)}/read`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' }
+    }).catch(err => {
+      console.error('Failed to mark notification as read:', err);
+      void refreshMedicalData('full', true);
+    });
+  }, [refreshMedicalData]);
+
   useEffect(() => {
     void refreshMedicalData('full', true);
 
@@ -683,7 +709,13 @@ export default function App() {
     setCurrentStaff(null);
   };
 
-  const navigateMenu = (menu: typeof activeMenu) => {
+  const navigateMenu = (menuTarget: typeof activeMenu | string) => {
+    const menu = menuTarget === 'staff-mgmt:marks' ? 'staff-mgmt' : menuTarget as typeof activeMenu;
+    if (menuTarget === 'staff-mgmt:marks') {
+      setStaffManagementInitialTab('marks');
+    } else if (menu === 'staff-mgmt') {
+      setStaffManagementInitialTab('edit');
+    }
     if (menu === 'profile') {
       setProfileReturnMenu(activeMenu === 'profile' ? 'home' : activeMenu);
       setActiveMenu('profile');
@@ -1629,11 +1661,27 @@ export default function App() {
             {/* Separator line */}
             <span className="hidden md:block w-px h-5 bg-white/25"></span>
 
+            {/* Workflow notifications */}
+            <BellNotificationMenu
+              staff={currentStaff}
+              notifications={notifications}
+              isOpen={isNotificationMenuOpen}
+              onToggle={() => {
+                setIsNotificationMenuOpen(prev => !prev);
+                setIsStaffAccountMenuOpen(false);
+              }}
+              onClose={() => setIsNotificationMenuOpen(false)}
+              onMarkRead={markNotificationRead}
+            />
+
             {/* Staff account menu */}
             <StaffAccountMenu
               staff={currentStaff}
               isOpen={isStaffAccountMenuOpen}
-              onToggle={() => setIsStaffAccountMenuOpen(prev => !prev)}
+              onToggle={() => {
+                setIsStaffAccountMenuOpen(prev => !prev);
+                setIsNotificationMenuOpen(false);
+              }}
               onClose={() => setIsStaffAccountMenuOpen(false)}
               onViewProfile={openStaffProfile}
             />
@@ -1749,6 +1797,7 @@ export default function App() {
                 consults={consults}
                 cathlabs={cathlabs}
                 operations={operations}
+                doctorPerformanceMarks={doctorPerformanceMarks}
                 onClose={() => setActiveMenu(profileReturnMenu)}
                 onStaffUpdated={(updated) => {
                   setCurrentStaff(updated);
@@ -2946,6 +2995,8 @@ export default function App() {
               staffList={staffList}
               currentStaff={currentStaff}
               rolePresetRecords={rolePresetRecords}
+              doctorPerformanceMarks={doctorPerformanceMarks}
+              initialTab={staffManagementInitialTab}
               onRefreshData={refreshStaffData}
               onRefreshRolePresets={refreshFullData}
               onPatchStaff={patchStaffMember}

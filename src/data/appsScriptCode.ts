@@ -119,6 +119,18 @@ function initializeDatabase() {
     "RolePresetID", "RolePresetLabel", "RolePresetDescription", "Permissions", "SortOrder", "IsSystem"
   ];
 
+  var notificationHeaders = [
+    "NotificationKey", "StaffKey", "StaffName", "Title", "Message", "Severity",
+    "RelatedEntityType", "RelatedEntityKey", "PatientKey", "PatientID", "PatientName",
+    "DedupKey", "IsRead", "CreatedTime", "ReadTime"
+  ];
+
+  var doctorPerformanceMarkHeaders = [
+    "MarkKey", "StaffKey", "StaffName", "MarkType", "Score", "Label", "Reason",
+    "RelatedEntityType", "RelatedEntityKey", "PatientKey", "PatientID", "PatientName",
+    "DedupKey", "CreatedBy", "CreatedTime"
+  ];
+
   getOrCreateSheet("Patient", patientHeaders);
   getOrCreateSheet("Consult", consultHeaders);
   getOrCreateSheet("Staff", staffHeaders);
@@ -136,6 +148,8 @@ function initializeDatabase() {
   }
 
   getOrCreateSheet("RolePreset", rolePresetHeaders);
+  getOrCreateSheet("Notification", notificationHeaders);
+  getOrCreateSheet("DoctorPerformanceMark", doctorPerformanceMarkHeaders);
 }
 
 // GET Requests - Returns JSON of all data
@@ -159,6 +173,8 @@ function doGet(e) {
   var cmrs = readSheetAsJson("CMR");
   var sources = readSheetAsJson("Source");
   var rolePresets = readSheetAsJson("RolePreset");
+  var notifications = readSheetAsJson("Notification");
+  var doctorPerformanceMarks = readSheetAsJson("DoctorPerformanceMark");
 
   // If Staff is completely empty, populate with some default users so admin can login
   if (staff.length === 0) {
@@ -178,7 +194,9 @@ function doGet(e) {
     operations: operations,
     cmrs: cmrs,
     sources: sources,
-    rolePresets: rolePresets
+    rolePresets: rolePresets,
+    notifications: notifications,
+    doctorPerformanceMarks: doctorPerformanceMarks
   };
 
   return ContentService.createTextOutput(JSON.stringify(responseData))
@@ -211,6 +229,10 @@ function doPost(e) {
         keyColumnName = "RolePresetID";
       } else if (type === "Source") {
         keyColumnName = "DiagnosisID";
+      } else if (type === "Notification") {
+        keyColumnName = "NotificationKey";
+      } else if (type === "DoctorPerformanceMark") {
+        keyColumnName = "MarkKey";
       }
       var keyColIndex = headers.indexOf(keyColumnName) + 1;
 

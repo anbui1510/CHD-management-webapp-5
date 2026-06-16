@@ -84,6 +84,21 @@ export function staffNameMatches(
   });
 }
 
+export function resolveStaffByNameOrKey(
+  candidate: string | undefined | null,
+  staffList: Staff[] = []
+): Staff | undefined {
+  const raw = String(candidate || '').trim();
+  if (!raw) return undefined;
+
+  const normalizedCandidate = normalizeNameToken(raw);
+  return staffList.find(staff => {
+    if (String(staff.StaffKey || '').trim() === raw) return true;
+    const variants = getStaffNameVariants(staff, staffList);
+    return variants.some(variant => normalizeNameToken(variant) === normalizedCandidate || raw === variant);
+  });
+}
+
 export function getStaffInitial(staff: Staff): string {
   const parts = staff.StaffName.trim().split(/\s+/);
   const lastName = parts[parts.length - 1] || staff.StaffName.charAt(0) || '?';

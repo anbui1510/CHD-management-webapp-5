@@ -88,6 +88,11 @@ const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
   return `${patientName} - PTV phụ: ${ptvPhu}`;
 };
 
+const formatCalendarPatientTooltip = (patientName: string, diagnosisID: string, ptvPhu1: string) => {
+  const base = `${patientName || 'Unknown Patient'} (${diagnosisID || 'N/A'})`;
+  return ptvPhu1?.trim() ? `${base} - ${ptvPhu1.trim()}` : base;
+};
+
 type SchedulingFormSnapshot = {
   diagnosisID: string;
   detailDiagnosis: string;
@@ -2599,6 +2604,10 @@ Xin cảm ơn!`;
                             <div className="flex-1 overflow-y-auto mt-1 flex flex-col gap-1 pr-0.5 custom-scrollbar">
                               {matchingConsults.map(c => {
                                 const pat = findPatientByKey(patients, c.PatientKey);
+                                const ptvPhu1Display = resolvePtvPhu1Display(
+                                  c.RequestBy || '',
+                                  c.Scheduled2ndInterventionist
+                                );
                                 return (
                                   <div
                                     key={c.ConsultKey}
@@ -2608,7 +2617,7 @@ Xin cảm ơn!`;
                                       if (pureCalendarMode) setShowSummaryModal(true);
                                     }}
                                     className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight px-1.5 py-0.5 rounded-lg truncate cursor-pointer transition select-none tracking-wide text-center uppercase"
-                                    title={`${pat?.PatientName || 'Unknown Patient'} (${c.DiagnosisID || 'N/A'})`}
+                                    title={formatCalendarPatientTooltip(pat?.PatientName || 'Unknown Patient', c.DiagnosisID || 'N/A', ptvPhu1Display)}
                                   >
                                     {pat?.PatientName ? pat.PatientName.split(' ').slice(-2).join(' ') : 'INFO'}
                                   </div>

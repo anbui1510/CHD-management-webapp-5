@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Activity,
+  AlertTriangle,
+  Award,
   CalendarDays,
   Camera,
   ChevronDown,
@@ -14,7 +16,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import type { CathLab, Consult, Operation, Staff } from '../types';
+import type { CathLab, Consult, DoctorPerformanceMark, Operation, Staff } from '../types';
 import { formatVNTime } from '../types';
 import { DateFieldWithCalendar, DateRangePickerPopover } from './MiniCalendarPopup';
 import {
@@ -23,6 +25,7 @@ import {
   ActivityPeriodPreset,
   StaffActivityMetrics,
   computeStaffActivityMetrics,
+  resolveActivityRange,
 } from '../utils/staffActivityStats';
 import { getStaffInitial } from '../utils/staffNameMatch';
 
@@ -32,6 +35,7 @@ interface StaffProfileViewProps {
   consults: Consult[];
   cathlabs: CathLab[];
   operations: Operation[];
+  doctorPerformanceMarks?: DoctorPerformanceMark[];
   onClose?: () => void;
   onStaffUpdated?: (updated: Staff) => void;
   triggerAlert?: (message: string, title?: string) => void;
@@ -100,6 +104,24 @@ function toAdminDraft(staff: Staff): AdminDraft {
   };
 }
 
+function parseDateKey(raw: string | undefined): string {
+  const trimmed = String(raw || '').trim().split('T')[0];
+  if (!trimmed) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const parts = trimmed.split('/');
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  return trimmed;
+}
+
+function dateInRange(dateKey: string, from: string, to: string): boolean {
+  if (!dateKey) return false;
+  if (from && dateKey < from) return false;
+  if (to && dateKey > to) return false;
+  return true;
+}
+
 function ActivityMetricRow({
   title,
   metric,
@@ -160,6 +182,7 @@ export default function StaffProfileView({
   consults,
   cathlabs,
   operations,
+  doctorPerformanceMarks = [],
   onClose,
   onStaffUpdated,
   triggerAlert,
@@ -201,6 +224,16 @@ export default function StaffProfileView({
     () => computeStaffActivityMetrics(profileStaff, staffList, consults, cathlabs, operations, activeFilter),
     [profileStaff, staffList, consults, cathlabs, operations, activeFilter]
   );
+
+  const filteredMarks = useMemo(() => {
+    const range = resolveActivityRange(activeFilter);
+    return doctorPerformanceMarks
+      .filter(mark => String(mark.StaffKey || '') === String(profileStaff.StaffKey || ''))
+      .filter(mark => dateInRange(parseDateKey(mark.CreatedTime), range.from, range.to))
+      .sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || '')));
+  }, [doctorPerformanceMarks, profileStaff.StaffKey, activeFilter]);
+
+  const totalMarkScore = filteredMarks.reduce((sum, mark) => sum + Number(mark.Score || 1), 0);
 
   const initial = getStaffInitial(profileStaff);
   const avatarUrl = resolveAvatarUrl(profileStaff.Avatar);
@@ -408,6 +441,46 @@ export default function StaffProfileView({
                 </React.Fragment>
               ))}
             </div>
+          </div>
+
+          <div className="bg-white border border-red-100 rounded-3xl p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-red-500" />
+                  Sẹo workflow
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 mt-1">Các điểm không hoàn thành được hệ thống ghi nhận tự động.</p>
+              </div>
+              <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-2 text-center">
+                <p className="text-[9px] font-black uppercase text-red-400">Tổng sẹo</p>
+                <p className="text-2xl font-black font-mono text-red-700">{totalMarkScore}</p>
+              </div>
+            </div>
+
+            {filteredMarks.length === 0 ? (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-4 text-xs font-bold text-slate-400 text-center">
+                Không có sẹo workflow trong kỳ đang xem.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredMarks.slice(0, 8).map(mark => (
+                  <div key={mark.MarkKey} className="rounded-2xl border border-red-50 bg-red-50/40 px-3 py-2.5 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-black text-slate-800 leading-snug">{mark.Label}</p>
+                        <span className="text-[10px] font-black font-mono text-red-700">-{Number(mark.Score || 1)}</span>
+                      </div>
+                      <p className="text-[11px] font-semibold text-slate-600 leading-snug mt-1">{mark.Reason}</p>
+                      <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">
+                        {formatVNTime(mark.CreatedTime)} {mark.PatientID ? `· ${mark.PatientID}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

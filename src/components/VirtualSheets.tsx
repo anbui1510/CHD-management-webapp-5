@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../data/appsScriptCode';
+import { WEEKLY_SCHEDULE_APPS_SCRIPT_CODE } from '../data/weeklyScheduleAppsScriptCode';
 
 interface VirtualSheetsProps {
   patients: Patient[];
@@ -38,6 +39,7 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+  const [copiedWeeklyScheduler, setCopiedWeeklyScheduler] = useState<boolean>(false);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
 
   // Fetch Sync configuration on mount
@@ -164,6 +166,12 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
     navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyWeeklySchedulerToClipboard = () => {
+    navigator.clipboard.writeText(WEEKLY_SCHEDULE_APPS_SCRIPT_CODE);
+    setCopiedWeeklyScheduler(true);
+    setTimeout(() => setCopiedWeeklyScheduler(false), 2000);
   };
 
   // Pagination Logic Helper
@@ -380,13 +388,14 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
           </div>
 
           {/* Code Block Copy container */}
-          <div className="bg-gray-900 rounded-2xl overflow-hidden text-slate-100 lg:col-span-5 flex flex-col max-h-[500px]">
+          <div className="lg:col-span-5 space-y-4">
+          <div className="bg-gray-900 rounded-2xl overflow-hidden text-slate-100 flex flex-col max-h-[360px]">
             <div className="bg-gray-800 px-4 py-2.5 border-b border-gray-700 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
                 <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
                 <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
-                <span className="text-xs font-mono text-slate-400 select-none ml-2">Code.gs AppScript</span>
+                <span className="text-xs font-mono text-slate-400 select-none ml-2">Code.gs Database Sync</span>
               </div>
               <button
                 type="button"
@@ -400,6 +409,31 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
             <pre className="p-4 overflow-auto text-[10px] font-mono leading-relaxed text-emerald-300 flex-1">
               <code>{GOOGLE_APPS_SCRIPT_CODE}</code>
             </pre>
+          </div>
+          <div className="bg-slate-950 rounded-2xl overflow-hidden text-slate-100 flex flex-col max-h-[360px] border border-slate-800">
+            <div className="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+                <span className="text-xs font-mono text-slate-400 select-none ml-2">Code.gs Weekly Scheduler</span>
+              </div>
+              <button
+                type="button"
+                onClick={copyWeeklySchedulerToClipboard}
+                className="bg-slate-800 hover:bg-slate-700 rounded px-2.5 py-1 text-[11px] font-sans font-semibold transition flex items-center gap-1"
+              >
+                {copiedWeeklyScheduler ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedWeeklyScheduler ? 'Đã sao chép!' : 'Sao chép mã xếp lịch'}
+              </button>
+            </div>
+            <div className="px-4 py-2 bg-amber-50 text-amber-900 text-[11px] font-semibold border-b border-amber-200">
+              Dùng cho file lịch tuần hiện tại. Trước khi chạy, đổi tên hàm xếp lịch cũ `taoLichTuanMoi()` thành `taoLichTuanMoiCore(context)`.
+            </div>
+            <pre className="p-4 overflow-auto text-[10px] font-mono leading-relaxed text-cyan-200 flex-1">
+              <code>{WEEKLY_SCHEDULE_APPS_SCRIPT_CODE}</code>
+            </pre>
+          </div>
           </div>
         </div>
       ) : null}

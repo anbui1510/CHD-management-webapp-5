@@ -231,6 +231,50 @@ export interface RolePreset {
   IsSystem?: string | boolean;
 }
 
+export type NotificationSeverity = 'info' | 'warning' | 'critical';
+
+export interface Notification {
+  NotificationKey: string;
+  StaffKey: string;
+  StaffName?: string;
+  Title: string;
+  Message: string;
+  Severity: NotificationSeverity;
+  RelatedEntityType?: 'Consult' | 'CathLab' | 'Patient' | 'Workflow';
+  RelatedEntityKey?: string;
+  PatientKey?: string;
+  PatientID?: string;
+  PatientName?: string;
+  DedupKey: string;
+  IsRead: boolean;
+  CreatedTime: string;
+  ReadTime?: string;
+}
+
+export type DoctorPerformanceMarkType =
+  | 'missing_staff_result'
+  | 'requester_overdue_staff_result'
+  | 'scheduler_missing_transfer'
+  | 'missing_cath_result';
+
+export interface DoctorPerformanceMark {
+  MarkKey: string;
+  StaffKey: string;
+  StaffName?: string;
+  MarkType: DoctorPerformanceMarkType;
+  Score: number;
+  Label: string;
+  Reason: string;
+  RelatedEntityType?: 'Consult' | 'CathLab' | 'Patient' | 'Workflow';
+  RelatedEntityKey?: string;
+  PatientKey?: string;
+  PatientID?: string;
+  PatientName?: string;
+  DedupKey: string;
+  CreatedBy: string;
+  CreatedTime: string;
+}
+
 export function formatVNTime(dateArg: any): string {
   if (!dateArg) return '';
   const dateString = String(dateArg);

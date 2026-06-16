@@ -1,4 +1,4 @@
-import type { CathLab, CMR, Consult, Operation, Patient, RolePreset, Source, Staff } from '../types';
+import type { CathLab, CMR, Consult, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff } from '../types';
 
 export type MedicalDataBundle = {
   patients: Patient[];
@@ -9,6 +9,8 @@ export type MedicalDataBundle = {
   cmrs: CMR[];
   sources: Source[];
   rolePresets: RolePreset[];
+  notifications: Notification[];
+  doctorPerformanceMarks: DoctorPerformanceMark[];
 };
 
 export type RefreshScope = 'full' | 'clinical' | 'consult' | 'staff' | 'mri';
@@ -21,7 +23,9 @@ const EMPTY_BUNDLE: MedicalDataBundle = {
   operations: [],
   cmrs: [],
   sources: [],
-  rolePresets: []
+  rolePresets: [],
+  notifications: [],
+  doctorPerformanceMarks: []
 };
 
 export async function fetchMedicalDataBundle(): Promise<MedicalDataBundle> {
@@ -39,7 +43,9 @@ export async function fetchMedicalDataBundle(): Promise<MedicalDataBundle> {
     operations: Array.isArray(data.operations) ? data.operations : EMPTY_BUNDLE.operations,
     cmrs: Array.isArray(data.cmrs) ? data.cmrs : EMPTY_BUNDLE.cmrs,
     sources: Array.isArray(data.sources) ? data.sources : EMPTY_BUNDLE.sources,
-    rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : EMPTY_BUNDLE.rolePresets
+    rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : EMPTY_BUNDLE.rolePresets,
+    notifications: Array.isArray(data.notifications) ? data.notifications : EMPTY_BUNDLE.notifications,
+    doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks) ? data.doctorPerformanceMarks : EMPTY_BUNDLE.doctorPerformanceMarks
   };
 }
 
@@ -53,6 +59,8 @@ export type MedicalDataSetters = {
   setSources: (value: Source[]) => void;
   setRolePresetRecords: (value: RolePreset[]) => void;
   setRuntimeRolePresets: (value: RolePreset[]) => void;
+  setNotifications: (value: Notification[]) => void;
+  setDoctorPerformanceMarks: (value: DoctorPerformanceMark[]) => void;
 };
 
 export function applyMedicalDataBundle(bundle: MedicalDataBundle, scope: RefreshScope, setters: MedicalDataSetters) {
@@ -63,6 +71,8 @@ export function applyMedicalDataBundle(bundle: MedicalDataBundle, scope: Refresh
 
   setters.setPatients(bundle.patients);
   setters.setConsults(bundle.consults);
+  setters.setNotifications(bundle.notifications);
+  setters.setDoctorPerformanceMarks(bundle.doctorPerformanceMarks);
 
   if (scope === 'consult') {
     setters.setSources(bundle.sources);

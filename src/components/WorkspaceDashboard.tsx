@@ -7,6 +7,7 @@ import {
   Archive,
   Calendar,
   Activity,
+  Award,
   ShieldCheck,
   Scissors,
   UserCog,
@@ -23,6 +24,7 @@ interface WorkspaceDashboardProps {
 
 type WorkspaceTile = {
   module: AppModule;
+  target?: string;
   label: string;
   description: string;
   icon: React.ReactNode;
@@ -178,6 +180,14 @@ export default function WorkspaceDashboard({
             icon: <UserCog className="w-6 h-6 text-indigo-600" />,
             iconBg: 'bg-indigo-50',
           },
+          {
+            module: 'staff-mgmt',
+            target: 'staff-mgmt:marks',
+            label: 'Thống kê sẹo workflow',
+            description: 'Tổng hợp sẹo · xếp hạng · sự kiện',
+            icon: <Award className="w-6 h-6 text-red-600" />,
+            iconBg: 'bg-red-50',
+          },
         ],
       },
     ];
@@ -212,9 +222,9 @@ export default function WorkspaceDashboard({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {section.tiles.map(tile => (
               <button
-                key={tile.module}
+                key={`${tile.module}-${tile.target || tile.label}`}
                 type="button"
-                onClick={() => onNavigate(tile.module)}
+                onClick={() => onNavigate(tile.target || tile.module)}
                 className={`bg-white border rounded-2xl p-5 hover:shadow-md transition text-left group ${
                   tile.highlight
                     ? 'border-pink-500 shadow-sm hover:bg-pink-50'

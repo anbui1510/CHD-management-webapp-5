@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Copy,
   Search,
   Shield,
   UserCog,
+  Award,
   Save,
   Lock,
   UserX,
@@ -12,8 +13,8 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from 'lucide-react';
-import type { Staff, RolePreset } from '../types';
-import { removeDiacritics } from '../types';
+import type { DoctorPerformanceMark, Staff, RolePreset } from '../types';
+import { formatVNTime, removeDiacritics } from '../types';
 import RolePresetMatrixPanel from './RolePresetMatrixPanel';
 import {
   ALL_APP_MODULES,
@@ -34,6 +35,8 @@ interface StaffManagementViewProps {
   staffList: Staff[];
   currentStaff: Staff | null;
   rolePresetRecords: RolePreset[];
+  doctorPerformanceMarks?: DoctorPerformanceMark[];
+  initialTab?: 'edit' | 'matrix' | 'marks';
   onRefreshData: () => void;
   onRefreshRolePresets: () => void;
   onPatchStaff?: (staffKey: string, patch: Partial<Staff>) => void;
@@ -63,6 +66,8 @@ export default function StaffManagementView({
   staffList,
   currentStaff,
   rolePresetRecords,
+  doctorPerformanceMarks = [],
+  initialTab = 'edit',
   onRefreshData,
   onRefreshRolePresets,
   onPatchStaff,
@@ -75,10 +80,14 @@ export default function StaffManagementView({
   const [copyFromKey, setCopyFromKey] = useState('');
   const [draft, setDraft] = useState<StaffDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'edit' | 'matrix'>('edit');
+  const [activeTab, setActiveTab] = useState<'edit' | 'matrix' | 'marks'>(initialTab);
 
   const rolePresets = getRuntimeRolePresets();
   const groupedModules = useMemo(() => modulesByGroup(), []);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const filteredStaff = useMemo(() => {
     let list = [...staffList];
@@ -110,6 +119,56 @@ export default function StaffManagementView({
     () => staffList.find(staff => staff.StaffKey === selectedKey) || null,
     [staffList, selectedKey]
   );
+
+  const markStats = useMemo(() => {
+    const staffMap = new Map(staffList.map(staff => [String(staff.StaffKey || ''), staff]));
+    const grouped = new Map<string, {
+      staff: Staff | null;
+      totalScore: number;
+      count: number;
+      latestTime: string;
+      marks: DoctorPerformanceMark[];
+    }>();
+
+    doctorPerformanceMarks.forEach(mark => {
+      const staffKey = String(mark.StaffKey || '').trim();
+      if (!staffKey) return;
+      const current = grouped.get(staffKey) || {
+        staff: staffMap.get(staffKey) || null,
+        totalScore: 0,
+        count: 0,
+        latestTime: '',
+        marks: [],
+      };
+      current.totalScore += Number(mark.Score || 1);
+      current.count += 1;
+      current.latestTime = String(mark.CreatedTime || '') > current.latestTime ? String(mark.CreatedTime || '') : current.latestTime;
+      current.marks.push(mark);
+      grouped.set(staffKey, current);
+    });
+
+    const rows = Array.from(grouped.entries())
+      .map(([staffKey, value]) => ({
+        staffKey,
+        staffName: value.staff?.StaffName || value.marks[0]?.StaffName || staffKey,
+        shortName: value.staff?.Name || value.marks[0]?.StaffName || '',
+        totalScore: value.totalScore,
+        count: value.count,
+        latestTime: value.latestTime,
+        marks: value.marks.sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || ''))),
+      }))
+      .sort((a, b) => b.totalScore - a.totalScore || b.count - a.count || a.staffName.localeCompare(b.staffName, 'vi'));
+
+    const recentMarks = [...doctorPerformanceMarks].sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || ''))).slice(0, 20);
+
+    return {
+      totalScore: rows.reduce((sum, row) => sum + row.totalScore, 0),
+      totalEvents: doctorPerformanceMarks.length,
+      affectedStaff: rows.length,
+      rows,
+      recentMarks,
+    };
+  }, [doctorPerformanceMarks, staffList]);
 
   const loadDraftFromStaff = (staff: Staff) => {
     const modules = isAdminStaff(staff)
@@ -314,6 +373,17 @@ export default function StaffManagementView({
           >
             Ma trận vai trò mẫu
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('marks')}
+            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+              activeTab === 'marks'
+                ? 'bg-[#d2145a] text-white border-[#d2145a]'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
+            }`}
+          >
+            Thống kê sẹo
+          </button>
         </div>
       </div>
 
@@ -324,6 +394,106 @@ export default function StaffManagementView({
           triggerAlert={triggerAlert}
           triggerConfirm={triggerConfirm}
         />
+      ) : activeTab === 'marks' ? (
+        <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-4">
+          <div className="xl:col-span-4 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3 h-fit">
+            <div className="bg-white border border-red-100 rounded-3xl p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-wider text-red-400">Tổng sẹo</p>
+              <p className="text-4xl font-black font-mono text-red-700 mt-2">{markStats.totalScore}</p>
+              <p className="text-[11px] font-bold text-slate-400 mt-1">{markStats.totalEvents} sự kiện được ghi nhận</p>
+            </div>
+            <div className="bg-white border border-amber-100 rounded-3xl p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-wider text-amber-500">Nhân sự có sẹo</p>
+              <p className="text-4xl font-black font-mono text-amber-700 mt-2">{markStats.affectedStaff}</p>
+              <p className="text-[11px] font-bold text-slate-400 mt-1">Tính trên toàn bộ dữ liệu hiện có</p>
+            </div>
+            <div className="bg-white border border-slate-150 rounded-3xl p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Cập nhật mới nhất</p>
+              <p className="text-lg font-black text-slate-800 mt-2">
+                {markStats.recentMarks[0]?.CreatedTime ? formatVNTime(markStats.recentMarks[0].CreatedTime) : '—'}
+              </p>
+              <p className="text-[11px] font-bold text-slate-400 mt-1">Theo bảng DoctorPerformanceMark</p>
+            </div>
+          </div>
+
+          <div className="xl:col-span-8 flex flex-col min-h-0 gap-4">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                    <Award className="w-4 h-4 text-red-500" />
+                    Bảng xếp hạng sẹo theo nhân sự
+                  </h3>
+                  <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Sắp xếp theo tổng điểm sẹo giảm dần.</p>
+                </div>
+              </div>
+              <div className="max-h-[330px] overflow-y-auto">
+                {markStats.rows.length === 0 ? (
+                  <div className="p-8 text-center text-xs font-bold text-slate-400">Chưa có sẹo workflow nào được ghi nhận.</div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
+                      <tr className="text-[10px] uppercase text-slate-400 font-black">
+                        <th className="px-4 py-2">Nhân sự</th>
+                        <th className="px-3 py-2 text-center">Tổng sẹo</th>
+                        <th className="px-3 py-2 text-center">Sự kiện</th>
+                        <th className="px-3 py-2">Gần nhất</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {markStats.rows.map(row => (
+                        <tr key={row.staffKey} className="hover:bg-red-50/30">
+                          <td className="px-4 py-3">
+                            <p className="font-extrabold text-slate-800">{row.staffName}</p>
+                            <p className="text-[10px] font-mono text-slate-400">{row.staffKey}{row.shortName ? ` · ${row.shortName}` : ''}</p>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="inline-flex min-w-9 justify-center rounded-full bg-red-50 text-red-700 px-2 py-1 font-black font-mono">
+                              {row.totalScore}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-center font-bold text-slate-600">{row.count}</td>
+                          <td className="px-3 py-3 font-mono text-[10px] text-slate-500">{row.latestTime ? formatVNTime(row.latestTime) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex-1 min-h-0">
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  Sự kiện sẹo gần đây
+                </h3>
+              </div>
+              <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                {markStats.recentMarks.length === 0 ? (
+                  <div className="p-8 text-center text-xs font-bold text-slate-400">Chưa có sự kiện để hiển thị.</div>
+                ) : (
+                  markStats.recentMarks.map(mark => (
+                    <div key={mark.MarkKey} className="p-3.5 hover:bg-slate-50 transition">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-xs text-slate-850">{mark.StaffName || mark.StaffKey} · {mark.Label}</p>
+                          <p className="text-[11px] font-semibold text-slate-600 mt-1 leading-snug">{mark.Reason}</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">
+                            {formatVNTime(mark.CreatedTime)}{mark.PatientID ? ` · ${mark.PatientID}` : ''}{mark.PatientName ? ` · ${mark.PatientName}` : ''}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-red-50 text-red-700 px-2 py-1 text-[10px] font-black font-mono">
+                          -{Number(mark.Score || 1)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-4">
           {/* Staff list */}

@@ -127,7 +127,7 @@ const isDateWithinRange = (dateValue: string | undefined, startDate: string, end
 
 const PIE_COLORS = ['#d2145a', '#7c3aed', '#0891b2', '#059669', '#f59e0b', '#2563eb', '#e11d48'];
 
-type PieMetric = 'diagnosis' | 'second_operator' | 'request_by';
+type PieMetric = 'diagnosis' | 'second_operator' | 'request_by' | 'cath_method';
 type PiePeriodMode = 'all' | 'month' | 'quarter' | 'year';
 
 interface PieSegment {
@@ -147,6 +147,18 @@ const buildPieSegments = (items: Array<{ label: string; value: number }>, total:
       color: PIE_COLORS[idx % PIE_COLORS.length],
       percent: (item.value / total) * 100
     }));
+};
+
+const parseCathMethods = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map(item => String(item || '').trim())
+      .filter(Boolean);
+  }
+  return String(value || '')
+    .split(/\s*(?:\+|,|;|\n)\s*/g)
+    .map(item => item.trim())
+    .filter(Boolean);
 };
 
 const DEFAULT_SHORTCUT_IDS = ['patients', 'consult-list', 'results-staff', 'cathlab-room'];
@@ -481,6 +493,23 @@ export default function HomeDashboard({
     );
   }, [pieCathlabs]);
 
+  const cathMethodDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let methodEntryTotal = 0;
+    pieCathlabs.forEach(cath => {
+      const methods = parseCathMethods(cath.CathMethod);
+      const uniqueMethods = methods.length > 0 ? [...new Set(methods)] : ['Chưa nhập'];
+      uniqueMethods.forEach(method => {
+        counts[method] = (counts[method] || 0) + 1;
+        methodEntryTotal += 1;
+      });
+    });
+    return buildPieSegments(
+      Object.entries(counts).map(([label, value]) => ({ label, value })),
+      methodEntryTotal
+    );
+  }, [pieCathlabs]);
+
   const requestByDistribution = useMemo(() => {
     const counts: Record<string, number> = {};
     pieCompletedConsults.forEach(c => {
@@ -503,6 +532,15 @@ export default function HomeDashboard({
         segments: secondOperatorDistribution
       };
     }
+    if (pieMetric === 'cath_method') {
+      return {
+        title: 'Phương pháp thông tim',
+        subtitle: 'Theo CathLab.CathMethod, tính trên lượt thông tim',
+        totalLabel: 'lượt thông tim',
+        total: pieCathlabs.length,
+        segments: cathMethodDistribution
+      };
+    }
     if (pieMetric === 'request_by') {
       return {
         title: 'BS đăng ký staff',
@@ -520,7 +558,7 @@ export default function HomeDashboard({
       total: cathPatientCount,
       segments: cathPatientDiagnosisDistribution
     };
-  }, [pieMetric, pieCathlabs, pieCompletedConsults, cathPatientDiagnosisDistribution, secondOperatorDistribution, requestByDistribution]);
+  }, [pieMetric, pieCathlabs, pieCompletedConsults, cathPatientDiagnosisDistribution, secondOperatorDistribution, cathMethodDistribution, requestByDistribution]);
 
   // Date and Week scheduling for Weekly Calendar
   const [referenceDate, setReferenceDate] = useState(() => {
@@ -1096,6 +1134,7 @@ export default function HomeDashboard({
                   {([
                     ['diagnosis', 'ICD'],
                     ['second_operator', 'PTV phụ 1'],
+                    ['cath_method', 'CathMethod'],
                     ['request_by', 'BS đăng ký']
                   ] as Array<[PieMetric, string]>).map(([id, label]) => (
                     <button

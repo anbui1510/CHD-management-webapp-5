@@ -7,10 +7,11 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { Patient, Consult, Staff, CathLab, CMR, Source, RolePreset, Operation } from './src/types';
+import { Patient, Consult, Staff, CathLab, CMR, Source, RolePreset, Operation, Notification, DoctorPerformanceMark } from './src/types';
 import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
+import { resolveStaffByNameOrKey } from './src/utils/staffNameMatch';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -47,6 +48,8 @@ const OPERATIONS_FILE = path.join(DB_DIR, 'operations.json');
 const CMRS_FILE = path.join(DB_DIR, 'cmrs.json');
 const SOURCES_FILE = path.join(DB_DIR, 'sources.json');
 const ROLE_PRESETS_FILE = path.join(DB_DIR, 'role-presets.json');
+const NOTIFICATIONS_FILE = path.join(DB_DIR, 'notifications.json');
+const DOCTOR_MARKS_FILE = path.join(DB_DIR, 'doctor-performance-marks.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
 
 // Ensure DB directory exists
@@ -182,7 +185,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
     const data = await response.json() as any;
 
-    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources) || Array.isArray(data.rolePresets))) {
+    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources) || Array.isArray(data.rolePresets) || Array.isArray(data.notifications) || Array.isArray(data.doctorPerformanceMarks))) {
       if (Array.isArray(data.patients)) {
         const currentPatients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
         const pMap = new Map();
@@ -310,6 +313,40 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       if (Array.isArray(data.rolePresets)) {
         writeDB(ROLE_PRESETS_FILE, resolveRolePresetRecords(data.rolePresets));
       }
+      if (Array.isArray(data.notifications)) {
+        const currentNotifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
+        const nMap = new Map();
+        data.notifications.forEach((n: any, i: number) => {
+          const k = n.NotificationKey || `notif_no_key_${i}`;
+          n.NotificationKey = k;
+          n.IsRead = n.IsRead === true || String(n.IsRead || '').trim().toLowerCase() === 'true';
+          const recent = recentLocalEdits.get(`Notification_${k}`);
+          if (recent && (Date.now() - recent.timestamp < 45000)) {
+            n = { ...n, ...recent.data };
+          }
+          nMap.set(k, n);
+        });
+        preserveLocalOnlyRecords(nMap, currentNotifications, record => record.NotificationKey);
+        preserveRecentLocalRecords(nMap, 'Notification', record => record.NotificationKey);
+        writeDB(NOTIFICATIONS_FILE, Array.from(nMap.values()));
+      }
+      if (Array.isArray(data.doctorPerformanceMarks)) {
+        const currentMarks = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []);
+        const mMap = new Map();
+        data.doctorPerformanceMarks.forEach((m: any, i: number) => {
+          const k = m.MarkKey || `mark_no_key_${i}`;
+          m.MarkKey = k;
+          m.Score = Number(m.Score || 1);
+          const recent = recentLocalEdits.get(`DoctorPerformanceMark_${k}`);
+          if (recent && (Date.now() - recent.timestamp < 45000)) {
+            m = { ...m, ...recent.data };
+          }
+          mMap.set(k, m);
+        });
+        preserveLocalOnlyRecords(mMap, currentMarks, record => record.MarkKey);
+        preserveRecentLocalRecords(mMap, 'DoctorPerformanceMark', record => record.MarkKey);
+        writeDB(DOCTOR_MARKS_FILE, Array.from(mMap.values()));
+      }
       lastSyncTime = Date.now();
       console.log('Successfully pulling synced and updated local database cache!');
       return true;
@@ -320,7 +357,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   return false;
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'RolePreset', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
@@ -624,6 +661,24 @@ function readDB<T>(filePath: string, defaultData: T[]): T[] {
           opMap.set(k, o);
         });
         parsed = Array.from(opMap.values());
+      } else if ('NotificationKey' in parsed[0]) {
+        const nMap = new Map();
+        parsed.forEach((n: any, i: number) => {
+          const k = n.NotificationKey || `notif_no_key_${i}`;
+          n.NotificationKey = k;
+          n.IsRead = n.IsRead === true || String(n.IsRead || '').trim().toLowerCase() === 'true';
+          nMap.set(k, n);
+        });
+        parsed = Array.from(nMap.values());
+      } else if ('MarkKey' in parsed[0]) {
+        const mMap = new Map();
+        parsed.forEach((m: any, i: number) => {
+          const k = m.MarkKey || `mark_no_key_${i}`;
+          m.MarkKey = k;
+          m.Score = Number(m.Score || 1);
+          mMap.set(k, m);
+        });
+        parsed = Array.from(mMap.values());
       } else if ('StaffKey' in parsed[0]) {
         const stMap = new Map();
         parsed.forEach((s: any, i: number) => {
@@ -753,6 +808,309 @@ function ensureRolePresetsDB(): RolePreset[] {
   return resolved;
 }
 
+const DEFAULT_SECRETARY_STAFF_KEY = '01442';
+const FALLBACK_SECRETARY_STAFF_KEY = '88888';
+const DEFAULT_SCHEDULER_STAFF_KEY = '01541';
+const FALLBACK_SCHEDULER_STAFF_KEY = '77777';
+
+function resolveStaff(candidate: string | undefined | null, staffList: Staff[]): Staff | undefined {
+  return resolveStaffByNameOrKey(candidate, staffList);
+}
+
+function resolveStaffByPreferredKeys(staffList: Staff[], keys: string[]): Staff | undefined {
+  return keys.map(key => staffList.find(staff => String(staff.StaffKey) === key)).find(Boolean);
+}
+
+function getDefaultSecretary(staffList: Staff[]): Staff | undefined {
+  return resolveStaffByPreferredKeys(staffList, [DEFAULT_SECRETARY_STAFF_KEY, FALLBACK_SECRETARY_STAFF_KEY])
+    || resolveStaff('BS. Tài', staffList);
+}
+
+function getDefaultScheduler(staffList: Staff[]): Staff | undefined {
+  return resolveStaffByPreferredKeys(staffList, [DEFAULT_SCHEDULER_STAFF_KEY, FALLBACK_SCHEDULER_STAFF_KEY])
+    || resolveStaff('BS. Hiếu', staffList);
+}
+
+function getPatientContext(patientKey: string | undefined, patients: Patient[]) {
+  const patient = patients.find(p => String(p.PatientKey || '') === String(patientKey || ''));
+  return {
+    patient,
+    PatientKey: patient?.PatientKey || patientKey || '',
+    PatientID: patient?.PatientID1 || '',
+    PatientName: patient?.PatientName || patient?.OtherPatientName || ''
+  };
+}
+
+function appendNotificationIfMissing(input: Omit<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'> & Partial<Pick<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'>>): Notification | null {
+  if (!input.StaffKey || !input.DedupKey) return null;
+  const notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
+  const existing = notifications.find(item => item.DedupKey === input.DedupKey && item.StaffKey === input.StaffKey);
+  if (existing) return existing;
+
+  const record: Notification = {
+    NotificationKey: input.NotificationKey || createUniqueKey('notif', notifications.map(item => item.NotificationKey)),
+    StaffKey: input.StaffKey,
+    StaffName: input.StaffName || '',
+    Title: input.Title,
+    Message: input.Message,
+    Severity: input.Severity || 'info',
+    RelatedEntityType: input.RelatedEntityType,
+    RelatedEntityKey: input.RelatedEntityKey,
+    PatientKey: input.PatientKey,
+    PatientID: input.PatientID,
+    PatientName: input.PatientName,
+    DedupKey: input.DedupKey,
+    IsRead: input.IsRead ?? false,
+    CreatedTime: input.CreatedTime || newTimestamp(),
+    ReadTime: input.ReadTime || ''
+  };
+
+  notifications.push(record);
+  writeDB(NOTIFICATIONS_FILE, notifications);
+  markLocalMutation();
+  recentLocalEdits.set(`Notification_${record.NotificationKey}`, { timestamp: Date.now(), data: record });
+  syncToGoogleSheets('Notification', 'insert', record.NotificationKey, record).catch(err => {
+    console.error('Error syncing notification insert:', err);
+  });
+  return record;
+}
+
+function appendDoctorMarkIfMissing(input: Omit<DoctorPerformanceMark, 'MarkKey' | 'CreatedTime' | 'Score' | 'CreatedBy'> & Partial<Pick<DoctorPerformanceMark, 'MarkKey' | 'CreatedTime' | 'Score' | 'CreatedBy'>>): DoctorPerformanceMark | null {
+  if (!input.StaffKey || !input.DedupKey) return null;
+  const marks = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []);
+  const existing = marks.find(item => item.DedupKey === input.DedupKey && item.StaffKey === input.StaffKey);
+  if (existing) return existing;
+
+  const record: DoctorPerformanceMark = {
+    MarkKey: input.MarkKey || createUniqueKey('mark', marks.map(item => item.MarkKey)),
+    StaffKey: input.StaffKey,
+    StaffName: input.StaffName || '',
+    MarkType: input.MarkType,
+    Score: input.Score ?? 1,
+    Label: input.Label,
+    Reason: input.Reason,
+    RelatedEntityType: input.RelatedEntityType,
+    RelatedEntityKey: input.RelatedEntityKey,
+    PatientKey: input.PatientKey,
+    PatientID: input.PatientID,
+    PatientName: input.PatientName,
+    DedupKey: input.DedupKey,
+    CreatedBy: input.CreatedBy || 'workflow-monitor',
+    CreatedTime: input.CreatedTime || newTimestamp()
+  };
+
+  marks.push(record);
+  writeDB(DOCTOR_MARKS_FILE, marks);
+  markLocalMutation();
+  recentLocalEdits.set(`DoctorPerformanceMark_${record.MarkKey}`, { timestamp: Date.now(), data: record });
+  syncToGoogleSheets('DoctorPerformanceMark', 'insert', record.MarkKey, record).catch(err => {
+    console.error('Error syncing doctor mark insert:', err);
+  });
+  return record;
+}
+
+function parseDateOnly(raw: string | undefined): Date | null {
+  const value = String(raw || '').trim().split('T')[0];
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function daysSince(raw: string | undefined, now = new Date()): number {
+  const date = parseDateOnly(raw);
+  if (!date) return 0;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function hasConsultResult(consult: Consult): boolean {
+  const result = String(consult.ConsultResultID || '').trim().toLowerCase();
+  return !!result && !['nodata', 'no data', '-', '—'].includes(result);
+}
+
+function isRemovedConsult(consult: Consult): boolean {
+  return consult.Removed === true || String(consult.Removed || '').trim().toLowerCase() === 'true';
+}
+
+function notifyStaffAboutConsult(staff: Staff | undefined, consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, title: string, message: string, dedupPrefix: string, severity: Notification['Severity'] = 'warning') {
+  if (!staff) return;
+  appendNotificationIfMissing({
+    StaffKey: staff.StaffKey,
+    StaffName: staff.StaffName,
+    Title: title,
+    Message: message,
+    Severity: severity,
+    RelatedEntityType: 'Consult',
+    RelatedEntityKey: consult.ConsultKey,
+    PatientKey: patientCtx.PatientKey,
+    PatientID: patientCtx.PatientID,
+    PatientName: patientCtx.PatientName,
+    DedupKey: `${dedupPrefix}:${consult.ConsultKey}:${staff.StaffKey}`
+  });
+}
+
+function createSecretaryOverrideMark(consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, staffList: Staff[], actorKey = 'workflow-monitor') {
+  const secretary = getDefaultSecretary(staffList);
+  if (!secretary) return;
+  appendDoctorMarkIfMissing({
+    StaffKey: secretary.StaffKey,
+    StaffName: secretary.StaffName,
+    MarkType: 'missing_staff_result',
+    Label: 'Không hoàn thành điền kết quả staff',
+    Reason: `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} đã phải xếp bổ sung do thiếu kết quả hội chẩn.`,
+    RelatedEntityType: 'Consult',
+    RelatedEntityKey: consult.ConsultKey,
+    PatientKey: patientCtx.PatientKey,
+    PatientID: patientCtx.PatientID,
+    PatientName: patientCtx.PatientName,
+    DedupKey: `mark:secretary-missing-staff-result:${consult.ConsultKey}`,
+    CreatedBy: actorKey
+  });
+  notifyStaffAboutConsult(
+    secretary,
+    consult,
+    patientCtx,
+    'Thiếu kết quả hội chẩn',
+    `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} đã phải xếp bổ sung vì chưa có kết quả hội chẩn.`,
+    'notif:secretary-missing-staff-result'
+  );
+}
+
+function createSchedulerEmergencyTransferMark(consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, staffList: Staff[], actorKey = 'workflow-monitor') {
+  const scheduler = getDefaultScheduler(staffList);
+  if (!scheduler) return;
+  appendDoctorMarkIfMissing({
+    StaffKey: scheduler.StaffKey,
+    StaffName: scheduler.StaffName,
+    MarkType: 'scheduler_missing_transfer',
+    Label: 'Không hoàn thành chuyển phòng TT',
+    Reason: `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} phải dùng thông tim cấp cứu do chưa được chuyển phòng TT.`,
+    RelatedEntityType: 'Consult',
+    RelatedEntityKey: consult.ConsultKey,
+    PatientKey: patientCtx.PatientKey,
+    PatientID: patientCtx.PatientID,
+    PatientName: patientCtx.PatientName,
+    DedupKey: `mark:scheduler-missing-transfer:${consult.ConsultKey}`,
+    CreatedBy: actorKey
+  });
+  notifyStaffAboutConsult(
+    scheduler,
+    consult,
+    patientCtx,
+    'Thiếu thao tác chuyển phòng TT',
+    `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} phải vượt quyền bằng thông tim cấp cứu vì chưa được chuyển phòng TT.`,
+    'notif:scheduler-missing-transfer'
+  );
+}
+
+function handleConsultWorkflowMutation(previous: Consult, updated: Consult, updateData: Partial<Consult>, staffList: Staff[], patients: Patient[]) {
+  const patientCtx = getPatientContext(updated.PatientKey, patients);
+  const actorKey = String(updateData.ConsultResultUpdatedBy || updateData.CheckDeviceUpdatedBy || 'workflow-monitor');
+
+  const wasPendingResult = !hasConsultResult(previous);
+  const nowHasResult = hasConsultResult(updated);
+  const isAdHocSchedulingActivation = wasPendingResult
+    && nowHasResult
+    && String(updateData.ConsultNote || '').includes('Kích hoạt xếp lịch bổ sung');
+  if (isAdHocSchedulingActivation) {
+    createSecretaryOverrideMark(updated, patientCtx, staffList, actorKey);
+  }
+
+  const wasTransferred = previous.TransferredToCathLab === true || String(previous.TransferredToCathLab || '').trim().toLowerCase() === 'true';
+  const nowTransferred = updated.TransferredToCathLab === true || String(updated.TransferredToCathLab || '').trim().toLowerCase() === 'true';
+  const isEmergencyTransferOverride = !wasTransferred
+    && nowTransferred
+    && String(updateData.PriorityOrder || '').trim() === 'Cấp cứu'
+    && String(updateData.CheckDeviceUpdatedBy || '').trim();
+  if (isEmergencyTransferOverride) {
+    createSchedulerEmergencyTransferMark(updated, patientCtx, staffList, actorKey);
+  }
+}
+
+function runWorkflowMonitor() {
+  const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+  const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
+  const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
+  const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
+  let notificationsBefore = readDB<Notification>(NOTIFICATIONS_FILE, []).length;
+  let marksBefore = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []).length;
+
+  const secretary = getDefaultSecretary(staffList);
+
+  consults.forEach(consult => {
+    if (isRemovedConsult(consult)) return;
+    const patientCtx = getPatientContext(consult.PatientKey, patients);
+    const patientLabel = patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey;
+    const requestByStaff = resolveStaff(consult.RequestBy, staffList) || resolveStaff(consult.ConsultCreateBy, staffList);
+
+    if (!hasConsultResult(consult)) {
+      const overdueDays = daysSince(consult.ConsultDate);
+      if (overdueDays > 3) {
+        const message = `BN ${patientLabel} của ${consult.RequestBy || 'BS đăng ký'} đăng ký chưa có KQ hội chẩn.`;
+        notifyStaffAboutConsult(requestByStaff, consult, patientCtx, 'Chưa có kết quả hội chẩn', message, 'notif:pending-staff-result');
+        notifyStaffAboutConsult(secretary, consult, patientCtx, 'Chưa có kết quả hội chẩn', message, 'notif:pending-staff-result');
+      }
+      if (overdueDays > 28 && requestByStaff) {
+        appendDoctorMarkIfMissing({
+          StaffKey: requestByStaff.StaffKey,
+          StaffName: requestByStaff.StaffName,
+          MarkType: 'requester_overdue_staff_result',
+          Label: 'Không hoàn thành theo dõi kết quả hội chẩn',
+          Reason: `BN ${patientLabel} đã quá ${overdueDays} ngày từ ngày đăng ký nhưng chưa có kết quả hội chẩn.`,
+          RelatedEntityType: 'Consult',
+          RelatedEntityKey: consult.ConsultKey,
+          PatientKey: patientCtx.PatientKey,
+          PatientID: patientCtx.PatientID,
+          PatientName: patientCtx.PatientName,
+          DedupKey: `mark:requester-overdue-staff-result:${consult.ConsultKey}`,
+          CreatedBy: 'workflow-monitor'
+        });
+      }
+    }
+
+    const plannedOverdueDays = daysSince(consult.PlannedCathLabDate);
+    const hasCathResult = cathlabs.some(cath => String(cath.ConsultKey || '') === String(consult.ConsultKey || ''));
+    const eligibleForCath = consult.TransferredToCathLab === true
+      || String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'true'
+      || (consult.CheckDevice === 'Đủ' && consult.CallStatus === 'Đồng ý');
+    if (consult.PlannedCathLabDate && plannedOverdueDays > 30 && eligibleForCath && !hasCathResult) {
+      const ptvAssistant = resolveStaff(consult.Scheduled2ndInterventionist, staffList);
+      if (ptvAssistant) {
+        appendDoctorMarkIfMissing({
+          StaffKey: ptvAssistant.StaffKey,
+          StaffName: ptvAssistant.StaffName,
+          MarkType: 'missing_cath_result',
+          Label: 'Không hoàn thành điền kết quả thông tim',
+          Reason: `BN ${patientLabel} đã quá ${plannedOverdueDays} ngày từ ngày dự kiến thông tim nhưng chưa có kết quả thông tim.`,
+          RelatedEntityType: 'Consult',
+          RelatedEntityKey: consult.ConsultKey,
+          PatientKey: patientCtx.PatientKey,
+          PatientID: patientCtx.PatientID,
+          PatientName: patientCtx.PatientName,
+          DedupKey: `mark:missing-cath-result:${consult.ConsultKey}:${ptvAssistant.StaffKey}`,
+          CreatedBy: 'workflow-monitor'
+        });
+        notifyStaffAboutConsult(
+          ptvAssistant,
+          consult,
+          patientCtx,
+          'Chưa điền kết quả thông tim',
+          `BN ${patientLabel} đã quá 1 tháng từ ngày dự kiến thông tim nhưng chưa có kết quả thông tim.`,
+          'notif:missing-cath-result',
+          'critical'
+        );
+      }
+    }
+  });
+
+  const notificationsAfter = readDB<Notification>(NOTIFICATIONS_FILE, []).length;
+  const marksAfter = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []).length;
+  return {
+    notificationsCreated: Math.max(0, notificationsAfter - notificationsBefore),
+    marksCreated: Math.max(0, marksAfter - marksBefore)
+  };
+}
+
 app.get('/api/all', async (_req, res) => {
   await syncFromGoogleSheets();
   res.json({
@@ -763,8 +1121,66 @@ app.get('/api/all', async (_req, res) => {
     operations: readDB<Operation>(OPERATIONS_FILE, []),
     cmrs: readDB<CMR>(CMRS_FILE, defaultCmrs),
     sources: readDB<Source>(SOURCES_FILE, []),
-    rolePresets: ensureRolePresetsDB()
+    rolePresets: ensureRolePresetsDB(),
+    notifications: readDB<Notification>(NOTIFICATIONS_FILE, []),
+    doctorPerformanceMarks: readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, [])
   });
+});
+
+app.get('/api/notifications', async (req, res) => {
+  await syncFromGoogleSheets();
+  const staffKey = String(req.query.staffKey || '').trim();
+  let notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
+  if (staffKey) {
+    notifications = notifications.filter(item => String(item.StaffKey || '') === staffKey);
+  }
+  notifications.sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || '')));
+  res.json(notifications);
+});
+
+app.put('/api/notifications/:key/read', async (req, res) => {
+  const notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
+  const key = req.params.key;
+  const index = notifications.findIndex(item => item.NotificationKey === key);
+  if (index === -1) {
+    res.status(404).json({ error: 'Notification not found' });
+    return;
+  }
+
+  notifications[index] = {
+    ...notifications[index],
+    IsRead: true,
+    ReadTime: notifications[index].ReadTime || newTimestamp()
+  };
+  writeDB(NOTIFICATIONS_FILE, notifications);
+  markLocalMutation();
+  recentLocalEdits.set(`Notification_${notifications[index].NotificationKey}`, { timestamp: Date.now(), data: notifications[index] });
+  syncToGoogleSheets('Notification', 'update', notifications[index].NotificationKey, notifications[index]).catch(err => {
+    console.error('Error syncing notification read update:', err);
+  });
+  res.json(notifications[index]);
+});
+
+app.get('/api/doctor-performance-marks', async (req, res) => {
+  await syncFromGoogleSheets();
+  const staffKey = String(req.query.staffKey || '').trim();
+  let marks = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []);
+  if (staffKey) {
+    marks = marks.filter(item => String(item.StaffKey || '') === staffKey);
+  }
+  marks.sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || '')));
+  res.json(marks);
+});
+
+app.post('/api/workflow-monitor/run', async (_req, res) => {
+  try {
+    await syncFromGoogleSheets();
+    const result = runWorkflowMonitor();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Error running workflow monitor:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Routes
@@ -1160,6 +1576,7 @@ app.put('/api/consults/:key', async (req, res) => {
   
   const index = consults.findIndex(c => c.ConsultKey === key);
   if (index !== -1) {
+    const previousConsult = { ...consults[index] };
     consults[index] = applyDiagnosisNormalization(
       { ...consults[index], ...updateData },
       ['DiagnosisID']
@@ -1174,6 +1591,14 @@ app.put('/api/consults/:key', async (req, res) => {
     syncToGoogleSheets('Consult', 'update', consults[index].ConsultKey, consults[index]).catch(err => {
       console.error('Error syncing consult update to google sheets background:', err);
     });
+
+    try {
+      const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+      const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
+      handleConsultWorkflowMutation(previousConsult, consults[index], updateData, staffList, patients);
+    } catch (err) {
+      console.error('Error evaluating consult workflow mutation:', err);
+    }
     
     res.json(consults[index]);
   } else {
@@ -1259,6 +1684,19 @@ app.post('/api/reset', (req, res) => {
   writeDB<Staff>(STAFF_FILE, defaultStaff);
   res.json({ message: "Database reset to defaults successfully" });
 });
+
+const WORKFLOW_MONITOR_INTERVAL_MS = 60 * 60 * 1000;
+
+setInterval(() => {
+  try {
+    const result = runWorkflowMonitor();
+    if (result.notificationsCreated > 0 || result.marksCreated > 0) {
+      console.log(`Workflow monitor created ${result.notificationsCreated} notifications and ${result.marksCreated} marks.`);
+    }
+  } catch (err) {
+    console.error('Workflow monitor interval failed:', err);
+  }
+}, WORKFLOW_MONITOR_INTERVAL_MS);
 
 // Vite Development or Production Mode Static Setup
 async function launch() {
