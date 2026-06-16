@@ -94,7 +94,7 @@ function initializeDatabase() {
   ];
   
   var cathLabHeaders = [
-    "CathKey", "PatientKey", "ConsultKey", "CathDate", "PostDiagnosisID", "PostDiagnosis",
+    "CathKey", "PatientKey", "ConsultKey", "CathDate", "DiagnosisID", "PostDiagnosisID", "PostDiagnosis",
     "CathResultID", "CathMethod", "CathPlan", "CathNote", "_1stInterventionist",
     "_2ndInterventionist", "_3rdInterventionist", "_4thInterventionist", "PlannedFollowUpDate",
     "CathUpdatedBy", "CathUpdatedTime"

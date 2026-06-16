@@ -89,6 +89,7 @@ export interface CathLab {
   PatientKey: string;
   ConsultKey: string;
   CathDate: string;
+  DiagnosisID?: string;
   PostDiagnosisID: string;
   PostDiagnosis: string;
   CathResultID: 'Thành công' | 'Không thành công' | 'Hoãn';

@@ -48,6 +48,13 @@ import StaffAccountMenu from './components/StaffAccountMenu';
 import StaffProfileView from './components/StaffProfileView';
 import ResultStaffDrawer from './components/ResultStaffDrawer';
 import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
+import {
+  resolveLatestDiagnosis,
+  normalizeRecordKey,
+  filterPatientConsults,
+  filterPatientCathlabs,
+  filterPatientOperations
+} from './utils/latestDiagnosis';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions } from './data/source';
@@ -1856,10 +1863,17 @@ export default function App() {
                         </tr>
                       ) : (
                         displayedPatients.map((pat) => {
-                          const pateConsults = consults.filter(c => c.PatientKey === pat.PatientKey);
-                          const latestConsult = pateConsults.length > 0
-                            ? [...pateConsults].sort((a, b) => new Date(b.ConsultDate).getTime() - new Date(a.ConsultDate).getTime())[0]
-                            : null;
+                          const patientConsults = filterPatientConsults(consults, pat.PatientKey);
+                          const patientConsultKeys = new Set(
+                            patientConsults.map(c => normalizeRecordKey(c.ConsultKey)).filter(Boolean)
+                          );
+                          const patientCathlabs = filterPatientCathlabs(cathlabs, pat.PatientKey, patientConsultKeys);
+                          const patientOperations = filterPatientOperations(operations, pat.PatientKey, patientConsultKeys);
+                          const latestDiagnosis = resolveLatestDiagnosis({
+                            consults: patientConsults,
+                            cathlabs: patientCathlabs,
+                            operations: patientOperations
+                          });
                           return (
                             <tr 
                               key={pat.PatientKey} 
@@ -1878,19 +1892,23 @@ export default function App() {
                               </td>
                               <td className="py-3 px-4 text-slate-600 font-medium truncate max-w-[150px]">{pat.PatientAddress || (pat as any).PatientAddress || ''}</td>
                               <td className="py-3 px-4">
-                                {latestConsult ? (
+                                {latestDiagnosis ? (
                                   <div className="flex flex-col">
                                     <span className="text-red-700 bg-red-50 border border-red-100 font-extrabold px-1.5 py-0.5 rounded text-[10px] font-mono w-max">
-                                      {latestConsult.DiagnosisID}
+                                      {latestDiagnosis.code || '—'}
                                     </span>
-                                    {latestConsult.DetailDiagnosis && (
+                                    {latestDiagnosis.detail ? (
                                       <span className="text-[10px] text-slate-400 font-bold italic truncate max-w-[140px] mt-0.5">
-                                        {latestConsult.DetailDiagnosis}
+                                        {latestDiagnosis.detail}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 font-bold italic truncate max-w-[140px] mt-0.5">
+                                        Không có mô tả chi tiết
                                       </span>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-[10px] text-slate-400 font-bold italic">Chưa có staff hội chẩn</span>
+                                  <span className="text-[10px] text-slate-400 font-bold italic">Chưa có chẩn đoán</span>
                                 )}
                               </td>
                               <td className="py-3 px-4 text-right">

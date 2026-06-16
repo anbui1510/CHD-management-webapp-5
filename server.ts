@@ -1189,7 +1189,7 @@ app.get('/api/cathlabs', async (req, res) => {
 
 app.post('/api/cathlabs', async (req, res) => {
   const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
-  const newCathLab: CathLab = applyDiagnosisNormalization(req.body, ['PostDiagnosisID']);
+  const newCathLab: CathLab = applyDiagnosisNormalization(req.body, ['DiagnosisID', 'PostDiagnosisID']);
   
   const requestedCathKey = newCathLab.CathKey;
   const cathKeyExists = requestedCathKey && cathlabs.some(cath => String(cath.CathKey || '') === String(requestedCathKey));
@@ -1216,7 +1216,7 @@ app.put('/api/cathlabs/:key', async (req, res) => {
   if (index !== -1) {
     cathlabs[index] = applyDiagnosisNormalization(
       { ...cathlabs[index], ...req.body },
-      ['PostDiagnosisID']
+      ['DiagnosisID', 'PostDiagnosisID']
     );
     writeDB<CathLab>(CATHLABS_FILE, cathlabs);
     markLocalMutation();

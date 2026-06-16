@@ -79,6 +79,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `PatientKey` | Liên kết Patient | Ref | | Bắt buộc | Liên kết với Bảng Patient |
 | `ConsultKey` | Liên kết Consult | Ref | | | Liên kết với Bảng Consult |
 | `CathDate` | Ngày thông tim | Date | | Bắt buộc | Định dạng dd/mm/yyyy |
+| `DiagnosisID` | Mã ICD thông tim | Enum | Ref tới `Source.DiagnosisID` | | Mã ICD trên ca thông tim; dùng thống kê HOME/BigQuery |
 | `PostDiagnosisID`| Bệnh chính sau TT | Enum | | Bắt buộc | |
 | `PostDiagnosis` | Chẩn đoán chi tiết sau PT| LongText| | | |
 | `CathResultID` | Kết luận sau TT | Enum | Thành công / Không thành công / Hoãn | Bắt buộc | |

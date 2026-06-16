@@ -1,6 +1,14 @@
 import React from 'react';
 import { Patient, Consult, CathLab, CMR, Operation, formatVNTime } from '../types';
 import {
+  parseMedicalDateTime,
+  resolveLatestDiagnosis,
+  normalizeRecordKey,
+  filterPatientConsults,
+  filterPatientCathlabs,
+  filterPatientOperations
+} from '../utils/latestDiagnosis';
+import {
   X,
   MapPin,
   UserSquare2,
@@ -34,14 +42,6 @@ const INTERVENTION_RESULTS = new Set([
   'điện sinh lý'
 ]);
 
-const getTime = (dateValue?: string) => {
-  if (!dateValue) return 0;
-  const time = new Date(String(dateValue).trim().split('T')[0]).getTime();
-  return Number.isNaN(time) ? 0 : time;
-};
-
-const normalizeKey = (value?: string) => String(value || '').trim().toLowerCase();
-
 const joinPeople = (people: Array<string | undefined>) => people.map(person => String(person || '').trim()).filter(Boolean).join(' - ');
 
 export default function PatientDetailsDrawer({
@@ -72,30 +72,30 @@ export default function PatientDetailsDrawer({
     }
   };
 
-  const patientKey = normalizeKey(patient.PatientKey);
-  const patientId1 = normalizeKey(patient.PatientID1);
+  const patientKey = normalizeRecordKey(patient.PatientKey);
+  const patientId1 = normalizeRecordKey(patient.PatientID1);
 
-  const patientConsults = consults
-    .filter(c => normalizeKey(c.PatientKey) === patientKey)
-    .sort((a, b) => getTime(b.ConsultDate) - getTime(a.ConsultDate));
+  const patientConsults = filterPatientConsults(consults, patient.PatientKey)
+    .sort((a, b) => parseMedicalDateTime(b.ConsultDate) - parseMedicalDateTime(a.ConsultDate));
 
-  const patientConsultKeys = new Set(patientConsults.map(c => normalizeKey(c.ConsultKey)).filter(Boolean));
+  const patientConsultKeys = new Set(patientConsults.map(c => normalizeRecordKey(c.ConsultKey)).filter(Boolean));
 
-  const patientCathlabs = cathlabs
-    .filter(cath => normalizeKey(cath.PatientKey) === patientKey || patientConsultKeys.has(normalizeKey(cath.ConsultKey)))
-    .sort((a, b) => getTime(b.CathDate) - getTime(a.CathDate));
+  const patientCathlabs = filterPatientCathlabs(cathlabs, patient.PatientKey, patientConsultKeys)
+    .sort((a, b) => parseMedicalDateTime(b.CathDate) - parseMedicalDateTime(a.CathDate));
 
   const patientCmrs = cmrs
     .filter(cmr =>
-      normalizeKey(cmr.PatientKey) === patientKey ||
-      normalizeKey(cmr.MBN) === patientId1 ||
-      patientConsultKeys.has(normalizeKey(cmr.ConsultKey))
+      normalizeRecordKey(cmr.PatientKey) === patientKey ||
+      normalizeRecordKey(cmr.MBN) === patientId1 ||
+      patientConsultKeys.has(normalizeRecordKey(cmr.ConsultKey))
     )
-    .sort((a, b) => getTime(b.CMRDate || b.CMRScheduledDate || b.UpdateTime) - getTime(a.CMRDate || a.CMRScheduledDate || a.UpdateTime));
+    .sort((a, b) =>
+      parseMedicalDateTime(b.CMRDate || b.CMRScheduledDate || b.UpdateTime) -
+      parseMedicalDateTime(a.CMRDate || a.CMRScheduledDate || a.UpdateTime)
+    );
 
-  const patientOperations = operations
-    .filter(op => normalizeKey(op.PatientKey) === patientKey || patientConsultKeys.has(normalizeKey(op.ConsultKey)))
-    .sort((a, b) => getTime(b.SurgDate) - getTime(a.SurgDate));
+  const patientOperations = filterPatientOperations(operations, patient.PatientKey, patientConsultKeys)
+    .sort((a, b) => parseMedicalDateTime(b.SurgDate) - parseMedicalDateTime(a.SurgDate));
 
   const joinSurgeons = (op: Operation) => joinPeople([
     op['1stSurgeon'],
@@ -104,28 +104,17 @@ export default function PatientDetailsDrawer({
     op['4thSurgeon']
   ]);
 
-  const latestDiagnosis = [
-    ...patientConsults.map(c => ({
-      date: c.ConsultDate,
-      time: getTime(c.ConsultDate),
-      code: c.DiagnosisID,
-      detail: c.DetailDiagnosis
-    })),
-    ...patientCathlabs.map(cath => ({
-      date: cath.CathDate,
-      time: getTime(cath.CathDate),
-      code: cath.PostDiagnosisID,
-      detail: cath.PostDiagnosis
-    }))
-  ]
-    .filter(item => item.time > 0 && (item.code || item.detail))
-    .sort((a, b) => b.time - a.time)[0];
+  const latestDiagnosis = resolveLatestDiagnosis({
+    consults: patientConsults,
+    cathlabs: patientCathlabs,
+    operations: patientOperations
+  });
 
-  const cathConsultKeys = new Set(patientCathlabs.map(cath => normalizeKey(cath.ConsultKey)).filter(Boolean));
+  const cathConsultKeys = new Set(patientCathlabs.map(cath => normalizeRecordKey(cath.ConsultKey)).filter(Boolean));
   const latestPendingPrep = patientConsults.find(c =>
     INTERVENTION_RESULTS.has(String(c.ConsultResultID || '').trim().toLowerCase()) &&
-    normalizeKey(c.ConsultKey) &&
-    !cathConsultKeys.has(normalizeKey(c.ConsultKey))
+    normalizeRecordKey(c.ConsultKey) &&
+    !cathConsultKeys.has(normalizeRecordKey(c.ConsultKey))
   );
 
   return (
@@ -316,6 +305,14 @@ export default function PatientDetailsDrawer({
                         <p><span className="text-slate-400 font-bold">KQ:</span> {cath.CathResultID || '—'}</p>
                         <p><span className="text-slate-400 font-bold">KH:</span> {cath.CathPlan || '—'}</p>
                       </div>
+                      {(cath.PostDiagnosisID || cath.PostDiagnosis) && (
+                        <p className="font-semibold text-slate-700 leading-relaxed">
+                          <span className="font-bold text-red-600 bg-red-50 px-1.5 py-0.5 border border-red-200 rounded text-[11px] font-mono">
+                            {cath.PostDiagnosisID || '—'}
+                          </span>
+                          {' - '}{cath.PostDiagnosis || '—'}
+                        </p>
+                      )}
                       {cath.CathNote && <p className="font-semibold text-slate-700 leading-relaxed"><span className="text-slate-400 font-bold">Ghi chú:</span> {cath.CathNote}</p>}
                     </div>
                   );

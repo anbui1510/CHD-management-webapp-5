@@ -449,33 +449,25 @@ export default function HomeDashboard({
         .filter(Boolean)
     );
 
-    const counts: Record<string, number> = {};
-    cathPatientKeys.forEach(patientKey => {
-      const latestCathDiagnosis = [...pieCathlabs]
-        .filter(cath => normalizePatientKey(cath.PatientKey) === patientKey && String(cath.PostDiagnosisID || '').trim())
-        .sort((a, b) => getDateTime(b.CathDate) - getDateTime(a.CathDate))[0]?.PostDiagnosisID;
-
-      const fallbackConsultDiagnosis = [...(consults || [])]
-        .filter(c =>
-          normalizePatientKey(c.PatientKey) === patientKey &&
-          String(c.DiagnosisID || '').trim() &&
-          getFormattedDateKey(c.ConsultDate) <= piePeriodRange.end
-        )
-        .sort((a, b) => {
-          const dateDiff = getDateTime(b.ConsultDate) - getDateTime(a.ConsultDate);
-          if (dateDiff !== 0) return dateDiff;
-          return String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || ''));
-        })[0]?.DiagnosisID;
-
-      const diagnosis = String(latestCathDiagnosis || fallbackConsultDiagnosis || 'Chưa phân loại').trim();
-      counts[diagnosis] = (counts[diagnosis] || 0) + 1;
+    // BigQuery-style: COUNT(DISTINCT PatientKey) per CathLab.DiagnosisID on any cath in period.
+    const patientsByIcd: Record<string, Set<string>> = {};
+    pieCathlabs.forEach(cath => {
+      const patientKey = normalizePatientKey(cath.PatientKey);
+      const icd = String(cath.DiagnosisID || '').trim();
+      if (!patientKey || !icd) return;
+      if (!patientsByIcd[icd]) patientsByIcd[icd] = new Set();
+      patientsByIcd[icd].add(patientKey);
     });
+
+    const counts = Object.fromEntries(
+      Object.entries(patientsByIcd).map(([icd, patients]) => [icd, patients.size])
+    );
 
     return buildPieSegments(
       Object.entries(counts).map(([label, value]) => ({ label, value })),
       cathPatientKeys.size
     );
-  }, [pieCathlabs, consults, piePeriodRange.end]);
+  }, [pieCathlabs]);
 
   const secondOperatorDistribution = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -523,7 +515,7 @@ export default function HomeDashboard({
     const cathPatientCount = new Set(pieCathlabs.map(cath => normalizePatientKey(cath.PatientKey)).filter(Boolean)).size;
     return {
       title: 'ICD bệnh nhân đã thông tim',
-      subtitle: 'Mỗi bệnh nhân chỉ tính 1 ICD gần nhất',
+      subtitle: 'BN từng có mã ICD trên ít nhất 1 ca thông tim (CathLab.DiagnosisID)',
       totalLabel: 'bệnh nhân',
       total: cathPatientCount,
       segments: cathPatientDiagnosisDistribution
