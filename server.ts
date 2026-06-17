@@ -1143,6 +1143,11 @@ app.get('/api/notifications', async (req, res) => {
   res.json(notifications);
 });
 
+app.post('/api/notifications', async (req, res) => {
+  const record = appendNotificationIfMissing(req.body);
+  res.status(record ? 201 : 400).json(record || { error: 'Notification requires StaffKey and DedupKey' });
+});
+
 app.put('/api/notifications/:key/read', async (req, res) => {
   const notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
   const key = req.params.key;
@@ -1175,6 +1180,11 @@ app.get('/api/doctor-performance-marks', async (req, res) => {
   }
   marks.sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || '')));
   res.json(marks);
+});
+
+app.post('/api/doctor-performance-marks', async (req, res) => {
+  const record = appendDoctorMarkIfMissing(req.body);
+  res.status(record ? 201 : 400).json(record || { error: 'Doctor performance mark requires StaffKey and DedupKey' });
 });
 
 app.post('/api/workflow-monitor/run', async (_req, res) => {

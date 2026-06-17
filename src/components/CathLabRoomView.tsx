@@ -5,6 +5,8 @@ import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Act
 import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
+import { classifyDiagnosisText } from '../utils/diagnosisClassifier';
+import { resolveStaffByNameOrKey } from '../utils/staffNameMatch';
 
 interface Props {
   patients: Patient[];
@@ -218,6 +220,39 @@ const getHisCell = (row: any[], headerMap: Map<string, number>, aliases: string[
   return '';
 };
 
+const getDateDistanceDays = (a?: string, b?: string) => {
+  if (!a || !b) return Number.POSITIVE_INFINITY;
+  const timeA = new Date(`${parseHisDateOnly(a)}T00:00:00`).getTime();
+  const timeB = new Date(`${parseHisDateOnly(b)}T00:00:00`).getTime();
+  if (Number.isNaN(timeA) || Number.isNaN(timeB)) return Number.POSITIVE_INFINITY;
+  return Math.abs(timeA - timeB) / (1000 * 60 * 60 * 24);
+};
+
+const hasConsultResult = (consult: Consult) => {
+  const result = String(consult.ConsultResultID || '').trim().toLowerCase();
+  return !!result && !['nodata', 'no data', '-', '—'].includes(result);
+};
+
+const isTransferredToCathLab = (consult: Consult) =>
+  consult.TransferredToCathLab === true ||
+  String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'true' ||
+  String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'yes' ||
+  String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'có';
+
+type HisWorkflowStage = 'missing_staff_result' | 'scheduler_missing_transfer' | 'missing_cath_result';
+
+const getHisWorkflowStage = (consult: Consult): HisWorkflowStage => {
+  if (!hasConsultResult(consult)) return 'missing_staff_result';
+  if (!consult.PlannedCathLabDate || !isTransferredToCathLab(consult)) return 'scheduler_missing_transfer';
+  return 'missing_cath_result';
+};
+
+const getHisStageLabel = (stage: HisWorkflowStage) => {
+  if (stage === 'missing_staff_result') return 'Chưa hoàn tất kết quả staff';
+  if (stage === 'scheduler_missing_transfer') return 'Chưa hoàn tất xếp lịch/chuyển phòng TT';
+  return 'Chưa nhập kết quả thông tim';
+};
+
 export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient }: Props) {
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
@@ -387,10 +422,41 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     });
   };
 
-  const getLatestConsultForPatient = (patientKey: string): Consult | undefined => {
-    return [...consults]
-      .filter(consult => normalizePatientKey(consult.PatientKey) === normalizePatientKey(patientKey))
-      .sort((a, b) => String(b.ConsultDate || '').localeCompare(String(a.ConsultDate || '')) || String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || '')))[0];
+  const findBestConsultForHisCath = (patientKey: string, cathDate: string): Consult | undefined => {
+    const normalizedPatient = normalizePatientKey(patientKey);
+    const cathTime = new Date(`${parseHisDateOnly(cathDate)}T00:00:00`).getTime();
+    if (!normalizedPatient || Number.isNaN(cathTime)) return undefined;
+
+    const cathConsultKeys = new Set(cathlabs.map(cath => String(cath.ConsultKey || '').trim()).filter(Boolean));
+    const eligibleResultSet = new Set(SCHEDULING_ELIGIBLE_RESULTS.map(item => item.toLowerCase()));
+
+    const scored = consults
+      .filter(consult => normalizePatientKey(consult.PatientKey) === normalizedPatient)
+      .filter(consult => !cathConsultKeys.has(String(consult.ConsultKey || '').trim()))
+      .map(consult => {
+        const consultTime = consult.ConsultDate ? new Date(`${parseHisDateOnly(consult.ConsultDate)}T00:00:00`).getTime() : 0;
+        const plannedDistance = consult.PlannedCathLabDate ? getDateDistanceDays(consult.PlannedCathLabDate, cathDate) : Number.POSITIVE_INFINITY;
+        const consultDistance = consultTime > 0 ? Math.abs(cathTime - consultTime) / (1000 * 60 * 60 * 24) : Number.POSITIVE_INFINITY;
+        const result = String(consult.ConsultResultID || '').trim().toLowerCase();
+        const resultEligible = eligibleResultSet.has(result);
+        const isPendingResult = !hasConsultResult(consult);
+        const beforeOrSameCath = consultTime > 0 && consultTime <= cathTime;
+        const score =
+          (resultEligible ? 500 : 0) +
+          (isPendingResult ? 180 : 0) +
+          (isTransferredToCathLab(consult) ? 220 : 0) +
+          (consult.PlannedCathLabDate ? 220 : 0) +
+          (plannedDistance <= 7 ? 220 : plannedDistance <= 30 ? 120 : 0) +
+          (beforeOrSameCath ? 120 : -300) -
+          Math.min(consultDistance, 365);
+
+        return { consult, score, plannedDistance, consultDistance, beforeOrSameCath, resultEligible, isPendingResult };
+      })
+      .filter(item => item.beforeOrSameCath || item.plannedDistance <= 7)
+      .filter(item => item.resultEligible || item.isPendingResult || item.plannedDistance <= 7)
+      .sort((a, b) => b.score - a.score || a.plannedDistance - b.plannedDistance || a.consultDistance - b.consultDistance);
+
+    return scored[0]?.consult;
   };
 
   const buildCathImportKey = (patientId: string, cathDate: string, cathMethod: string) =>
@@ -414,6 +480,119 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       });
     });
     return keys;
+  };
+
+  const resolveResponsibleStaffForHisStage = (consult: Consult, stage: HisWorkflowStage, cathPayload: CathLab): Staff | undefined => {
+    if (stage === 'missing_staff_result') {
+      return resolveStaffByNameOrKey(consult.RequestBy, staffList)
+        || resolveStaffByNameOrKey(consult.ConsultCreateBy, staffList);
+    }
+    if (stage === 'scheduler_missing_transfer') {
+      return resolveStaffByNameOrKey(consult.CheckDeviceBy, staffList)
+        || resolveStaffByNameOrKey(consult.CheckDeviceUpdatedBy, staffList)
+        || resolveStaffByNameOrKey(consult.Scheduled2ndInterventionist, staffList)
+        || staffList.find(staff => String(staff.StaffRolePreset || '').includes('dieu-phoi'))
+        || resolveStaffByNameOrKey(consult.RequestBy, staffList);
+    }
+    return resolveStaffByNameOrKey(cathPayload._1stInterventionist, staffList)
+      || resolveStaffByNameOrKey(cathPayload._2ndInterventionist, staffList)
+      || resolveStaffByNameOrKey(consult.Scheduled1stInterventionist, staffList)
+      || resolveStaffByNameOrKey(consult.Scheduled2ndInterventionist, staffList)
+      || resolveStaffByNameOrKey(consult.RequestBy, staffList);
+  };
+
+  const createHisWorkflowNotificationAndMark = async (
+    consult: Consult,
+    patient: Patient,
+    cathPayload: CathLab,
+    stage: HisWorkflowStage
+  ) => {
+    const postWorkflowRecord = async (endpoint: string, payload: Record<string, any>) => {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || `Không thể ghi ${endpoint}`);
+      }
+    };
+
+    const responsible = resolveResponsibleStaffForHisStage(consult, stage, cathPayload);
+    const adminStaff = staffList.filter(staff => String(staff.Role || '').toLowerCase() === 'admin');
+    const recipients = new Map<string, Staff>();
+    if (responsible) recipients.set(responsible.StaffKey, responsible);
+    adminStaff.forEach(staff => recipients.set(staff.StaffKey, staff));
+
+    const baseDedup = `his-auto-close:${consult.ConsultKey}:${cathPayload.CathDate}:${stage}`;
+    const title = 'HIS import tự hoàn tất ca treo';
+    const message = `${patient.PatientName || patient.PatientID1} đã có kết quả thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)} từ HIS. Workflow treo "${getHisStageLabel(stage)}" đã được tự động đóng.`;
+
+    await Promise.all([
+      ...Array.from(recipients.values()).map(staff => {
+        const notification = {
+          NotificationKey: `notif_${baseDedup}:${staff.StaffKey}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
+          StaffKey: staff.StaffKey,
+          StaffName: staff.StaffName,
+          Title: title,
+          Message: message,
+          Severity: stage === 'missing_cath_result' ? 'critical' : 'warning',
+          RelatedEntityType: 'Consult',
+          RelatedEntityKey: consult.ConsultKey,
+          PatientKey: patient.PatientKey,
+          PatientID: patient.PatientID1,
+          PatientName: patient.PatientName,
+          DedupKey: `${baseDedup}:notify:${staff.StaffKey}`,
+          IsRead: false,
+          CreatedTime: new Date().toISOString(),
+          ReadTime: ''
+        };
+        return postWorkflowRecord('/api/notifications', notification);
+      }),
+      responsible ? postWorkflowRecord(
+        '/api/doctor-performance-marks',
+        {
+          MarkKey: `mark_${baseDedup}:${responsible.StaffKey}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
+          StaffKey: responsible.StaffKey,
+          StaffName: responsible.StaffName,
+          MarkType: stage,
+          Score: stage === 'missing_cath_result' ? 2 : 1,
+          Label: getHisStageLabel(stage),
+          Reason: message,
+          RelatedEntityType: 'Consult',
+          RelatedEntityKey: consult.ConsultKey,
+          PatientKey: patient.PatientKey,
+          PatientID: patient.PatientID1,
+          PatientName: patient.PatientName,
+          DedupKey: `${baseDedup}:mark:${responsible.StaffKey}`,
+          CreatedBy: loggedInStaffId || 'HIS_IMPORT',
+          CreatedTime: new Date().toISOString()
+        }
+      ) : Promise.resolve()
+    ]);
+  };
+
+  const buildHisAutoCloseConsultPatch = (consult: Consult, cathPayload: CathLab, stage: HisWorkflowStage): Partial<Consult> => {
+    const logLine = `[HIS import ${new Date().toISOString()}] Đã tự hoàn tất workflow "${getHisStageLabel(stage)}" vì HIS ghi nhận ca thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)}. CathKey=${cathPayload.CathKey}`;
+    const resultPatch = hasConsultResult(consult)
+      ? {}
+      : {
+          ConsultResultID: 'Can thiệp thông tim' as Consult['ConsultResultID'],
+          DetailConsultResult: String(consult.DetailConsultResult || '').trim() || 'Đã thực hiện thông tim thực tế theo HIS',
+          ConsultResultUpdatedBy: loggedInStaffId || 'HIS_IMPORT',
+          ConsultResultUpdatedTime: new Date().toISOString()
+        };
+
+    return {
+      ...resultPatch,
+      CallStatus: 'Đã can thiệp/mổ',
+      PlannedCathLabDate: cathPayload.CathDate,
+      TransferredToCathLab: true,
+      CathMethod: Array.isArray(cathPayload.CathMethod) ? cathPayload.CathMethod.join(' + ') : String(cathPayload.CathMethod || ''),
+      PostCathDepart: consult.PostCathDepart || 'Tim Mạch',
+      ConsultNote: consult.ConsultNote ? `${consult.ConsultNote}\n${logLine}` : logLine
+    };
   };
 
   const handleHisImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -446,6 +625,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       const currentPatients = [...patients];
       const patientsToCreate: Patient[] = [];
       const cathlabsToCreate: CathLab[] = [];
+      const consultsToAutoClose: Array<{ consult: Consult; patient: Patient; cath: CathLab; stage: HisWorkflowStage; patch: Partial<Consult> }> = [];
       const importedSummaries: string[] = [];
       const existingCathKeys = buildExistingCathImportKeys(currentPatients, cathlabs);
       const importedKeys = new Set<string>();
@@ -493,19 +673,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           patientsToCreate.push(patient);
         }
 
-        const latestConsult = getLatestConsultForPatient(patient.PatientKey);
+        const matchedConsult = findBestConsultForHisCath(patient.PatientKey, cathDate);
+        const autoDiagnosisID = normalizeDiagnosisID(
+          matchedConsult?.DiagnosisID || classifyDiagnosisText(postDiagnosis, preDiagnosis)
+        );
         const cathPayload: CathLab = {
           CathKey: `cath_his_${Date.now()}_${index}`,
           PatientKey: patient.PatientKey,
-          ConsultKey: latestConsult?.ConsultKey || '',
+          ConsultKey: matchedConsult?.ConsultKey || '',
           CathDate: cathDate,
-          DiagnosisID: latestConsult?.DiagnosisID || '',
-          PostDiagnosisID: latestConsult?.DiagnosisID || '',
+          DiagnosisID: autoDiagnosisID,
+          PostDiagnosisID: autoDiagnosisID,
           PostDiagnosis: postDiagnosis,
           CathResultID: 'Thành công',
           CathMethod: cathMethod as any,
           CathPlan: 'Tái khám thường',
-          CathNote: 'Import từ file thủ thuật HIS',
+          CathNote: matchedConsult
+            ? `Import từ file thủ thuật HIS; đối soát ConsultKey=${matchedConsult.ConsultKey}`
+            : 'Import từ file thủ thuật HIS; chưa tìm thấy hội chẩn phù hợp để đối soát',
           _1stInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptvchinh'])),
           _2ndInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptv1'])),
           _3rdInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptv2'])),
@@ -516,7 +701,17 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         };
 
         cathlabsToCreate.push(cathPayload);
-        importedSummaries.push(`${patient.PatientName || patientName || patientId} - ${postDiagnosis || 'Không có chẩn đoán'} - ${cathMethod} - ${formatVNTime(cathDate)}`);
+        if (matchedConsult) {
+          const stage = getHisWorkflowStage(matchedConsult);
+          consultsToAutoClose.push({
+            consult: matchedConsult,
+            patient,
+            cath: cathPayload,
+            stage,
+            patch: buildHisAutoCloseConsultPatch(matchedConsult, cathPayload, stage)
+          });
+        }
+        importedSummaries.push(`${patient.PatientName || patientName || patientId} - ${autoDiagnosisID || 'Chưa mã hóa ICD'} - ${postDiagnosis || 'Không có chẩn đoán'} - ${cathMethod} - ${formatVNTime(cathDate)}`);
         importedKeys.add(importKey);
       });
 
@@ -548,11 +743,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         if (!response.ok) throw new Error(`Không thể import CathLab ${cath.CathKey}`);
       }
 
+      let autoClosedCount = 0;
+      for (const item of consultsToAutoClose) {
+        onPatchConsult?.(item.consult.ConsultKey, item.patch);
+        const response = await fetch(`/api/consults/${encodeURIComponent(item.consult.ConsultKey)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item.patch)
+        });
+        if (!response.ok) throw new Error(`Không thể tự đóng workflow Consult ${item.consult.ConsultKey}`);
+        await createHisWorkflowNotificationAndMark(item.consult, item.patient, item.cath, item.stage);
+        autoClosedCount++;
+      }
+
       setActiveTab('done');
       const summaryText = importedSummaries.slice(0, 20).map((summary, idx) => `${idx + 1}. ${summary}`).join('\n');
       const truncatedNote = importedSummaries.length > 20 ? `\n... và ${importedSummaries.length - 20} ca khác` : '';
-      setHisImportStatus(`Đã import ${cathlabsToCreate.length} ca. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
-      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${cathlabsToCreate.length}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
+      setHisImportStatus(`Đã import ${cathlabsToCreate.length} ca. Tự đóng ${autoClosedCount} workflow treo. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
+      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${cathlabsToCreate.length}\nWorkflow tự đóng: ${autoClosedCount}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
       onRefreshData();
     } catch (error) {
       console.error(error);

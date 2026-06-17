@@ -8,9 +8,11 @@ type SheetData = {
   sources: any[];
   deviceTemplates: any[];
   rolePresets: any[];
+  notifications: any[];
+  doctorPerformanceMarks: any[];
 };
 
-type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset';
+type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark';
 
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
 const viteEnv = (import.meta as any).env || {};
@@ -23,7 +25,9 @@ const EMPTY_DATA: SheetData = {
   cmrs: [],
   sources: [],
   deviceTemplates: [],
-  rolePresets: []
+  rolePresets: [],
+  notifications: [],
+  doctorPerformanceMarks: []
 };
 
 const endpointMap: Record<string, { type: SheetType; collection: keyof SheetData; keyField: string; prefix: string }> = {
@@ -35,7 +39,9 @@ const endpointMap: Record<string, { type: SheetType; collection: keyof SheetData
   cmrs: { type: 'CMR', collection: 'cmrs', keyField: 'CMRKey', prefix: 'cmr' },
   sources: { type: 'Source', collection: 'sources', keyField: 'DiagnosisID', prefix: 'source' },
   'device-templates': { type: 'DeviceTemplate', collection: 'deviceTemplates', keyField: 'DeviceName', prefix: 'device' },
-  'role-presets': { type: 'RolePreset', collection: 'rolePresets', keyField: 'RolePresetID', prefix: 'preset' }
+  'role-presets': { type: 'RolePreset', collection: 'rolePresets', keyField: 'RolePresetID', prefix: 'preset' },
+  notifications: { type: 'Notification', collection: 'notifications', keyField: 'NotificationKey', prefix: 'notif' },
+  'doctor-performance-marks': { type: 'DoctorPerformanceMark', collection: 'doctorPerformanceMarks', keyField: 'MarkKey', prefix: 'mark' }
 };
 
 let cache: SheetData | null = null;
@@ -95,7 +101,9 @@ const normalizeData = (data: Partial<SheetData>): SheetData => ({
   cmrs: Array.isArray(data.cmrs) ? data.cmrs : [],
   sources: Array.isArray(data.sources) ? data.sources : [],
   deviceTemplates: Array.isArray(data.deviceTemplates) ? data.deviceTemplates : [],
-  rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : []
+  rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : [],
+  notifications: Array.isArray(data.notifications) ? data.notifications : [],
+  doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks) ? data.doctorPerformanceMarks : []
 });
 
 const loadAllData = async (force = false): Promise<SheetData> => {
@@ -206,6 +214,17 @@ const prepareRecordForInsert = async (endpoint: string, record: any, config: (ty
     next.CMRKey = next.CMRKey || next.CMRkey || createKey(config.prefix);
     next.UpdateTime = next.UpdateTime || new Date().toISOString();
   }
+  if (endpoint === 'notifications') {
+    next.NotificationKey = next.NotificationKey || createKey(config.prefix);
+    next.CreatedTime = next.CreatedTime || new Date().toISOString();
+    next.IsRead = next.IsRead ?? false;
+  }
+  if (endpoint === 'doctor-performance-marks') {
+    next.MarkKey = next.MarkKey || createKey(config.prefix);
+    next.CreatedTime = next.CreatedTime || new Date().toISOString();
+    next.CreatedBy = next.CreatedBy || 'HIS_IMPORT';
+    next.Score = next.Score ?? 1;
+  }
   return next;
 };
 
@@ -303,6 +322,13 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     const target = parsed.searchParams.get('url') || '';
     if (!target) return textResponse('Missing url', { status: 400 });
     return fetch(target);
+  }
+
+  if (endpoint === 'notifications' && parts[2] === 'read' && method === 'PUT') {
+    return upsertRecord('notifications', key, method, {
+      ...init,
+      body: JSON.stringify({ IsRead: true, ReadTime: new Date().toISOString() })
+    });
   }
 
   const config = endpointMap[endpoint];
