@@ -95,6 +95,8 @@ const formatCalendarPatientTooltip = (patientName: string, diagnosisID: string, 
   return ptvPhu1?.trim() ? `${base} - ${ptvPhu1.trim()}` : base;
 };
 
+const normalizeRefKey = (value: unknown) => String(value ?? '').trim().toLowerCase();
+
 type SchedulingFormSnapshot = {
   diagnosisID: string;
   detailDiagnosis: string;
@@ -574,6 +576,14 @@ Xin cảm ơn!`;
     });
     return map;
   }, [consults]);
+
+  const completedCathConsultKeys = useMemo(() => {
+    return new Set(
+      cathlabs
+        .map(cath => normalizeRefKey(cath.ConsultKey))
+        .filter(Boolean)
+    );
+  }, [cathlabs]);
 
   const isPendingConsultResult = (resultId: unknown) => {
     if (!resultId) return true;
