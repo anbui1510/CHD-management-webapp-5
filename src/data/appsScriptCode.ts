@@ -211,6 +211,81 @@ function doGet(e) {
                        .setMimeType(ContentService.MimeType.JSON);
 }
 
+function getKeyColumnNameForType(type) {
+  var keyColumnName = type + "Key";
+  if (type === "RolePreset") {
+    keyColumnName = "RolePresetID";
+  } else if (type === "Source") {
+    keyColumnName = "DiagnosisID";
+  } else if (type === "DeviceTemplate") {
+    keyColumnName = "DeviceName";
+  } else if (type === "Notification") {
+    keyColumnName = "NotificationKey";
+  } else if (type === "DoctorPerformanceMark") {
+    keyColumnName = "MarkKey";
+  }
+  return keyColumnName;
+}
+
+function writeRecordToSheet(type, action, key, record) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
+  if (!sheet) {
+    throw new Error("Sheet not found: " + type);
+  }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var keyColumnName = getKeyColumnNameForType(type);
+  var keyColIndex = headers.indexOf(keyColumnName) + 1;
+
+  if (keyColIndex === 0) {
+    keyColIndex = 1;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var foundRowIndex = -1;
+  
+  if (lastRow > 1) {
+    var keyValues = sheet.getRange(2, keyColIndex, lastRow - 1, 1).getValues();
+    for (var i = 0; i < keyValues.length; i++) {
+      if (keyValues[i][0] == key) {
+        foundRowIndex = i + 2;
+        break;
+      }
+    }
+  }
+
+  var rowValues = [];
+  for (var col = 0; col < headers.length; col++) {
+    var header = headers[col];
+    var val = record[header];
+    if (val !== undefined && val !== null) {
+      var strVal = String(val).trim();
+      var isNumericTextCol = (
+        header === "PatientID1" || 
+        header === "PatientID2" || 
+        header === "PatientPhone1" || 
+        header === "PatientPhone2" || 
+        header === "StaffPhone"
+      );
+      if (isNumericTextCol && strVal !== "") {
+        if (!strVal.startsWith("'")) {
+          val = "'" + strVal;
+        }
+      }
+    }
+    rowValues.push(val !== undefined ? val : "");
+  }
+
+  if (foundRowIndex !== -1) {
+    var rowRange = sheet.getRange(foundRowIndex, 1, 1, headers.length);
+    rowRange.setValues([rowValues]);
+    return { status: "success", action: "updated", key: key, rowIndex: foundRowIndex };
+  }
+
+  sheet.appendRow(rowValues);
+  return { status: "success", action: "inserted", key: key, rowIndex: sheet.getLastRow() };
+}
+
 // POST Requests - Inserts or Updates records
 function doPost(e) {
   initializeDatabase();
@@ -224,80 +299,20 @@ function doPost(e) {
     var key = payload.key; // Unique key to find
     var record = payload.data; // JSON Object
 
+    if (action === "batch") {
+      var operations = Array.isArray(payload.operations) ? payload.operations : [];
+      var results = [];
+      for (var opIndex = 0; opIndex < operations.length; opIndex++) {
+        var operation = operations[opIndex];
+        results.push(writeRecordToSheet(operation.type, operation.action, operation.key, operation.data || {}));
+      }
+      result = { status: "success", action: "batch", count: results.length, results: results };
+      return ContentService.createTextOutput(JSON.stringify(result))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (action === "update" || action === "insert") {
-      var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
-      if (!sheet) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Sheet not found: " + type }))
-                             .setMimeType(ContentService.MimeType.JSON);
-      }
-
-      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      var keyColumnName = type + "Key";
-      if (type === "RolePreset") {
-        keyColumnName = "RolePresetID";
-      } else if (type === "Source") {
-        keyColumnName = "DiagnosisID";
-      } else if (type === "DeviceTemplate") {
-        keyColumnName = "DeviceName";
-      } else if (type === "Notification") {
-        keyColumnName = "NotificationKey";
-      } else if (type === "DoctorPerformanceMark") {
-        keyColumnName = "MarkKey";
-      }
-      var keyColIndex = headers.indexOf(keyColumnName) + 1;
-
-      if (keyColIndex === 0) {
-        // Fallback if Column name differs
-        keyColIndex = 1;
-      }
-
-      // Search for existing row by key
-      var lastRow = sheet.getLastRow();
-      var foundRowIndex = -1;
-      
-      if (lastRow > 1) {
-        var keyValues = sheet.getRange(2, keyColIndex, lastRow - 1, 1).getValues();
-        for (var i = 0; i < keyValues.length; i++) {
-          if (keyValues[i][0] == key) {
-            foundRowIndex = i + 2; // Offset for headers + index
-            break;
-          }
-        }
-      }
-
-      // Format record object into row values matches headers exactly
-      var rowValues = [];
-      for (var col = 0; col < headers.length; col++) {
-        var header = headers[col];
-        var val = record[header];
-        if (val !== undefined && val !== null) {
-          var strVal = String(val).trim();
-          var isNumericTextCol = (
-            header === "PatientID1" || 
-            header === "PatientID2" || 
-            header === "PatientPhone1" || 
-            header === "PatientPhone2" || 
-            header === "StaffPhone"
-          );
-          if (isNumericTextCol && strVal !== "") {
-            if (!strVal.startsWith("'")) {
-              val = "'" + strVal;
-            }
-          }
-        }
-        rowValues.push(val !== undefined ? val : "");
-      }
-
-      if (foundRowIndex !== -1) {
-        // Update existing row
-        var rowRange = sheet.getRange(foundRowIndex, 1, 1, headers.length);
-        rowRange.setValues([rowValues]);
-        result = { status: "success", action: "updated", key: key, rowIndex: foundRowIndex };
-      } else {
-        // Insert new row
-        sheet.appendRow(rowValues);
-        result = { status: "success", action: "inserted", key: key, rowIndex: sheet.getLastRow() };
-      }
+      result = writeRecordToSheet(type, action, key, record);
     }
   } catch (err) {
     result = { status: "error", message: err.toString() };

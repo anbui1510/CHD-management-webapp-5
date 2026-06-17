@@ -192,6 +192,25 @@ const postToScript = async (
   return result;
 };
 
+const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'insert' | 'update'; key: string; data: any }>) => {
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
+
+  const response = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'batch', operations })
+  });
+
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Apps Script trả về HTTP ${response.status}`);
+  const result = JSON.parse(text);
+  if (result.status === 'error') {
+    throw new Error(result.message || 'Apps Script không thể ghi dữ liệu theo lô');
+  }
+  return result;
+};
+
 const createKey = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 const getRecordKey = (record: any, config: (typeof endpointMap)[string]) => {
@@ -270,6 +289,62 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
 };
 
+const batchWriteRecords = async (init?: RequestInit) => {
+  const body = await parseBody(init);
+  const incomingOperations = Array.isArray(body.operations) ? body.operations : [];
+  if (incomingOperations.length === 0) {
+    return jsonResponse({ error: 'Batch write requires operations' }, { status: 400 });
+  }
+
+  if (!cache) {
+    try {
+      await loadAllData();
+    } catch {
+      cache = { ...EMPTY_DATA };
+    }
+  }
+
+  const scriptOperations: Array<{ type: SheetType; action: 'insert' | 'update'; key: string; data: any }> = [];
+  const responseRecords: any[] = [];
+
+  for (const operation of incomingOperations) {
+    const endpoint = String(operation.endpoint || '').trim();
+    const method = String(operation.method || 'POST').toUpperCase();
+    const config = endpointMap[endpoint];
+    if (!config) {
+      return jsonResponse({ error: `Unsupported batch endpoint: ${endpoint}` }, { status: 400 });
+    }
+
+    const isUpdate = method === 'PUT' || method === 'PATCH';
+    const prepared = isUpdate
+      ? { ...(findCachedRecord(endpoint, operation.key, config) || {}), ...(operation.data || {}) }
+      : await prepareRecordForInsert(endpoint, operation.data || {}, config);
+    const finalKey = operation.key || getRecordKey(prepared, config) || createKey(config.prefix);
+    prepared[config.keyField] = finalKey;
+    if (endpoint === 'cmrs') {
+      prepared.CMRKey = prepared.CMRKey || prepared.CMRkey || finalKey;
+      prepared.UpdateTime = prepared.UpdateTime || new Date().toISOString();
+    }
+
+    scriptOperations.push({
+      type: config.type,
+      action: isUpdate ? 'update' : 'insert',
+      key: String(finalKey),
+      data: prepared
+    });
+    responseRecords.push(prepared);
+  }
+
+  await postBatchToScript(scriptOperations);
+
+  scriptOperations.forEach((operation, index) => {
+    const config = Object.values(endpointMap).find(item => item.type === operation.type);
+    if (config) upsertCachedRecord(config, responseRecords[index], operation.action === 'insert');
+  });
+
+  return jsonResponse({ success: true, count: responseRecords.length, records: responseRecords });
+};
+
 const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response | null> => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
   const parsed = new URL(url, window.location.origin);
@@ -307,6 +382,14 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
 
   if (endpoint === 'reset') {
     return jsonResponse({ message: 'Reset local database không khả dụng khi chạy bằng Apps Script.' }, { status: 400 });
+  }
+
+  if (endpoint === 'batch-write' && method === 'POST') {
+    if (!scriptUrl) {
+      if (isLocalHost()) return null;
+      return jsonResponse({ error: 'Chưa kết nối Google Apps Script URL trong mục Google Sheets.' }, { status: 400 });
+    }
+    return batchWriteRecords(init);
   }
 
   if (endpoint === 'all' && method === 'GET') {

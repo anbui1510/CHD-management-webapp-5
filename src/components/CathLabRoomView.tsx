@@ -149,6 +149,7 @@ const removeVietnameseTones = (str: any): string => {
 
 const DEFAULT_HIS_PATIENT_ADDRESS = 'TP Hồ Chí Minh';
 const HIS_ADDRESS_WARNING = 'BN được tạo tự động từ import HIS, địa chỉ đang mặc định là TP Hồ Chí Minh. Cần cập nhật lại địa chỉ hành chính chính xác.';
+const HIS_IMPORT_BATCH_SIZE = 15;
 
 const normalizeHisText = (value: any): string => String(value ?? '').trim().replace(/\s+/g, ' ');
 
@@ -240,6 +241,7 @@ const isTransferredToCathLab = (consult: Consult) =>
   String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'có';
 
 type HisWorkflowStage = 'missing_staff_result' | 'scheduler_missing_transfer' | 'missing_cath_result';
+type BatchWriteOperation = { endpoint: string; method: 'POST' | 'PUT' | 'PATCH'; key?: string; data: Record<string, any> };
 
 const getHisWorkflowStage = (consult: Consult): HisWorkflowStage => {
   if (!hasConsultResult(consult)) return 'missing_staff_result';
@@ -251,6 +253,14 @@ const getHisStageLabel = (stage: HisWorkflowStage) => {
   if (stage === 'missing_staff_result') return 'Chưa hoàn tất kết quả staff';
   if (stage === 'scheduler_missing_transfer') return 'Chưa hoàn tất xếp lịch/chuyển phòng TT';
   return 'Chưa nhập kết quả thông tim';
+};
+
+const chunkArray = <T,>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 };
 
 export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient }: Props) {
@@ -501,24 +511,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       || resolveStaffByNameOrKey(consult.RequestBy, staffList);
   };
 
-  const createHisWorkflowNotificationAndMark = async (
+  const buildHisWorkflowNotificationAndMarkOperations = (
     consult: Consult,
     patient: Patient,
     cathPayload: CathLab,
     stage: HisWorkflowStage
-  ) => {
-    const postWorkflowRecord = async (endpoint: string, payload: Record<string, any>) => {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(text || `Không thể ghi ${endpoint}`);
-      }
-    };
-
+  ): BatchWriteOperation[] => {
     const responsible = resolveResponsibleStaffForHisStage(consult, stage, cathPayload);
     const adminStaff = staffList.filter(staff => String(staff.Role || '').toLowerCase() === 'admin');
     const recipients = new Map<string, Staff>();
@@ -528,10 +526,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     const baseDedup = `his-auto-close:${consult.ConsultKey}:${cathPayload.CathDate}:${stage}`;
     const title = 'HIS import tự hoàn tất ca treo';
     const message = `${patient.PatientName || patient.PatientID1} đã có kết quả thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)} từ HIS. Workflow treo "${getHisStageLabel(stage)}" đã được tự động đóng.`;
+    const operations: BatchWriteOperation[] = [];
 
-    await Promise.all([
-      ...Array.from(recipients.values()).map(staff => {
-        const notification = {
+    Array.from(recipients.values()).forEach(staff => {
+      operations.push({
+        endpoint: 'notifications',
+        method: 'POST',
+        data: {
           NotificationKey: `notif_${baseDedup}:${staff.StaffKey}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
           StaffKey: staff.StaffKey,
           StaffName: staff.StaffName,
@@ -547,12 +548,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           IsRead: false,
           CreatedTime: new Date().toISOString(),
           ReadTime: ''
-        };
-        return postWorkflowRecord('/api/notifications', notification);
-      }),
-      responsible ? postWorkflowRecord(
-        '/api/doctor-performance-marks',
-        {
+        }
+      });
+    });
+
+    if (responsible) {
+      operations.push({
+        endpoint: 'doctor-performance-marks',
+        method: 'POST',
+        data: {
           MarkKey: `mark_${baseDedup}:${responsible.StaffKey}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
           StaffKey: responsible.StaffKey,
           StaffName: responsible.StaffName,
@@ -569,8 +573,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           CreatedBy: loggedInStaffId || 'HIS_IMPORT',
           CreatedTime: new Date().toISOString()
         }
-      ) : Promise.resolve()
-    ]);
+      });
+    }
+
+    return operations;
   };
 
   const buildHisAutoCloseConsultPatch = (consult: Consult, cathPayload: CathLab, stage: HisWorkflowStage): Partial<Consult> => {
@@ -593,6 +599,19 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       PostCathDepart: consult.PostCathDepart || 'Tim Mạch',
       ConsultNote: consult.ConsultNote ? `${consult.ConsultNote}\n${logLine}` : logLine
     };
+  };
+
+  const postBatchWrite = async (operations: BatchWriteOperation[]) => {
+    if (operations.length === 0) return;
+    const response = await fetch('/api/batch-write', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operations })
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(text || 'Không thể ghi dữ liệu theo lô');
+    }
   };
 
   const handleHisImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -721,46 +740,67 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         return;
       }
 
-      setHisImportStatus(`Đang lưu ${cathlabsToCreate.length} ca HIS...`);
-      patientsToCreate.forEach(patient => onAddPatient?.(patient));
-      cathlabsToCreate.forEach(cath => onAddCathlab?.(cath));
-
-      for (const patient of patientsToCreate) {
-        const response = await fetch('/api/patients', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patient)
-        });
-        if (!response.ok) throw new Error(`Không thể tạo BN ${patient.PatientID1}`);
-      }
-
-      for (const cath of cathlabsToCreate) {
-        const response = await fetch('/api/cathlabs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cath)
-        });
-        if (!response.ok) throw new Error(`Không thể import CathLab ${cath.CathKey}`);
-      }
-
+      let savedCathCount = 0;
       let autoClosedCount = 0;
-      for (const item of consultsToAutoClose) {
-        onPatchConsult?.(item.consult.ConsultKey, item.patch);
-        const response = await fetch(`/api/consults/${encodeURIComponent(item.consult.ConsultKey)}`, {
+      const totalCathCount = cathlabsToCreate.length;
+      setHisImportStatus(`Đang ghi HIS theo lô 0/${totalCathCount} ca...`);
+
+      for (const patientChunk of chunkArray(patientsToCreate, HIS_IMPORT_BATCH_SIZE)) {
+        setHisImportStatus(`Đang tạo ${patientChunk.length} BN mới từ HIS... Đã ghi ${savedCathCount}/${totalCathCount} ca.`);
+        await postBatchWrite(patientChunk.map(patient => ({
+          endpoint: 'patients',
+          method: 'POST',
+          data: patient as unknown as Record<string, any>
+        })));
+        patientChunk.forEach(patient => onAddPatient?.(patient));
+      }
+
+      for (const cathChunk of chunkArray(cathlabsToCreate, HIS_IMPORT_BATCH_SIZE)) {
+        setHisImportStatus(`Đang ghi CathLab HIS... Đã ghi ${savedCathCount}/${totalCathCount} ca.`);
+        await postBatchWrite(cathChunk.map(cath => ({
+          endpoint: 'cathlabs',
+          method: 'POST',
+          data: cath as unknown as Record<string, any>
+        })));
+        savedCathCount += cathChunk.length;
+        cathChunk.forEach(cath => onAddCathlab?.(cath));
+        setHisImportStatus(`Đã ghi ${savedCathCount}/${totalCathCount} ca HIS. Đang xử lý workflow treo...`);
+      }
+
+      const workflowNotificationOps: BatchWriteOperation[] = [];
+      for (const consultChunk of chunkArray(consultsToAutoClose, HIS_IMPORT_BATCH_SIZE)) {
+        setHisImportStatus(`Đã ghi ${savedCathCount}/${totalCathCount} ca HIS. Đang tự đóng workflow ${autoClosedCount}/${consultsToAutoClose.length}...`);
+        await postBatchWrite(consultChunk.map(item => ({
+          endpoint: 'consults',
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item.patch)
+          key: item.consult.ConsultKey,
+          data: item.patch as Record<string, any>
+        })));
+        consultChunk.forEach(item => {
+          onPatchConsult?.(item.consult.ConsultKey, item.patch);
+          workflowNotificationOps.push(...buildHisWorkflowNotificationAndMarkOperations(item.consult, item.patient, item.cath, item.stage));
         });
-        if (!response.ok) throw new Error(`Không thể tự đóng workflow Consult ${item.consult.ConsultKey}`);
-        await createHisWorkflowNotificationAndMark(item.consult, item.patient, item.cath, item.stage);
-        autoClosedCount++;
+        autoClosedCount += consultChunk.length;
+      }
+
+      let workflowSideEffectWarning = '';
+      if (workflowNotificationOps.length > 0) {
+        try {
+          setHisImportStatus(`Đã ghi ${savedCathCount}/${totalCathCount} ca HIS. Đang ghi thông báo/sẹo workflow...`);
+          for (const notifyChunk of chunkArray(workflowNotificationOps, HIS_IMPORT_BATCH_SIZE)) {
+            await postBatchWrite(notifyChunk);
+          }
+        } catch (notifyError) {
+          console.error('Không thể ghi Notification/DoctorPerformanceMark sau import HIS:', notifyError);
+          workflowSideEffectWarning = '\nLưu ý: CathLab đã import xong nhưng một phần thông báo/sẹo workflow chưa ghi được. Có thể đồng bộ lại và import lại để bổ sung phần còn thiếu.';
+        }
       }
 
       setActiveTab('done');
       const summaryText = importedSummaries.slice(0, 20).map((summary, idx) => `${idx + 1}. ${summary}`).join('\n');
       const truncatedNote = importedSummaries.length > 20 ? `\n... và ${importedSummaries.length - 20} ca khác` : '';
-      setHisImportStatus(`Đã import ${cathlabsToCreate.length} ca. Tự đóng ${autoClosedCount} workflow treo. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
-      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${cathlabsToCreate.length}\nWorkflow tự đóng: ${autoClosedCount}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
+      setHisImportStatus(`Đã import ${savedCathCount}/${totalCathCount} ca. Tự đóng ${autoClosedCount} workflow treo. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
+      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${savedCathCount}/${totalCathCount}\nWorkflow tự đóng: ${autoClosedCount}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}${workflowSideEffectWarning}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
       onRefreshData();
     } catch (error) {
       console.error(error);

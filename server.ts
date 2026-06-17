@@ -1187,6 +1187,104 @@ app.post('/api/doctor-performance-marks', async (req, res) => {
   res.status(record ? 201 : 400).json(record || { error: 'Doctor performance mark requires StaffKey and DedupKey' });
 });
 
+type BatchEndpointConfig<T> = {
+  type: 'Patient' | 'Consult' | 'CathLab' | 'Notification' | 'DoctorPerformanceMark';
+  file: string;
+  defaults: T[];
+  keyField: keyof T & string;
+  prefix: string;
+  normalize?: (record: any) => T;
+};
+
+function getBatchEndpointConfig(endpoint: string): BatchEndpointConfig<any> | null {
+  const configs: Record<string, BatchEndpointConfig<any>> = {
+    patients: { type: 'Patient', file: PATIENTS_FILE, defaults: defaultPatients, keyField: 'PatientKey', prefix: 'pat' },
+    consults: {
+      type: 'Consult',
+      file: CONSULTS_FILE,
+      defaults: defaultConsults,
+      keyField: 'ConsultKey',
+      prefix: 'con',
+      normalize: record => applyDiagnosisNormalization(record, ['DiagnosisID'])
+    },
+    cathlabs: {
+      type: 'CathLab',
+      file: CATHLABS_FILE,
+      defaults: defaultCathlabs,
+      keyField: 'CathKey',
+      prefix: 'cath',
+      normalize: record => applyDiagnosisNormalization(record, ['DiagnosisID', 'PostDiagnosisID'])
+    },
+    notifications: { type: 'Notification', file: NOTIFICATIONS_FILE, defaults: [], keyField: 'NotificationKey', prefix: 'notif' },
+    'doctor-performance-marks': { type: 'DoctorPerformanceMark', file: DOCTOR_MARKS_FILE, defaults: [], keyField: 'MarkKey', prefix: 'mark' }
+  };
+  return configs[endpoint] || null;
+}
+
+app.post('/api/batch-write', async (req, res) => {
+  try {
+    const operations = Array.isArray(req.body?.operations) ? req.body.operations : [];
+    if (operations.length === 0) {
+      res.status(400).json({ error: 'Batch write requires operations' });
+      return;
+    }
+
+    const savedRecords: any[] = [];
+    for (const operation of operations) {
+      const endpoint = String(operation.endpoint || '').trim();
+      const config = getBatchEndpointConfig(endpoint);
+      if (!config) {
+        res.status(400).json({ error: `Unsupported batch endpoint: ${endpoint}` });
+        return;
+      }
+
+      const records = readDB<any>(config.file, config.defaults);
+      const isUpdate = ['PUT', 'PATCH'].includes(String(operation.method || 'POST').toUpperCase());
+      const incoming = config.normalize ? config.normalize(operation.data || {}) : { ...(operation.data || {}) };
+      const requestedKey = String(operation.key || incoming[config.keyField] || '').trim();
+      const existingIndex = requestedKey
+        ? records.findIndex(record => String(record[config.keyField] || '') === requestedKey)
+        : -1;
+      const finalKey = requestedKey || createUniqueKey(config.prefix, records.map(record => record[config.keyField]));
+      const nextRecord = existingIndex >= 0
+        ? { ...records[existingIndex], ...incoming, [config.keyField]: finalKey }
+        : { ...incoming, [config.keyField]: finalKey };
+
+      if (endpoint === 'patients') {
+        nextRecord.PatientCreateTime = nextRecord.PatientCreateTime || newTimestamp();
+      } else if (endpoint === 'consults') {
+        nextRecord.ConsultCreateTime = nextRecord.ConsultCreateTime || newTimestamp();
+      } else if (endpoint === 'notifications') {
+        nextRecord.CreatedTime = nextRecord.CreatedTime || newTimestamp();
+        nextRecord.IsRead = nextRecord.IsRead ?? false;
+      } else if (endpoint === 'doctor-performance-marks') {
+        nextRecord.CreatedTime = nextRecord.CreatedTime || newTimestamp();
+        nextRecord.CreatedBy = nextRecord.CreatedBy || 'HIS_IMPORT';
+        nextRecord.Score = nextRecord.Score ?? 1;
+      }
+
+      if (existingIndex >= 0) {
+        records[existingIndex] = nextRecord;
+      } else {
+        records.push(nextRecord);
+      }
+
+      writeDB<any>(config.file, records);
+      recentLocalEdits.set(`${config.type}_${finalKey}`, { timestamp: Date.now(), data: nextRecord });
+      syncToGoogleSheets(config.type, existingIndex >= 0 || isUpdate ? 'update' : 'insert', finalKey, nextRecord).catch(err => {
+        console.error(`Error syncing batch ${endpoint}:`, err);
+      });
+      savedRecords.push(nextRecord);
+    }
+
+    markLocalMutation();
+    res.json({ success: true, count: savedRecords.length, records: savedRecords });
+  } catch (err) {
+    console.error('Error in POST /api/batch-write:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/api/workflow-monitor/run', async (_req, res) => {
   try {
     await syncFromGoogleSheets();
