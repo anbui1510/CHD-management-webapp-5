@@ -216,6 +216,29 @@ export default function App() {
 
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
 
+  const cathConsultKeySet = useMemo(
+    () => new Set(cathlabs.map(cath => String(cath.ConsultKey || '').trim().toLowerCase()).filter(Boolean)),
+    [cathlabs]
+  );
+
+  const isPendingStaffConsult = useCallback((consult: Consult) => {
+    const resVal = String(consult.ConsultResultID || '').trim().toLowerCase();
+    const pendingResult = !consult.ConsultResultID || resVal === '' || resVal === 'nodata' || resVal === 'no data' || resVal === '—' || resVal === '-';
+    if (!pendingResult) return false;
+    const consultKey = String(consult.ConsultKey || '').trim().toLowerCase();
+    return !consultKey || !cathConsultKeySet.has(consultKey);
+  }, [cathConsultKeySet]);
+
+  const pendingStaffConsultCount = useMemo(
+    () => consults.filter(isPendingStaffConsult).length,
+    [consults, isPendingStaffConsult]
+  );
+
+  const completedStaffConsultCount = useMemo(
+    () => consults.length - pendingStaffConsultCount,
+    [consults.length, pendingStaffConsultCount]
+  );
+
   // Fast Patients Cache map to optimize O(N*M) lookups down to O(M)
   const patientsMap = useMemo(() => {
     const map = new Map<string, Patient>();
@@ -745,7 +768,7 @@ export default function App() {
       setPendingConsultsCount(0);
       return;
     }
-    const matchingPending = consults.filter(c => c.PatientKey === patientKey && !c.ConsultResultID);
+    const matchingPending = consults.filter(c => c.PatientKey === patientKey && isPendingStaffConsult(c));
     setPendingConsultsCount(matchingPending.length);
   };
 
@@ -1319,8 +1342,7 @@ export default function App() {
     const list = consults.filter(c => {
       const typeMatch = filterType === 'Tất cả' || c.ConsultType === filterType;
       const dateMatch = !filterDate || c.ConsultDate === filterDate;
-      const resVal = String(c.ConsultResultID || '').trim().toLowerCase();
-      const notConsultedYet = !c.ConsultResultID || resVal === '' || resVal === 'nodata' || resVal === 'no data' || resVal === '—' || resVal === '-';
+      const notConsultedYet = isPendingStaffConsult(c);
       
       const pat = getPatientByKey(c.PatientKey);
       if (!pat) return false; // Ẩn bệnh nhân không tìm thấy hồ sơ (tránh mismatch đếm ca)
@@ -1382,7 +1404,7 @@ export default function App() {
   const CONSULTS_PER_PAGE = 100;
   const filteredConsultsList = useMemo(() => {
     return getFilteredConsults();
-  }, [consults, patientsMap, filterType, filterDate, consultListSearch, consultSortOrder]);
+  }, [consults, patientsMap, filterType, filterDate, consultListSearch, consultSortOrder, isPendingStaffConsult]);
   const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
   const displayedConsults = filteredConsultsList.slice(
     (consultCurrentPage - 1) * CONSULTS_PER_PAGE,
@@ -1746,10 +1768,10 @@ export default function App() {
                   {isSidebarExpanded && (
                     <span className="truncate flex-1 text-left">{menu.label}</span>
                   )}
-                  {menu.id === 'results-staff' && consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length > 0 && (
+                  {menu.id === 'results-staff' && pendingStaffConsultCount > 0 && (
                     isSidebarExpanded ? (
                       <span className="bg-pink-100 text-[#d2145a] text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-auto">
-                        {consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
+                        {pendingStaffConsultCount}
                       </span>
                     ) : (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#d2145a] rounded-full"></span>
@@ -1782,8 +1804,8 @@ export default function App() {
             <HomeDashboard 
               onNavigate={(menu) => navigateMenu(menu as typeof activeMenu)}
               patientCount={patients.length}
-              pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
-              completedConsultCount={consults.filter(c => c.ConsultResultID && !['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
+              pendingConsultCount={pendingStaffConsultCount}
+              completedConsultCount={completedStaffConsultCount}
               onOpenScheduler={(type) => setActiveScheduler(type)}
               onOpenRules={(type) => setActiveRules(type)}
               currentStaffName={currentStaff?.StaffName}
@@ -1825,7 +1847,7 @@ export default function App() {
                 navigateMenu(menu as typeof activeMenu);
               }}
               patientCount={patients.length}
-              pendingConsultCount={consults.filter(c => !c.ConsultResultID || ['nodata', 'no data', '—', '-'].includes(String(c.ConsultResultID).trim().toLowerCase())).length}
+              pendingConsultCount={pendingStaffConsultCount}
               pendingMriCount={cmrs.filter(c => !c.CMRScheduledDate).length + consults.filter(c => String(c.ConsultResultID || '').trim().toLowerCase() === 'chụp mri').length}
               canAccessModule={(module) => canAccessModule(currentStaff, module)}
             />
@@ -2196,7 +2218,7 @@ export default function App() {
                       })()}
 
                       {/* Red/Amber Warning if already has pending consults in system */}
-                      {newConsultData.PatientKey && consults.some(c => c.PatientKey === newConsultData.PatientKey && !c.ConsultResultID) && (
+                      {newConsultData.PatientKey && consults.some(c => c.PatientKey === newConsultData.PatientKey && isPendingStaffConsult(c)) && (
                         <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-3 text-[11px] flex gap-2">
                           <AlertTriangle className="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
                           <div>
@@ -2781,6 +2803,7 @@ export default function App() {
             <StaffResultsView 
               patients={patients}
               consults={consults}
+              cathlabs={cathlabs}
               sources={sources}
               deviceTemplates={deviceTemplates}
               staffList={staffList}
@@ -3053,7 +3076,7 @@ export default function App() {
                 ...prev,
                 PatientKey: pat.PatientKey
               }));
-              setPendingConsultsCount(consults.filter(c => c.PatientKey === pat.PatientKey && !c.ConsultResultID).length);
+              setPendingConsultsCount(consults.filter(c => c.PatientKey === pat.PatientKey && isPendingStaffConsult(c)).length);
               setActiveMenu('consult-form');
             }}
           />

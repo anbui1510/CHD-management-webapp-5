@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Patient, Consult, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS } from '../types';
+import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
@@ -39,6 +39,8 @@ const ADDRESS_OPTIONS = [
   "TP Hà Nội", "Tuyên Quang", "Cao Bằng", "Lai Châu", "Lào Cai", "Thái Nguyên", "Điện Biên", "Lạng Sơn", "Sơn La", "Phú Thọ", "Bắc Ninh", "Quảng Ninh", "TP Hải Phòng", "Hưng Yên", "Ninh Bình", "Thanh Hoá", "Nghệ An", "Hà Tĩnh", "Quảng Trị", "TP Huế", "TP Đà Nẵng", "Quảng Ngãi", "Gia Lai", "Đắk Lắk", "Khánh Hoà", "Lâm Đồng", "Đồng Nai", "Tây Ninh", "TP Hồ Chí Minh", "Đồng Tháp", "An Giang", "Vĩnh Long", "TP Cần Thơ", "Cà Mau"
 ];
 
+const normalizeRefKey = (value: unknown) => String(value ?? '').trim().toLowerCase();
+
 const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] = []): string => {
   if (!fullName) return '';
   let cleaned = fullName.replace(/\s*\(.*?\)\s*/g, '').trim();
@@ -73,6 +75,7 @@ const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] 
 interface StaffResultsViewProps {
   patients: Patient[];
   consults: Consult[];
+  cathlabs?: CathLab[];
   sources?: Source[];
   deviceTemplates?: DeviceTemplate[];
   staffList?: Staff[];
@@ -84,7 +87,7 @@ interface StaffResultsViewProps {
   onAddConsult?: (consult: Consult) => void;
 }
 
-export default function StaffResultsView({ patients, consults, sources = [], deviceTemplates = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult }: StaffResultsViewProps) {
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -423,17 +426,28 @@ export default function StaffResultsView({ patients, consults, sources = [], dev
     return s === '' || s === 'nodata' || s === 'no data' || s === '—' || s === '-';
   };
 
+  const cathConsultKeys = useMemo(
+    () => new Set(cathlabs.map(cath => normalizeRefKey(cath.ConsultKey)).filter(Boolean)),
+    [cathlabs]
+  );
+
+  const isPendingStaffResult = (consult: Consult) => {
+    if (!isPendingResult(consult.ConsultResultID)) return false;
+    const consultKey = normalizeRefKey(consult.ConsultKey);
+    return !consultKey || !cathConsultKeys.has(consultKey);
+  };
+
   // Counters
   const cathStats = {
     all: cathConsults.length,
-    pending: cathConsults.filter(c => isPendingResult(c.ConsultResultID)).length,
-    completed: cathConsults.filter(c => !isPendingResult(c.ConsultResultID)).length
+    pending: cathConsults.filter(isPendingStaffResult).length,
+    completed: cathConsults.filter(c => !isPendingStaffResult(c)).length
   };
 
   const surgStats = {
     all: surgConsults.length,
-    pending: surgConsults.filter(c => isPendingResult(c.ConsultResultID)).length,
-    completed: surgConsults.filter(c => !isPendingResult(c.ConsultResultID)).length
+    pending: surgConsults.filter(isPendingStaffResult).length,
+    completed: surgConsults.filter(c => !isPendingStaffResult(c)).length
   };
 
   const [cathSortOrder, setCathSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -442,8 +456,8 @@ export default function StaffResultsView({ patients, consults, sources = [], dev
   // Filter lists with pagination support
   const filteredCathAll = cathConsults.filter(c => {
     // 1. Tab filtering
-    if (cathTab === 'pending' && !isPendingResult(c.ConsultResultID)) return false;
-    if (cathTab === 'completed' && isPendingResult(c.ConsultResultID)) return false;
+    if (cathTab === 'pending' && !isPendingStaffResult(c)) return false;
+    if (cathTab === 'completed' && isPendingStaffResult(c)) return false;
 
     // 2. Search query filtering
     if (cathSearch.trim() !== '') {
@@ -465,8 +479,8 @@ export default function StaffResultsView({ patients, consults, sources = [], dev
 
   const filteredSurgAll = surgConsults.filter(c => {
     // 1. Tab filtering
-    if (surgTab === 'pending' && !isPendingResult(c.ConsultResultID)) return false;
-    if (surgTab === 'completed' && isPendingResult(c.ConsultResultID)) return false;
+    if (surgTab === 'pending' && !isPendingStaffResult(c)) return false;
+    if (surgTab === 'completed' && isPendingStaffResult(c)) return false;
 
     // 2. Search query filtering
     if (surgSearch.trim() !== '') {
