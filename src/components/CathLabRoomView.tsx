@@ -111,7 +111,7 @@ const getSchedulingWaitlistConsult = (
   if (!normalized) return undefined;
   const latestKey = latestMap.get(normalized);
   if (!latestKey) return undefined;
-  const consult = consults.find(c => c.ConsultKey === latestKey);
+  const consult = consults.find(c => String(c.ConsultKey || '').trim().toLowerCase() === String(latestKey || '').trim().toLowerCase());
   if (!consult || !isConsultInSchedulingWaitlist(consult, latestMap, patients)) return undefined;
   return consult;
 };
@@ -158,6 +158,9 @@ const normalizeHisHeader = (value: any): string =>
 
 const normalizeHisKey = (value: any): string =>
   normalizeHisText(value).toLowerCase();
+
+const normalizeRefKey = (value: any): string =>
+  String(value ?? '').trim().toLowerCase();
 
 const parseHisDateOnly = (value: any): string => {
   if (!value) return '';
@@ -240,6 +243,12 @@ const isTransferredToCathLab = (consult: Consult) =>
   String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'yes' ||
   String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'có';
 
+const cathLabHasConsultKey = (cathlabs: CathLab[], consultKey: any): boolean => {
+  const normalizedConsultKey = normalizeRefKey(consultKey);
+  if (!normalizedConsultKey) return false;
+  return cathlabs.some(cath => normalizeRefKey(cath.ConsultKey) === normalizedConsultKey);
+};
+
 type HisWorkflowStage = 'missing_staff_result' | 'scheduler_missing_transfer' | 'missing_cath_result';
 type BatchWriteOperation = { endpoint: string; method: 'POST' | 'PUT' | 'PATCH'; key?: string; data: Record<string, any> };
 
@@ -291,7 +300,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const pendingConsults = useMemo(() => {
      let list = consults.filter(c => {
        const transferred = c.TransferredToCathLab === true || String(c.TransferredToCathLab).trim().toLowerCase() === 'true';
-       return transferred && !c.Removed && !cathlabs.some(cath => cath.ConsultKey === c.ConsultKey);
+       return transferred && !c.Removed && !cathLabHasConsultKey(cathlabs, c.ConsultKey);
      });
      
      if (searchTerm.trim() !== '') {
@@ -437,12 +446,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     const cathTime = new Date(`${parseHisDateOnly(cathDate)}T00:00:00`).getTime();
     if (!normalizedPatient || Number.isNaN(cathTime)) return undefined;
 
-    const cathConsultKeys = new Set(cathlabs.map(cath => String(cath.ConsultKey || '').trim()).filter(Boolean));
+    const cathConsultKeys = new Set(cathlabs.map(cath => normalizeRefKey(cath.ConsultKey)).filter(Boolean));
     const eligibleResultSet = new Set(SCHEDULING_ELIGIBLE_RESULTS.map(item => item.toLowerCase()));
 
     const scored = consults
       .filter(consult => normalizePatientKey(consult.PatientKey) === normalizedPatient)
-      .filter(consult => !cathConsultKeys.has(String(consult.ConsultKey || '').trim()))
+      .filter(consult => !cathConsultKeys.has(normalizeRefKey(consult.ConsultKey)))
       .map(consult => {
         const consultTime = consult.ConsultDate ? new Date(`${parseHisDateOnly(consult.ConsultDate)}T00:00:00`).getTime() : 0;
         const plannedDistance = consult.PlannedCathLabDate ? getDateDistanceDays(consult.PlannedCathLabDate, cathDate) : Number.POSITIVE_INFINITY;
