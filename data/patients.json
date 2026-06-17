@@ -68757,8 +68757,7 @@
     "PatientPhone2": "",
     "PatientCreateBy": "{\"StaffKey\":\"11111\",\"StaffName\":\"Admin\",\"Name\":\"Admin\",\"StaffSex\":\"\",\"Avatar\":\"\",\"StaffDOB\":\"\",\"Deparment\":\"\",\"Career\":\"\",\"Email\":\"\",\"StaffPhone\":\"\",\"Password\":\"1111\",\"Role\":\"Admin\",\"StaffRolePreset\":\"\",\"Permissions\":\"\",\"View\":\"\",\"StaffCreateTime\":\"\",\"FireDate\":\"\",\"ReportType\":\"Theo kỳ\",\"SelectedPeriod\":\"Năm nay\",\"DateFrom\":\"2026-01-01\",\"DateTo\":\"2027-06-30\",\"Filter_Dept\":\"\",\"Filter_Doctor\":\"\",\"Filter_Result\":\"\",\"View_Mode\":\"Theo kết quả hội chẩn\",\"Department\":\"\"}",
     "PatientCreateTime": "2026-06-16T13:25:15.379Z",
-    "Outcome": "Đã thông",
-    "PatientAddressDefaultWarning": "BN được tạo tự động từ import HIS, địa chỉ đang mặc định là TP Hồ Chí Minh. Cần cập nhật lại địa chỉ hành chính chính xác."
+    "Outcome": "Đã thông"
   },
   {
     "PatientKey": "MOCK2025_PAT_001",
