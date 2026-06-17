@@ -637,6 +637,8 @@ Xin cảm ơn!`;
       if (formattedConsultDate < '2026-01-01') return false;
 
       if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) { return false; }
+      const normalizedConsultKey = normalizeRefKey(c.ConsultKey);
+      if (normalizedConsultKey && completedCathConsultKeys.has(normalizedConsultKey)) { return false; }
 
       const isRemoved = c.Removed === true || String(c.Removed).toUpperCase() === 'TRUE' || String(c.Removed).toLowerCase() === 'có' || String(c.Removed).toLowerCase() === 'yes';
       if (isRemoved) { return false; }
@@ -669,7 +671,7 @@ Xin cảm ơn!`;
     });
     
     return result;
-  }, [consults, patients, latestConsultsMap]);
+  }, [consults, patients, latestConsultsMap, completedCathConsultKeys]);
 
   // Segment Waiting List into tabs: "Chưa xếp lịch" and "Đã xếp lịch"
   // Sắp xếp ngày gần nhất lên trên, ngày xa nhất dưới
