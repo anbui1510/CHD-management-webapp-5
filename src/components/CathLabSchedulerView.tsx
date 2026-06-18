@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
-import { buildCathlabsByPatientKey, isConsultCathCompleted } from '../utils/cathlabWaitlist';
+import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -629,6 +629,7 @@ Xin cảm ơn!`;
 
       if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) { return false; }
       if (isConsultCathCompleted(c, cathlabsByPatientKey.get(normalizePatientKey(c.PatientKey)))) { return false; }
+      if (isConsultWaitlistExcludedByStatus(c.Status)) { return false; }
 
       const isRemoved = c.Removed === true || String(c.Removed).toUpperCase() === 'TRUE' || String(c.Removed).toLowerCase() === 'có' || String(c.Removed).toLowerCase() === 'yes';
       if (isRemoved) { return false; }

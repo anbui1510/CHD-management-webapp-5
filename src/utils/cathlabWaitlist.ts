@@ -3,6 +3,15 @@ import { normalizePatientKey } from '../types';
 
 const normalizeRefKey = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
+/** Legacy Consult.Status values that should not appear in cath scheduling waitlist. */
+export function isConsultWaitlistExcludedByStatus(status?: string): boolean {
+  const normalized = String(status ?? '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized === 'no data') return true;
+  if (normalized.includes('đã thông tim')) return true;
+  return false;
+}
+
 export const getConsultDateKey = (value?: string): string => {
   if (!value) return '';
   const trimmed = value.trim().split('T')[0];
