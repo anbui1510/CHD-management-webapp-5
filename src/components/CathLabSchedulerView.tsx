@@ -2071,6 +2071,92 @@ Xin cảm ơn!`;
     return `${formatVNTime(dobStr)} (${ageInParen})`;
   };
 
+  const hasAdminField = (v?: string) => Boolean(v && String(v).trim() !== '' && v !== '-');
+
+  const renderPatientAdminInfo = (pat: Patient, variant: 'form' | 'print' = 'form') => {
+    const hasId2 = hasAdminField(pat.PatientID2);
+    const hasPhone2 = hasAdminField(pat.PatientPhone2);
+    const hasPhone1 = hasAdminField(pat.PatientPhone1);
+    const hasOtherName = hasAdminField(pat.OtherPatientName);
+    const isFullLayout = hasId2 && hasPhone2;
+    const address = pat.PatientAddress || '—';
+
+    const labelCls =
+      variant === 'form'
+        ? 'text-slate-400 font-bold text-[8px] uppercase shrink-0'
+        : 'text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0';
+    const valueCls =
+      variant === 'form' ? 'font-bold text-slate-800' : 'font-bold text-slate-800 text-[12.5px]';
+    const monoCls =
+      variant === 'form'
+        ? 'font-extrabold font-mono text-slate-800 text-[11px]'
+        : 'font-extrabold font-mono text-slate-800 text-[12.5px]';
+    const rowGap = variant === 'form' ? 'gap-x-4' : 'gap-x-5';
+    const containerCls = variant === 'form' ? 'space-y-2 text-xs' : 'space-y-2.5 text-[12px]';
+
+    const Field = ({
+      label,
+      value,
+      mono,
+    }: {
+      label: string;
+      value: React.ReactNode;
+      mono?: boolean;
+    }) => (
+      <span className="inline-flex items-baseline gap-x-1.5">
+        <span className={labelCls}>{label}</span>
+        <span className={mono ? monoCls : valueCls}>{value}</span>
+      </span>
+    );
+
+    const Row = ({ children }: { children: React.ReactNode }) => (
+      <div className={`flex flex-wrap items-baseline ${rowGap} gap-y-1`}>{children}</div>
+    );
+
+    return (
+      <div className={containerCls}>
+        {hasOtherName && (
+          <Row>
+            <Field label="Tên khác:" value={pat.OtherPatientName} />
+          </Row>
+        )}
+        {isFullLayout ? (
+          <>
+            <Row>
+              <Field label="Mã NB:" value={pat.PatientID1 || '—'} mono />
+              <Field label="Mã NB khác:" value={pat.PatientID2} mono />
+            </Row>
+            <Row>
+              <Field label="Ngày sinh:" value={formatPatientDobWithAge(pat.PatientDOB)} />
+              <Field label="Giới:" value={pat.PatientSex || '—'} />
+            </Row>
+            <Row>
+              <Field label="Địa chỉ:" value={address} />
+            </Row>
+            <Row>
+              <Field label="SĐ1:" value={pat.PatientPhone1} mono />
+              <Field label="SĐ2:" value={pat.PatientPhone2} mono />
+            </Row>
+          </>
+        ) : (
+          <>
+            <Row>
+              <Field label="Mã NB:" value={pat.PatientID1 || '—'} mono />
+              <Field label="Giới:" value={pat.PatientSex || '—'} />
+            </Row>
+            <Row>
+              <Field label="Ngày sinh:" value={formatPatientDobWithAge(pat.PatientDOB)} />
+            </Row>
+            <Row>
+              <Field label="Địa chỉ:" value={address} />
+              {hasPhone1 && <Field label="SĐ1:" value={pat.PatientPhone1} mono />}
+            </Row>
+          </>
+        )}
+      </div>
+    );
+  };
+
   const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-[13px] text-slate-800 min-h-[34px]';
   const adHocSelectCls = `${adHocInputCls} font-bold`;
   const adHocLabelCls = 'text-slate-500 font-bold text-[10.5px] uppercase shrink-0 leading-tight w-[11rem]';
@@ -2841,40 +2927,7 @@ Xin cảm ơn!`;
                         <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
                           THÔNG TIN HÀNH CHÍNH
                         </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                          <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                            <span className="inline-flex items-baseline gap-x-1.5">
-                              <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB:</span>
-                              <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1 || '—'}</span>
-                            </span>
-                            {pat.PatientID2 && String(pat.PatientID2).trim() !== '' && pat.PatientID2 !== '-' && (
-                              <span className="inline-flex items-baseline gap-x-1.5">
-                                <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB khác:</span>
-                                <span className="font-semibold font-mono text-slate-700 text-[11px]">{pat.PatientID2}</span>
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Ngày sinh:</span>
-                            <span className="font-bold text-slate-800">{formatPatientDobWithAge(pat.PatientDOB)}</span>
-                          </div>
-                          <div className="flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Giới tính:</span>
-                            <span className="font-bold text-slate-800">{pat.PatientSex}</span>
-                          </div>
-                          <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Địa chỉ:</span>
-                            <span className="font-bold text-slate-800 whitespace-normal break-words">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
-                          </div>
-                          <div className="flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Điện thoại 1:</span>
-                            <span className="font-extrabold text-slate-800 font-mono text-[11px]">{pat.PatientPhone1 || '—'}</span>
-                          </div>
-                          <div className="flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Điện thoại 2:</span>
-                            <span className="font-semibold text-slate-700 font-mono">{pat.PatientPhone2 || '—'}</span>
-                          </div>
-                        </div>
+                        {renderPatientAdminInfo(pat, 'form')}
                       </div>
 
                       {/* Part 2: Consultation administrative summary */}
@@ -3985,38 +4038,7 @@ Xin cảm ơn!`;
                       <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1">
                         THÔNG TIN HÀNH CHÍNH
                       </span>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2.5 text-[12px] pb-0.5">
-                        {pat.OtherPatientName && String(pat.OtherPatientName).trim() !== '' && pat.OtherPatientName !== '-' && (
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Họ và tên khác:</span>
-                            <span className="font-extrabold text-slate-900 uppercase block break-words text-[13px]">{pat.OtherPatientName}</span>
-                          </div>
-                        )}
-                        {pat.PatientID2 && pat.PatientID2 !== '-' && String(pat.PatientID2).trim() !== '' && (
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Mã NB khác:</span>
-                            <span className="font-black font-mono text-slate-855 text-[13px]">{pat.PatientID2}</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Ngày sinh:</span>
-                          <span className="font-bold text-slate-800 text-[12.5px]">{formatPatientDobWithAge(pat.PatientDOB)}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Giới tính:</span>
-                          <span className="font-bold text-slate-800 text-[12.5px]">{pat.PatientSex}</span>
-                        </div>
-                        <div className="col-span-1 md:col-span-2">
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Địa chỉ:</span>
-                          <span className="font-bold text-slate-800 block break-words text-[12px]">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
-                        </div>
-                        <div className="col-span-1 md:col-span-2">
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Điện thoại:</span>
-                          <span className="font-extrabold text-slate-800 font-mono text-[12.5px] block break-words">
-                            {[pat.PatientPhone1, pat.PatientPhone2].filter(Boolean).join(' | ') || '—'}
-                          </span>
-                        </div>
-                      </div>
+                      {renderPatientAdminInfo(pat, 'print')}
                     </div>
 
                     {/* Box 2: THÔNG TIN ĐÃ ĐĂNG KÝ HỘI CHẨN */}
