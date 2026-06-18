@@ -346,8 +346,10 @@ function readSheetAsJson(sheetName) {
       
       // Convert Date objects to ISO string
       if (cellVal instanceof Date) {
-        // Check if date represents calendar date only (no time)
-        if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {
+        // Skip invalid dates (empty/broken cells) — toISOString() throws RangeError otherwise
+        if (isNaN(cellVal.getTime())) {
+          obj[headers[c]] = "";
+        } else if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {
           // Format as YYYY-MM-DD
           var year = cellVal.getFullYear();
           var month = ("0" + (cellVal.getMonth() + 1)).slice(-2);

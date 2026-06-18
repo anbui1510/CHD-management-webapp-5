@@ -22,7 +22,10 @@ export function useRefreshMedicalData(setters: MedicalDataSetters) {
         applyMedicalDataBundle(bundle, scope, setters);
         meta.lastAt = Date.now();
       })
-      .catch(err => console.error('Failed to refresh medical data:', err))
+      .catch(err => {
+        console.error('Failed to refresh medical data:', err);
+        throw err;
+      })
       .finally(() => {
         meta.pending = null;
       });

@@ -118,7 +118,12 @@ const loadAllData = async (force = false): Promise<SheetData> => {
       const text = await res.text();
       if (!res.ok) throw new Error(`Apps Script trả về HTTP ${res.status}`);
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
-        throw new Error('Apps Script đang trả về HTML. Hãy deploy Web app với quyền truy cập Anyone và copy đúng Web app URL.');
+        const scriptError = text.match(/<div[^>]*>([^<]+)<\/div>\s*<\/body>/i)?.[1]?.trim();
+        throw new Error(
+          scriptError
+            ? `Apps Script lỗi: ${scriptError}`
+            : 'Apps Script đang trả về HTML. Hãy deploy Web app với quyền truy cập Anyone và copy đúng Web app URL.'
+        );
       }
       const parsed = JSON.parse(text);
       cache = normalizeData(parsed);

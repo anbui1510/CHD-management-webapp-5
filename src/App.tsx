@@ -304,6 +304,7 @@ export default function App() {
   const [loginStaffKey, setLoginStaffKey] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
+  const [loginLoadError, setLoginLoadError] = useState<string>('');
 
   // Search Filter State (Patient List & Globals)
   const [patientSearch, setPatientSearch] = useState<string>('');
@@ -596,7 +597,14 @@ export default function App() {
   }, [refreshMedicalData]);
 
   useEffect(() => {
-    void refreshMedicalData('full', true);
+    void refreshMedicalData('full', true).catch(err => {
+      const msg = err instanceof Error ? err.message : String(err);
+      setLoginLoadError(
+        msg.includes('Failed to fetch')
+          ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
+          : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
+      );
+    });
 
     // Recover logged-in session if exists
     const storedStaff = localStorage.getItem('CurrentStaffKey');
@@ -618,6 +626,12 @@ export default function App() {
       localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
     }
   }, [staffList, currentStaff?.StaffKey]);
+
+  useEffect(() => {
+    if (currentStaff || staffList.length === 0) return;
+    setLoginStaffKey(prev => prev || staffList[0].StaffKey);
+    setLoginLoadError('');
+  }, [staffList, currentStaff]);
 
   useEffect(() => {
     if (!currentStaff) return;
@@ -1432,10 +1446,10 @@ export default function App() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {loginError && (
+            {((loginLoadError && staffList.length === 0) || loginError) && (
               <div className="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-3 text-xs leading-relaxed flex gap-1.5">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{loginError}</span>
+                <span>{(loginLoadError && staffList.length === 0) ? loginLoadError : loginError}</span>
               </div>
             )}
 
