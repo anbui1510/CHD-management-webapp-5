@@ -2064,6 +2064,13 @@ Xin cảm ơn!`;
     return '';
   };
 
+  const formatPatientDobWithAge = (dobStr?: string) => {
+    if (!dobStr) return '—';
+    const age = getAgeDescription(dobStr);
+    const ageInParen = age.endsWith(' tháng') ? `${age} tuổi` : age || '—';
+    return `${formatVNTime(dobStr)} (${ageInParen})`;
+  };
+
   const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-[13px] text-slate-800 min-h-[34px]';
   const adHocSelectCls = `${adHocInputCls} font-bold`;
   const adHocLabelCls = 'text-slate-500 font-bold text-[10.5px] uppercase shrink-0 leading-tight w-[11rem]';
@@ -2832,22 +2839,24 @@ Xin cảm ơn!`;
                       {/* Part 1: Administrative Details */}
                       <div className="bg-white border border-slate-150 p-3.5 rounded-2xl shadow-xs">
                         <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
-                          Thông tin hành chính bệnh nhi
+                          THÔNG TIN HÀNH CHÍNH
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                          <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB:</span>
-                            <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1 || '—'}</span>
+                          <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <span className="inline-flex items-baseline gap-x-1.5">
+                              <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB:</span>
+                              <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1 || '—'}</span>
+                            </span>
+                            {pat.PatientID2 && String(pat.PatientID2).trim() !== '' && pat.PatientID2 !== '-' && (
+                              <span className="inline-flex items-baseline gap-x-1.5">
+                                <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB khác:</span>
+                                <span className="font-semibold font-mono text-slate-700 text-[11px]">{pat.PatientID2}</span>
+                              </span>
+                            )}
                           </div>
-                          {pat.PatientID2 && String(pat.PatientID2).trim() !== '' && pat.PatientID2 !== '-' && (
-                            <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-1.5">
-                              <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB khác:</span>
-                              <span className="font-semibold font-mono text-slate-700 text-[11px]">{pat.PatientID2}</span>
-                            </div>
-                          )}
                           <div className="flex flex-wrap items-baseline gap-x-1.5">
-                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Tuổi / Ngày sinh:</span>
-                            <span className="font-bold text-slate-800">{getAgeDescription(pat.PatientDOB)} ({formatVNTime(pat.PatientDOB)})</span>
+                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Ngày sinh:</span>
+                            <span className="font-bold text-slate-800">{formatPatientDobWithAge(pat.PatientDOB)}</span>
                           </div>
                           <div className="flex flex-wrap items-baseline gap-x-1.5">
                             <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Giới tính:</span>
@@ -3990,8 +3999,8 @@ Xin cảm ơn!`;
                           </div>
                         )}
                         <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Tuổi / Ngày sinh:</span>
-                          <span className="font-bold text-slate-800 text-[12.5px]">{getAgeDescription(pat.PatientDOB)} ({formatVNTime(pat.PatientDOB)})</span>
+                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Ngày sinh:</span>
+                          <span className="font-bold text-slate-800 text-[12.5px]">{formatPatientDobWithAge(pat.PatientDOB)}</span>
                         </div>
                         <div>
                           <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Giới tính:</span>
