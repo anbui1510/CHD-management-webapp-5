@@ -2834,32 +2834,34 @@ Xin cảm ơn!`;
                         <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
                           Thông tin hành chính bệnh nhi
                         </span>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                          <div className="col-span-1 sm:col-span-1">
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB1 (ID1):</span>
-                            <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                          <div className="sm:col-span-2">
+                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB:</span>
+                            <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1 || '—'}</span>
                           </div>
-                          <div className="col-span-1 sm:col-span-1">
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB2 (ID2):</span>
-                            <span className="font-semibold font-mono text-slate-700">{pat.PatientID2 || '—'}</span>
-                          </div>
-                          <div className="col-span-1 sm:col-span-1">
+                          {pat.PatientID2 && String(pat.PatientID2).trim() !== '' && pat.PatientID2 !== '-' && (
+                            <div className="sm:col-span-2">
+                              <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB khác:</span>
+                              <span className="font-semibold font-mono text-slate-700 text-[11px]">{pat.PatientID2}</span>
+                            </div>
+                          )}
+                          <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Tuổi / Ngày sinh:</span>
                             <span className="font-bold text-slate-800">{getAgeDescription(pat.PatientDOB)} ({formatVNTime(pat.PatientDOB)})</span>
                           </div>
-                          <div className="col-span-1 sm:col-span-1">
+                          <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Giới tính:</span>
                             <span className="font-bold text-slate-800">{pat.PatientSex}</span>
                           </div>
-                          <div className="col-span-2 sm:col-span-2">
+                          <div className="sm:col-span-2">
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Địa chỉ:</span>
                             <span className="font-bold text-slate-800 block whitespace-normal break-words">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
                           </div>
-                          <div className="col-span-2 sm:col-span-2">
+                          <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 1:</span>
                             <span className="font-extrabold text-slate-800 font-mono text-[11px]">{pat.PatientPhone1 || '—'}</span>
                           </div>
-                          <div className="col-span-2 sm:col-span-2">
+                          <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 2:</span>
                             <span className="font-semibold text-slate-700 font-mono">{pat.PatientPhone2 || '—'}</span>
                           </div>
@@ -3963,7 +3965,7 @@ Xin cảm ơn!`;
                       </div>
                       <div className="text-right shrink-0">
                         <div className="flex items-center gap-1.5 justify-start sm:justify-end">
-                          <span className="text-[10px] text-slate-400 font-extrabold uppercase shrink-0">Mã NB (ID1):</span>
+                          <span className="text-[10px] text-slate-400 font-extrabold uppercase shrink-0">Mã NB:</span>
                           <span className="font-extrabold text-slate-850 font-mono text-sm tracking-wider bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">{pat.PatientID1}</span>
                         </div>
                       </div>
@@ -3983,7 +3985,7 @@ Xin cảm ơn!`;
                         )}
                         {pat.PatientID2 && pat.PatientID2 !== '-' && String(pat.PatientID2).trim() !== '' && (
                           <div>
-                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Mã NB khác (ID2):</span>
+                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Mã NB khác:</span>
                             <span className="font-black font-mono text-slate-855 text-[13px]">{pat.PatientID2}</span>
                           </div>
                         )}
