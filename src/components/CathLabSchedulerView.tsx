@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
 import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
+import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -856,18 +857,7 @@ Xin cảm ơn!`;
         const p = findPatientByKey(patients, c.PatientKey);
         
         const dobFormatted = p?.PatientDOB ? formatVNTime(p.PatientDOB) : '';
-        const ageDesc = p?.PatientDOB ? (() => {
-          const birthDate = new Date(p.PatientDOB);
-          const today = new Date();
-          let years = today.getFullYear() - birthDate.getFullYear();
-          let months = today.getMonth() - birthDate.getMonth();
-          if (months < 0) {
-            years--;
-            months += 12;
-          }
-          if (years === 0) return `${months} tháng`;
-          return `${years} tuổi ${months > 0 ? months + ' tháng' : ''}`;
-        })() : '';
+        const ageDesc = p?.PatientDOB ? getPatientAgeDescription(p.PatientDOB) : '';
 
         const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
         const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAddress || ''}` : '';
@@ -1160,19 +1150,7 @@ Xin cảm ơn!`;
       const cathLabDateDisplay = c.PlannedCathLabDate ? `${formatVNTime(c.PlannedCathLabDate)}\n(${dayOfWeekStr})` : '';
 
       const dobFormatted = formatVNTime(p?.PatientDOB);
-      const ageDesc = p ? (() => {
-        if (!p.PatientDOB) return '';
-        const today = new Date('2026-06-07');
-        const birthDate = new Date(p.PatientDOB);
-        let years = today.getFullYear() - birthDate.getFullYear();
-        let months = today.getMonth() - birthDate.getMonth();
-        if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
-          years--;
-          months += 12;
-        }
-        if (years === 0) return `${months} tháng`;
-        return `${years} tuổi ${months > 0 ? months + ' tháng' : ''}`;
-      })() : '';
+      const ageDesc = p?.PatientDOB ? getPatientAgeDescription(p.PatientDOB) : '';
 
       const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
       const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAddress || ''}` : '';
@@ -2039,39 +2017,6 @@ Xin cảm ơn!`;
     setSaving(false);
   };
 
-  const getAgeDescription = (dobStr: string) => {
-    if (!dobStr) return '';
-    try {
-      const parts = dobStr.split('-');
-      if (parts.length === 3) {
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const day = parseInt(parts[2], 10);
-        const dob = new Date(year, month - 1, day);
-        const today = new Date();
-        let ageYears = today.getFullYear() - dob.getFullYear();
-        let ageMonths = today.getMonth() - dob.getMonth();
-        if (ageMonths < 0 || (ageMonths === 0 && today.getDate() < dob.getDate())) {
-          ageYears--;
-          ageMonths += 12;
-        }
-        if (ageYears < 1) {
-          const totalMonths = (today.getFullYear() - dob.getFullYear()) * 12 + (today.getMonth() - dob.getMonth());
-          return totalMonths <= 0 ? 'Sơ sinh' : `${totalMonths} tháng`;
-        }
-        return `${ageYears} tuổi`;
-      }
-    } catch (e) {}
-    return '';
-  };
-
-  const formatPatientDobWithAge = (dobStr?: string) => {
-    if (!dobStr) return '—';
-    const age = getAgeDescription(dobStr);
-    const ageInParen = age.endsWith(' tháng') ? `${age} tuổi` : age || '—';
-    return `${formatVNTime(dobStr)} (${ageInParen})`;
-  };
-
   const hasAdminField = (v?: string) => Boolean(v && String(v).trim() !== '' && v !== '-');
 
   const renderPatientAdminInfo = (pat: Patient, variant: 'form' | 'print' = 'form') => {
@@ -2128,7 +2073,7 @@ Xin cảm ơn!`;
               <Field label="Mã NB khác:" value={pat.PatientID2} mono />
             </Row>
             <Row>
-              <Field label="Ngày sinh:" value={formatPatientDobWithAge(pat.PatientDOB)} />
+              <Field label="Ngày sinh:" value={formatPatientDobWithAge(pat.PatientDOB, undefined, formatVNTime)} />
               <Field label="Giới:" value={pat.PatientSex || '—'} />
             </Row>
             <Row>
@@ -2146,7 +2091,7 @@ Xin cảm ơn!`;
               <Field label="Giới:" value={pat.PatientSex || '—'} />
             </Row>
             <Row>
-              <Field label="Ngày sinh:" value={formatPatientDobWithAge(pat.PatientDOB)} />
+              <Field label="Ngày sinh:" value={formatPatientDobWithAge(pat.PatientDOB, undefined, formatVNTime)} />
             </Row>
             <Row>
               <Field label="Địa chỉ:" value={address} />
@@ -2315,14 +2260,14 @@ Xin cảm ơn!`;
   return (
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans transition-all duration-300">
       
-      <div className="flex-1 overflow-hidden p-3 lg:p-4 flex h-full min-h-0 gap-4">
+      <div className="flex-1 overflow-hidden p-3 lg:p-4 flex flex-col lg:flex-row h-full min-h-0 gap-4">
         
         {/* Main Workspace Frame */}
         <div className={`flex-1 transition-all h-full min-h-0`}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : (isAnyFilterExpanded ? 'hidden md:flex lg:col-span-6' : 'lg:col-span-6')}`}>
+        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : 'lg:col-span-6'}`}>
           
           <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between gap-2">
             <div>
@@ -2438,7 +2383,46 @@ Xin cảm ơn!`;
                 {searchQuery ? 'Không tìm thấy bệnh nhi thích hợp' : 'Không có bệnh nhi nào trong danh sách hiển thị'}
               </div>
             ) : (
-              <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
+              <>
+              <div className="md:hidden divide-y divide-slate-150">
+                {paginatedWaitlist.map((c) => {
+                  const pat = findPatientByKey(patients, c.PatientKey);
+                  if (!pat) return null;
+                  const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
+                  return (
+                    <button
+                      key={c.ConsultKey}
+                      type="button"
+                      onClick={() => handleSelectConsult(c)}
+                      className={`w-full text-left p-3 transition ${
+                        isSelected ? 'bg-indigo-50/90 border-l-4 border-indigo-600' : 'hover:bg-indigo-50/45'
+                      }`}
+                    >
+                      <div className="font-extrabold uppercase text-slate-900 leading-snug break-words">
+                        {pat.PatientName}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-bold font-mono mt-0.5">
+                        ID1: {pat.PatientID1}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-2 text-[10px]">
+                        <span className="bg-slate-100 text-slate-800 font-extrabold px-1.5 py-0.5 rounded font-mono">
+                          {c.DiagnosisID || '—'}
+                        </span>
+                        <span className={`font-extrabold text-[8px] uppercase px-2 py-0.5 rounded-full border ${getPriorityBadgeClass(c.PriorityOrder || '')}`}>
+                          {normalizePriorityOrder(c.PriorityOrder)}
+                        </span>
+                        <span className="text-slate-500">
+                          {c.CheckDevice === 'Đủ' ? 'DC: Đủ' : c.CheckDevice === 'Thiếu' ? 'DC: Thiếu' : 'Chưa check DC'}
+                        </span>
+                        {c.PlannedCathLabDate && (
+                          <span className="font-mono text-slate-600">{formatVNTime(c.PlannedCathLabDate)}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <table className="hidden md:table w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
                 <thead className="bg-slate-50/70 text-slate-500 sticky top-0 border-b border-slate-200 uppercase text-[9px] font-extrabold tracking-wider z-10 shadow-xs">
                   <tr>
                     {activeTab === 'scheduled' && (
@@ -2533,6 +2517,7 @@ Xin cảm ơn!`;
                   })}
                 </tbody>
               </table>
+              </>
             )}
           </div>
           
@@ -3336,7 +3321,7 @@ Xin cảm ơn!`;
               </div>
 
               {/* Save Footer Bar */}
-              <div className="p-4 border-t border-slate-105 bg-slate-50 flex justify-between gap-3 shrink-0 flex-wrap">
+              <div className="p-4 border-t border-slate-105 bg-slate-50 flex flex-col sm:flex-row sm:justify-between gap-3 shrink-0 flex-wrap">
                 <div className="flex gap-2 items-center flex-wrap">
                   {/* Xem hồ sơ */}
                   {(() => {
@@ -3404,18 +3389,18 @@ Xin cảm ơn!`;
                   </button>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={handleCloseSchedulingView}
-                    className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-2xl cursor-pointer transition"
+                    className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-2xl cursor-pointer transition min-h-[44px]"
                   >
                     Đóng lại
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2 rounded-2xl shadow-xs text-xs cursor-pointer transition flex items-center gap-2 disabled:opacity-50"
+                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2.5 rounded-2xl shadow-xs text-xs cursor-pointer transition flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
                   >
                     {saving ? 'Đang lưu...' : 'Lưu kết quả xếp lịch'}
                   </button>
@@ -3525,11 +3510,58 @@ Xin cảm ơn!`;
           </div>
         </div>
 
+        {!pureCalendarMode && (
+          <div className="lg:hidden flex gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setIsFilterExpanded(true);
+                setIsDeviceFilterExpanded(false);
+              }}
+              className="flex-1 min-h-[44px] px-3 py-2 rounded-2xl bg-white border border-slate-200 text-[11px] font-bold text-slate-700 shadow-sm"
+            >
+              Bộ lọc xuất lịch
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDeviceFilterExpanded(true);
+                setIsFilterExpanded(false);
+              }}
+              className="flex-1 min-h-[44px] px-3 py-2 rounded-2xl bg-white border border-slate-200 text-[11px] font-bold text-slate-700 shadow-sm"
+            >
+              Bộ lọc duyệt DC
+            </button>
+          </div>
+        )}
+
         {/* Right Collapsible Panels Container */}
-        <div className={`shrink-0 flex flex-col gap-4 self-start h-full min-h-0 ${pureCalendarMode ? 'hidden' : ''}`}>
+        <div className={`shrink-0 flex flex-col gap-4 self-start h-full min-h-0 w-full lg:w-auto ${
+          pureCalendarMode ? 'hidden' : ''
+        } ${
+          isFilterExpanded || isDeviceFilterExpanded
+            ? 'fixed inset-0 z-40 p-3 bg-slate-50/95 backdrop-blur-[1px] lg:relative lg:inset-auto lg:z-auto lg:p-0 lg:bg-transparent'
+            : 'hidden lg:flex'
+        }`}>
           
+          {/* Mobile close for filter overlay */}
+          {(isFilterExpanded || isDeviceFilterExpanded) && (
+            <div className="lg:hidden flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFilterExpanded(false);
+                  setIsDeviceFilterExpanded(false);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600"
+              >
+                Đóng bộ lọc
+              </button>
+            </div>
+          )}
+
           {/* Export Schedule Panel */}
-          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-[320px] flex-1 min-h-0' : 'w-[52px]'}`}>
+          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isFilterExpanded ? (
               <div 
                 className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl"
@@ -3613,7 +3645,7 @@ Xin cảm ơn!`;
           </div>
 
           {/* Device Export Panel */}
-          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isDeviceFilterExpanded ? 'w-[320px] flex-1 min-h-0' : 'w-[52px]'}`}>
+          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isDeviceFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isDeviceFilterExpanded ? (
                <div className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl" onClick={() => { setIsDeviceFilterExpanded(true); setIsFilterExpanded(false); }}>
                  <div className="bg-slate-100 p-2.5 rounded-2xl text-slate-500 mb-6 hover:bg-[#0d9488] hover:text-white transition">
@@ -3923,7 +3955,7 @@ Xin cảm ơn!`;
             const generateTextSummary = (pObj: Patient, cObj: Consult) => {
               const weightDisplay = selectedConsult?.PatientWeight ? `${selectedConsult.PatientWeight} kg` : '—';
               const heightDisplay = selectedConsult?.PatientHeight ? `${selectedConsult.PatientHeight} cm` : '—';
-              const ageDesc = getAgeDescription(pObj.PatientDOB) || '—';
+              const ageDesc = getPatientAgeDescription(pObj.PatientDOB) || '—';
               const addressDisplay = pObj.PatientAddress || (pObj as any).PatientAddress || '';
               const phoneList = [pObj.PatientPhone1, pObj.PatientPhone2].filter(Boolean).join(' | ');
               const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);

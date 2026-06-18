@@ -539,7 +539,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                 </div>
               </div>
 
-              <div className="mt-3 pt-2 border-t border-slate-100 w-full grid grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium font-sans font-sans">
+              <div className="mt-3 pt-2 border-t border-slate-100 w-full grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium font-sans font-sans">
                 <div>
                   <span className="text-slate-400">Chẩn đoán:</span>{' '}
                   <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1 rounded">{c.DiagnosisID}</span>
@@ -590,10 +590,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           </div>
 
           {/* Filtering choice headers exactly matching screenshot 7 */}
-          <div className="shrink-0 flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 mb-4">
+          <div className="shrink-0 flex flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 mb-4 gap-1">
             <button
               onClick={() => handleCathTabChange('all')}
-              className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`flex-1 min-w-[88px] text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
                 cathTab === 'all' 
                   ? 'bg-slate-900 text-white font-bold' 
                   : 'hover:bg-slate-100'
@@ -723,10 +723,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           </div>
 
           {/* Filtering choice headers exactly matching screenshot 7 */}
-          <div className="shrink-0 flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 mb-4">
+          <div className="shrink-0 flex flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 mb-4 gap-1">
             <button
               onClick={() => handleSurgTabChange('all')}
-              className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`flex-1 min-w-[88px] text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
                 surgTab === 'all' 
                   ? 'bg-slate-900 text-white font-bold' 
                   : 'hover:bg-slate-100'
@@ -856,7 +856,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[96vh] md:max-h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
             
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 text-[#d2145a] shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-150 px-4 sm:px-6 py-4 bg-indigo-50/50 text-[#d2145a] shrink-0">
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-5 h-5 animate-pulse text-indigo-600" />
                 <div>
@@ -1013,7 +1013,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                                 </button>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-xs">
                                 <div>
                                   <span className="text-slate-400 font-bold block text-[8px] uppercase">Họ và tên:</span>
                                   <span className="font-extrabold text-indigo-950 uppercase text-[11px]">{selectedPat.PatientName}</span>
@@ -1065,7 +1065,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     {/* CREATE QUICK NEW PATIENT FIELDS */}
                     {patientMode === 'create' && (
                       <div className="bg-pink-50/50 border border-pink-100 rounded-2xl p-2.5 space-y-2 animate-in slide-in-from-top-1.5 duration-200">
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Mã bệnh nhi (ID1) *</label>
                             <input
@@ -1101,7 +1101,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày sinh *</label>
                             <input
@@ -1137,7 +1137,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">SĐT gia đình</label>
                             <input
@@ -1168,7 +1168,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   {/* Medical Registration parameters fields */}
                   <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2">
                     
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kiểu staff *</label>
                         <select
@@ -1193,7 +1193,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Cân nặng (kg) *</label>
                         <input
@@ -1218,7 +1218,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký *</label>
                         <select
@@ -1454,7 +1454,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100">
                       <div>
                         <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase text-left">Người điền KQ</label>
                         <input

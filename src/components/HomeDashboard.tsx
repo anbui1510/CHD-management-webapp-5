@@ -690,7 +690,7 @@ export default function HomeDashboard({
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50 pt-2 px-4 pb-4 sm:pt-2 sm:px-5 sm:pb-5 space-y-3 sm:space-y-4 animate-in fade-in duration-300">
-      <div style={{ width: '1098.02px', height: '90px' }} className="bg-gradient-to-r from-pink-600 to-[#d2145a] rounded-3xl px-5 sm:px-6 text-white shadow-sm relative overflow-hidden shrink-0 flex items-center">
+      <div className="w-full min-h-[90px] bg-gradient-to-r from-pink-600 to-[#d2145a] rounded-3xl px-5 sm:px-6 text-white shadow-sm relative overflow-hidden shrink-0 flex items-center">
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
           <HeartPulse className="w-48 h-48 animate-pulse" />
         </div>
@@ -763,15 +763,14 @@ export default function HomeDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 flex-1 min-h-0 min-w-0 pb-1">
         
         {/* LEFT COLUMN: Chart + Quick Access */}
-        <div className="flex flex-col space-y-4 h-full min-h-0 lg:max-w-[538.003px] w-full">
+        <div className="flex flex-col space-y-4 h-full min-h-0 w-full">
           
           {/* BIỂU ĐỒ THỐNG KÊ TIM THEO THÁNG */}
           <div 
-            style={{ height: '180px', width: '538.003px' }} 
-            className="bg-white border border-slate-150 rounded-2xl p-3 shadow-sm flex items-center justify-between shrink-0 relative max-w-full z-20"
+            className="bg-white border border-slate-150 rounded-2xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 relative w-full min-h-[180px] z-20"
           >
             {/* Title & Total info */}
-            <div className="flex flex-col justify-center shrink-0 pr-3 border-r border-[#f1f5f9] h-full w-[155px]">
+            <div className="flex flex-col justify-center shrink-0 sm:pr-3 sm:border-r border-[#f1f5f9] sm:h-full w-full sm:w-[155px]">
               <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-tight flex items-center gap-1 shrink-0">
                 <span className="leading-tight whitespace-normal break-words">
                   {chartMetric === 'staff_consults'
@@ -1117,9 +1116,9 @@ export default function HomeDashboard({
             </div>
 
             <div className="order-1 h-[48%] min-h-[220px] border border-slate-150 rounded-2xl bg-slate-50/60 p-3 flex flex-col overflow-hidden">
-              <div className="flex items-start justify-between gap-3 shrink-0 mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 shrink-0 mb-2">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Database className="w-4 h-4 text-[#d2145a] shrink-0" />
                     <span className="text-xs font-black text-slate-800 uppercase tracking-tight truncate">
                       Thống kê tỷ lệ
@@ -1130,7 +1129,7 @@ export default function HomeDashboard({
                   </div>
                 </div>
 
-                <div className="flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm shrink-0">
+                <div className="flex flex-wrap bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm shrink-0 gap-0.5">
                   {([
                     ['diagnosis', 'ICD'],
                     ['second_operator', 'PTV phụ 1'],
@@ -1153,8 +1152,8 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 mb-1.5 -mt-1 shrink-0">
-                <div className="flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1.5 -mt-1 shrink-0">
+                <div className="flex flex-wrap bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm gap-0.5">
                   {([
                     ['all', 'Tất cả'],
                     ['month', 'Tháng'],
@@ -1176,7 +1175,7 @@ export default function HomeDashboard({
                   ))}
                 </div>
 
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                   {piePeriodMode === 'month' && (
                     <select
                       value={pieFilterMonth}
@@ -1226,8 +1225,8 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 grid grid-cols-[200px_1fr] gap-3 items-center overflow-hidden">
-                <div className="relative w-[176px] h-[176px] mx-auto shrink-0 -translate-y-2" onMouseLeave={() => setHoveredPieSegment(null)}>
+              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[minmax(140px,200px)_1fr] gap-3 items-center overflow-hidden">
+                <div className="relative w-full max-w-[176px] aspect-square mx-auto shrink-0 sm:-translate-y-2" onMouseLeave={() => setHoveredPieSegment(null)}>
                   {(() => {
                     const radius = 38;
                     const circumference = 2 * Math.PI * radius;

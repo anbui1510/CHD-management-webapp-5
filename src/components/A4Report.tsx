@@ -5,6 +5,7 @@
 
 import React, { useRef } from 'react';
 import { Consult, Patient, formatVNTime } from '../types';
+import { formatPatientDobWithAge } from '../utils/patientDisplay';
 import { Printer, Download, X, ClipboardCheck, Calendar, Activity, ShieldAlert } from 'lucide-react';
 
 interface A4ReportProps {
@@ -15,18 +16,6 @@ interface A4ReportProps {
 
 export default function A4Report({ consult, patient, onClose }: A4ReportProps) {
   const reportRef = useRef<HTMLDivElement>(null);
-
-  const calculateAge = (dobString: string) => {
-    if (!dobString) return '—';
-    const birthday = new Date(dobString);
-    const today = new Date();
-    let age = today.getFullYear() - birthday.getFullYear();
-    const m = today.getMonth() - birthday.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthday.getDate())) {
-      age--;
-    }
-    return age > 0 ? `${age} tuổi` : 'Dưới 1 tuổi';
-  };
 
   const handlePrint = () => {
     const printContent = reportRef.current?.innerHTML;
@@ -113,7 +102,7 @@ export default function A4Report({ consult, patient, onClose }: A4ReportProps) {
                 <div>
                   <span className="text-gray-500 font-medium font-sans">Ngày sinh:</span>{' '}
                   <span className="font-medium text-gray-800">
-                    {formatVNTime(patient.PatientDOB)} ({calculateAge(patient.PatientDOB)})
+                    {formatPatientDobWithAge(patient.PatientDOB, undefined, formatVNTime)}
                   </span>
                 </div>
                 <div>

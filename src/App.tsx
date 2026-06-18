@@ -59,10 +59,21 @@ import {
   filterPatientCathlabs,
   filterPatientOperations
 } from './utils/latestDiagnosis';
+import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions } from './data/source';
 import { AppModule, canAccessModule, canManageStaff, setRuntimeRolePresets } from './auth/permissions';
+import MobileBottomNav from './components/layout/MobileBottomNav';
+import MobileMoreMenu from './components/layout/MobileMoreMenu';
+import {
+  ActiveMenuId,
+  SIDEBAR_MENU_ITEMS,
+  getMobileMoreMenuItems,
+  getNavIcon,
+  MOBILE_BOTTOM_TAB_ITEMS,
+} from './config/navigation';
+import { useIsMobile } from './hooks/useMediaQuery';
 
 import { 
   Users, 
@@ -159,44 +170,6 @@ const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] 
   }
   
   return `BS. ${firstName}`;
-};
-
-const getExcelAgeHelper = (dobStr: string) => {
-  if (!dobStr) return '';
-  try {
-    const birth = new Date(dobStr);
-    const now = new Date('2026-06-06'); // Reference mock date 2026-06-06
-    
-    const diffTime = now.getTime() - birth.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) return 'Sơ sinh';
-    if (diffDays < 30) {
-      return `${diffDays} ngày tuổi`;
-    }
-    
-    let years = now.getFullYear() - birth.getFullYear();
-    let months = now.getMonth() - birth.getMonth();
-    if (months < 0 || (months === 0 && now.getDate() < birth.getDate())) {
-      years--;
-      months = 12 + months;
-    }
-    
-    const totalMonths = years * 12 + months;
-    if (totalMonths < 12) {
-      return `${totalMonths} tháng tuổi`;
-    } else if (years <= 5) {
-      if (months > 0) {
-        return `${years} tuổi ${months} tháng`;
-      } else {
-        return `${years} tuổi`;
-      }
-    } else {
-      return `${years} tuổi`;
-    }
-  } catch (e) {
-    return '';
-  }
 };
 
 export default function App() {
@@ -296,6 +269,8 @@ export default function App() {
 
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
+  const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Collapsible Filter Panel State
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
@@ -760,6 +735,7 @@ export default function App() {
       setProfileReturnMenu(activeMenu === 'profile' ? 'home' : activeMenu);
       setActiveMenu('profile');
       setIsStaffAccountMenuOpen(false);
+      setIsMobileMoreMenuOpen(false);
       return;
     }
     if (!canAccessModule(currentStaff, menu as AppModule)) {
@@ -768,6 +744,7 @@ export default function App() {
       return;
     }
     setActiveMenu(menu);
+    setIsMobileMoreMenuOpen(false);
   };
 
   const openStaffProfile = () => {
@@ -1098,45 +1075,6 @@ export default function App() {
         }
 
         try {
-          // Helper for age computation
-          const getAgeDescription = (dobStr: string) => {
-            if (!dobStr) return '';
-            try {
-              const birth = new Date(dobStr);
-              const now = new Date('2026-06-06');
-              
-              const diffTime = now.getTime() - birth.getTime();
-              const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-              
-              if (diffDays < 0) return '(Sơ sinh)';
-              if (diffDays < 30) {
-                return `(${diffDays} ngày tuổi)`;
-              }
-              
-              let years = now.getFullYear() - birth.getFullYear();
-              let months = now.getMonth() - birth.getMonth();
-              if (months < 0 || (months === 0 && now.getDate() < birth.getDate())) {
-                years--;
-                months = 12 + months;
-              }
-              
-              const totalMonths = years * 12 + months;
-              if (totalMonths < 12) {
-                return `(${totalMonths} tháng tuổi)`;
-              } else if (years <= 5) {
-                if (months > 0) {
-                  return `(${years} tuổi ${months} tháng)`;
-                } else {
-                  return `(${years} tuổi)`;
-                }
-              } else {
-                return `(${years} tuổi)`;
-              }
-            } catch (e) {
-              return '';
-            }
-          };
-
           // Import ExcelJS dynamically to keep initial bundle size light
           const ExcelJS = await import('exceljs');
           
@@ -1228,7 +1166,7 @@ export default function App() {
             if (pat) {
               const sex = pat.PatientSex || '';
               const dobText = formatVNTime(pat.PatientDOB) || '';
-              const ageDesc = getAgeDescription(pat.PatientDOB) || '';
+              const ageDesc = getPatientAgeDescriptionParen(pat.PatientDOB) || '';
               const phone1 = pat.PatientPhone1 || '';
               const phone2 = pat.PatientPhone2 || '';
               const address = pat.PatientAddress || (pat as any).PatientAddress || '';
@@ -1425,6 +1363,23 @@ export default function App() {
     consultCurrentPage * CONSULTS_PER_PAGE
   );
 
+  const primarySideMenus = useMemo(
+    () => SIDEBAR_MENU_ITEMS.filter(menu => canAccessModule(currentStaff, menu.id as AppModule)),
+    [currentStaff]
+  );
+
+  const mobileBottomTabIds = useMemo(
+    () => MOBILE_BOTTOM_TAB_ITEMS
+      .map(tab => tab.id)
+      .filter(id => canAccessModule(currentStaff, id as AppModule)),
+    [currentStaff]
+  );
+
+  const mobileMoreMenuItems = useMemo(
+    () => getMobileMoreMenuItems().filter(item => canAccessModule(currentStaff, item.id as AppModule)),
+    [currentStaff]
+  );
+
   // Return Login screen if not authenticated
   if (!currentStaff) {
     return (
@@ -1500,22 +1455,13 @@ export default function App() {
     );
   }
 
-  // Define sidebar shortcuts navigation schema
-  const primarySideMenus = [
-    { id: 'home', label: 'Home', icon: <Home className="w-4 h-4" /> },
-    { id: 'workspace', label: 'Không gian làm việc', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: 'patients', label: 'Hồ sơ bệnh án', icon: <Heart className="w-4 h-4" /> },
-    { id: 'consult-list', label: 'Hội chẩn', icon: <ClipboardList className="w-4 h-4" /> },
-    { id: 'results-staff', label: 'Nhập kết quả staff', icon: <FileText className="w-4 h-4" /> },
-    { id: 'schedule-tt', label: 'Xếp lịch & Dụng cụ', icon: <CalendarDays className="w-4 h-4" /> },
-    { id: 'mri-register', label: 'Đăng ký MRI', icon: <Activity className="w-4 h-4" /> },
-    { id: 'mri-scheduler', label: 'Xếp lịch MRI', icon: <Activity className="w-4 h-4" /> },
-    { id: 'mri-result', label: 'Điền KQ MRI', icon: <Activity className="w-4 h-4" /> },
-    { id: 'mri-calendar', label: 'Lịch chụp MRI', icon: <CalendarDays className="w-4 h-4" /> },
-    { id: 'google-sheets', label: 'Virtual Google Sheets', icon: <Database className="w-4 h-4" /> },
-    { id: 'excel-export', label: 'Bảng Filter_Consult', icon: <Download className="w-4 h-4" /> },
-    { id: 'staff-mgmt', label: 'Quản lý nhân sự', icon: <UserCog className="w-4 h-4" /> },
-  ].filter(menu => canAccessModule(currentStaff, menu.id as AppModule));
+  const handleHeaderMenuToggle = () => {
+    if (isMobile) {
+      setIsMobileMoreMenuOpen(prev => !prev);
+      return;
+    }
+    setIsSidebarExpanded(prev => !prev);
+  };
 
 
 
@@ -1647,7 +1593,7 @@ export default function App() {
   const headerInfo = getHeaderContent();
 
   return (
-    <div className="h-screen bg-slate-50 text-slate-800 flex flex-col font-sans overflow-hidden">
+    <div className="min-h-dvh h-dvh bg-slate-50 text-slate-800 flex flex-col font-sans overflow-hidden">
       
       {/* Top Application Header Bar styled beautifully like the secondary custom red banner in screenshot */}
       <header className="bg-[#d2145a] text-white shrink-0 shadow-md">
@@ -1656,9 +1602,9 @@ export default function App() {
           {/* Left Panel: Menu toggle + View title & Subtitle */}
           <div className="flex items-center gap-2.5 min-w-0">
             <button 
-              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+              onClick={handleHeaderMenuToggle}
               className="hover:bg-white/10 p-1.5 rounded-xl transition shrink-0"
-              title="Mở rộng Sidebar"
+              title={isMobile ? 'Mở menu module' : 'Mở rộng Sidebar'}
             >
               <Menu className="w-5 h-5 text-white/90" />
             </button>
@@ -1748,10 +1694,10 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-room' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0`}>
+      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-room' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4`}>
         
         {/* Collapsible Left navigation Aside drawer */}
-        <aside className={`${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
+        <aside className={`hidden md:block ${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
           <div className={`bg-white border border-slate-200 rounded-3xl ${isSidebarExpanded ? 'p-4' : 'p-2 sm:p-2'} shadow-sm space-y-4`}>
             
             {/* Quick profile overview */}
@@ -1777,7 +1723,7 @@ export default function App() {
                   }`}
                 >
                   <span className={`${activeMenu === menu.id ? 'text-[#d2145a]' : 'text-slate-400'}`}>
-                    {menu.icon}
+                    {getNavIcon(menu.id as ActiveMenuId)}
                   </span>
                   {isSidebarExpanded && (
                     <span className="truncate flex-1 text-left">{menu.label}</span>
@@ -3736,9 +3682,25 @@ export default function App() {
       </AnimatePresence>
 
       {/* Footer bar */}
-      <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 text-[10px] py-1.5 shrink-0 text-center font-medium font-sans">
+      <footer className="hidden md:block bg-slate-900 border-t border-slate-800 text-slate-400 text-[10px] py-1.5 shrink-0 text-center font-medium font-sans">
         <span>© 2026 CHD Management v5.0 | Bệnh viện Tim Tim Mạch &amp; Khoa Phẫu Thuật Tim Nhi (Google Sheets &amp; PDF Sync)</span>
       </footer>
+
+      <MobileBottomNav
+        activeMenu={activeMenu as ActiveMenuId}
+        onNavigate={(menuId) => navigateMenu(menuId)}
+        onOpenMore={() => setIsMobileMoreMenuOpen(true)}
+        pendingStaffCount={pendingStaffConsultCount}
+        visibleTabIds={mobileBottomTabIds}
+      />
+
+      <MobileMoreMenu
+        isOpen={isMobileMoreMenuOpen}
+        onClose={() => setIsMobileMoreMenuOpen(false)}
+        items={mobileMoreMenuItems}
+        activeMenu={activeMenu as ActiveMenuId}
+        onNavigate={(menuId) => navigateMenu(menuId)}
+      />
 
     </div>
   );

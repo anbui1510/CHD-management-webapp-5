@@ -23,6 +23,7 @@ import {
   resolveCMRDevice,
   resolveCMRMethod
 } from '../data/cmrDefaults';
+import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
@@ -100,33 +101,6 @@ const getPatientDisplayName = (patientName?: string): string => {
   if (!patientName) return 'MRI';
   const parts = patientName.trim().split(/\s+/);
   return parts.slice(-2).join(' ');
-};
-
-const getAgeDescription = (dobStr?: string, refDateStr?: string): string => {
-  if (!dobStr) return '';
-  const key = getFormattedDateKey(dobStr);
-  const parts = key.split('-');
-  if (parts.length !== 3) return '';
-  const dob = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-  if (Number.isNaN(dob.getTime())) return '';
-
-  const refKey = refDateStr ? getFormattedDateKey(refDateStr) : '';
-  const refParts = refKey.split('-');
-  const ref = refParts.length === 3
-    ? new Date(Number(refParts[0]), Number(refParts[1]) - 1, Number(refParts[2]))
-    : new Date();
-
-  let years = ref.getFullYear() - dob.getFullYear();
-  let months = ref.getMonth() - dob.getMonth();
-  if (months < 0 || (months === 0 && ref.getDate() < dob.getDate())) {
-    years -= 1;
-    months += 12;
-  }
-  if (years <= 0) {
-    if (months <= 0) return 'Sơ sinh';
-    return `${months} tháng tuổi`;
-  }
-  return `${years} tuổi`;
 };
 
 const EXCEL_LINE_HEIGHT_PT = 18;
@@ -462,7 +436,7 @@ export default function MRISchedulerView({
           : '';
 
         const dobFormatted = patient?.PatientDOB ? formatVNTime(patient.PatientDOB) : '';
-        const ageDesc = patient?.PatientDOB ? getAgeDescription(patient.PatientDOB, scheduledKey) : '';
+        const ageDesc = patient?.PatientDOB ? getPatientAgeDescription(patient.PatientDOB, scheduledKey) : '';
         const weightRaw = String(item.PatientWeight || item.__consult?.PatientWeight || '').trim();
         const weightStr = weightRaw
           ? (weightRaw.toLowerCase().includes('kg') ? weightRaw : `${weightRaw}kg`)
@@ -1201,7 +1175,7 @@ export default function MRISchedulerView({
                           </div>
                           <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Tuổi / Ngày sinh:</span>
-                            <span className="font-bold text-slate-800">{patient ? `${getAgeDescription(patient.PatientDOB)} (${formatVNTime(patient.PatientDOB)})` : '—'}</span>
+                            <span className="font-bold text-slate-800">{patient ? formatPatientDobWithAge(patient.PatientDOB, undefined, formatVNTime) : '—'}</span>
                           </div>
                           <div>
                             <span className="text-slate-400 block font-bold text-[8px] uppercase">Giới tính:</span>

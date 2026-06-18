@@ -8,6 +8,7 @@ import {
   filterPatientCathlabs,
   filterPatientOperations
 } from '../utils/latestDiagnosis';
+import { formatPatientDobWithAge } from '../utils/patientDisplay';
 import {
   X,
   MapPin,
@@ -56,22 +57,6 @@ export default function PatientDetailsDrawer({
   onSelectPDF,
   onRegisterNewConsult
 }: PatientDetailsDrawerProps) {
-
-  const getAgeString = (dobString: string) => {
-    if (!dobString) return '';
-    try {
-      const birth = new Date(dobString);
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const monthDiff = today.getMonth() - birth.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age--;
-      }
-      return age > 0 ? `${age} tuổi` : 'Dưới 1 tuổi';
-    } catch (e) {
-      return '';
-    }
-  };
 
   const patientKey = normalizeRecordKey(patient.PatientKey);
   const patientId1 = normalizeRecordKey(patient.PatientID1);
@@ -168,7 +153,7 @@ export default function PatientDetailsDrawer({
               </p>
               <p className="flex items-center gap-1.5">
                 <span className="text-slate-400 font-medium">📅 Ngày sinh:</span>
-                <span className="font-bold text-slate-800">{formatVNTime(patient.PatientDOB)} ({getAgeString(patient.PatientDOB)})</span>
+                <span className="font-bold text-slate-800">{formatPatientDobWithAge(patient.PatientDOB, undefined, formatVNTime)}</span>
               </p>
               <p className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-slate-400" />
