@@ -118,8 +118,6 @@ type SchedulingFormSnapshot = {
   scheduled3rd: string;
 };
 
-type WaitlistDateScope = 'from_2026' | 'from_2025' | 'all_history';
-
 const snapshotsEqual = (a: SchedulingFormSnapshot, b: SchedulingFormSnapshot) =>
   JSON.stringify(a) === JSON.stringify(b);
 
@@ -259,8 +257,6 @@ export default function CathLabSchedulerView({
   
   // Tab states for waitlist
   const [activeTab, setActiveTab] = useState<'unscheduled' | 'scheduled' | 'all'>('unscheduled');
-  const [waitlistDateScope, setWaitlistDateScope] = useState<WaitlistDateScope>('from_2026');
-  
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -635,9 +631,6 @@ Xin cảm ơn!`;
 
     const result = consults.filter(c => {
       if (!c.ConsultDate) return false;
-      const formattedConsultDate = getFormattedDateKey(c.ConsultDate);
-      if (waitlistDateScope === 'from_2026' && formattedConsultDate < '2026-01-01') return false;
-      if (waitlistDateScope === 'from_2025' && formattedConsultDate < '2025-01-01') return false;
 
       if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) { return false; }
       const normalizedConsultKey = normalizeRefKey(c.ConsultKey);
@@ -674,7 +667,7 @@ Xin cảm ơn!`;
     });
     
     return result;
-  }, [consults, patients, latestConsultsMap, completedCathConsultKeys, waitlistDateScope]);
+  }, [consults, patients, latestConsultsMap, completedCathConsultKeys]);
 
   // Segment Waiting List into tabs: "Chưa xếp lịch" and "Đã xếp lịch"
   // Sắp xếp ngày gần nhất lên trên, ngày xa nhất dưới
@@ -2319,16 +2312,6 @@ Xin cảm ơn!`;
                 {segmentedWaitlist.all.length}
               </span>
             </button>
-            <select
-              value={waitlistDateScope}
-              onChange={(event) => setWaitlistDateScope(event.target.value as WaitlistDateScope)}
-              className="min-w-[130px] bg-white border border-slate-200 rounded-xl px-2 py-2 text-[11px] font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#d2145a]/40"
-              title="Lọc theo ngày hội chẩn"
-            >
-              <option value="from_2026">Từ 2026</option>
-              <option value="from_2025">Từ 2025</option>
-              <option value="all_history">Tất cả lịch sử</option>
-            </select>
           </div>
 
           {/* Search bar inside queue listing */}
