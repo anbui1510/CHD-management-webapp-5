@@ -2834,35 +2834,35 @@ Xin cảm ơn!`;
                         <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
                           Thông tin hành chính bệnh nhi
                         </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-                          <div className="sm:col-span-2">
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB:</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                          <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB:</span>
                             <span className="font-extrabold font-mono text-slate-800 text-[11px]">{pat.PatientID1 || '—'}</span>
                           </div>
                           {pat.PatientID2 && String(pat.PatientID2).trim() !== '' && pat.PatientID2 !== '-' && (
-                            <div className="sm:col-span-2">
-                              <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã NB khác:</span>
+                            <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-1.5">
+                              <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Mã NB khác:</span>
                               <span className="font-semibold font-mono text-slate-700 text-[11px]">{pat.PatientID2}</span>
                             </div>
                           )}
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Tuổi / Ngày sinh:</span>
+                          <div className="flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Tuổi / Ngày sinh:</span>
                             <span className="font-bold text-slate-800">{getAgeDescription(pat.PatientDOB)} ({formatVNTime(pat.PatientDOB)})</span>
                           </div>
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Giới tính:</span>
+                          <div className="flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Giới tính:</span>
                             <span className="font-bold text-slate-800">{pat.PatientSex}</span>
                           </div>
-                          <div className="sm:col-span-2">
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Địa chỉ:</span>
-                            <span className="font-bold text-slate-800 block whitespace-normal break-words">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
+                          <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Địa chỉ:</span>
+                            <span className="font-bold text-slate-800 whitespace-normal break-words">{pat.PatientAddress || (pat as any).PatientAddress || '—'}</span>
                           </div>
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 1:</span>
+                          <div className="flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Điện thoại 1:</span>
                             <span className="font-extrabold text-slate-800 font-mono text-[11px]">{pat.PatientPhone1 || '—'}</span>
                           </div>
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[8px] uppercase">Điện thoại 2:</span>
+                          <div className="flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="text-slate-400 font-bold text-[8px] uppercase shrink-0">Điện thoại 2:</span>
                             <span className="font-semibold text-slate-700 font-mono">{pat.PatientPhone2 || '—'}</span>
                           </div>
                         </div>
