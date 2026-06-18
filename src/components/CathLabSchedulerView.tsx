@@ -2344,13 +2344,13 @@ Xin cảm ơn!`;
                 {searchQuery ? 'Không tìm thấy bệnh nhi thích hợp' : 'Không có bệnh nhi nào trong danh sách hiển thị'}
               </div>
             ) : (
-              <table className="w-full min-w-[650px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
+              <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
                 <thead className="bg-slate-50/70 text-slate-500 sticky top-0 border-b border-slate-200 uppercase text-[9px] font-extrabold tracking-wider z-10 shadow-xs">
                   <tr>
                     {activeTab === 'scheduled' && (
                        <th className="py-3 px-2 border-b border-slate-200 text-center w-20">Hành động</th>
                     )}
-                    <th className="py-3 px-3 border-b border-slate-200">Họ và tên</th>
+                    <th className="py-3 px-3 border-b border-slate-200 min-w-[200px]">Họ và tên</th>
                     <th className="py-3 px-2 border-b border-slate-200">ICD</th>
                     <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>
                     <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>
@@ -2392,8 +2392,8 @@ Xin cảm ơn!`;
                             </div>
                           </td>
                         )}
-                        <td className="py-3.5 px-3">
-                          <span className="font-extrabold uppercase text-slate-900 block truncate max-w-[130px]">
+                        <td className="py-3.5 px-3 min-w-[200px]">
+                          <span className="font-extrabold uppercase text-slate-900 block whitespace-normal break-words leading-snug">
                             {pat.PatientName}
                           </span>
                           <span className="text-[9px] text-slate-400 font-bold font-mono">
