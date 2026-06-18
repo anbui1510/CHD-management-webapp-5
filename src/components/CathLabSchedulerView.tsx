@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
+import { buildCathlabsByPatientKey, isConsultCathCompleted } from '../utils/cathlabWaitlist';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -576,13 +577,7 @@ Xin cảm ơn!`;
     return map;
   }, [consults]);
 
-  const completedCathConsultKeys = useMemo(() => {
-    return new Set(
-      cathlabs
-        .map(cath => normalizeRefKey(cath.ConsultKey))
-        .filter(Boolean)
-    );
-  }, [cathlabs]);
+  const cathlabsByPatientKey = useMemo(() => buildCathlabsByPatientKey(cathlabs), [cathlabs]);
 
   const isPendingConsultResult = (resultId: unknown) => {
     if (!resultId) return true;
@@ -633,8 +628,7 @@ Xin cảm ơn!`;
       if (!c.ConsultDate) return false;
 
       if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) { return false; }
-      const normalizedConsultKey = normalizeRefKey(c.ConsultKey);
-      if (normalizedConsultKey && completedCathConsultKeys.has(normalizedConsultKey)) { return false; }
+      if (isConsultCathCompleted(c, cathlabsByPatientKey.get(normalizePatientKey(c.PatientKey)))) { return false; }
 
       const isRemoved = c.Removed === true || String(c.Removed).toUpperCase() === 'TRUE' || String(c.Removed).toLowerCase() === 'có' || String(c.Removed).toLowerCase() === 'yes';
       if (isRemoved) { return false; }
@@ -667,7 +661,7 @@ Xin cảm ơn!`;
     });
     
     return result;
-  }, [consults, patients, latestConsultsMap, completedCathConsultKeys]);
+  }, [consults, patients, latestConsultsMap, cathlabsByPatientKey]);
 
   // Segment Waiting List into tabs: "Chưa xếp lịch" and "Đã xếp lịch"
   // Sắp xếp ngày gần nhất lên trên, ngày xa nhất dưới
