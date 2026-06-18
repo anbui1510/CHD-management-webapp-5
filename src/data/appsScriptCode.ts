@@ -5,7 +5,7 @@
  * Instructions:
  * 1. Open your Google Sheet (https://docs.google.com/spreadsheets/d/your-sheet-id)
  * 2. In the top menu, go to "Extensions" (Tiện ích mở rộng) -> "Apps Script"
- * 3. Delete any default code in Code.gs and paste this entire script.
+ * 3. Copy code từ docs/Code.gs (hoặc nút Copy trong app Virtual Google Sheets). KHÔNG copy trực tiếp file appsScriptCode.ts (có dòng export/`; gây lỗi cú pháp).
  * 4. Click the Save icon (orange folder/save icon).
  * 5. Click "Deploy" (Triển khai) -> "New deployment" (Triển khai mới).
  * 6. Select "Web app" (Ứng dụng web) as deployment type (click gear icon next to "Select type").
@@ -346,7 +346,7 @@ function readSheetAsJson(sheetName) {
       
       // Convert Date objects to ISO string
       if (cellVal instanceof Date) {
-        // Skip invalid dates (empty/broken cells) — toISOString() throws RangeError otherwise
+        // Skip invalid dates (empty/broken cells) - toISOString() throws RangeError otherwise
         if (isNaN(cellVal.getTime())) {
           obj[headers[c]] = "";
         } else if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {

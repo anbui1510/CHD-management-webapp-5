@@ -9,6 +9,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js data",
     "lint": "tsc --noEmit",
+    "extract:apps-script": "node scripts/extract-apps-script.mjs",
     "sync:github:init": "bash scripts/github-init.sh",
     "sync:github": "bash scripts/github-sync.sh",
     "sync:github:watch": "bash scripts/github-auto-sync.sh"
