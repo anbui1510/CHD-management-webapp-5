@@ -1448,7 +1448,7 @@ Xin cảm ơn!`;
     return !snapshotsEqual(buildCurrentFormSnapshot(), formSnapshot);
   };
 
-  const getMissingSchedulingRequiredFields = () => {
+  const getMissingTransferRequiredFields = () => {
     const missing: string[] = [];
     if (!checkDevice) missing.push('Kiểm dụng cụ');
     if (!callStatus) missing.push('Trạng thái gọi bệnh');
@@ -1808,12 +1808,6 @@ Xin cảm ơn!`;
     e.preventDefault();
     if (!selectedConsult) return;
 
-    const missing = getMissingSchedulingRequiredFields();
-    if (missing.length > 0) {
-      setErrorMsg(`Vui lòng điền đầy đủ: ${missing.join(', ')}`);
-      return;
-    }
-
     setSuccessMsg('');
     setErrorMsg('');
     setActionConfirm({
@@ -1825,11 +1819,6 @@ Xin cảm ơn!`;
 
   const handleExitSave = async () => {
     if (!selectedConsult) return;
-    const missing = getMissingSchedulingRequiredFields();
-    if (missing.length > 0) {
-      setExitConfirmError(`Các trường bắt buộc: ${missing.join(', ')}`);
-      return;
-    }
     setSaving(true);
     setExitConfirmError('');
     const ok = await executeSave(getCurrentFormData(), { closeOnSuccess: false });
@@ -1901,6 +1890,11 @@ Xin cảm ơn!`;
   };
 
   const handleActionTransfer = () => {
+    const missing = getMissingTransferRequiredFields();
+    if (missing.length > 0) {
+      setActionAlert(`Vui lòng điền đầy đủ trước khi chuyển phòng TT: ${missing.join(', ')}`);
+      return;
+    }
     if (!isTransferEnabled()) {
       setActionAlert("Chỉ có thể chuyển phòng TT khi Đã kiểm đủ dụng cụ, Gia đình đồng ý, và có Ngày dự kiến thông tim!");
       return;
@@ -2038,7 +2032,7 @@ Xin cảm ơn!`;
         ? 'font-extrabold font-mono text-slate-800 text-[11px]'
         : 'font-extrabold font-mono text-slate-800 text-[12.5px]';
     const rowGap = variant === 'form' ? 'gap-x-4' : 'gap-x-5';
-    const containerCls = variant === 'form' ? 'space-y-2 text-xs' : 'space-y-2.5 text-[12px]';
+    const containerCls = variant === 'form' ? 'space-y-1 text-xs' : 'space-y-2.5 text-[12px]';
 
     const Field = ({
       label,
@@ -2056,7 +2050,7 @@ Xin cảm ơn!`;
     );
 
     const Row = ({ children }: { children: React.ReactNode }) => (
-      <div className={`flex flex-wrap items-baseline ${rowGap} gap-y-1`}>{children}</div>
+      <div className={`flex flex-wrap items-baseline ${rowGap} gap-y-0.5`}>{children}</div>
     );
 
     return (
@@ -2877,7 +2871,7 @@ Xin cảm ơn!`;
               </div>
 
               {/* SINGLE UNIFIED SCROLLABLE AREA */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-full">
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-full">
                 
                 {(() => {
                   const pat = findPatientByKey(patients, selectedConsult.PatientKey);
@@ -2888,7 +2882,7 @@ Xin cảm ơn!`;
                     scheduled2nd
                   );
                   return (
-                    <div className="space-y-4">
+                    <div className="space-y-2">
 
                       {/* Patient name highlight — tách khỏi ô hành chính */}
                       <div className="flex flex-wrap items-center gap-2">
@@ -2904,24 +2898,24 @@ Xin cảm ơn!`;
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 items-start">
                         {/* Cột trái: hành chính, đăng ký HC, kết quả HC */}
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                       
                       {/* Part 1: Administrative Details */}
-                      <div className="bg-white border border-slate-150 p-3.5 rounded-2xl shadow-xs">
-                        <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
+                      <div className="bg-white border border-slate-150 p-3 rounded-2xl shadow-xs">
+                        <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1 mb-1.5">
                           THÔNG TIN HÀNH CHÍNH
                         </span>
                         {renderPatientAdminInfo(pat, 'form')}
                       </div>
 
                       {/* Part 2: Consultation administrative summary */}
-                      <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl shadow-xs">
-                        <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-150 pb-1.5 mb-2.5">
+                      <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl shadow-xs">
+                        <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-150 pb-1 mb-1.5">
                           Thông tin đăng ký hội chẩn
                         </span>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
                           <div>
                             <span className="text-slate-400 font-bold block uppercase text-[7.5px]">Ngày Staff:</span>
                             <span className="font-extrabold text-slate-800 font-mono">{formatVNTime(selectedConsult.ConsultDate)}</span>
@@ -2942,13 +2936,13 @@ Xin cảm ơn!`;
                       </div>
 
                       {/* Part 3: Kết quả Hội chẩn — có thể chỉnh sửa */}
-                      <div className="bg-indigo-50/60 border border-indigo-120 p-3.5 rounded-2xl flex flex-col gap-2 text-[11px] shadow-xs">
-                        <span className="text-indigo-900 font-black uppercase text-[10px] tracking-wider block border-b border-indigo-100 pb-1.5 mb-1">
+                      <div className="bg-indigo-50/60 border border-indigo-120 p-3 rounded-2xl flex flex-col gap-1 text-[11px] shadow-xs">
+                        <span className="text-indigo-900 font-black uppercase text-[10px] tracking-wider block border-b border-indigo-100 pb-1 mb-0.5">
                           Kết quả Hội chẩn
                         </span>
-                        <div className="grid grid-cols-1 gap-2.5">
+                        <div className="grid grid-cols-1 gap-1.5">
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Bệnh chính</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Bệnh chính</label>
                             <SearchableEnumSelect
                               options={diagnosisOptions}
                               value={schedDiagnosisID}
@@ -2961,7 +2955,7 @@ Xin cảm ơn!`;
                             />
                           </div>
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Chẩn đoán chi tiết</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chẩn đoán chi tiết</label>
                             <textarea
                               rows={2.5}
                               value={schedDetailDiagnosis}
@@ -2971,7 +2965,7 @@ Xin cảm ơn!`;
                             />
                           </div>
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Kết luận chính</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Kết luận chính</label>
                             <SearchableEnumSelect
                               options={CONCLUSION_OPTIONS}
                               value={schedConsultResultID}
@@ -2981,7 +2975,7 @@ Xin cảm ơn!`;
                             />
                           </div>
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Ưu tiên</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Ưu tiên</label>
                             <div className="flex gap-1.5">
                               {PRIORITY_OPTIONS.map((opt) => {
                                 const isSel = priorityOrder === opt;
@@ -3003,7 +2997,7 @@ Xin cảm ơn!`;
                             </div>
                           </div>
                           <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0.5">Kết quả Hội chẩn chi tiết</label>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Kết quả Hội chẩn chi tiết</label>
                             <textarea
                               rows={2.5}
                               value={schedDetailConsultResult}
@@ -3018,13 +3012,13 @@ Xin cảm ơn!`;
                         </div>
 
                         {/* Cột phải: chuẩn bị dụng cụ, xếp lịch */}
-                        <div className="space-y-4">
-                <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs space-y-4">
-                  <span className="font-extrabold text-[#d2145a] text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1.5">
+                        <div className="space-y-2">
+                <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-xs space-y-2">
+                  <span className="font-extrabold text-[#d2145a] text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     CHUẨN BỊ DỤNG CỤ
                   </span>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   
                     {/* Planned Device */}
                     <div className="md:col-span-2">
@@ -3040,7 +3034,7 @@ Xin cảm ơn!`;
 
                     {/* Planned Price */}
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Số tiền dự kiến (VNĐ)</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Số tiền dự kiến (VNĐ)</label>
                       <input
                         type="text"
                         placeholder="ví dụ: 45,000,000..."
@@ -3052,7 +3046,7 @@ Xin cảm ơn!`;
 
                     {/* Device Stock Check - Enum Cards button style */}
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Kiểm dụng cụ *</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kiểm dụng cụ *</label>
                       <div className="flex gap-2 h-[35px]">
                         {(['Đủ', 'Thiếu'] as const).map((opt) => (
                           <button
@@ -3076,7 +3070,7 @@ Xin cảm ơn!`;
 
                     {/* Supply Dept feedback */}
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Phòng vật tư phản hồi</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phòng vật tư phản hồi</label>
                       <textarea
                         rows={2}
                         placeholder="Ghi chú dụng cụ đặc thù, vật tư phản hồi..."
@@ -3088,7 +3082,7 @@ Xin cảm ơn!`;
 
                     {/* Operation Room feedback */}
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Phòng mổ phản hồi</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phòng mổ phản hồi</label>
                       <textarea
                         rows={2}
                         placeholder="Nếu có phản hồi từ phòng mổ, ghi nhận chi tiết tại đây..."
@@ -3103,16 +3097,16 @@ Xin cảm ơn!`;
 
                 {/* Part 5: XẾP LỊCH */}
                 {checkDevice !== 'Thiếu' && (
-                  <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs space-y-4">
-                    <span className="font-extrabold text-[#d2145a] text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1.5">
+                  <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-xs space-y-2">
+                    <span className="font-extrabold text-[#d2145a] text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                       XẾP LỊCH
                     </span>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       
                       {/* Call Status - Enum buttons group */}
                       <div className="md:col-span-2">
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Trạng thái gọi bệnh</label>
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Trạng thái gọi bệnh</label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                           {CALL_STATUS_OPTIONS.map((opt) => {
                             const isSel = callStatus === opt;
@@ -3136,7 +3130,7 @@ Xin cảm ơn!`;
 
                       {/* Call Note */}
                       <div className="md:col-span-2">
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Lưu ý gọi bệnh</label>
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Lưu ý gọi bệnh</label>
                         <textarea
                           rows={2}
                           placeholder="Thông tin liên lạc hoặc lý do chưa can thiệp..."
@@ -3178,7 +3172,7 @@ Xin cảm ơn!`;
                         <>
                           {/* Planned Cath Date (type="date") */}
                           <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Ngày thông dự kiến</label>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày thông dự kiến</label>
                             <div className="relative">
                               <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2 pointer-events-none" />
                               <input
@@ -3192,7 +3186,7 @@ Xin cảm ơn!`;
 
                           {/* Post Cath Department */}
                           <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">Khoa nằm sau thông tim</label>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nằm sau thông tim</label>
                             <select
                               value={postCathDepart}
                               onChange={(e) => setPostCathDepart(e.target.value)}
@@ -3207,7 +3201,7 @@ Xin cảm ơn!`;
 
                           {/* Cath Methods */}
                           <div className="md:col-span-2 relative">
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">
                               Phương pháp thủ thuật (có thể chọn nhiều)
                             </label>
                             <SearchableEnumSelect
@@ -3223,7 +3217,7 @@ Xin cảm ơn!`;
 
                           {/* Scheduled Interventionists (1, 2, 3) */}
                           <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">PTV chính</label>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">PTV chính</label>
                             <select
                               value={scheduled1st}
                               onChange={(e) => setScheduled1st(e.target.value)}
@@ -3237,7 +3231,7 @@ Xin cảm ơn!`;
                           </div>
 
                           <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">PTV phụ 1</label>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">PTV phụ 1</label>
                             <select
                               value={scheduled2nd}
                               onChange={(e) => setScheduled2nd(e.target.value)}
@@ -3251,7 +3245,7 @@ Xin cảm ơn!`;
                           </div>
 
                           <div className="md:col-span-2">
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">PTV phụ 2</label>
+                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">PTV phụ 2</label>
                             <select
                               value={scheduled3rd}
                               onChange={(e) => setScheduled3rd(e.target.value)}
@@ -3269,9 +3263,9 @@ Xin cảm ơn!`;
                         </>
                       )}
 
-                      <div className="md:col-span-2 grid grid-cols-2 gap-2 mt-2 pt-3 border-t border-slate-100">
+                      <div className="md:col-span-2 grid grid-cols-2 gap-1.5 mt-1 pt-1.5 border-t border-slate-100">
                         <div>
-                          <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase">Người xếp lịch/check DC</label>
+                          <label className="block text-slate-400 font-bold text-[9px] mb-0.5 uppercase">Người xếp lịch/check DC</label>
                           <input
                             type="text"
                             disabled
@@ -3283,7 +3277,7 @@ Xin cảm ơn!`;
                           />
                         </div>
                         <div>
-                          <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default" title="CheckDeviceUpdatedTime">Cập nhật lúc</label>
+                          <label className="block text-slate-400 font-bold text-[9px] mb-0.5 uppercase cursor-default" title="CheckDeviceUpdatedTime">Cập nhật lúc</label>
                           <input
                             type="text"
                             disabled
@@ -3789,7 +3783,7 @@ Xin cảm ơn!`;
                 Bạn có thay đổi chưa được lưu. Bạn có muốn lưu kết quả xếp lịch không?
               </p>
               <p className="text-[11px] text-slate-500 font-semibold">
-                Trường bắt buộc khi lưu: Kiểm dụng cụ, Trạng thái gọi bệnh, Ngày thông dự kiến.
+                Có thể lưu bất kỳ trường nào đã nhập. Chỉ nút &quot;Chuyển phòng TT&quot; yêu cầu đủ Kiểm dụng cụ, Trạng thái gọi bệnh và Ngày thông dự kiến.
               </p>
               {exitConfirmError && (
                 <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
