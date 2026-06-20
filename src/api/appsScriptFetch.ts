@@ -419,6 +419,11 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     });
   }
 
+  // Server-only endpoints (PubMed, Gemini, docx) — always pass through to Express
+  if (endpoint === 'chd-brief' || endpoint === 'workflow-monitor') {
+    return null;
+  }
+
   const config = endpointMap[endpoint];
   if (!config) return jsonResponse({ error: `Unsupported API endpoint: ${endpoint}` }, { status: 404 });
 
