@@ -7,6 +7,14 @@ import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
 import { classifyDiagnosisText } from '../utils/diagnosisClassifier';
 import { resolveStaffByNameOrKey } from '../utils/staffNameMatch';
+import {
+  buildCathImportDateKey,
+  collectPatientHisIds,
+  findExistingCathForHisMerge,
+  mergeHisIntoExistingCath,
+  normalizeCathDateKey,
+  shouldSkipDuplicateHisImport,
+} from '../utils/hisCathImport';
 
 interface Props {
   patients: Patient[];
@@ -485,15 +493,21 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     const keys = new Set<string>();
     cathList.forEach(cath => {
       const patient = findPatientByKey(patientList, cath.PatientKey);
-      const patientIds = [
-        patient?.PatientID1,
-        ...(String(patient?.PatientID2 || '').split('-'))
-      ].map(id => normalizeHisText(id)).filter(Boolean);
-      const cathMethods = parseCathMethods(cath.CathMethod).length > 0 ? parseCathMethods(cath.CathMethod) : [String(cath.CathMethod || '')];
+      const patientIds = patient
+        ? collectPatientHisIds(patient)
+        : [normalizeHisKey(cath.PatientKey)].filter(Boolean);
+      const cathDate = normalizeCathDateKey(parseHisDateOnly(cath.CathDate));
+      const cathMethods =
+        parseCathMethods(cath.CathMethod).length > 0
+          ? parseCathMethods(cath.CathMethod)
+          : [String(cath.CathMethod || '')];
       patientIds.forEach(patientId => {
+        if (patientId && cathDate) {
+          keys.add(buildCathImportDateKey(patientId, cathDate));
+        }
         cathMethods.forEach(method => {
-          if (patientId && cath.CathDate && method) {
-            keys.add(buildCathImportKey(patientId, parseHisDateOnly(cath.CathDate), method));
+          if (patientId && cathDate && method) {
+            keys.add(buildCathImportKey(patientId, cathDate, method));
           }
         });
       });
@@ -651,14 +665,28 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       });
 
       const currentPatients = [...patients];
+      let currentCathlabs = [...cathlabs];
       const patientsToCreate: Patient[] = [];
       const cathlabsToCreate: CathLab[] = [];
+      const cathlabsToUpdate: CathLab[] = [];
       const consultsToAutoClose: Array<{ consult: Consult; patient: Patient; cath: CathLab; stage: HisWorkflowStage; patch: Partial<Consult> }> = [];
       const importedSummaries: string[] = [];
-      const existingCathKeys = buildExistingCathImportKeys(currentPatients, cathlabs);
+      const existingCathKeys = buildExistingCathImportKeys(currentPatients, currentCathlabs);
       const importedKeys = new Set<string>();
       let skippedExisting = 0;
       let skippedInvalid = 0;
+
+      const upsertCathInMemory = (cath: CathLab) => {
+        const idx = currentCathlabs.findIndex(item => item.CathKey === cath.CathKey);
+        if (idx >= 0) currentCathlabs[idx] = cath;
+        else currentCathlabs.push(cath);
+      };
+
+      const queueCathUpdate = (cath: CathLab) => {
+        const idx = cathlabsToUpdate.findIndex(item => item.CathKey === cath.CathKey);
+        if (idx >= 0) cathlabsToUpdate[idx] = cath;
+        else cathlabsToUpdate.push(cath);
+      };
 
       rows.slice(headerRowIndex + 1).forEach((row, index) => {
         const patientId = getHisCell(row, headerMap, ['manb']);
@@ -674,12 +702,31 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         }
 
         const importKey = buildCathImportKey(patientId, cathDate, cathMethod);
-        if (existingCathKeys.has(importKey) || importedKeys.has(importKey)) {
+        const dateOnlyKey = buildCathImportDateKey(patientId, cathDate);
+        if (importedKeys.has(importKey)) {
           skippedExisting++;
           return;
         }
 
         let patient = findPatientByHisId(patientId, currentPatients);
+        const existingCath = patient
+          ? findExistingCathForHisMerge(patient.PatientKey, cathDate, currentCathlabs)
+          : undefined;
+
+        if (existingCath && shouldSkipDuplicateHisImport(existingCath, cathMethod)) {
+          skippedExisting++;
+          importedKeys.add(importKey);
+          importedKeys.add(dateOnlyKey);
+          return;
+        }
+
+        if (!existingCath && (existingCathKeys.has(importKey) || existingCathKeys.has(dateOnlyKey))) {
+          skippedExisting++;
+          importedKeys.add(importKey);
+          importedKeys.add(dateOnlyKey);
+          return;
+        }
+
         if (!patient) {
           patient = {
             PatientKey: `pat_his_${Date.now()}_${index}`,
@@ -728,7 +775,36 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           CathUpdatedTime: new Date().toISOString()
         };
 
+        if (existingCath) {
+          const merged = mergeHisIntoExistingCath(
+            existingCath,
+            cathPayload,
+            matchedConsult?.ConsultKey
+          );
+          upsertCathInMemory(merged);
+          queueCathUpdate(merged);
+          importedKeys.add(importKey);
+          importedKeys.add(dateOnlyKey);
+          existingCathKeys.add(importKey);
+          existingCathKeys.add(dateOnlyKey);
+          if (matchedConsult) {
+            const stage = getHisWorkflowStage(matchedConsult);
+            consultsToAutoClose.push({
+              consult: matchedConsult,
+              patient,
+              cath: merged,
+              stage,
+              patch: buildHisAutoCloseConsultPatch(matchedConsult, merged, stage)
+            });
+          }
+          importedSummaries.push(
+            `${patient.PatientName || patientName || patientId} - ${autoDiagnosisID || 'Chưa mã hóa ICD'} - gộp HIS vào ca ${existingCath.CathKey} - ${cathMethod} - ${formatVNTime(cathDate)}`
+          );
+          return;
+        }
+
         cathlabsToCreate.push(cathPayload);
+        upsertCathInMemory(cathPayload);
         if (matchedConsult) {
           const stage = getHisWorkflowStage(matchedConsult);
           consultsToAutoClose.push({
@@ -741,17 +817,21 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         }
         importedSummaries.push(`${patient.PatientName || patientName || patientId} - ${autoDiagnosisID || 'Chưa mã hóa ICD'} - ${postDiagnosis || 'Không có chẩn đoán'} - ${cathMethod} - ${formatVNTime(cathDate)}`);
         importedKeys.add(importKey);
+        importedKeys.add(dateOnlyKey);
+        existingCathKeys.add(importKey);
+        existingCathKeys.add(dateOnlyKey);
       });
 
-      if (patientsToCreate.length === 0 && cathlabsToCreate.length === 0) {
+      if (patientsToCreate.length === 0 && cathlabsToCreate.length === 0 && cathlabsToUpdate.length === 0) {
         setHisImportStatus(`Không có ca mới. Bỏ qua ${skippedExisting} ca đã có.`);
         alert(`Không có ca mới để import.\nĐã bỏ qua: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}`);
         return;
       }
 
       let savedCathCount = 0;
+      let updatedCathCount = 0;
       let autoClosedCount = 0;
-      const totalCathCount = cathlabsToCreate.length;
+      const totalCathCount = cathlabsToCreate.length + cathlabsToUpdate.length;
       setHisImportStatus(`Đang ghi HIS theo lô 0/${totalCathCount} ca...`);
 
       for (const patientChunk of chunkArray(patientsToCreate, HIS_IMPORT_BATCH_SIZE)) {
@@ -762,6 +842,18 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           data: patient as unknown as Record<string, any>
         })));
         patientChunk.forEach(patient => onAddPatient?.(patient));
+      }
+
+      for (const cathChunk of chunkArray(cathlabsToUpdate, HIS_IMPORT_BATCH_SIZE)) {
+        setHisImportStatus(`Đang cập nhật CathLab HIS (gộp)... ${updatedCathCount}/${cathlabsToUpdate.length} ca.`);
+        await postBatchWrite(cathChunk.map(cath => ({
+          endpoint: 'cathlabs',
+          method: 'PUT',
+          key: cath.CathKey,
+          data: cath as unknown as Record<string, any>
+        })));
+        updatedCathCount += cathChunk.length;
+        cathChunk.forEach(cath => onPatchCathlab?.(cath.CathKey, cath));
       }
 
       for (const cathChunk of chunkArray(cathlabsToCreate, HIS_IMPORT_BATCH_SIZE)) {
@@ -808,8 +900,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       setActiveTab('done');
       const summaryText = importedSummaries.slice(0, 20).map((summary, idx) => `${idx + 1}. ${summary}`).join('\n');
       const truncatedNote = importedSummaries.length > 20 ? `\n... và ${importedSummaries.length - 20} ca khác` : '';
-      setHisImportStatus(`Đã import ${savedCathCount}/${totalCathCount} ca. Tự đóng ${autoClosedCount} workflow treo. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
-      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${savedCathCount}/${totalCathCount}\nWorkflow tự đóng: ${autoClosedCount}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}${workflowSideEffectWarning}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
+      setHisImportStatus(`Đã import ${savedCathCount} ca mới, gộp ${updatedCathCount} ca. Tự đóng ${autoClosedCount} workflow treo. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
+      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${savedCathCount}\nCa gộp cập nhật: ${updatedCathCount}\nWorkflow tự đóng: ${autoClosedCount}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}${workflowSideEffectWarning}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
       onRefreshData();
     } catch (error) {
       console.error(error);

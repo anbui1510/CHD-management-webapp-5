@@ -126,7 +126,7 @@ export default function PatientDetailsDrawer({
               </div>
               <div>
                 <span className="text-[10px] uppercase font-mono tracking-wider font-extrabold text-[#d2145a] bg-pink-50 border border-pink-200 rounded px-1.5 py-0.5">
-                  Mã người bệnh: {patient.PatientID1} {patient.PatientID2 ? `| Mã người bệnh khác: ${patient.PatientID2}` : ''}
+                  MNB: {patient.PatientID1}{patient.PatientID2 ? ` | MNB khác: ${patient.PatientID2}` : ''}
                 </span>
                 <h2 className="text-lg font-black text-slate-800 leading-none uppercase pt-2">{patient.PatientName}</h2>
                 {patient.OtherPatientName && patient.OtherPatientName !== patient.PatientName && (

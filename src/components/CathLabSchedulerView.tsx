@@ -99,7 +99,29 @@ const formatCalendarPatientTooltip = (patientName: string, diagnosisID: string, 
 
 const normalizeRefKey = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
+const parseWeightForInput = (value?: string) =>
+  String(value || '').replace(/\s*kg\s*/gi, '').trim();
+
+const parseHeightForInput = (value?: string) =>
+  String(value || '').replace(/\s*cm\s*/gi, '').trim();
+
+const formatWeightForSave = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /\bkg\b/i.test(trimmed) ? trimmed : `${trimmed} kg`;
+};
+
+const formatHeightForSave = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /\bcm\b/i.test(trimmed) ? trimmed : `${trimmed} cm`;
+};
+
 type SchedulingFormSnapshot = {
+  consultDate: string;
+  requestBy: string;
+  patientWeight: string;
+  patientHeight: string;
   diagnosisID: string;
   detailDiagnosis: string;
   consultResultID: string;
@@ -324,6 +346,10 @@ export default function CathLabSchedulerView({
   const [callStatus, setCallStatus] = useState('');
   const [callNote, setCallNote] = useState('');
   const [priorityOrder, setPriorityOrder] = useState<PriorityOrderEnum>('Chương trình');
+  const [schedConsultDate, setSchedConsultDate] = useState('');
+  const [schedRequestBy, setSchedRequestBy] = useState('');
+  const [schedPatientWeight, setSchedPatientWeight] = useState('');
+  const [schedPatientHeight, setSchedPatientHeight] = useState('');
   const [schedDiagnosisID, setSchedDiagnosisID] = useState('');
   const [schedDetailDiagnosis, setSchedDetailDiagnosis] = useState('');
   const [schedConsultResultID, setSchedConsultResultID] = useState('');
@@ -479,6 +505,10 @@ export default function CathLabSchedulerView({
     }
     const autoPtv2 = getAutoScheduled2nd(c.RequestBy || '');
     return {
+      consultDate: c.ConsultDate ? getFormattedDateKey(c.ConsultDate) : '',
+      requestBy: c.RequestBy || '',
+      patientWeight: parseWeightForInput(c.PatientWeight),
+      patientHeight: parseHeightForInput(c.PatientHeight),
       diagnosisID: c.DiagnosisID || '',
       detailDiagnosis: c.DetailDiagnosis || '',
       consultResultID: c.ConsultResultID || '',
@@ -1423,6 +1453,10 @@ Xin cảm ơn!`;
 
   // Setup form fields on consult selection
   const buildCurrentFormSnapshot = (): SchedulingFormSnapshot => ({
+    consultDate: schedConsultDate,
+    requestBy: schedRequestBy,
+    patientWeight: schedPatientWeight,
+    patientHeight: schedPatientHeight,
     diagnosisID: schedDiagnosisID,
     detailDiagnosis: schedDetailDiagnosis,
     consultResultID: schedConsultResultID,
@@ -1439,7 +1473,7 @@ Xin cảm ơn!`;
     selectedMethods: [...selectedMethods],
     postCathDepart,
     scheduled1st,
-    scheduled2nd: scheduled2nd || getAutoScheduled2nd(selectedConsult?.RequestBy || ''),
+    scheduled2nd: scheduled2nd || getAutoScheduled2nd(schedRequestBy || selectedConsult?.RequestBy || ''),
     scheduled3rd,
   });
 
@@ -1490,6 +1524,10 @@ Xin cảm ơn!`;
 
   const applySelectConsult = (c: Consult) => {
     setSelectedConsult(c);
+    setSchedConsultDate(c.ConsultDate ? getFormattedDateKey(c.ConsultDate) : '');
+    setSchedRequestBy(c.RequestBy || '');
+    setSchedPatientWeight(parseWeightForInput(c.PatientWeight));
+    setSchedPatientHeight(parseHeightForInput(c.PatientHeight));
     setSchedDiagnosisID(c.DiagnosisID || '');
     setSchedDetailDiagnosis(c.DetailDiagnosis || '');
     setSchedConsultResultID(c.ConsultResultID || '');
@@ -1779,8 +1817,12 @@ Xin cảm ơn!`;
   };
 
   const getCurrentFormData = (): Partial<Consult> => {
-    const finalScheduled2nd = scheduled2nd || getAutoScheduled2nd(selectedConsult?.RequestBy || '');
+    const finalScheduled2nd = scheduled2nd || getAutoScheduled2nd(schedRequestBy || selectedConsult?.RequestBy || '');
     return {
+      ConsultDate: schedConsultDate,
+      RequestBy: schedRequestBy,
+      PatientWeight: formatWeightForSave(schedPatientWeight),
+      PatientHeight: formatHeightForSave(schedPatientHeight),
       DiagnosisID: schedDiagnosisID,
       DetailDiagnosis: schedDetailDiagnosis,
       ConsultResultID: schedConsultResultID as Consult['ConsultResultID'],
@@ -2096,6 +2138,24 @@ Xin cảm ơn!`;
       </div>
     );
   };
+
+  const schedInputCls =
+    'w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-200 text-[10.5px] text-slate-700 min-h-[32px]';
+
+  const renderScheduleDatePicker = (value: string, onChange: (val: string) => void) => (
+    <div className="relative w-full">
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+      />
+      <div className={`${schedInputCls} font-mono font-bold flex items-center justify-between`}>
+        <span>{value ? formatVNTime(value) : 'dd/mm/yyyy'}</span>
+        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+      </div>
+    </div>
+  );
 
   const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-[13px] text-slate-800 min-h-[34px]';
   const adHocSelectCls = `${adHocInputCls} font-bold`;
@@ -2877,7 +2937,7 @@ Xin cảm ơn!`;
                   const pat = findPatientByKey(patients, selectedConsult.PatientKey);
                   if (!pat) return null;
                   const ptvPhu1Display = resolvePtvPhu1Display(
-                    selectedConsult.RequestBy || '',
+                    schedRequestBy || selectedConsult.RequestBy || '',
                     selectedConsult.Scheduled2ndInterventionist,
                     scheduled2nd
                   );
@@ -2910,37 +2970,57 @@ Xin cảm ơn!`;
                         {renderPatientAdminInfo(pat, 'form')}
                       </div>
 
-                      {/* Part 2: Consultation administrative summary */}
-                      <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl shadow-xs">
-                        <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-150 pb-1 mb-1.5">
-                          Thông tin đăng ký hội chẩn
-                        </span>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
-                          <div>
-                            <span className="text-slate-400 font-bold block uppercase text-[7.5px]">Ngày Staff:</span>
-                            <span className="font-extrabold text-slate-800 font-mono">{formatVNTime(selectedConsult.ConsultDate)}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-bold block uppercase text-[7.5px]">Người Đăng Ký:</span>
-                            <span className="font-extrabold text-slate-800 truncate block">{selectedConsult.RequestBy || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-bold block uppercase text-[7.5px]">Cân nặng:</span>
-                            <span className="font-extrabold text-slate-850 font-mono">{selectedConsult.PatientWeight ? `${selectedConsult.PatientWeight} kg` : '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-bold block uppercase text-[7.5px]">Chiều cao:</span>
-                            <span className="font-bold text-slate-700 font-mono">{selectedConsult.PatientHeight ? `${selectedConsult.PatientHeight} cm` : '—'}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Part 3: Kết quả Hội chẩn — có thể chỉnh sửa */}
-                      <div className="bg-indigo-50/60 border border-indigo-120 p-3 rounded-2xl flex flex-col gap-1 text-[11px] shadow-xs">
+                      {/* Kết quả Hội chẩn — gộp đăng ký + kết quả, tất cả chỉnh sửa được */}
+                      <div className="bg-indigo-50/60 border border-indigo-120 p-3 rounded-2xl flex flex-col gap-1.5 text-[11px] shadow-xs">
                         <span className="text-indigo-900 font-black uppercase text-[10px] tracking-wider block border-b border-indigo-100 pb-1 mb-0.5">
                           Kết quả Hội chẩn
                         </span>
-                        <div className="grid grid-cols-1 gap-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Ngày staff</label>
+                            {renderScheduleDatePicker(schedConsultDate, setSchedConsultDate)}
+                          </div>
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Người đăng ký</label>
+                            <select
+                              value={schedRequestBy}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSchedRequestBy(val);
+                                setScheduled2nd(getAutoScheduled2nd(val));
+                              }}
+                              className={`${schedInputCls} font-bold`}
+                            >
+                              <option value="">— Chọn BS —</option>
+                              {staffList.filter(s => !s.FireDate).map(st => (
+                                <option key={st.StaffKey} value={formatShortDoctorName(st.StaffName)}>
+                                  {formatShortDoctorName(st.StaffName)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Cân nặng (kg)</label>
+                            <input
+                              type="text"
+                              placeholder="12.5"
+                              value={schedPatientWeight}
+                              onChange={(e) => setSchedPatientWeight(e.target.value)}
+                              className={`${schedInputCls} font-mono font-bold`}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chiều cao (cm)</label>
+                            <input
+                              type="text"
+                              placeholder="95"
+                              value={schedPatientHeight}
+                              onChange={(e) => setSchedPatientHeight(e.target.value)}
+                              className={`${schedInputCls} font-mono`}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5 pt-0.5">
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Bệnh chính</label>
                             <SearchableEnumSelect
@@ -2961,7 +3041,7 @@ Xin cảm ơn!`;
                               value={schedDetailDiagnosis}
                               onChange={(e) => setSchedDetailDiagnosis(e.target.value)}
                               placeholder="Nhập chẩn đoán chi tiết..."
-                              className="w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-[10.5px] text-slate-700 leading-relaxed resize-y"
+                              className={`${schedInputCls} leading-relaxed resize-y`}
                             />
                           </div>
                           <div>
@@ -3003,7 +3083,7 @@ Xin cảm ơn!`;
                               value={schedDetailConsultResult}
                               onChange={(e) => setSchedDetailConsultResult(e.target.value)}
                               placeholder="Nhập kết quả hội chẩn chi tiết..."
-                              className="w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-[10.5px] text-slate-700 leading-relaxed resize-y"
+                              className={`${schedInputCls} leading-relaxed resize-y`}
                             />
                           </div>
                         </div>
