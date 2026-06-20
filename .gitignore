@@ -15,3 +15,8 @@ data/sync_config.json
 
 # Cache dev
 .vite/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
