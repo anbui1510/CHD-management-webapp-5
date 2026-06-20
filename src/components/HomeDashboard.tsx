@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { AppModule } from '../auth/permissions';
 import { motion } from 'motion/react';
-import { 
-  Users, 
-  Workflow, 
-  CheckCircle, 
-  Activity, 
+import {
+  Users,
+  Workflow,
+  CheckCircle,
+  Activity,
   CalendarDays,
   FileText,
   HeartPulse,
@@ -21,9 +21,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
 } from 'lucide-react';
 import { Patient, Consult, CathLab, findPatientByKey, normalizePatientKey } from '../types';
+import ChdDailyBriefHomeWidget from './ChdDailyBriefHomeWidget';
 
 interface HomeDashboardProps {
   onNavigate: (menu: string) => void;
@@ -690,6 +691,7 @@ export default function HomeDashboard({
   };
 
   const visibleStats = STATS_POOL.filter(s => selectedStatIds.includes(s.id));
+  const showBriefWidget = canAccessModule('chd-daily-brief');
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50 pt-2 px-4 pb-4 sm:pt-2 sm:px-5 sm:pb-5 space-y-3 sm:space-y-4 animate-in fade-in duration-300">
@@ -744,22 +746,31 @@ export default function HomeDashboard({
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {visibleStats.map((stat, idx) => (
-            <motion.div 
-              key={idx}
-              whileHover={{ y: -1 }}
-              className={`bg-white rounded-2xl p-3 border ${stat.border} shadow-sm flex flex-col justify-between relative overflow-hidden group min-h-[85px]`}
-            >
-              <div className="absolute top-1 right-1 opacity-[0.08] transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                {stat.icon}
-              </div>
-              <div className="z-10 relative">
-                <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">{stat.label}</span>
-                <p className={`text-3xl font-black mt-0.5 font-mono ${stat.color} leading-none`}>{stat.value}</p>
-              </div>
-            </motion.div>
-          ))}
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
+          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {visibleStats.map((stat, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ y: -1 }}
+                className={`bg-white rounded-2xl p-3 border ${stat.border} shadow-sm flex flex-col justify-between relative overflow-hidden group min-h-[85px]`}
+              >
+                <div className="absolute top-1 right-1 opacity-[0.08] transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                  {stat.icon}
+                </div>
+                <div className="z-10 relative">
+                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">{stat.label}</span>
+                  <p className={`text-3xl font-black mt-0.5 font-mono ${stat.color} leading-none`}>{stat.value}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {showBriefWidget && (
+            <ChdDailyBriefHomeWidget
+              onOpen={() => onNavigate('chd-daily-brief')}
+              className="w-full lg:w-[min(100%,280px)] lg:shrink-0 lg:max-w-[300px]"
+            />
+          )}
         </div>
       </div>
 
