@@ -9,6 +9,7 @@ import {
   filterPatientOperations
 } from '../utils/latestDiagnosis';
 import { formatPatientDobWithAge } from '../utils/patientDisplay';
+import { PatientAdminEditButton } from './PatientAdminEditButton';
 import {
   X,
   MapPin,
@@ -120,11 +121,11 @@ export default function PatientDetailsDrawer({
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 border border-slate-150 rounded-2xl shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-full bg-pink-100 border-2 border-pink-200 text-[#d2145a] flex items-center justify-center font-bold text-xl uppercase shadow-inner shrink-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="hidden md:flex w-14 h-14 rounded-full bg-pink-100 border-2 border-pink-200 text-[#d2145a] items-center justify-center font-bold text-xl uppercase shadow-inner shrink-0">
                 {patient.PatientSex === 'Nam' ? '👦' : '👧'}
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="text-[10px] uppercase font-mono tracking-wider font-extrabold text-[#d2145a] bg-pink-50 border border-pink-200 rounded px-1.5 py-0.5">
                   MNB: {patient.PatientID1}{patient.PatientID2 ? ` | MNB khác: ${patient.PatientID2}` : ''}
                 </span>
@@ -135,12 +136,7 @@ export default function PatientDetailsDrawer({
               </div>
             </div>
 
-            <button
-              onClick={() => onEditPatientAdmin(patient)}
-              className="bg-white hover:bg-[#d2145a] hover:text-white border border-slate-300 hover:border-[#d2145a] text-[#d2145a] font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition flex items-center gap-1 shrink-0 cursor-pointer"
-            >
-              ✏️ Sửa hành chính
-            </button>
+            <PatientAdminEditButton onClick={() => onEditPatientAdmin(patient)} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-150 rounded-2xl p-4">

@@ -16,6 +16,7 @@ import {
   formatVNTime,
   removeDiacritics
 } from '../types';
+import { PatientAdminEditButton } from './PatientAdminEditButton';
 
 interface MRIResultViewProps {
   patients: Patient[];
@@ -513,13 +514,7 @@ export default function MRIResultView({
 
                 <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-2 shrink-0">
                   {onEditPatientAdmin && (
-                    <button
-                      type="button"
-                      onClick={handleEditAdmin}
-                      className="px-4 py-2 text-xs font-extrabold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-2xl cursor-pointer transition flex items-center gap-2"
-                    >
-                      <UserCog className="w-4 h-4" /> Sửa hành chính
-                    </button>
+                    <PatientAdminEditButton onClick={handleEditAdmin} />
                   )}
                   {isDoneSelected && !editMode ? (
                     <button

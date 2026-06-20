@@ -160,3 +160,82 @@ export function filterPatientOperations(operations: Operation[], patientKey: str
       consultKeys.has(normalizeRecordKey(op.ConsultKey))
   );
 }
+
+function pushUniqueCath(list: CathLab[], cath: CathLab) {
+  const key = normalizeRecordKey(cath.CathKey);
+  if (!key || list.some(item => normalizeRecordKey(item.CathKey) === key)) return;
+  list.push(cath);
+}
+
+function pushUniqueOperation(list: Operation[], op: Operation) {
+  const key = normalizeRecordKey(op.SurgKey);
+  if (!key || list.some(item => normalizeRecordKey(item.SurgKey) === key)) return;
+  list.push(op);
+}
+
+/** Pre-index clinical records by patient, resolve diagnosis lazily with cache. */
+export function createLatestDiagnosisResolver(
+  consults: Consult[],
+  cathlabs: CathLab[],
+  operations: Operation[] = []
+) {
+  const consultsByPatient = new Map<string, Consult[]>();
+  const consultPatientByConsultKey = new Map<string, string>();
+
+  for (const consult of consults) {
+    const patientKey = normalizeRecordKey(consult.PatientKey);
+    const consultKey = normalizeRecordKey(consult.ConsultKey);
+    if (patientKey) {
+      const list = consultsByPatient.get(patientKey) || [];
+      list.push(consult);
+      consultsByPatient.set(patientKey, list);
+    }
+    if (consultKey && patientKey) {
+      consultPatientByConsultKey.set(consultKey, patientKey);
+    }
+  }
+
+  const cathByPatient = new Map<string, CathLab[]>();
+  const addCathForPatient = (patientKey: string, cath: CathLab) => {
+    if (!patientKey) return;
+    const list = cathByPatient.get(patientKey) || [];
+    pushUniqueCath(list, cath);
+    cathByPatient.set(patientKey, list);
+  };
+
+  for (const cath of cathlabs) {
+    addCathForPatient(normalizeRecordKey(cath.PatientKey), cath);
+    const linkedPatientKey = consultPatientByConsultKey.get(normalizeRecordKey(cath.ConsultKey));
+    if (linkedPatientKey) addCathForPatient(linkedPatientKey, cath);
+  }
+
+  const operationsByPatient = new Map<string, Operation[]>();
+  const addOperationForPatient = (patientKey: string, op: Operation) => {
+    if (!patientKey) return;
+    const list = operationsByPatient.get(patientKey) || [];
+    pushUniqueOperation(list, op);
+    operationsByPatient.set(patientKey, list);
+  };
+
+  for (const op of operations) {
+    addOperationForPatient(normalizeRecordKey(op.PatientKey), op);
+    const linkedPatientKey = consultPatientByConsultKey.get(normalizeRecordKey(op.ConsultKey));
+    if (linkedPatientKey) addOperationForPatient(linkedPatientKey, op);
+  }
+
+  const cache = new Map<string, LatestDiagnosis | undefined>();
+
+  return (patientKeyRaw: string): LatestDiagnosis | undefined => {
+    const patientKey = normalizeRecordKey(patientKeyRaw);
+    if (!patientKey) return undefined;
+    if (cache.has(patientKey)) return cache.get(patientKey);
+
+    const diagnosis = resolveLatestDiagnosis({
+      consults: consultsByPatient.get(patientKey) || [],
+      cathlabs: cathByPatient.get(patientKey) || [],
+      operations: operationsByPatient.get(patientKey) || [],
+    });
+    cache.set(patientKey, diagnosis);
+    return diagnosis;
+  };
+}

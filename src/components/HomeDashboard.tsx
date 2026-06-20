@@ -694,7 +694,7 @@ export default function HomeDashboard({
   const showBriefWidget = canAccessModule('chd-daily-brief');
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-slate-50 pt-2 px-4 pb-4 sm:pt-2 sm:px-5 sm:pb-5 space-y-3 sm:space-y-4 animate-in fade-in duration-300">
+    <div className="h-full flex flex-col overflow-y-auto md:overflow-hidden bg-slate-50 pt-2 px-3 sm:px-5 pb-4 space-y-3 sm:space-y-4 animate-in fade-in duration-300">
       <div className="w-full min-h-[90px] bg-gradient-to-r from-pink-600 to-[#d2145a] rounded-3xl px-5 sm:px-6 text-white shadow-sm relative overflow-hidden shrink-0 flex items-center">
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
           <HeartPulse className="w-48 h-48 animate-pulse" />
@@ -774,10 +774,10 @@ export default function HomeDashboard({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 flex-1 min-h-0 min-w-0 pb-1">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:flex-1 md:min-h-0 min-w-0 pb-1">
         
         {/* LEFT COLUMN: Chart + Quick Access */}
-        <div className="flex flex-col space-y-4 h-full min-h-0 w-full">
+        <div className="flex flex-col space-y-4 md:h-full md:min-h-0 w-full">
           
           {/* BIỂU ĐỒ THỐNG KÊ TIM THEO THÁNG */}
           <div 

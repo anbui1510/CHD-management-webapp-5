@@ -54,11 +54,7 @@ import StaffProfileView from './components/StaffProfileView';
 import ResultStaffDrawer from './components/ResultStaffDrawer';
 import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
 import {
-  resolveLatestDiagnosis,
-  normalizeRecordKey,
-  filterPatientConsults,
-  filterPatientCathlabs,
-  filterPatientOperations
+  createLatestDiagnosisResolver,
 } from './utils/latestDiagnosis';
 import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
@@ -75,6 +71,14 @@ import {
   MOBILE_BOTTOM_TAB_ITEMS,
 } from './config/navigation';
 import { useIsMobile } from './hooks/useMediaQuery';
+import {
+  loadMobileQuickTabs,
+  pinMobileQuickTab,
+  saveMobileQuickTabs,
+  DEFAULT_MOBILE_QUICK_SLOTS,
+  MOBILE_QUICK_SLOT_COUNT,
+} from './utils/mobileQuickTabs';
+import { PatientAdminEditButton } from './components/PatientAdminEditButton';
 
 import { 
   Users, 
@@ -244,8 +248,10 @@ export default function App() {
   };
 
   // Refs for synchronized double scrollbar in consult log list
+  const MOBILE_PATIENTS_BATCH = 50;
   const topScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
+  const patientTableScrollRef = useRef<HTMLDivElement>(null);
   const [tableScrollWidth, setTableScrollWidth] = useState(850);
 
   const handleTopScroll = () => {
@@ -271,6 +277,7 @@ export default function App() {
   // Collapsible Sidebar State
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
   const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
+  const [mobileQuickTabIds, setMobileQuickTabIds] = useState<ActiveMenuId[]>(DEFAULT_MOBILE_QUICK_SLOTS);
   const isMobile = useIsMobile();
 
   // Collapsible Filter Panel State
@@ -286,6 +293,7 @@ export default function App() {
   const [patientSearch, setPatientSearch] = useState<string>('');
   const [consultListSearch, setConsultListSearch] = useState<string>('');
   const [patientCurrentPage, setPatientCurrentPage] = useState<number>(1);
+  const [mobilePatientVisibleCount, setMobilePatientVisibleCount] = useState(MOBILE_PATIENTS_BATCH);
   const [consultCurrentPage, setConsultCurrentPage] = useState<number>(1);
   const [searchPatientQuery, setSearchPatientQuery] = useState<string>('');
 
@@ -746,6 +754,36 @@ export default function App() {
     }
     setActiveMenu(menu);
     setIsMobileMoreMenuOpen(false);
+  };
+
+  const normalizeMobileQuickTabs = (staff: Staff, loaded: ActiveMenuId[]): ActiveMenuId[] => {
+    const allowed = loaded.filter(id => canAccessModule(staff, id as AppModule));
+    const pool = [...allowed];
+    for (const def of DEFAULT_MOBILE_QUICK_SLOTS) {
+      if (pool.length >= MOBILE_QUICK_SLOT_COUNT) break;
+      if (!pool.includes(def) && canAccessModule(staff, def as AppModule)) pool.push(def);
+    }
+    return pool.slice(0, MOBILE_QUICK_SLOT_COUNT);
+  };
+
+  useEffect(() => {
+    if (!currentStaff?.StaffKey) return;
+    setMobileQuickTabIds(normalizeMobileQuickTabs(currentStaff, loadMobileQuickTabs(currentStaff.StaffKey)));
+  }, [currentStaff?.StaffKey]);
+
+  const handleMobileMoreNavigate = (menuId: ActiveMenuId) => {
+    if (!currentStaff?.StaffKey) {
+      navigateMenu(menuId);
+      return;
+    }
+    setMobileQuickTabIds(prev => {
+      const next = pinMobileQuickTab(prev, menuId);
+      if (JSON.stringify(next) !== JSON.stringify(prev)) {
+        saveMobileQuickTabs(currentStaff.StaffKey, next);
+      }
+      return next;
+    });
+    navigateMenu(menuId);
   };
 
   const openStaffProfile = () => {
@@ -1347,22 +1385,48 @@ export default function App() {
     });
   }, [patients, patientSearch]);
 
+  const getLatestDiagnosisForPatient = useMemo(
+    () => createLatestDiagnosisResolver(consults, cathlabs, operations),
+    [consults, cathlabs, operations]
+  );
+
+  useEffect(() => {
+    setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
+  }, [patientSearch, activeMenu]);
+
+  const handlePatientTableScroll = useCallback(() => {
+    if (!isMobile) return;
+    const el = patientTableScrollRef.current;
+    if (!el || mobilePatientVisibleCount >= filteredPatients.length) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
+      setMobilePatientVisibleCount(prev =>
+        Math.min(prev + MOBILE_PATIENTS_BATCH, filteredPatients.length)
+      );
+    }
+  }, [isMobile, mobilePatientVisibleCount, filteredPatients.length]);
+
   const PATIENTS_PER_PAGE = 50;
   const totalPatientPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE) || 1;
-  const displayedPatients = filteredPatients.slice(
-    (patientCurrentPage - 1) * PATIENTS_PER_PAGE,
-    patientCurrentPage * PATIENTS_PER_PAGE
-  );
+  const displayedPatients = useMemo(() => {
+    if (isMobile) return filteredPatients.slice(0, mobilePatientVisibleCount);
+    return filteredPatients.slice(
+      (patientCurrentPage - 1) * PATIENTS_PER_PAGE,
+      patientCurrentPage * PATIENTS_PER_PAGE
+    );
+  }, [filteredPatients, isMobile, patientCurrentPage, mobilePatientVisibleCount]);
 
   const CONSULTS_PER_PAGE = 100;
   const filteredConsultsList = useMemo(() => {
     return getFilteredConsults();
   }, [consults, patientsMap, filterType, filterDate, consultListSearch, consultSortOrder, isPendingStaffConsult]);
   const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
-  const displayedConsults = filteredConsultsList.slice(
-    (consultCurrentPage - 1) * CONSULTS_PER_PAGE,
-    consultCurrentPage * CONSULTS_PER_PAGE
-  );
+  const displayedConsults = useMemo(() => {
+    if (isMobile) return filteredConsultsList;
+    return filteredConsultsList.slice(
+      (consultCurrentPage - 1) * CONSULTS_PER_PAGE,
+      consultCurrentPage * CONSULTS_PER_PAGE
+    );
+  }, [filteredConsultsList, isMobile, consultCurrentPage]);
 
   const primarySideMenus = useMemo(
     () => SIDEBAR_MENU_ITEMS.filter(menu => canAccessModule(currentStaff, menu.id as AppModule)),
@@ -1370,10 +1434,8 @@ export default function App() {
   );
 
   const mobileBottomTabIds = useMemo(
-    () => MOBILE_BOTTOM_TAB_ITEMS
-      .map(tab => tab.id)
-      .filter(id => canAccessModule(currentStaff, id as AppModule)),
-    [currentStaff]
+    () => mobileQuickTabIds.filter(id => canAccessModule(currentStaff, id as AppModule)),
+    [currentStaff, mobileQuickTabIds]
   );
 
   const mobileMoreMenuItems = useMemo(
@@ -1488,13 +1550,13 @@ export default function App() {
         };
       case 'consult-list':
         return {
-          title: "ĐĂNG KÝ HỘI CHẨN NỘI - NGOẠI KHOA",
+          title: isMobile ? "Đăng ký hội chẩn" : "ĐĂNG KÝ HỘI CHẨN NỘI - NGOẠI KHOA",
           subtitle: "",
           icon: <ClipboardList className="w-5 h-5 text-pink-200" />
         };
       case 'results-staff':
         return {
-          title: "NHẬP KẾT QUẢ HỘI CHẨN NỘI - NGOẠI KHOA",
+          title: isMobile ? "NHẬP KẾT QUẢ HỘI CHẨN" : "NHẬP KẾT QUẢ HỘI CHẨN NỘI - NGOẠI KHOA",
           subtitle: "",
           icon: <FileText className="w-5 h-5 text-pink-200" />
         };
@@ -1764,7 +1826,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -1822,19 +1884,16 @@ export default function App() {
 
           {/* PATIENT MANAGER PANEL */}
           {activeMenu === 'patients' && (
-            <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-4 sm:p-6 space-y-4 overflow-hidden">
+            <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-2 sm:p-6 gap-2 sm:gap-4 overflow-hidden">
               
-              {/* Header and Add Patient Trigger */}
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 shrink-0">
-                <div>
-                  <h2 className="text-base font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase">
-                    <Heart className="w-5 h-5 text-pink-600 fill-pink-50" /> DANH SÁCH BỆNH NHI
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Quản lý hồ sơ hành chính, lịch sử hội chẩn, can thiệp, phẫu thuật</p>
-                </div>
+              <div className="flex flex-col gap-2 shrink-0">
+                <h2 className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase pt-0.5">
+                  <Heart className="w-5 h-5 text-pink-600 fill-pink-50" /> DANH SÁCH BỆNH NHI
+                </h2>
+                <p className="hidden sm:block text-xs text-slate-500 -mt-1">Quản lý hồ sơ hành chính, lịch sử hội chẩn, can thiệp, phẫu thuật</p>
                 
                 <div className="flex items-center gap-2">
-                  <div className="relative">
+                  <div className="relative flex-1 min-w-0">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
@@ -1843,14 +1902,16 @@ export default function App() {
                       onChange={(e) => {
                         setPatientSearch(e.target.value);
                         setPatientCurrentPage(1);
+                        setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
                       }}
-                      className="w-[220px] pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a] focus:border-[#d2145a] font-sans shadow-sm"
+                      className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a] focus:border-[#d2145a] font-sans shadow-sm"
                     />
                     {patientSearch && (
                       <button 
                         onClick={() => {
                           setPatientSearch('');
                           setPatientCurrentPage(1);
+                          setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
                         }}
                         className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                       >
@@ -1876,21 +1937,48 @@ export default function App() {
                       });
                       setShowAddPatient(true);
                     }}
-                    className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
+                    className="md:hidden w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm transition cursor-pointer flex items-center justify-center"
+                    title="Thêm bệnh nhi mới"
+                    aria-label="Thêm bệnh nhi mới"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setEditingPatientKey(null);
+                      setNewPatientData({
+                        PatientID1: '',
+                        PatientID2: '',
+                        PatientName: '',
+                        OtherPatientName: '',
+                        PatientDOB: '',
+                        PatientSex: 'Nam',
+                        PatientAddress: 'Hà Nội',
+                        PatientPhone1: '',
+                        PatientPhone2: '',
+                        Outcome: ''
+                      });
+                      setShowAddPatient(true);
+                    }}
+                    className="hidden md:flex bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2.5 rounded-2xl text-xs items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
                   >
                     <Plus className="w-4 h-4" /> Thêm bệnh nhi mới
                   </button>
                 </div>
               </div>
 
-              {/* Patient data flat list table styled strictly like Screenshot 3 */}
               <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl flex flex-col shadow-sm overflow-hidden">
                 
-                <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div
+                  ref={patientTableScrollRef}
+                  onScroll={handlePatientTableScroll}
+                  className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar"
+                >
+                  <table className="w-full text-left text-xs border-collapse min-w-[720px]">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] uppercase font-black tracking-wider font-mono">
-                        <th className="py-3 px-4 shadow-sm">Họ và tên bé</th>
+                        <th className="py-3 px-4 shadow-sm sticky left-0 z-20 bg-slate-50 min-w-[140px]">Họ và tên bé</th>
                         <th className="py-3 px-4 shadow-sm">Ngày sinh</th>
                         <th className="py-3 px-4 shadow-sm">Giới tính</th>
                         <th className="py-3 px-4 shadow-sm">Địa chỉ</th>
@@ -1906,25 +1994,16 @@ export default function App() {
                           </td>
                         </tr>
                       ) : (
-                        displayedPatients.map((pat) => {
-                          const patientConsults = filterPatientConsults(consults, pat.PatientKey);
-                          const patientConsultKeys = new Set(
-                            patientConsults.map(c => normalizeRecordKey(c.ConsultKey)).filter(Boolean)
-                          );
-                          const patientCathlabs = filterPatientCathlabs(cathlabs, pat.PatientKey, patientConsultKeys);
-                          const patientOperations = filterPatientOperations(operations, pat.PatientKey, patientConsultKeys);
-                          const latestDiagnosis = resolveLatestDiagnosis({
-                            consults: patientConsults,
-                            cathlabs: patientCathlabs,
-                            operations: patientOperations
-                          });
+                        <>
+                        {displayedPatients.map((pat) => {
+                          const latestDiagnosis = getLatestDiagnosisForPatient(pat.PatientKey);
                           return (
                             <tr 
                               key={pat.PatientKey} 
                               onClick={() => setSelectedPatientForDetail(pat)}
                               className="hover:bg-pink-50/50 cursor-pointer transition duration-150 group"
                             >
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-4 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/50 shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] min-w-[140px]">
                                 <p className="font-extrabold text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat.PatientName}</p>
                                 <p className="text-[10px] text-slate-400 mt-0.5 font-mono">Mã HS: {pat.PatientID1}</p>
                               </td>
@@ -1964,13 +2043,21 @@ export default function App() {
                               </td>
                             </tr>
                           );
-                        })
+                        })}
+                        {isMobile && filteredPatients.length > displayedPatients.length && (
+                          <tr>
+                            <td colSpan={6} className="py-3 text-center text-[10px] text-slate-400 font-semibold bg-slate-50/80">
+                              {displayedPatients.length} / {filteredPatients.length} bệnh nhi · Cuộn để tải thêm
+                            </td>
+                          </tr>
+                        )}
+                        </>
                       )}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                <div className="hidden md:flex bg-slate-50 border-t border-slate-200 p-4 flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
                   <div className="text-[11px] text-slate-500 font-semibold font-mono uppercase">
                     Tổng số: {filteredPatients.length} / {patients.length} bệnh nhi tim bẩm sinh CHD 
                     {filteredPatients.length > 0 && (
@@ -2027,8 +2114,8 @@ export default function App() {
           {/* NEW CONSULT REGISTRATION OVERLAY DIALOG MODAL */}
           <AnimatePresence>
             {showAddConsult && (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4">
+                <div className="bg-white rounded-3xl max-w-xl w-full max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
                   
                   <div className="flex items-center justify-between border-b border-slate-150 px-6 py-3.5 text-[#d2145a] shrink-0">
                     <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
@@ -2050,7 +2137,7 @@ export default function App() {
                   <form onSubmit={handleAddConsultSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0 font-semibold text-slate-700">
                     
                     {/* Scrollable Form body */}
-                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3.5 scrollbar-thin">
+                    <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-3.5 scrollbar-thin min-h-0">
                     
                     {/* Searchable Patient Selection Block */}
                     <div className="bg-slate-50 border border-slate-150 p-4 rounded-2xl space-y-3">
@@ -2406,7 +2493,7 @@ export default function App() {
                   </div>
 
                   {/* Fixed Footer with Actions */}
-                  <div className="border-t border-slate-150 px-6 py-3.5 bg-slate-50 flex gap-3 shrink-0 rounded-b-3xl w-full">
+                  <div className="border-t border-slate-150 px-4 md:px-6 py-3.5 bg-slate-50 flex gap-3 shrink-0 rounded-b-3xl w-full pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -2435,14 +2522,13 @@ export default function App() {
 
           {/* ACTIVE CONSULTATION LIST (Hội chẩn split screen, Screenshot 5) */}
           {activeMenu === 'consult-list' && (
-            <div className="flex-1 min-h-0 h-full flex flex-col lg:flex-row gap-4 lg:gap-6 animate-in fade-in duration-200 w-full bg-slate-50 p-4 lg:p-6">
+            <div className="flex-1 min-h-0 h-full flex flex-col lg:flex-row gap-3 lg:gap-6 animate-in fade-in duration-200 w-full bg-slate-50 p-2 sm:p-4 lg:p-6 overflow-hidden">
               
-              {/* L: Waiting group and list */}
-              <div className="flex-1 min-h-0 h-full flex flex-col bg-white border border-slate-200 rounded-3xl p-4 lg:p-5 shadow-sm min-w-0">
+              <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-3xl p-3 sm:p-4 lg:p-5 shadow-sm min-w-0">
                 
-                <div className="shrink-0 flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-150 pb-2.5 mb-2">
-                  <div>
-                    <h3 className="font-extrabold text-neutral-900 uppercase flex items-center gap-1.5">
+                <div className="shrink-0 flex flex-col gap-2 border-b border-slate-150 pb-2.5 mb-2">
+                  <div className="hidden md:block">
+                    <h3 className="font-extrabold text-neutral-900 uppercase flex items-center gap-1.5 text-sm">
                       <ClipboardCheck className="w-5 h-5 text-teal-600" />
                       Danh sách chờ hội chẩn
                     </h3>
@@ -2450,7 +2536,7 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="relative">
+                    <div className="relative flex-1 min-w-0">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                       <input
                         type="text"
@@ -2460,7 +2546,7 @@ export default function App() {
                           setConsultListSearch(e.target.value);
                           setConsultCurrentPage(1);
                         }}
-                        className="w-[220px] pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
+                        className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
                       />
                       {consultListSearch && (
                         <button 
@@ -2474,6 +2560,15 @@ export default function App() {
                         </button>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsFilterExpanded(true)}
+                      className="lg:hidden w-10 h-10 shrink-0 rounded-full bg-white border border-slate-200 text-[#d2145a] shadow-sm flex items-center justify-center"
+                      title="Bộ lọc & xuất báo cáo"
+                      aria-label="Bộ lọc"
+                    >
+                      <Filter className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => {
                         setNewConsultData({
@@ -2496,24 +2591,50 @@ export default function App() {
                         setPendingConsultsCount(0);
                         setShowAddConsult(true);
                       }}
-                      className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition shrink-0 cursor-pointer"
+                      className="hidden sm:flex bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2 rounded-2xl text-xs items-center justify-center gap-1.5 shadow-sm transition shrink-0 cursor-pointer"
                     >
                       <Plus className="w-4 h-4" /> Đăng kí staff
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNewConsultData({
+                          PatientKey: '',
+                          ConsultType: 'Staff mổ',
+                          PatientWeight: '',
+                          PatientHeight: '',
+                          ConsultDate: new Date().toISOString().split('T')[0],
+                          RequestBy: '',
+                          DiagnosisID: '',
+                          DetailDiagnosis: '',
+                          Department: 'Tim Mạch',
+                          PriorityOrder: 'Chương trình',
+                          RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
+                          CheckDevice: '',
+                          ConsultNote: '',
+                          PlannedDevice: '',
+                          PlannedPrice: ''
+                        });
+                        setPendingConsultsCount(0);
+                        setShowAddConsult(true);
+                      }}
+                      className="sm:hidden w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm flex items-center justify-center"
+                      title="Đăng kí staff"
+                      aria-label="Đăng kí staff"
+                    >
+                      <Plus className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
 
-                {/* Double Scrollbar: Top Scroll */}
                 <div 
                   ref={topScrollRef} 
                   onScroll={handleTopScroll}
-                  className="shrink-0 overflow-x-auto overflow-y-hidden select-none mb-1 scrollbar-thin" 
+                  className="hidden sm:block shrink-0 overflow-x-auto overflow-y-hidden select-none mb-1 scrollbar-thin" 
                   style={{ height: '8px' }}
                 >
                   <div style={{ width: `${tableScrollWidth}px`, height: '1px' }}></div>
                 </div>
 
-                {/* Main flat logs table */}
                 <div 
                   ref={bottomScrollRef} 
                   onScroll={handleBottomScroll}
@@ -2522,7 +2643,7 @@ export default function App() {
                   <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
-                        <th className="py-2.5 px-3">Bệnh nhi</th>
+                        <th className="py-2.5 px-3 sticky left-0 z-20 bg-slate-50 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none">Bệnh nhi</th>
                         <th className="py-2.5 px-3">Kiểu staff</th>
                         <th className="py-2.5 px-3">Chẩn đoán</th>
                         <th 
@@ -2559,7 +2680,7 @@ export default function App() {
                               onClick={() => makeRegisterEdit(item)}
                               className="hover:bg-pink-50/45 cursor-pointer transition duration-150 group"
                             >
-                              <td className="py-3 px-3">
+                              <td className="py-3 px-3 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/45 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none">
                                 <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat.PatientName}</p>
                                 <p className="text-[10px] text-slate-500 font-mono">MNB: {pat.PatientID1}</p>
                               </td>
@@ -2626,8 +2747,8 @@ export default function App() {
                   </table>
                 </div>
 
-                {/* Pagination footer */}
-                <div className="shrink-0 bg-slate-50 border border-slate-200 mt-4 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                {/* Pagination footer — desktop only */}
+                <div className="hidden lg:flex shrink-0 bg-slate-50 border border-slate-200 mt-4 rounded-2xl p-4 flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
                   <div className="text-[11px] text-slate-500 font-semibold font-mono uppercase">
                     Tổng số: {filteredConsultsList.length} / {consults.length} đợt hội chẩn
                     {filteredConsultsList.length > 0 && (
@@ -2678,21 +2799,92 @@ export default function App() {
 
               </div>
 
-              {/* R: Collapsible Dynamic filters dashboard pane, width shrunk to 2/3 and collapsable similar to the left sidebar */}
+              {/* Mobile filter sheet */}
+              {isFilterExpanded && (
+                <div className="lg:hidden fixed inset-0 z-50">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-slate-900/50"
+                    aria-label="Đóng bộ lọc"
+                    onClick={() => setIsFilterExpanded(false)}
+                  />
+                  <div className="absolute inset-x-0 bottom-0 max-h-[min(70dvh,480px)] bg-white rounded-t-3xl shadow-2xl border border-slate-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] overflow-y-auto">
+                    <div className="flex items-center justify-between border-b border-slate-150 pb-2 mb-4">
+                      <div className="flex items-center gap-1.5">
+                        <Filter className="w-4 h-4 text-[#d2145a]" />
+                        <h4 className="font-extrabold uppercase text-[10px] text-neutral-900 tracking-wider">Bộ lọc &amp; Xuất báo cáo</h4>
+                      </div>
+                      <button type="button" onClick={() => setIsFilterExpanded(false)} className="p-1 text-slate-400 hover:text-[#d2145a]">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-4 text-xs font-semibold text-slate-700">
+                      <div>
+                        <label className="block text-slate-400 font-bold uppercase text-[9px] mb-1">Chọn Ngày staff</label>
+                        <input
+                          type="date"
+                          value={filterDate}
+                          onChange={(e) => {
+                            setFilterDate(e.target.value);
+                            setConsultCurrentPage(1);
+                          }}
+                          className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-bold uppercase text-[9px] mb-1">Kiểu staff</label>
+                        <select
+                          value={filterType}
+                          onChange={(e) => {
+                            setFilterType(e.target.value);
+                            setConsultCurrentPage(1);
+                          }}
+                          className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold"
+                        >
+                          <option value="Tất cả">Tất cả</option>
+                          <option value="Staff thông">Staff thông</option>
+                          <option value="Staff mổ">Staff mổ</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            setFilterDate('');
+                            setFilterType('Tất cả');
+                            setConsultCurrentPage(1);
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-xl border border-slate-200 text-[11px] cursor-pointer"
+                        >
+                          Xóa bộ lọc
+                        </button>
+                        <button
+                          onClick={handleExcelExportSimulator}
+                          disabled={exportLoading}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl border border-emerald-500 text-[11px] flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" /> In danh sách
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Desktop filter sidebar */}
               {!isFilterExpanded ? (
                 <div 
                   onClick={() => setIsFilterExpanded(true)}
-                  className="bg-white hover:bg-slate-50 border border-slate-200 rounded-3xl p-3 flex flex-row lg:flex-col items-center justify-center lg:justify-start lg:pt-8 gap-2 cursor-pointer shadow-sm w-full lg:w-14 shrink-0 h-full group transition-all duration-200"
+                  className="hidden lg:flex bg-white hover:bg-slate-50 border border-slate-200 rounded-3xl p-3 flex-col items-center justify-start pt-8 gap-2 cursor-pointer shadow-sm w-14 shrink-0 group transition-all duration-200"
                   title="Mở rộng bộ lọc"
                 >
                   <Filter className="w-5 h-5 text-[#d2145a] group-hover:scale-110 transition-transform" />
-                  <ChevronLeft className="w-4 h-4 text-slate-400 hidden lg:block" />
-                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500 lg:[writing-mode:vertical-lr] lg:rotate-180">
+                  <ChevronLeft className="w-4 h-4 text-slate-400" />
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500 [writing-mode:vertical-lr] rotate-180">
                     Mở bộ lọc &amp; xuất báo cáo
                   </span>
                 </div>
               ) : (
-                <div className="bg-white border border-slate-200 rounded-3xl p-5 flex flex-col shadow-sm text-xs font-semibold text-slate-700 w-full lg:w-[280px] shrink-0 h-full min-h-0 animate-in slide-in-from-right-4 duration-200">
+                <div className="hidden lg:flex bg-white border border-slate-200 rounded-3xl p-5 flex-col shadow-sm text-xs font-semibold text-slate-700 w-[280px] shrink-0 h-full min-h-0 animate-in slide-in-from-right-4 duration-200">
                   <div className="flex items-center justify-between border-b border-slate-150 pb-2 mb-4 shrink-0">
                     <div className="flex items-center gap-1.5">
                       <Filter className="w-4 h-4 text-[#d2145a]" />
@@ -3075,9 +3267,9 @@ export default function App() {
       {/* Centered Registration Edit Modal Dialog (Sửa Đăng ký staff) */}
       <AnimatePresence>
         {editingRegConsultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={() => setEditingRegConsultKey(null)}></div>
-            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden">
               
               <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
                 <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">
@@ -3092,7 +3284,7 @@ export default function App() {
               </div>
 
               {/* Form Frame */}
-              <form onSubmit={submitConsultRegistrationUpdate} className="flex flex-col text-xs text-slate-700 leading-relaxed font-semibold">
+              <form onSubmit={submitConsultRegistrationUpdate} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-semibold">
                 
                 {(() => {
                   const edc = consults.find(c => c.ConsultKey === editingRegConsultKey);
@@ -3100,10 +3292,11 @@ export default function App() {
                   if (!edp || !edc) return null;
 
                   return (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                       
+                      <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
                       {/* Grid Body */}
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 p-4 md:p-6">
                         
                         {/* Left Column: Administrative block */}
                         <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-3 shadow-sm self-start">
@@ -3111,8 +3304,7 @@ export default function App() {
                             <span className="text-[9px] uppercase tracking-wider font-mono font-black text-rose-500">THÔNG TIN HÀNH CHÍNH</span>
                             
                             {/* Sửa hành chính button */}
-                            <button
-                              type="button"
+                            <PatientAdminEditButton
                               onClick={() => {
                                 setEditingPatientKey(edp.PatientKey);
                                 setNewPatientData({
@@ -3129,39 +3321,36 @@ export default function App() {
                                 });
                                 setShowAddPatient(true);
                               }}
-                              className="bg-white hover:bg-slate-100 text-[#d2145a] border border-rose-200 text-[10px] px-2.5 py-1 rounded-xl font-bold uppercase transition shadow-xs cursor-pointer inline-flex items-center gap-1"
-                            >
-                              ✏️ Sửa
-                            </button>
+                            />
                           </div>
 
-                          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-[11px] text-slate-500 font-bold">
-                            <div className="col-span-2">
-                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Họ và tên:</span>
-                              <span className="text-neutral-950 font-black uppercase text-xs">{edp.PatientName}</span>
+                          <div className="flex flex-col gap-1.5 md:grid md:grid-cols-2 md:gap-x-3 md:gap-y-2.5 text-[11px] text-slate-500 font-bold">
+                            <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
+                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Họ và tên:</span>
+                              <span className="text-neutral-950 font-black uppercase text-xs truncate">{edp.PatientName}</span>
                             </div>
-                            <div>
-                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Ngày sinh:</span>
+                            <div className="flex items-baseline gap-2 min-w-0 md:block">
+                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Ngày sinh:</span>
                               <span className="text-slate-800 font-bold font-mono">{formatVNTime(edp.PatientDOB)}</span>
                             </div>
-                            <div>
-                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Giới tính:</span>
+                            <div className="flex items-baseline gap-2 min-w-0 md:block">
+                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Giới tính:</span>
                               <span className="text-slate-800 font-bold">{edp.PatientSex}</span>
                             </div>
-                            <div className="col-span-2">
-                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Mã người bệnh:</span>
-                              <span className="text-slate-850 font-extrabold font-mono text-[10px] bg-slate-200/50 border border-slate-300 rounded px-1.5 py-0.5 w-max block mt-0.5">{edp.PatientID1} {edp.PatientID2 ? `| ${edp.PatientID2}` : ''}</span>
+                            <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
+                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Mã người bệnh:</span>
+                              <span className="text-slate-850 font-extrabold font-mono text-[10px] bg-slate-200/50 border border-slate-300 rounded px-1.5 py-0.5 md:mt-0.5 md:block md:w-max">{edp.PatientID1} {edp.PatientID2 ? `| ${edp.PatientID2}` : ''}</span>
                             </div>
-                            <div className="col-span-2 border-t border-slate-150 pt-2">
-                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Địa chỉ:</span>
-                              <span className="text-slate-700 font-semibold">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
+                            <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2 md:border-t md:border-slate-150 md:pt-2 border-t border-slate-150 pt-1.5">
+                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Địa chỉ:</span>
+                              <span className="text-slate-700 font-semibold truncate">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
                             </div>
-                            <div>
-                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Số ĐT 1:</span>
+                            <div className="flex items-baseline gap-2 min-w-0 md:block">
+                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Số ĐT 1:</span>
                               <span className="text-slate-850 font-mono font-bold text-slate-850">{edp.PatientPhone1 || '—'}</span>
                             </div>
-                            <div>
-                              <span className="text-slate-400 font-medium block text-[9px] uppercase">Số ĐT 2:</span>
+                            <div className="flex items-baseline gap-2 min-w-0 md:block">
+                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Số ĐT 2:</span>
                               <span className="text-slate-850 font-mono font-bold text-slate-850">{edp.PatientPhone2 || '—'}</span>
                             </div>
                           </div>
@@ -3367,9 +3556,10 @@ export default function App() {
                         </div>
 
                       </div>
+                      </div>
 
                       {/* Sticky Fixed Footer */}
-                      <div className="border-t border-slate-150 p-4 bg-slate-50 flex gap-3 justify-end shrink-0 w-full">
+                      <div className="border-t border-slate-150 p-4 bg-slate-50 flex gap-3 justify-end shrink-0 w-full pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
                         <button
                           type="button"
                           onClick={() => setEditingRegConsultKey(null)}
@@ -3399,7 +3589,7 @@ export default function App() {
       <AnimatePresence>
         {showAddPatient && (
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed">
+            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-4 sm:p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed">
               
               <div className="flex items-center justify-between border-b border-slate-150 pb-2.5 text-[#d2145a]">
                 <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
@@ -3420,7 +3610,7 @@ export default function App() {
               </div>
 
               <form onSubmit={handleAddPatientSubmit} className="space-y-4 font-medium text-slate-700">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[#d2145a] font-extrabold uppercase text-[10px] mb-1">Mã người bệnh *</label>
                     <input
@@ -3444,7 +3634,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Họ và tên bé *</label>
                     <input
@@ -3468,7 +3658,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Ngày sinh *</label>
                     <VNDateInput
@@ -3491,7 +3681,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Số điện thoại 1</label>
                     <input
@@ -3527,7 +3717,7 @@ export default function App() {
                 </div>
 
                 {/* Patient Creator Admin Details (Grayed Out ReadOnly Column inputs) */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Người tạo mới</label>
                     <input
@@ -3703,7 +3893,7 @@ export default function App() {
         onNavigate={(menuId) => navigateMenu(menuId)}
         onOpenMore={() => setIsMobileMoreMenuOpen(true)}
         pendingStaffCount={pendingStaffConsultCount}
-        visibleTabIds={mobileBottomTabIds}
+        quickTabIds={mobileBottomTabIds}
       />
 
       <MobileMoreMenu
@@ -3711,7 +3901,7 @@ export default function App() {
         onClose={() => setIsMobileMoreMenuOpen(false)}
         items={mobileMoreMenuItems}
         activeMenu={activeMenu as ActiveMenuId}
-        onNavigate={(menuId) => navigateMenu(menuId)}
+        onNavigate={(menuId) => handleMobileMoreNavigate(menuId)}
       />
 
     </div>

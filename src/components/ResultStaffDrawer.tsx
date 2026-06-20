@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { AnimatePresence } from 'motion/react';
 import { ClipboardList, Stethoscope } from 'lucide-react';
 import {
@@ -200,7 +201,7 @@ export default function ResultStaffDrawer({
   return (
     <AnimatePresence>
       {consultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in duration-200">
             <div 
               className="absolute inset-0" 
               onClick={() => {
@@ -208,9 +209,9 @@ export default function ResultStaffDrawer({
                 setIsEditing(false);
               }}
             ></div>
-            <div className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[96vh]">
+            <div className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[96vh]">
               
-              <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
+              <div className="bg-[#d2145a] text-white px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between shadow-sm shrink-0">
                 <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">
                   <Stethoscope className="w-5 h-5 text-white" /> Điền kết quả staff
                 </h3>
@@ -228,30 +229,44 @@ export default function ResultStaffDrawer({
               {/* Output Form Frame */}
               <form 
                 onSubmit={submitResultUpdate} 
-                className="flex-1 overflow-y-auto p-6 text-xs text-slate-700 leading-relaxed font-sans"
+                className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-sans"
               >
+                <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-4 md:p-6">
                 <div className="space-y-6">
                       
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch animate-in fade-in duration-300">
                         
                         {/* Khung 1: Bệnh nhi đang hội chẩn (Hành chính) */}
                         <div className="lg:col-span-3 flex flex-col">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4.5 space-y-3 relative shadow-sm h-full flex flex-col justify-between">
+                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4.5 space-y-1 md:space-y-3 relative shadow-sm h-full flex flex-col justify-between">
                             <div>
-                              <div className="flex items-center border-b border-slate-100 pb-2">
+                              <div className="hidden md:flex items-center border-b border-slate-100 pb-2">
                                 <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-slate-400">Bệnh nhi đang hội chẩn</span>
                               </div>
                               
-                              <h4 className="text-sm font-black text-[#d2145a] uppercase leading-tight mt-3">{patient.PatientName}</h4>
-                              {patient.OtherPatientName && (
-                                <p className="text-[10px] text-slate-400 font-medium italic mt-1">Tên khác: {patient.OtherPatientName}</p>
-                              )}
+                              <div className="flex items-start justify-between gap-2 mt-0 md:mt-3">
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-sm font-black text-[#d2145a] uppercase leading-tight">{patient.PatientName}</h4>
+                                  {patient.OtherPatientName && (
+                                    <p className="text-[10px] text-slate-400 font-medium italic mt-0.5 md:mt-1">Tên khác: {patient.OtherPatientName}</p>
+                                  )}
+                                </div>
+                                <PatientAdminEditButton
+                                  className="md:hidden shrink-0"
+                                  onClick={() => {
+                                    onEditPatientAdmin(patient);
+                                    handleClose();
+                                  }}
+                                />
+                              </div>
                               
-                              <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium pt-3 border-t border-slate-100 mt-3">
+                              <div className="grid grid-cols-1 gap-y-1 md:gap-y-1.5 text-[11px] text-slate-600 font-medium pt-1.5 mt-1.5 md:pt-3 md:mt-3 border-t border-slate-100">
                                 <p><span className="text-slate-400">Mã BN 1:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientID1 || ''}</span></p>
                                 {patient.PatientID2 && <p><span className="text-slate-400">Mã BN 2:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientID2}</span></p>}
-                                <p><span className="text-slate-400">Ngày sinh:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(patient.PatientDOB)}</span></p>
-                                <p><span className="text-slate-400">Tuổi:</span> <span className="font-bold text-rose-600 font-mono">{getExcelAgeHelper(patient.PatientDOB)}</span></p>
+                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0 md:contents">
+                                  <p><span className="text-slate-400">Ngày sinh:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(patient.PatientDOB)}</span></p>
+                                  <p><span className="text-slate-400">Tuổi:</span> <span className="font-bold text-rose-600 font-mono">{getExcelAgeHelper(patient.PatientDOB)}</span></p>
+                                </div>
                                 <p><span className="text-slate-400">Giới tính:</span> <span className="font-bold text-slate-800">{patient.PatientSex}</span></p>
                                 {patient.PatientAddress && <p className="col-span-1"><span className="text-slate-400">Địa chỉ:</span> <span className="font-bold text-slate-800 leading-tight">{patient.PatientAddress}</span></p>}
                                 {patient.PatientPhone1 && <p><span className="text-slate-400">Số ĐT 1:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientPhone1}</span></p>}
@@ -259,8 +274,8 @@ export default function ResultStaffDrawer({
                               </div>
                             </div>
 
-                            <div className="space-y-4">
-                               <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100">
+                            <div className="space-y-2 md:space-y-4">
+                               <div className="grid grid-cols-2 gap-2 mt-2 pt-2 md:mt-4 md:pt-4 border-t border-slate-100">
                                   {!isEditing ? (
                                     <>
                                       {formData.PatientHeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Chiều cao:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientHeight} cm</span></p>}
@@ -292,16 +307,13 @@ export default function ResultStaffDrawer({
                                   )}
                                </div>
 
-                              <button
-                                type="button"
+                              <PatientAdminEditButton
+                                className="hidden md:flex mx-auto"
                                 onClick={() => {
                                   onEditPatientAdmin(patient);
                                   handleClose();
                                 }}
-                                className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase text-[10px] px-3 py-2.5 rounded-xl transition-transform hover:scale-[1.02] shrink-0 shadow-sm"
-                              >
-                                ✏ Sửa hành chính
-                              </button>
+                              />
                             </div>
                           </div>
                         </div>
@@ -309,7 +321,7 @@ export default function ResultStaffDrawer({
                         {/* Khung 2: Thông tin hội chẩn */}
                         <div className="lg:col-span-3 flex flex-col">
                           <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4.5 space-y-3 shadow-sm h-full flex flex-col justify-start">
-                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 block border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
+                            <span className="hidden md:block text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
                             
                             {!isEditing ? (
                               <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium pt-1">
@@ -410,9 +422,15 @@ export default function ResultStaffDrawer({
                             
                             {!isEditing ? (
                               <div className="space-y-3 text-[11px] text-slate-600 font-medium pt-1">
-                                <div className="grid grid-cols-2 gap-3.5">
-                                  <p><span className="text-slate-400">ICD:</span> {formData.DiagnosisID ? <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-mono ml-1">{formData.DiagnosisID}</span> : ''}</p>
-                                  <p><span className="text-slate-400">Kết luận chính:</span> {formData.ConsultResultID ? <span className="font-extrabold text-[#d2145a] ml-1">{formData.ConsultResultID}</span> : ''}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3.5">
+                                  <p className="flex items-baseline gap-2 flex-wrap">
+                                    <span className="text-slate-400 shrink-0">ICD:</span>
+                                    {formData.DiagnosisID ? <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-mono">{formData.DiagnosisID}</span> : null}
+                                  </p>
+                                  <p className="flex items-baseline gap-2 flex-wrap">
+                                    <span className="text-slate-400 shrink-0">Kết luận chính:</span>
+                                    {formData.ConsultResultID ? <span className="font-extrabold text-[#d2145a]">{formData.ConsultResultID}</span> : null}
+                                  </p>
                                 </div>
 
                                 <p>
@@ -447,7 +465,7 @@ export default function ResultStaffDrawer({
                               </div>
                             ) : (
                               <div className="space-y-3.5 pt-1">
-                                <div className="grid grid-cols-2 gap-3.5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                   <div>
                                     <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
                                     <SearchableEnumSelect
@@ -463,7 +481,11 @@ export default function ResultStaffDrawer({
                                     />
                                   </div>
                                   <div>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1 font-sans">Kết luận chính <span className="text-red-500">*</span></label>
+                                    <label className="block md:mb-1 text-slate-500 font-bold text-[10px] mb-1 font-sans">
+                                      <span className="md:hidden inline mr-1">Kết luận chính</span>
+                                      <span className="hidden md:inline">Kết luận chính </span>
+                                      <span className="text-red-500">*</span>
+                                    </label>
                                     <SearchableEnumSelect
                                       required
                                       options={CONCLUSION_OPTIONS}
@@ -571,8 +593,11 @@ export default function ResultStaffDrawer({
 
                       </div>
 
-                      {/* Action buttons area */}
-                      <div className="pt-2 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+                </div>
+                </div>
+
+                      {/* Action buttons area — sticky footer */}
+                      <div className="pt-2 border-t border-slate-100 flex justify-end gap-3 shrink-0 px-4 md:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white">
                         {!isEditing ? (
                           <div className="w-full flex justify-end">
                             <button
@@ -592,13 +617,13 @@ export default function ResultStaffDrawer({
                                 setFormData(buildFormState(consult));
                                 setIsEditing(false);
                               }}
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-6 rounded-2xl transition cursor-pointer text-xs font-sans text-center lg:w-48"
+                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl transition cursor-pointer text-xs font-sans text-center lg:w-48"
                             >
-                              Hủy chỉnh sửa
+                              Hủy
                             </button>
                             <button
                               type="submit"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-6 rounded-2xl shadow-md transition cursor-pointer text-xs font-sans text-center font-bold lg:w-48"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl shadow-md transition cursor-pointer text-xs font-sans text-center font-bold lg:w-48"
                             >
                               ✓ Lưu kết quả
                             </button>
@@ -606,7 +631,6 @@ export default function ResultStaffDrawer({
                         )}
                       </div>
 
-                    </div>
               </form>
             </div>
           </div>

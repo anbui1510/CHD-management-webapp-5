@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, Bell, CheckCheck } from 'lucide-react';
 import type { Consult, Notification, Patient, Staff } from '../types';
 import { formatVNTime } from '../types';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 interface BellNotificationMenuProps {
   staff: Staff;
@@ -25,6 +26,7 @@ export default function BellNotificationMenu({
   onMarkRead,
 }: BellNotificationMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -117,7 +119,13 @@ export default function BellNotificationMenu({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-[125] w-[330px] max-w-[calc(100vw-24px)] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+        <div
+          className={
+            isMobile
+              ? 'fixed inset-x-3 top-[calc(3.25rem+env(safe-area-inset-top))] z-[125] max-h-[min(72dvh,520px)] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 flex flex-col'
+              : 'absolute right-0 top-[calc(100%+8px)] z-[125] w-[330px] max-w-[calc(100vw-24px)] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150'
+          }
+        >
           <div className="px-3 py-2.5 border-b border-slate-100 flex items-center justify-between gap-2">
             <div>
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Thông báo</p>
@@ -135,7 +143,7 @@ export default function BellNotificationMenu({
             )}
           </div>
 
-          <div className="max-h-[360px] overflow-y-auto">
+          <div className={`overflow-y-auto ${isMobile ? 'flex-1 min-h-0' : 'max-h-[360px]'}`}>
             {staffNotifications.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <Bell className="w-8 h-8 mx-auto text-slate-200 mb-2" />

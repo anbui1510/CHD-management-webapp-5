@@ -2,7 +2,7 @@ import React from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import {
   ActiveMenuId,
-  MOBILE_BOTTOM_TAB_ITEMS,
+  getMobileNavItem,
   getNavIcon,
   isBottomTabActive,
   isMoreMenuActive,
@@ -13,7 +13,7 @@ interface MobileBottomNavProps {
   onNavigate: (menuId: ActiveMenuId) => void;
   onOpenMore: () => void;
   pendingStaffCount?: number;
-  visibleTabIds?: ActiveMenuId[];
+  quickTabIds?: ActiveMenuId[];
 }
 
 export default function MobileBottomNav({
@@ -21,13 +21,9 @@ export default function MobileBottomNav({
   onNavigate,
   onOpenMore,
   pendingStaffCount = 0,
-  visibleTabIds,
+  quickTabIds = [],
 }: MobileBottomNavProps) {
-  const tabs = visibleTabIds
-    ? MOBILE_BOTTOM_TAB_ITEMS.filter(tab => visibleTabIds.includes(tab.id))
-    : MOBILE_BOTTOM_TAB_ITEMS;
-
-  const moreActive = isMoreMenuActive(activeMenu);
+  const moreActive = isMoreMenuActive(activeMenu, quickTabIds);
 
   return (
     <nav
@@ -35,22 +31,36 @@ export default function MobileBottomNav({
       aria-label="Điều hướng chính"
     >
       <div className="grid grid-cols-5 min-h-[4rem]">
-        {tabs.map(tab => {
-          const active = isBottomTabActive(activeMenu, tab.id);
+        <button
+          type="button"
+          onClick={() => onNavigate('home')}
+          className={`relative flex flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] font-bold transition ${
+            isBottomTabActive(activeMenu, 'home') ? 'text-[#d2145a]' : 'text-slate-500'
+          }`}
+        >
+          <span className={isBottomTabActive(activeMenu, 'home') ? 'text-[#d2145a]' : 'text-slate-400'}>
+            {getNavIcon('home', 'w-5 h-5')}
+          </span>
+          <span className="truncate max-w-full">Home</span>
+        </button>
+
+        {quickTabIds.map(tabId => {
+          const tab = getMobileNavItem(tabId);
+          const active = isBottomTabActive(activeMenu, tabId);
           return (
             <button
-              key={tab.id}
+              key={tabId}
               type="button"
-              onClick={() => onNavigate(tab.id)}
+              onClick={() => onNavigate(tabId)}
               className={`relative flex flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] font-bold transition ${
                 active ? 'text-[#d2145a]' : 'text-slate-500'
               }`}
             >
               <span className={active ? 'text-[#d2145a]' : 'text-slate-400'}>
-                {getNavIcon(tab.id, 'w-5 h-5')}
+                {getNavIcon(tabId, 'w-5 h-5')}
               </span>
               <span className="truncate max-w-full">{tab.shortLabel || tab.label}</span>
-              {tab.id === 'results-staff' && pendingStaffCount > 0 && (
+              {tabId === 'results-staff' && pendingStaffCount > 0 && (
                 <span className="absolute top-1 right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#d2145a] text-white text-[8px] font-black flex items-center justify-center">
                   {pendingStaffCount > 99 ? '99+' : pendingStaffCount}
                 </span>

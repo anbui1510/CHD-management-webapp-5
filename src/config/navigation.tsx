@@ -50,6 +50,26 @@ export const MOBILE_BOTTOM_TAB_ITEMS: NavMenuItem[] = [
   { id: 'patients', label: 'Hồ sơ', shortLabel: 'Hồ sơ' },
 ];
 
+const MOBILE_SHORT_LABELS: Partial<Record<ActiveMenuId, string>> = {
+  workspace: 'Workspace',
+  'consult-list': 'Hội chẩn',
+  'consult-form': 'ĐK HC',
+  'schedule-view': 'Lịch TT',
+  'cathlab-room': 'P.TT',
+  archive: 'Lưu trữ',
+  'mri-register': 'ĐK MRI',
+  'mri-scheduler': 'XL MRI',
+  'mri-result': 'KQ MRI',
+  'mri-calendar': 'Lịch MRI',
+  'surgery-room': 'P.Mổ',
+  'surgery-scheduler': 'XL Mổ',
+  'surgery-schedule-view': 'Lịch Mổ',
+  'google-sheets': 'Sheets',
+  'excel-export': 'Export',
+  'chd-daily-brief': 'Brief',
+  'staff-mgmt': 'Nhân sự',
+};
+
 export const MOBILE_MORE_MENU_IDS: ActiveMenuId[] = [
   'workspace',
   'consult-list',
@@ -135,6 +155,14 @@ export function getNavIcon(id: ActiveMenuId, className = 'w-4 h-4'): ReactNode {
   }
 }
 
+export function getMobileNavItem(id: ActiveMenuId): NavMenuItem {
+  const preset = MOBILE_BOTTOM_TAB_ITEMS.find(tab => tab.id === id);
+  if (preset) return preset;
+  const label = MOBILE_MORE_LABELS[id] || id;
+  const shortLabel = MOBILE_SHORT_LABELS[id] || label.split(' ')[0]?.slice(0, 8) || label;
+  return { id, label, shortLabel };
+}
+
 export function isBottomTabActive(activeMenu: ActiveMenuId, tabId: ActiveMenuId): boolean {
   if (tabId === 'schedule-tt') {
     return activeMenu === 'schedule-tt' || activeMenu === 'schedule-view';
@@ -145,6 +173,7 @@ export function isBottomTabActive(activeMenu: ActiveMenuId, tabId: ActiveMenuId)
   return activeMenu === tabId;
 }
 
-export function isMoreMenuActive(activeMenu: ActiveMenuId): boolean {
+export function isMoreMenuActive(activeMenu: ActiveMenuId, quickTabIds: ActiveMenuId[] = []): boolean {
+  if (activeMenu === 'home' || quickTabIds.includes(activeMenu)) return false;
   return MOBILE_MORE_MENU_IDS.includes(activeMenu);
 }

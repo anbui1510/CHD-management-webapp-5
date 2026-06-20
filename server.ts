@@ -25,7 +25,7 @@ import { formatAnnouncementVN } from './src/chdDailyBrief/formatAnnouncement';
 import { startChdBriefScheduler } from './src/chdDailyBrief/scheduler';
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
 
 app.use(express.json({ limit: '5mb' }));
 

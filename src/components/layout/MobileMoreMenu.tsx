@@ -31,7 +31,7 @@ export default function MobileMoreMenu({
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
           <div>
             <p className="text-sm font-black text-slate-800 uppercase tracking-wide">Thêm module</p>
-            <p className="text-[10px] text-slate-400 font-medium">Các chức năng khác của hệ thống</p>
+            <p className="text-[10px] text-slate-400 font-medium">Chọn module — sẽ ghim vào thanh dưới</p>
           </div>
           <button
             type="button"
