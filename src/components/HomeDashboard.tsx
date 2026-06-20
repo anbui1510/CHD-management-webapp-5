@@ -16,6 +16,7 @@ import {
   Download,
   Archive,
   Settings,
+  Newspaper,
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
@@ -55,6 +56,7 @@ const SHORTCUTS_POOL = [
   { id: 'surgery-scheduler', label: 'Xếp lịch phẫu thuật', desc: 'Phân ca mổ tim', iconName: 'CalendarDays', color: 'rose' },
   { id: 'surgery-schedule-view', label: 'Lịch mổ dự kiến', desc: 'Xem lịch phòng mổ', iconName: 'CalendarDays', color: 'rose' },
   { id: 'google-sheets', label: 'Google Sheets', desc: 'Cơ sở dữ liệu virtual', iconName: 'Database', color: 'violet' },
+  { id: 'chd-daily-brief', label: 'CHD Daily Brief', desc: 'Bản tin y văn tim mạch nhi 7h sáng', iconName: 'Newspaper', color: 'blue' },
   { id: 'excel-export', label: 'Bảng Filter & Xuất', desc: 'Xuất biên bản hàng loạt', iconName: 'Download', color: 'cyan' },
   { id: 'staff-mgmt', label: 'Quản lý nhân sự', desc: 'Phân quyền module & tài khoản', iconName: 'LayoutDashboard', color: 'indigo' },
 ];
@@ -68,6 +70,7 @@ const renderIcon = (name: string, className: string) => {
     case 'CalendarDays': return <CalendarDays className={className} />;
     case 'Activity': return <Activity className={className} />;
     case 'Database': return <Database className={className} />;
+    case 'Newspaper': return <Newspaper className={className} />;
     case 'Download': return <Download className={className} />;
     case 'Archive': return <Archive className={className} />;
     default: return <Users className={className} />;

@@ -24,7 +24,8 @@ export type AppModule =
   | 'surgery-schedule-view'
   | 'excel-export'
   | 'google-sheets'
-  | 'staff-mgmt';
+  | 'staff-mgmt'
+  | 'chd-daily-brief';
 
 export type AppModuleGroup =
   | 'Chung'
@@ -61,6 +62,7 @@ export const APP_MODULE_DEFINITIONS: AppModuleDefinition[] = [
   { id: 'excel-export', label: 'Bảng Filter_Consult', group: 'Quản trị', description: 'Xuất Excel / filter consult' },
   { id: 'google-sheets', label: 'Virtual Google Sheets', group: 'Quản trị', description: 'Sửa dữ liệu trực tiếp trên sheet ảo' },
   { id: 'staff-mgmt', label: 'Quản lý nhân sự', group: 'Quản trị', description: 'Phân quyền module cho nhân viên' },
+  { id: 'chd-daily-brief', label: 'CHD Daily Brief', group: 'Chung', description: 'Bản tin y văn tim mạch nhi mỗi sáng 7h' },
 ];
 
 export const ALL_APP_MODULES: AppModule[] = APP_MODULE_DEFINITIONS.map(item => item.id);

@@ -3,7 +3,7 @@
     "RolePresetID": "admin-khoa",
     "RolePresetLabel": "Admin khoa",
     "RolePresetDescription": "Toàn quyền mọi module và quản trị hệ thống",
-    "Permissions": "home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt",
+    "Permissions": "home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt,chd-daily-brief",
     "SortOrder": 1,
     "IsSystem": true
   },
@@ -18,7 +18,7 @@
     "RolePresetID": "bs-hoi-chan",
     "RolePresetLabel": "BS hội chẩn",
     "RolePresetDescription": "Đăng ký và nhập kết quả staff",
-    "Permissions": "home,workspace,patients,consult-list,results-staff",
+    "Permissions": "home,workspace,patients,consult-list,results-staff,chd-daily-brief",
     "SortOrder": 3
   },
   {

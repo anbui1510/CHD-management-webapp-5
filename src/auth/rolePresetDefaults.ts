@@ -8,7 +8,7 @@ export interface RolePresetRecord {
 }
 
 const ALL_MODULES_CSV =
-  'home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt';
+  'home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt,chd-daily-brief';
 
 export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
   {
@@ -30,7 +30,7 @@ export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
     RolePresetID: 'bs-hoi-chan',
     RolePresetLabel: 'BS hội chẩn',
     RolePresetDescription: 'Đăng ký và nhập kết quả staff',
-    Permissions: 'home,workspace,patients,consult-list,results-staff',
+    Permissions: 'home,workspace,patients,consult-list,results-staff,chd-daily-brief',
     SortOrder: 3,
   },
   {

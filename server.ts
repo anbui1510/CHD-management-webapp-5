@@ -6,12 +6,23 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
 import { Patient, Consult, Staff, CathLab, CMR, Source, DeviceTemplate, RolePreset, Operation, Notification, DoctorPerformanceMark } from './src/types';
 import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
 import { resolveStaffByNameOrKey } from './src/utils/staffNameMatch';
+import { getTopicForDate, formatDateISO, formatDateVN } from './src/chdDailyBrief/topics';
+import {
+  runPipeline,
+  getPipelineStatus,
+  loadBriefContent,
+  getBriefHistory,
+} from './src/chdDailyBrief/runPipeline';
+import { docxPath } from './src/chdDailyBrief/paths';
+import { formatAnnouncementVN } from './src/chdDailyBrief/formatAnnouncement';
+import { startChdBriefScheduler } from './src/chdDailyBrief/scheduler';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -1296,6 +1307,109 @@ app.post('/api/workflow-monitor/run', async (_req, res) => {
   }
 });
 
+// --- CHD Daily Brief ---
+app.get('/api/chd-brief/today', async (_req, res) => {
+  try {
+    const today = new Date();
+    const dateIso = formatDateISO(today);
+    const topic = getTopicForDate(today);
+    const content = loadBriefContent(dateIso);
+    const status = getPipelineStatus();
+    res.json({
+      dateIso,
+      dateVN: formatDateVN(today),
+      topic,
+      content,
+      status,
+      hasDocx: fs.existsSync(docxPath(dateIso)),
+    });
+  } catch (err) {
+    console.error('Error in GET /api/chd-brief/today:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/chd-brief/generate', async (req, res) => {
+  try {
+    const force = Boolean(req.body?.force);
+    const result = await runPipeline({ force });
+    res.json(result);
+  } catch (err) {
+    console.error('Error in POST /api/chd-brief/generate:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error' });
+  }
+});
+
+app.get('/api/chd-brief/history', (_req, res) => {
+  try {
+    res.json(getBriefHistory());
+  } catch (err) {
+    console.error('Error in GET /api/chd-brief/history:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/chd-brief/download/:date', (req, res) => {
+  try {
+    const date = String(req.params.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      res.status(400).json({ error: 'Invalid date format' });
+      return;
+    }
+    const filePath = docxPath(date);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+    res.download(filePath, `CHD_Brief_${date}.docx`);
+  } catch (err) {
+    console.error('Error in GET /api/chd-brief/download:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/chd-brief/announcement/:date', (req, res) => {
+  try {
+    const date = String(req.params.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      res.status(400).json({ error: 'Invalid date format' });
+      return;
+    }
+    const content = loadBriefContent(date);
+    if (!content) {
+      res.status(404).json({ error: 'Brief not found for this date' });
+      return;
+    }
+    res.type('text/plain; charset=utf-8').send(formatAnnouncementVN(content));
+  } catch (err) {
+    console.error('Error in GET /api/chd-brief/announcement:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/chd-brief/content/:date', (req, res) => {
+  try {
+    const date = String(req.params.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      res.status(400).json({ error: 'Invalid date format' });
+      return;
+    }
+    const content = loadBriefContent(date);
+    if (!content) {
+      res.status(404).json({ error: 'Brief not found for this date' });
+      return;
+    }
+    res.json(content);
+  } catch (err) {
+    console.error('Error in GET /api/chd-brief/content:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/chd-brief/status', (_req, res) => {
+  res.json(getPipelineStatus());
+});
+
 // Routes
 app.get('/api/staff', async (req, res) => {
   await syncFromGoogleSheets();
@@ -1842,6 +1956,7 @@ async function launch() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+    startChdBriefScheduler();
   });
 }
 

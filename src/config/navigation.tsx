@@ -12,6 +12,7 @@ import {
   Home,
   LayoutDashboard,
   UserCog,
+  Newspaper,
 } from 'lucide-react';
 
 export type ActiveMenuId =
@@ -38,6 +39,7 @@ export const SIDEBAR_MENU_ITEMS: NavMenuItem[] = [
   { id: 'mri-calendar', label: 'Lịch chụp MRI' },
   { id: 'google-sheets', label: 'Virtual Google Sheets' },
   { id: 'excel-export', label: 'Bảng Filter_Consult' },
+  { id: 'chd-daily-brief', label: 'CHD Daily Brief' },
   { id: 'staff-mgmt', label: 'Quản lý nhân sự' },
 ];
 
@@ -64,6 +66,7 @@ export const MOBILE_MORE_MENU_IDS: ActiveMenuId[] = [
   'surgery-schedule-view',
   'google-sheets',
   'excel-export',
+  'chd-daily-brief',
   'staff-mgmt',
 ];
 
@@ -83,6 +86,7 @@ const MOBILE_MORE_LABELS: Partial<Record<ActiveMenuId, string>> = {
   'surgery-schedule-view': 'Xem lịch mổ',
   'google-sheets': 'Virtual Google Sheets',
   'excel-export': 'Bảng Filter_Consult',
+  'chd-daily-brief': 'CHD Daily Brief',
   'staff-mgmt': 'Quản lý nhân sự',
 };
 
@@ -119,6 +123,8 @@ export function getNavIcon(id: ActiveMenuId, className = 'w-4 h-4'): ReactNode {
       return <Database className={className} />;
     case 'excel-export':
       return <Download className={className} />;
+    case 'chd-daily-brief':
+      return <Newspaper className={className} />;
     case 'staff-mgmt':
     case 'profile':
       return <UserCog className={className} />;

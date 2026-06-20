@@ -46,6 +46,7 @@ import MRIResultView from './components/MRIResultView';
 import MRICalendarView from './components/MRICalendarView';
 import SurgeryRoomView from './components/SurgeryRoomView';
 import DevelopingFeatureView from './components/DevelopingFeatureView';
+import ChdDailyBriefView from './components/ChdDailyBriefView';
 import StaffManagementView from './components/StaffManagementView';
 import StaffAccountMenu from './components/StaffAccountMenu';
 import BellNotificationMenu from './components/BellNotificationMenu';
@@ -260,7 +261,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'staff-mgmt'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
   const [profileReturnMenu, setProfileReturnMenu] = useState<typeof activeMenu>('home');
   const [isStaffAccountMenuOpen, setIsStaffAccountMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -1581,6 +1582,12 @@ export default function App() {
           subtitle: "Module 6 · Gán vai trò và quyền truy cập",
           icon: <UserCog className="w-5 h-5 text-pink-200" />
         };
+      case 'chd-daily-brief':
+        return {
+          title: "CHD DAILY BRIEF",
+          subtitle: "Bản tin y văn tim mạch nhi mỗi sáng 7h",
+          icon: <FileText className="w-5 h-5 text-pink-200" />
+        };
       default:
         return {
           title: "HỆ THỐNG QUẢN LÝ TIM BẨM SINH - KHOA TIM MẠCH - BVNĐTP",
@@ -1757,7 +1764,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -2995,6 +3002,11 @@ export default function App() {
               triggerAlert={triggerAlert}
               triggerConfirm={triggerConfirm}
             />
+          )}
+
+          {/* CHD DAILY BRIEF */}
+          {activeMenu === 'chd-daily-brief' && (
+            <ChdDailyBriefView />
           )}
 
           {/* VIRTUAL GOOGLE SHEETS */}
