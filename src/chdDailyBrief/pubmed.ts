@@ -4,16 +4,17 @@ import type { DailyTopic } from './types';
 const ESEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
 const EFETCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi';
 
-function getToolParams(): Record<string, string> {
+function getToolParams(config?: { email?: string; tool?: string }): Record<string, string> {
   return {
-    tool: process.env.PUBMED_TOOL || 'chd-daily-brief',
-    email: process.env.PUBMED_EMAIL || 'chd-brief@example.com',
+    tool: config?.tool || process.env.PUBMED_TOOL || 'chd-daily-brief',
+    email: config?.email || process.env.PUBMED_EMAIL || 'chd-brief@example.com',
   };
 }
 
 async function esearch(
   query: string,
-  options: { retmax: number; sort: string; mindate?: string }
+  options: { retmax: number; sort: string; mindate?: string },
+  config?: { email?: string; tool?: string }
 ): Promise<string[]> {
   const params = new URLSearchParams({
     db: 'pubmed',
@@ -21,7 +22,7 @@ async function esearch(
     retmode: 'json',
     retmax: String(options.retmax),
     sort: options.sort,
-    ...getToolParams(),
+    ...getToolParams(config),
   });
   if (options.mindate) {
     params.set('mindate', options.mindate.replace(/-/g, '/'));
@@ -81,29 +82,32 @@ function parsePubMedXml(xml: string): PubMedArticle[] {
   return articles;
 }
 
-async function efetchMetadata(pmids: string[]): Promise<PubMedArticle[]> {
+async function efetchMetadata(pmids: string[], config?: { email?: string; tool?: string }): Promise<PubMedArticle[]> {
   if (pmids.length === 0) return [];
   const params = new URLSearchParams({
     db: 'pubmed',
     id: pmids.join(','),
     retmode: 'xml',
-    ...getToolParams(),
+    ...getToolParams(config),
   });
   const res = await fetch(`${EFETCH_URL}?${params}`);
   if (!res.ok) throw new Error(`PubMed efetch failed: ${res.status}`);
   return parsePubMedXml(await res.text());
 }
 
-export async function searchPubMedForTopic(topic: DailyTopic): Promise<PubMedArticle[]> {
+export async function searchPubMedForTopic(
+  topic: DailyTopic,
+  config?: { email?: string; tool?: string }
+): Promise<PubMedArticle[]> {
   const currentYear = new Date().getFullYear();
   const query1 = `(${topic.keywords}) AND congenital heart disease AND pediatrics`;
   const query2 = `(${topic.keywords}) AND (randomized controlled trial OR systematic review OR meta-analysis) AND congenital heart disease`;
 
   const [ids1, ids2] = await Promise.all([
-    esearch(query1, { retmax: 10, sort: 'pub_date', mindate: `${currentYear - 1}/01/01` }),
-    esearch(query2, { retmax: 8, sort: 'relevance', mindate: '2023/01/01' }),
+    esearch(query1, { retmax: 10, sort: 'pub_date', mindate: `${currentYear - 1}/01/01` }, config),
+    esearch(query2, { retmax: 8, sort: 'relevance', mindate: '2023/01/01' }, config),
   ]);
 
   const uniqueIds = [...new Set([...ids1, ...ids2])].slice(0, 12);
-  return efetchMetadata(uniqueIds);
+  return efetchMetadata(uniqueIds, config);
 }

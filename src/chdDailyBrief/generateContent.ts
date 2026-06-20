@@ -79,9 +79,10 @@ function validateContent(data: unknown): ChdBriefContent {
 export async function generateBriefContent(
   topic: DailyTopic,
   articles: PubMedArticle[],
-  date: Date = new Date()
+  date: Date = new Date(),
+  options?: { apiKey?: string }
 ): Promise<ChdBriefContent> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = options?.apiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY chưa được cấu hình');
 
   const ai = new GoogleGenAI({ apiKey });

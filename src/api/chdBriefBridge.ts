@@ -89,7 +89,7 @@ export async function handleChdBriefRequest(
       {
         success: false,
         error:
-          'Không kết nối được API server. CHD Daily Brief cần deploy Node server (npm start) với GEMINI_API_KEY. Trên môi trường tĩnh chỉ xem được chủ đề hôm nay.',
+          'Không kết nối được API. Trên Cloudflare Pages cần Pages Functions + GEMINI_API_KEY. Chủ đề hôm nay vẫn xem được offline.',
       },
       { status: 503 }
     );

@@ -11,8 +11,9 @@ import {
   BookOpen,
   Sparkles,
 } from 'lucide-react';
-import { parseJsonResponse } from '../chdDailyBrief/browserApi';
-import { saveCachedBrief } from '../chdDailyBrief/browserApi';
+import { parseJsonResponse, loadCachedBrief, saveCachedBrief } from '../chdDailyBrief/browserApi';
+import { downloadBriefDocx } from '../chdDailyBrief/buildDocxBlob';
+import { formatAnnouncementVN } from '../chdDailyBrief/formatAnnouncement';
 import type { ChdBriefContent } from '../chdDailyBrief/types';
 
 interface ChdArticle {
@@ -165,8 +166,8 @@ export default function ChdDailyBriefView() {
       if (data.content) {
         setContent(data.content);
         saveCachedBrief(data.content);
+        setHasDocx(true);
       }
-      setHasDocx(true);
       await loadToday();
       await loadHistory();
     } catch (err) {
@@ -180,6 +181,13 @@ export default function ChdDailyBriefView() {
   const handleCopyAnnouncement = async () => {
     const date = selectedDate || dateIso;
     try {
+      const cached = content || loadCachedBrief(date);
+      if (cached) {
+        await navigator.clipboard.writeText(formatAnnouncementVN(cached));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      }
       const res = await fetch(`/api/chd-brief/announcement/${date}`);
       if (!res.ok) throw new Error('Chưa có bản tin cho ngày này');
       const text = await res.text();
@@ -191,8 +199,18 @@ export default function ChdDailyBriefView() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     const date = selectedDate || dateIso;
+    const brief = content || loadCachedBrief(date);
+    if (brief) {
+      try {
+        await downloadBriefDocx(brief);
+        return;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Tải Word thất bại');
+        return;
+      }
+    }
     window.open(`/api/chd-brief/download/${date}`, '_blank');
   };
 
