@@ -1,7 +1,7 @@
 import fs from 'fs';
 import type { BriefIndex, ChdBriefContent, PipelineResult, PipelineStatus } from './types';
 import { getTopicForDate, formatDateISO } from './topics';
-import { searchPubMedForTopic } from './pubmed';
+import { searchAllSourcesForTopic } from './literatureSearch';
 import { filterAndRankArticles } from './filterArticles';
 import { generateBriefContent } from './generateContent';
 import { buildDocx } from './buildDocx';
@@ -82,9 +82,16 @@ export async function runPipeline(options: { force?: boolean; date?: Date } = {}
   }
 
   try {
-    setStatus('pubmed', 'Đang tra cứu PubMed...', dateIso);
-    const rawArticles = await searchPubMedForTopic(topic);
-    if (rawArticles.length === 0) throw new Error('Không tìm thấy bài trên PubMed');
+    setStatus('pubmed', 'Đang tra cứu PubMed, PMC, Europe PMC, Cochrane, Semantic Scholar, OpenAlex...', dateIso);
+    const { articles: rawArticles, sourcesHit } = await searchAllSourcesForTopic(topic);
+    if (rawArticles.length === 0) {
+      throw new Error(
+        'Không tìm thấy bài trên các nguồn (PubMed, PMC, Embase, Cochrane, Semantic Scholar, OpenAlex). Thử lại sau hoặc đổi chủ đề.'
+      );
+    }
+    if (sourcesHit.length) {
+      setStatus('pubmed', `Đã tìm thấy ${rawArticles.length} bài từ: ${sourcesHit.join(', ')}`, dateIso);
+    }
 
     setStatus('filter', 'Đang lọc và chọn 5 bài chất lượng cao...', dateIso);
     const selected = filterAndRankArticles(rawArticles, 5);

@@ -26,6 +26,8 @@ export interface PubMedArticle {
   pubDate: string;
   doi: string;
   pubTypes: string[];
+  /** Nguồn tra cứu: PubMed/MEDLINE, PMC, Europe PMC, Cochrane, Semantic Scholar, OpenAlex, … */
+  source?: string;
 }
 
 export interface DailyTopic {

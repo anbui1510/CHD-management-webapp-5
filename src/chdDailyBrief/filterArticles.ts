@@ -1,4 +1,5 @@
 import type { PubMedArticle } from './types';
+import { articleDedupeKey } from './literatureSearch';
 
 const TOP_JOURNALS = [
   'circulation', 'journal of the american college of cardiology', 'jacc', 'jama pediatrics',
@@ -17,11 +18,12 @@ function combinedText(article: PubMedArticle): string {
   return `${article.title} ${article.abstract} ${article.pubTypes.join(' ')}`.toLowerCase();
 }
 
+const CHD_HINTS =
+  /congenit|pediatr|paediatr|fontan|fetal|tetralogy|fallot|switch|ventricular|pulmonary|heart defect|chd|neonat|infant|cardiac surgery|catheter|aortic|truncus|atrial|septal|coarctation|transposition|echocardiograph/i;
+
 function shouldExclude(article: PubMedArticle): boolean {
   const text = combinedText(article);
-  if (!text.includes('congenit') && !text.includes('pediatr') && !text.includes('fontan') && !text.includes('fetal')) {
-    return true;
-  }
+  if (!CHD_HINTS.test(text)) return true;
   return EXCLUDE_PATTERNS.some(p => p.test(text));
 }
 
@@ -65,7 +67,12 @@ function scoreArticle(article: PubMedArticle): number {
 
 export function filterAndRankArticles(articles: PubMedArticle[], count = 5): PubMedArticle[] {
   const seen = new Set<string>();
-  const candidates = articles.filter(a => { if (seen.has(a.pmid)) return false; seen.add(a.pmid); return true; });
+  const candidates = articles.filter(a => {
+    const key = articleDedupeKey(a);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   let filtered = candidates.filter(a => !shouldExclude(a));
   if (filtered.length < count) {

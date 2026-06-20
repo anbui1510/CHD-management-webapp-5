@@ -1,5 +1,6 @@
 import type { PubMedArticle } from './types';
 import type { DailyTopic } from './types';
+import { buildPlainQuery, buildTopicQuery } from './buildQuery';
 
 const ESEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
 const EFETCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi';
@@ -13,11 +14,12 @@ function getToolParams(config?: { email?: string; tool?: string }): Record<strin
 
 async function esearch(
   query: string,
+  db: 'pubmed' | 'pmc',
   options: { retmax: number; sort: string; mindate?: string },
   config?: { email?: string; tool?: string }
 ): Promise<string[]> {
   const params = new URLSearchParams({
-    db: 'pubmed',
+    db,
     term: query,
     retmode: 'json',
     retmax: String(options.retmax),
@@ -30,12 +32,12 @@ async function esearch(
   }
 
   const res = await fetch(`${ESEARCH_URL}?${params}`);
-  if (!res.ok) throw new Error(`PubMed esearch failed: ${res.status}`);
+  if (!res.ok) throw new Error(`NCBI esearch (${db}) failed: ${res.status}`);
   const data = await res.json();
   return data?.esearchresult?.idlist ?? [];
 }
 
-function parsePubMedXml(xml: string): PubMedArticle[] {
+function parsePubMedXml(xml: string, source: string): PubMedArticle[] {
   const articles: PubMedArticle[] = [];
   const articleBlocks = xml.split(/<PubmedArticle>/).slice(1);
 
@@ -76,23 +78,63 @@ function parsePubMedXml(xml: string): PubMedArticle[] {
       pubTypes.push(ptMatch[1].trim());
     }
 
-    articles.push({ pmid: pmidMatch[1], title, abstract, authors, journal, pubDate, doi, pubTypes });
+    articles.push({ pmid: pmidMatch[1], title, abstract, authors, journal, pubDate, doi, pubTypes, source });
   }
 
   return articles;
 }
 
-async function efetchMetadata(pmids: string[], config?: { email?: string; tool?: string }): Promise<PubMedArticle[]> {
+async function efetchMetadata(
+  pmids: string[],
+  db: 'pubmed' | 'pmc',
+  sourceLabel: string,
+  config?: { email?: string; tool?: string }
+): Promise<PubMedArticle[]> {
   if (pmids.length === 0) return [];
   const params = new URLSearchParams({
-    db: 'pubmed',
+    db,
     id: pmids.join(','),
     retmode: 'xml',
     ...getToolParams(config),
   });
   const res = await fetch(`${EFETCH_URL}?${params}`);
-  if (!res.ok) throw new Error(`PubMed efetch failed: ${res.status}`);
-  return parsePubMedXml(await res.text());
+  if (!res.ok) throw new Error(`NCBI efetch (${db}) failed: ${res.status}`);
+  return parsePubMedXml(await res.text(), sourceLabel);
+}
+
+export async function searchPubMedQuery(
+  query: string,
+  config?: { email?: string; tool?: string; mindate?: string; retmax?: number }
+): Promise<PubMedArticle[]> {
+  const currentYear = new Date().getFullYear();
+  const ids = await esearch(
+    query,
+    'pubmed',
+    {
+      retmax: config?.retmax ?? 15,
+      sort: 'relevance',
+      mindate: config?.mindate ?? `${currentYear - 2}/01/01`,
+    },
+    config
+  );
+  return efetchMetadata(ids, 'pubmed', 'PubMed / MEDLINE', config);
+}
+
+export async function searchPmcQuery(
+  query: string,
+  config?: { email?: string; tool?: string; retmax?: number }
+): Promise<PubMedArticle[]> {
+  const ids = await esearch(
+    query,
+    'pmc',
+    { retmax: config?.retmax ?? 12, sort: 'relevance' },
+    config
+  );
+  const articles = await efetchMetadata(ids.slice(0, 12), 'pmc', 'PubMed Central (PMC)', config);
+  return articles.map(a => ({
+    ...a,
+    pmid: a.pmid || `pmc-${ids[articles.indexOf(a)]}`,
+  }));
 }
 
 export async function searchPubMedForTopic(
@@ -100,14 +142,32 @@ export async function searchPubMedForTopic(
   config?: { email?: string; tool?: string }
 ): Promise<PubMedArticle[]> {
   const currentYear = new Date().getFullYear();
-  const query1 = `(${topic.keywords}) AND congenital heart disease AND pediatrics`;
-  const query2 = `(${topic.keywords}) AND (randomized controlled trial OR systematic review OR meta-analysis) AND congenital heart disease`;
+  const mindate = `${currentYear - 2}/01/01`;
 
-  const [ids1, ids2] = await Promise.all([
-    esearch(query1, { retmax: 10, sort: 'pub_date', mindate: `${currentYear - 1}/01/01` }, config),
-    esearch(query2, { retmax: 8, sort: 'relevance', mindate: '2023/01/01' }, config),
-  ]);
+  const queries = [
+    buildTopicQuery(topic, 'normal'),
+    buildTopicQuery(topic, 'strict'),
+    buildTopicQuery(topic, 'broad'),
+    buildPlainQuery(topic),
+  ];
 
-  const uniqueIds = [...new Set([...ids1, ...ids2])].slice(0, 12);
-  return efetchMetadata(uniqueIds, config);
+  const idSets: string[] = [];
+  for (const q of queries) {
+    const ids = await esearch(q, 'pubmed', { retmax: 12, sort: 'relevance', mindate }, config);
+    idSets.push(...ids);
+    if (idSets.length >= 8) break;
+  }
+
+  if (idSets.length === 0) {
+    const broadIds = await esearch(
+      buildTopicQuery(topic, 'broad'),
+      'pubmed',
+      { retmax: 15, sort: 'relevance' },
+      config
+    );
+    idSets.push(...broadIds);
+  }
+
+  const uniqueIds = [...new Set(idSets)].slice(0, 20);
+  return efetchMetadata(uniqueIds, 'pubmed', 'PubMed / MEDLINE', config);
 }

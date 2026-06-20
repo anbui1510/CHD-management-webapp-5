@@ -1,5 +1,5 @@
 import { getTopicForDate, formatDateISO, formatDateVN } from './topics';
-import { searchPubMedForTopic } from './pubmed';
+import { searchAllSourcesForTopic } from './literatureSearch';
 import { filterAndRankArticles } from './filterArticles';
 import { generateBriefContent } from './generateContent';
 
@@ -70,7 +70,8 @@ export async function handleChdBriefRequest(request: Request, env: ChdBriefEnv):
       return json(
         {
           success: false,
-          error: 'Thiếu GEMINI_API_KEY. Thêm biến môi trường trên Cloudflare Dashboard.',
+          error:
+            'Thiếu GEMINI_API_KEY lúc chạy (Runtime). Vào Workers & Pages → chdmanagementwebapp5 → Settings → Variables and Secrets (mục Runtime, không phải Build) → Add → Type: Secret → Name: GEMINI_API_KEY → redeploy.',
         },
         503
       );
@@ -78,9 +79,16 @@ export async function handleChdBriefRequest(request: Request, env: ChdBriefEnv):
 
     try {
       const topic = getTopicForDate(today);
-      const rawArticles = await searchPubMedForTopic(topic, pubmedConfig);
+      const { articles: rawArticles, sourcesHit } = await searchAllSourcesForTopic(topic, pubmedConfig);
       if (rawArticles.length === 0) {
-        return json({ success: false, error: 'Không tìm thấy bài trên PubMed' }, 404);
+        return json(
+          {
+            success: false,
+            error:
+              'Không tìm thấy bài trên các nguồn (PubMed, PMC, Embase, Cochrane, Semantic Scholar, OpenAlex).',
+          },
+          404
+        );
       }
 
       const selected = filterAndRankArticles(rawArticles, 5);
@@ -92,7 +100,7 @@ export async function handleChdBriefRequest(request: Request, env: ChdBriefEnv):
         apiKey: env.GEMINI_API_KEY,
       });
 
-      return json({ success: true, content, skipped: false });
+      return json({ success: true, content, skipped: false, sourcesHit });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return json({ success: false, error: message }, 500);
