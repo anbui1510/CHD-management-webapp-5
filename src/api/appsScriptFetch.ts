@@ -1,3 +1,5 @@
+import { handleChdBriefRequest } from './chdBriefBridge';
+
 type SheetData = {
   patients: any[];
   consults: any[];
@@ -419,8 +421,13 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     });
   }
 
-  // Server-only endpoints (PubMed, Gemini, docx) — always pass through to Express
-  if (endpoint === 'chd-brief' || endpoint === 'workflow-monitor') {
+  // CHD Daily Brief: try real server first, fallback to client cache
+  if (endpoint === 'chd-brief') {
+    const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
+    return handleChdBriefRequest(parts, method, init, nativeFetch || fetch);
+  }
+
+  if (endpoint === 'workflow-monitor') {
     return null;
   }
 
@@ -451,6 +458,7 @@ export const installAppsScriptFetchBridge = () => {
   (window as any).__CHD_APPS_SCRIPT_FETCH_BRIDGE__ = true;
 
   const nativeFetch = window.fetch.bind(window);
+  (window as any).__CHD_NATIVE_FETCH__ = nativeFetch;
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const handled = await handleApiRequest(input, init);
     if (handled) return handled;

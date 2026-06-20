@@ -1948,16 +1948,25 @@ async function launch() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    // Serve HTML
-    app.get('*', (req, res) => {
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        return next();
+      }
       res.sendFile(path.join(distPath, 'index.html'));
+    });
+    app.use('/api', (_req, res) => {
+      res.status(404).json({ error: 'API route not found' });
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-    startChdBriefScheduler();
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+      startChdBriefScheduler();
+    });
+  }
 }
 
 launch();
+
+export default app;

@@ -11,13 +11,9 @@ import {
   BookOpen,
   Sparkles,
 } from 'lucide-react';
-
-interface DailyTopic {
-  topic: string;
-  keywords: string;
-  purpose: string;
-  preferredTypes: string;
-}
+import { parseJsonResponse } from '../chdDailyBrief/browserApi';
+import { saveCachedBrief } from '../chdDailyBrief/browserApi';
+import type { ChdBriefContent } from '../chdDailyBrief/types';
 
 interface ChdArticle {
   titleNews: string;
@@ -30,11 +26,11 @@ interface ChdArticle {
   doi: string;
 }
 
-interface ChdBriefContent {
-  DATE_VN: string;
-  DATE_ISO: string;
-  TOPIC: string;
-  articles: ChdArticle[];
+interface DailyTopic {
+  topic: string;
+  keywords: string;
+  purpose: string;
+  preferredTypes: string;
 }
 
 interface PipelineStatus {
@@ -83,7 +79,14 @@ export default function ChdDailyBriefView() {
     try {
       const res = await fetch('/api/chd-brief/today');
       if (!res.ok) throw new Error('Không tải được dữ liệu');
-      const data = await res.json();
+      const data = await parseJsonResponse(res) as {
+        dateIso: string;
+        dateVN: string;
+        topic: DailyTopic;
+        content: ChdBriefContent | null;
+        status: PipelineStatus;
+        hasDocx: boolean;
+      };
       setDateIso(data.dateIso);
       setDateVN(data.dateVN);
       setTopic(data.topic);
@@ -101,10 +104,8 @@ export default function ChdDailyBriefView() {
   const loadHistory = useCallback(async () => {
     try {
       const res = await fetch('/api/chd-brief/history');
-      if (res.ok) {
-        const data = await res.json();
-        setHistory(data.entries ?? []);
-      }
+      const data = await parseJsonResponse(res) as { entries?: HistoryEntry[] };
+      setHistory(data.entries ?? []);
     } catch {
       // ignore
     }
@@ -115,7 +116,7 @@ export default function ChdDailyBriefView() {
     try {
       const res = await fetch(`/api/chd-brief/content/${date}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await parseJsonResponse(res) as ChdBriefContent;
         setContent(data);
         setHasDocx(true);
       } else {
@@ -136,7 +137,7 @@ export default function ChdDailyBriefView() {
   const pollStatus = useCallback(async () => {
     const res = await fetch('/api/chd-brief/status');
     if (res.ok) {
-      const s = await res.json();
+      const s = await parseJsonResponse(res) as PipelineStatus;
       setStatus(s);
       return s;
     }
@@ -152,11 +153,19 @@ export default function ChdDailyBriefView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force }),
       });
-      const data = await res.json();
+      const data = await parseJsonResponse(res) as {
+        success?: boolean;
+        skipped?: boolean;
+        error?: string;
+        content?: ChdBriefContent;
+      };
       if (!data.success && !data.skipped) {
         throw new Error(data.error || 'Tạo bản tin thất bại');
       }
-      if (data.content) setContent(data.content);
+      if (data.content) {
+        setContent(data.content);
+        saveCachedBrief(data.content);
+      }
       setHasDocx(true);
       await loadToday();
       await loadHistory();
