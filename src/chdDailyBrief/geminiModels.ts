@@ -1,0 +1,63 @@
+/** Models with free-tier quota (gemini-2.0-flash shut down / limit 0 on free tier as of mid-2026). */
+export const GEMINI_FREE_TIER_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+] as const;
+
+export type GeminiModelId = (typeof GEMINI_FREE_TIER_MODELS)[number] | string;
+
+export function resolveGeminiModels(preferred?: string): string[] {
+  const trimmed = preferred?.trim();
+  if (trimmed) {
+    const rest = GEMINI_FREE_TIER_MODELS.filter(m => m !== trimmed);
+    return [trimmed, ...rest];
+  }
+  return [...GEMINI_FREE_TIER_MODELS];
+}
+
+export function isGeminiQuotaError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    msg.includes('429') ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('quota exceeded') ||
+    msg.includes('rate limit') ||
+    msg.includes('limit: 0')
+  );
+}
+
+export function formatGeminiUserError(err: unknown, lastModel?: string): string {
+  const raw = err instanceof Error ? err.message : String(err);
+
+  if (raw.includes('prepayment credits are depleted')) {
+    return 'Hết credit Gemini (prepay). Vào https://ai.studio/projects → Billing để nạp thêm, hoặc dùng API key project Free tier.';
+  }
+
+  if (raw.includes('free_tier') && (raw.includes('limit: 0') || raw.includes('gemini-2.0-flash'))) {
+    return `Model ${lastModel ?? 'gemini-2.0-flash'} không còn trên free tier. Đặt GEMINI_MODEL=gemini-2.5-flash trên Cloudflare (Runtime Secret/Variable) và redeploy.`;
+  }
+
+  if (raw.includes('free_tier') || raw.includes('Quota exceeded')) {
+    return 'Vượt quota free tier Gemini (RPM/RPD). Đợi ~1 phút rồi thử lại, hoặc xem https://ai.dev/rate-limit . Gợi ý: GEMINI_MODEL=gemini-2.5-flash-lite (nhẹ hơn).';
+  }
+
+  if (raw.includes('API key not valid') || raw.includes('invalid_api_key')) {
+    return 'API key Gemini không hợp lệ. Kiểm tra GEMINI_API_KEY trên Cloudflare Runtime Secrets.';
+  }
+
+  const short = raw.length > 280 ? `${raw.slice(0, 280)}…` : raw;
+  return `Gemini lỗi${lastModel ? ` (model: ${lastModel})` : ''}: ${short}`;
+}
+
+export function parseRetryDelayMs(err: unknown): number {
+  const raw = err instanceof Error ? err.message : String(err);
+  const match = raw.match(/retry in ([\d.]+)s/i);
+  if (match) return Math.ceil(parseFloat(match[1]) * 1000) + 500;
+  return 0;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export { sleep };

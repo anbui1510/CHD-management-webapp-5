@@ -5,6 +5,7 @@ import { generateBriefContent } from './generateContent';
 
 export interface ChdBriefEnv {
   GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
   PUBMED_EMAIL?: string;
   PUBMED_TOOL?: string;
 }
@@ -98,6 +99,7 @@ export async function handleChdBriefRequest(request: Request, env: ChdBriefEnv):
 
       const content = await generateBriefContent(topic, selected, today, {
         apiKey: env.GEMINI_API_KEY,
+        model: env.GEMINI_MODEL,
       });
 
       return json({ success: true, content, skipped: false, sourcesHit });
