@@ -11,7 +11,13 @@ import {
   BookOpen,
   Sparkles,
 } from 'lucide-react';
-import { parseJsonResponse, loadCachedBrief, saveCachedBrief } from '../chdDailyBrief/browserApi';
+import {
+  parseJsonResponse,
+  loadCachedBrief,
+  saveCachedBrief,
+  getTodayClientPayload,
+  getHistoryClientPayload,
+} from '../chdDailyBrief/browserApi';
 import { downloadBriefDocx } from '../chdDailyBrief/buildDocxBlob';
 import { formatAnnouncementVN } from '../chdDailyBrief/formatAnnouncement';
 import type { ChdBriefContent } from '../chdDailyBrief/types';
@@ -77,9 +83,19 @@ export default function ChdDailyBriefView() {
   const loadToday = useCallback(async () => {
     setLoading(true);
     setError('');
+    const local = getTodayClientPayload();
+    setDateIso(local.dateIso);
+    setDateVN(local.dateVN);
+    setTopic(local.topic);
+    setContent(local.content);
+    setStatus(local.status as PipelineStatus);
+    setHasDocx(local.hasDocx);
+    setSelectedDate(local.dateIso);
+    setLoading(false);
+
     try {
       const res = await fetch('/api/chd-brief/today');
-      if (!res.ok) throw new Error('Không tải được dữ liệu');
+      if (!res.ok) return;
       const data = await parseJsonResponse(res) as {
         dateIso: string;
         dateVN: string;
@@ -91,22 +107,22 @@ export default function ChdDailyBriefView() {
       setDateIso(data.dateIso);
       setDateVN(data.dateVN);
       setTopic(data.topic);
-      setContent(data.content);
+      if (data.content) setContent(data.content);
       setStatus(data.status);
-      setHasDocx(data.hasDocx);
+      setHasDocx(data.hasDocx || Boolean(data.content));
       setSelectedDate(data.dateIso);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Lỗi không xác định');
-    } finally {
-      setLoading(false);
+    } catch {
+      // Giữ dữ liệu local — trang vẫn dùng được khi API chưa sẵn sàng
     }
   }, []);
 
   const loadHistory = useCallback(async () => {
+    setHistory(getHistoryClientPayload().entries);
     try {
       const res = await fetch('/api/chd-brief/history');
+      if (!res.ok) return;
       const data = await parseJsonResponse(res) as { entries?: HistoryEntry[] };
-      setHistory(data.entries ?? []);
+      if (data.entries?.length) setHistory(data.entries);
     } catch {
       // ignore
     }

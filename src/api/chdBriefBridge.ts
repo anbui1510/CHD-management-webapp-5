@@ -26,13 +26,25 @@ async function tryNativeChdBrief(
 ): Promise<Response | null> {
   try {
     const res = await nativeFetch(`/api/chd-brief/${path}`, init);
-    const contentType = res.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
-      const peek = (await res.clone().text()).trimStart().slice(0, 20).toLowerCase();
-      if (peek.startsWith('<!doctype') || peek.startsWith('<html')) return null;
+    const text = await res.clone().text();
+    const trimmed = text.trimStart().toLowerCase();
+    if (
+      trimmed.startsWith('<!doctype') ||
+      trimmed.startsWith('<html') ||
+      (trimmed.startsWith('<') && trimmed.includes('<head'))
+    ) {
+      return null;
     }
-    if (res.status === 404 && path.startsWith('content/')) return null;
-    return res;
+    try {
+      JSON.parse(text);
+    } catch {
+      return null;
+    }
+    return new Response(text, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
   } catch {
     return null;
   }

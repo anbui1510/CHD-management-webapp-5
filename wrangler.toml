@@ -1,9 +1,9 @@
 name = "chd-management-webapp"
+main = "worker/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "dist"
 
-# Required when Cloudflare runs `wrangler deploy` (Workers Builds)
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"

@@ -67,9 +67,9 @@ export function getAnnouncementClient(date: string): string | null {
 export async function parseJsonResponse(res: Response): Promise<unknown> {
   const contentType = res.headers.get('content-type') || '';
   const text = await res.text();
-  if (contentType.includes('text/html') || text.trimStart().toLowerCase().startsWith('<!doctype')) {
+  if (contentType.includes('text/html') || text.trimStart().toLowerCase().startsWith('<!doctype') || text.trimStart().startsWith('<')) {
     throw new Error(
-      'API server chưa sẵn sàng (nhận HTML thay vì JSON). Hãy deploy với Node server (npm start) hoặc chạy npm run dev.'
+      'API chưa hoạt động (nhận HTML thay vì JSON). Kiểm tra Cloudflare Worker + GEMINI_API_KEY.'
     );
   }
   try {
