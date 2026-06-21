@@ -784,7 +784,7 @@ export default function HomeDashboard({
             className="bg-white border border-slate-150 rounded-2xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 relative w-full min-h-[180px] z-20"
           >
             {/* Title & Total info */}
-            <div className="flex flex-col justify-center shrink-0 sm:pr-3 sm:border-r border-[#f1f5f9] sm:h-full w-full sm:w-[155px]">
+            <div className="flex flex-col justify-center shrink-0 pr-16 sm:pr-3 sm:border-r border-[#f1f5f9] sm:h-full w-full sm:w-[155px]">
               <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-tight flex items-center gap-1 shrink-0">
                 <span className="leading-tight whitespace-normal break-words">
                   {chartMetric === 'staff_consults'
@@ -800,7 +800,7 @@ export default function HomeDashboard({
             </div>
 
             {/* Render Bars */}
-            <div className="flex-1 flex items-end justify-around h-full px-2 my-0.5">
+            <div className="flex-1 flex items-end justify-around h-28 sm:h-full px-2 my-0.5">
               {monthlyCathData.map((d) => {
                 const percentage = Math.max((d.value / maxCathCount) * 100, 4);
                 return (
@@ -830,7 +830,7 @@ export default function HomeDashboard({
             </div>
 
             {/* Controls panel: 2 buttons on vertical line */}
-            <div className="flex flex-col items-center justify-between border-l border-[#f1f5f9] pl-2.5 h-full py-0.5 shrink-0 select-none">
+            <div className="absolute top-3 right-3 flex flex-row items-center gap-2 sm:relative sm:top-auto sm:right-auto sm:flex-col sm:items-center sm:justify-between sm:border-l sm:border-[#f1f5f9] sm:pl-2.5 sm:h-full sm:py-0.5 sm:shrink-0 select-none z-30">
               {/* Option 1: Metric Gear/Config Popup */}
               <div className="relative">
                 <button
