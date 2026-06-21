@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Git Pull (Hạn chế Agent)",
+        "type": "shell",
+        "command": "git pull origin main",
+        "problemMatcher": []
+      }
+    ]
+  }

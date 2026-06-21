@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "date": "2026-06-21",
+      "topic": "Fetal Cardiology & Adult Congenital Heart Disease (ACHD)",
+      "createdAt": "2026-06-21T00:00:27.854Z",
+      "status": "error",
+      "error": "GEMINI_API_KEY chưa được cấu hình"
+    }
+  ],
+  "lastAutoRunDate": "2026-06-21"
+}
