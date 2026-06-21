@@ -124,6 +124,35 @@ const getSchedulingWaitlistConsult = (
   return consult;
 };
 
+/**
+ * Returns the consult that is already queued in the CathLab room (TransferredToCathLab=true, no cath result yet)
+ * for the given patientKey. Used to prevent PTV from accidentally creating duplicate ad-hoc records.
+ */
+const getPatientPendingCathLabConsult = (
+  patientKey: string,
+  consults: Consult[],
+  cathlabs: CathLab[]
+): Consult | undefined => {
+  const normalized = normalizePatientKey(patientKey);
+  if (!normalized) return undefined;
+  return consults.find(c => {
+    if (normalizePatientKey(c.PatientKey) !== normalized) return false;
+    const transferred = c.TransferredToCathLab === true
+      || String(c.TransferredToCathLab).trim().toLowerCase() === 'true'
+      || String(c.TransferredToCathLab).trim().toLowerCase() === 'yes'
+      || String(c.TransferredToCathLab).trim().toLowerCase() === 'có';
+    if (!transferred) return false;
+    const isRemoved = c.Removed === true
+      || String(c.Removed).toUpperCase() === 'TRUE'
+      || String(c.Removed).toLowerCase() === 'có'
+      || String(c.Removed).toLowerCase() === 'yes';
+    if (isRemoved) return false;
+    // Only counts if no cath result has been recorded yet
+    if (cathLabHasConsultKey(cathlabs, c.ConsultKey)) return false;
+    return true;
+  });
+};
+
 const parseCathMethods = (methodStr: any): string[] => {
   if (Array.isArray(methodStr)) return methodStr.map(String);
   if (typeof methodStr !== 'string' || !methodStr) return [];
@@ -953,6 +982,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const handleAdHocPatientSelect = (patient: Patient) => {
+    // TH(2) — Check 1: BN đang chờ trong Danh sách chờ TT (đã chuyển phòng, chưa có kết quả)
+    const pendingCathConsult = getPatientPendingCathLabConsult(patient.PatientKey, consults, cathlabs);
+    if (pendingCathConsult) {
+      triggerConfirm(
+        `BN "${patient.PatientName}" đang có trong danh sách chờ thông tim phòng cathlab. Bạn có muốn mở phiếu kết quả của BN này thay vì tạo mới?`,
+        () => {
+          setIsAdHocModalOpen(false);
+          setAdHocSelectedPatientKey('');
+          setAdHocSearchQuery('');
+          setActiveTab('pending');
+          openPendingForm(pendingCathConsult, patient);
+        },
+        'BN đã trong danh sách chờ TT'
+      );
+      return;
+    }
+
+    // TH(1)/(2) — Check 2: BN đang chờ trong view Xếp lịch (chưa chuyển phòng)
     const waitlistConsult = getSchedulingWaitlistConsult(patient.PatientKey, consults, patients);
     if (waitlistConsult) {
       triggerConfirm(
@@ -986,8 +1033,26 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      }
 
      if (adHocPatientMode === 'existing' && adHocSelectedPatientKey) {
-        const waitlistConsult = getSchedulingWaitlistConsult(adHocSelectedPatientKey, consults, patients);
         const patient = findPatientByKey(patients, adHocSelectedPatientKey);
+
+        // TH(2) — Khi Lưu: check BN đã có trong danh sách chờ TT phòng cathlab
+        const pendingCathConsult = getPatientPendingCathLabConsult(adHocSelectedPatientKey, consults, cathlabs);
+        if (pendingCathConsult && patient) {
+          triggerConfirm(
+            `BN "${patient.PatientName}" đang có trong danh sách chờ thông tim. Mở phiếu kết quả của BN này thay vì tạo hồ sơ cấp cứu mới?`,
+            () => {
+              setIsAdHocModalOpen(false);
+              setAdHocSelectedPatientKey('');
+              setActiveTab('pending');
+              openPendingForm(pendingCathConsult, patient);
+            },
+            'BN đã trong danh sách chờ TT'
+          );
+          return;
+        }
+
+        // TH(1)/(2) — Khi Lưu: check BN đang chờ trong view Xếp lịch
+        const waitlistConsult = getSchedulingWaitlistConsult(adHocSelectedPatientKey, consults, patients);
         if (waitlistConsult && patient) {
           triggerConfirm(
             'BN này đang chờ trong view Xếp lịch. Bạn có muốn tiếp tục chuyển phòng thông tim?',
