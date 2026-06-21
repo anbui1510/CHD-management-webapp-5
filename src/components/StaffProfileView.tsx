@@ -220,7 +220,7 @@ export default function StaffProfileView({
   const [showPassword, setShowPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [sessionTimeout, setSessionTimeout] = useState<string>(() => {
-    return localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || 'unlimit';
+    return localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || '30';
   });
 
   useEffect(() => {
@@ -229,7 +229,7 @@ export default function StaffProfileView({
     setIsEditingAdmin(false);
     setShowPassword(false);
     setShowEditPassword(false);
-    setSessionTimeout(localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || 'unlimit');
+    setSessionTimeout(localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || '30');
   }, [staff]);
 
   const activeFilter = useMemo<ActivityDateFilter>(

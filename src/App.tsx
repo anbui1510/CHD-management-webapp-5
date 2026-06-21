@@ -596,7 +596,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(storedStaff) as Staff;
         const staffKey = parsed.StaffKey;
-        const timeoutSetting = localStorage.getItem(`SessionTimeout_${staffKey}`) || 'unlimit';
+        const timeoutSetting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
         let isExpired = false;
         if (timeoutSetting !== 'unlimit') {
           const timeoutMs = timeoutSetting === '1' ? 60 * 1000 : (timeoutSetting === '30' ? 30 * 60 * 1000 : (timeoutSetting === '60' ? 60 * 60 * 1000 : 0));
@@ -629,7 +629,7 @@ export default function App() {
     const staffKey = currentStaff.StaffKey;
     
     const getTimeoutMs = () => {
-      const setting = localStorage.getItem(`SessionTimeout_${staffKey}`) || 'unlimit';
+      const setting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
       if (setting === '1') return 60 * 1000;
       if (setting === '30') return 30 * 60 * 1000;
       if (setting === '60') return 60 * 60 * 1000;
