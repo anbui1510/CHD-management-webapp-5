@@ -8,6 +8,7 @@ import {
   Camera,
   ChevronDown,
   ChevronUp,
+  Clock,
   Mail,
   Pencil,
   Phone,
@@ -44,7 +45,16 @@ interface StaffProfileViewProps {
 
 type AdminDraft = Pick<
   Staff,
-  'StaffName' | 'Name' | 'Department' | 'Career' | 'StaffDOB' | 'StaffSex' | 'Email' | 'StaffPhone' | 'Avatar'
+  | 'StaffName'
+  | 'Name'
+  | 'Department'
+  | 'Career'
+  | 'StaffDOB'
+  | 'StaffSex'
+  | 'Email'
+  | 'StaffPhone'
+  | 'Avatar'
+  | 'Password'
 >;
 
 const PERIOD_OPTIONS: { id: ActivityPeriodPreset; label: string }[] = [
@@ -102,6 +112,7 @@ function toAdminDraft(staff: Staff): AdminDraft {
     Email: staff.Email || '',
     StaffPhone: staff.StaffPhone || '',
     Avatar: staff.Avatar || '',
+    Password: staff.Password || '',
   };
 }
 
@@ -206,10 +217,19 @@ export default function StaffProfileView({
   const [saving, setSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [sessionTimeout, setSessionTimeout] = useState<string>(() => {
+    return localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || 'unlimit';
+  });
+
   useEffect(() => {
     setProfileStaff(staff);
     setAdminDraft(toAdminDraft(staff));
     setIsEditingAdmin(false);
+    setShowPassword(false);
+    setShowEditPassword(false);
+    setSessionTimeout(localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || 'unlimit');
   }, [staff]);
 
   const activeFilter = useMemo<ActivityDateFilter>(
@@ -310,6 +330,7 @@ export default function StaffProfileView({
           Email: adminDraft.Email?.trim() || '',
           StaffPhone: adminDraft.StaffPhone?.trim() || '',
           Avatar: adminDraft.Avatar || '',
+          Password: adminDraft.Password?.trim() || '',
         }),
       });
 
@@ -317,6 +338,10 @@ export default function StaffProfileView({
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Không thể lưu hồ sơ');
       }
+
+      // Save session timeout
+      localStorage.setItem(`SessionTimeout_${profileStaff.StaffKey}`, sessionTimeout);
+      window.dispatchEvent(new Event('storage'));
 
       const updated = (await response.json()) as Staff;
       setProfileStaff(updated);
@@ -643,6 +668,40 @@ export default function StaffProfileView({
                   <AdminInfoRow icon={<User className="w-4 h-4" />} label="Giới tính" value={profileStaff.StaffSex || '—'} />
                   <AdminInfoRow icon={<Mail className="w-4 h-4" />} label="Email" value={profileStaff.Email || '—'} breakAll />
                   <AdminInfoRow icon={<Phone className="w-4 h-4" />} label="Số điện thoại" value={profileStaff.StaffPhone || '—'} />
+                  
+                  {/* Mật khẩu đăng nhập row */}
+                  <div className="flex items-start gap-2 text-xs">
+                    <span className="text-slate-400 shrink-0 mt-0.5"><Shield className="w-4 h-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Mật khẩu đăng nhập</p>
+                      <div className="flex items-center justify-between">
+                        <p className="font-mono font-extrabold text-slate-800">
+                          {showPassword ? profileStaff.Password : '••••••••'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                        >
+                          {showPassword ? 'Ẩn' : 'Hiện'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Thời gian tự động đăng xuất row */}
+                  <div className="flex items-start gap-2 text-xs">
+                    <span className="text-slate-400 shrink-0 mt-0.5"><Clock className="w-4 h-4" /></span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Thời gian tự động đăng xuất</p>
+                      <p className="font-bold text-slate-800">
+                        {sessionTimeout === '1' ? '1 phút' :
+                         sessionTimeout === '30' ? '30 phút' :
+                         sessionTimeout === '60' ? '1 giờ' :
+                         'Vô hạn (Không tự động đăng xuất)'}
+                      </p>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-3">
@@ -663,7 +722,7 @@ export default function StaffProfileView({
                     <select
                       value={adminDraft.StaffSex || ''}
                       onChange={e => setAdminDraft(prev => ({ ...prev, StaffSex: e.target.value }))}
-                      className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+                      className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white"
                     >
                       <option value="">—</option>
                       <option value="Nam">Nam</option>
@@ -673,6 +732,38 @@ export default function StaffProfileView({
                   <AdminEditField label="Email" value={adminDraft.Email || ''} onChange={value => setAdminDraft(prev => ({ ...prev, Email: value }))} />
                   <AdminEditField label="Số điện thoại" value={adminDraft.StaffPhone || ''} onChange={value => setAdminDraft(prev => ({ ...prev, StaffPhone: value }))} />
                   <AdminEditField label="Link avatar (tuỳ chọn)" value={adminDraft.Avatar?.startsWith('data:') ? '' : (adminDraft.Avatar || '')} onChange={value => setAdminDraft(prev => ({ ...prev, Avatar: value }))} placeholder="https://... hoặc NV_Images/..." />
+                  
+                  {/* Mật khẩu đăng nhập edit field */}
+                  <div className="relative">
+                    <AdminEditField
+                      label="Mật khẩu đăng nhập"
+                      value={adminDraft.Password || ''}
+                      onChange={value => setAdminDraft(prev => ({ ...prev, Password: value }))}
+                      type={showEditPassword ? 'text' : 'password'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword(!showEditPassword)}
+                      className="absolute right-3 bottom-2 text-[10px] font-bold text-indigo-600 hover:text-indigo-800"
+                    >
+                      {showEditPassword ? 'Ẩn' : 'Hiện'}
+                    </button>
+                  </div>
+
+                  {/* Thời gian tự động đăng xuất select field */}
+                  <label className="block">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Thời gian tự động đăng xuất</span>
+                    <select
+                      value={sessionTimeout}
+                      onChange={e => setSessionTimeout(e.target.value)}
+                      className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white"
+                    >
+                      <option value="1">1 phút</option>
+                      <option value="30">30 phút</option>
+                      <option value="60">1 giờ</option>
+                      <option value="unlimit">Vô hạn (Không tự động đăng xuất)</option>
+                    </select>
+                  </label>
                 </div>
               )}
             </div>
@@ -712,16 +803,19 @@ function AdminEditField({
   value,
   onChange,
   placeholder,
+  type = 'text',
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  type?: string;
 }) {
   return (
     <label className="block">
       <span className="text-[10px] font-bold text-slate-400 uppercase">{label}</span>
       <input
+        type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}

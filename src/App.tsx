@@ -594,13 +594,99 @@ export default function App() {
     const storedStaff = localStorage.getItem('CurrentStaffKey');
     if (storedStaff) {
       try {
-        const parsed = JSON.parse(storedStaff);
-        setCurrentStaff(parsed);
+        const parsed = JSON.parse(storedStaff) as Staff;
+        const staffKey = parsed.StaffKey;
+        const timeoutSetting = localStorage.getItem(`SessionTimeout_${staffKey}`) || 'unlimit';
+        let isExpired = false;
+        if (timeoutSetting !== 'unlimit') {
+          const timeoutMs = timeoutSetting === '1' ? 60 * 1000 : (timeoutSetting === '30' ? 30 * 60 * 1000 : (timeoutSetting === '60' ? 60 * 60 * 1000 : 0));
+          const lastActivityStr = localStorage.getItem(`LastActivity_${staffKey}`);
+          if (lastActivityStr && timeoutMs > 0) {
+            const lastActivity = parseInt(lastActivityStr, 10);
+            if (!isNaN(lastActivity) && (Date.now() - lastActivity >= timeoutMs)) {
+              isExpired = true;
+            }
+          }
+        }
+        if (isExpired) {
+          localStorage.removeItem('CurrentStaffKey');
+        } else {
+          setCurrentStaff(parsed);
+          localStorage.setItem(`LastActivity_${staffKey}`, Date.now().toString());
+        }
       } catch (e) {
         localStorage.removeItem('CurrentStaffKey');
       }
     }
   }, []);
+
+  // Auto logout / session timeout logic
+  useEffect(() => {
+    if (!currentStaff?.StaffKey) return;
+
+    const staffKey = currentStaff.StaffKey;
+    
+    const getTimeoutMs = () => {
+      const setting = localStorage.getItem(`SessionTimeout_${staffKey}`) || 'unlimit';
+      if (setting === '1') return 60 * 1000;
+      if (setting === '30') return 30 * 60 * 1000;
+      if (setting === '60') return 60 * 60 * 1000;
+      return 0; // 0 means unlimit
+    };
+
+    let timeoutMs = getTimeoutMs();
+
+    const handleStorageChange = () => {
+      timeoutMs = getTimeoutMs();
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    const updateActivity = () => {
+      localStorage.setItem(`LastActivity_${staffKey}`, Date.now().toString());
+    };
+
+    if (!localStorage.getItem(`LastActivity_${staffKey}`)) {
+      updateActivity();
+    }
+
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    let lastWrite = 0;
+    const handleUserActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite > 2000) { // Throttle writes
+        updateActivity();
+        lastWrite = now;
+      }
+    };
+
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, handleUserActivity);
+    });
+
+    const interval = setInterval(() => {
+      if (timeoutMs <= 0) return;
+      const lastActivityStr = localStorage.getItem(`LastActivity_${staffKey}`);
+      if (lastActivityStr) {
+        const lastActivity = parseInt(lastActivityStr, 10);
+        if (!isNaN(lastActivity)) {
+          const elapsed = Date.now() - lastActivity;
+          if (elapsed >= timeoutMs) {
+            localStorage.removeItem('CurrentStaffKey');
+            setCurrentStaff(null);
+            alert('Phiên đăng nhập của bạn đã hết hạn do không hoạt động.');
+          }
+        }
+      }
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      activityEvents.forEach(evt => {
+        window.removeEventListener(evt, handleUserActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [currentStaff]);
 
   useEffect(() => {
     if (!currentStaff?.StaffKey || staffList.length === 0) return;
@@ -697,6 +783,7 @@ export default function App() {
         FireDate: ''
       } as Staff);
       localStorage.setItem('CurrentStaffKey', JSON.stringify(bypassStaff));
+      localStorage.setItem(`LastActivity_${bypassStaff.StaffKey}`, Date.now().toString());
       setCurrentStaff(bypassStaff);
       setNewConsultData(prev => ({ ...prev, RequestBy: bypassStaff.StaffName }));
       return;
@@ -720,6 +807,7 @@ export default function App() {
     }
 
     localStorage.setItem('CurrentStaffKey', JSON.stringify(staffMember));
+    localStorage.setItem(`LastActivity_${staffMember.StaffKey}`, Date.now().toString());
     setCurrentStaff(staffMember);
     setNewConsultData(prev => ({
       ...prev,
@@ -729,6 +817,9 @@ export default function App() {
 
   // Logout handler
   const handleLogout = () => {
+    if (currentStaff?.StaffKey) {
+      localStorage.removeItem(`LastActivity_${currentStaff.StaffKey}`);
+    }
     localStorage.removeItem('CurrentStaffKey');
     setCurrentStaff(null);
   };
