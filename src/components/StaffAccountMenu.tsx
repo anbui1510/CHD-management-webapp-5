@@ -59,7 +59,7 @@ export default function StaffAccountMenu({
           {initial}
         </div>
         <span className="font-extrabold text-xs text-white max-w-[140px] truncate hidden sm:inline">
-          {initial} - {staff.StaffName}
+          {staff.StaffName}
         </span>
         <ChevronDown className={`w-3.5 h-3.5 text-white/80 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>

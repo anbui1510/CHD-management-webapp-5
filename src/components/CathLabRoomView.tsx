@@ -1291,14 +1291,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
   return (
     <div className="flex-1 flex flex-col p-4 w-full h-full overflow-hidden bg-slate-50">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 shrink-0">
-           <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 shrink-0 lg:flex-nowrap">
+           <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
               <button 
                 onClick={() => setActiveTab('pending')}
                 className={`font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'pending' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
               >
                  <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0"/>
-                 <span className="hidden sm:inline">Danh sách chờ thông tim</span>
+                 <span className="hidden sm:inline">Chờ thông tim</span>
                  <span className="sm:hidden">Chờ thông</span>
                  <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${activeTab==='pending'?'bg-indigo-500 text-white':'bg-slate-100 text-slate-500'}`}>{pendingConsults.length}</span>
               </button>
@@ -1308,13 +1308,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                 className={`font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'done' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
               >
                  <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0"/>
-                 <span className="hidden sm:inline">Danh sách đã thông tim</span>
+                 <span className="hidden sm:inline">Đã thông tim</span>
                  <span className="sm:hidden">Đã thông</span>
                  <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${activeTab==='done'?'bg-indigo-500 text-white':'bg-slate-100 text-slate-500'}`}>{doneCathlabs.length}</span>
               </button>
            </div>
 
-           <div className="sm:ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
+           <div className="sm:ml-auto flex flex-wrap lg:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
               <div className="flex-1 sm:flex-initial flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5">
                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
                  <input 
