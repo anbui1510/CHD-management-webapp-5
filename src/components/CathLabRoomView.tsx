@@ -1226,60 +1226,66 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
   return (
     <div className="flex-1 flex flex-col p-4 w-full h-full overflow-hidden bg-slate-50">
-       <div className="flex flex-wrap items-center gap-3 mb-4 shrink-0">
-          <button 
-            onClick={() => setActiveTab('pending')}
-            className={`font-extrabold text-[13px] px-5 py-2.5 rounded-2xl transition flex items-center gap-2 ${activeTab === 'pending' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
-          >
-             <CalendarDays className="w-4 h-4"/>
-             Danh sách chờ thông tim
-             <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${activeTab==='pending'?'bg-indigo-500 text-white':'bg-slate-100 text-slate-500'}`}>{pendingConsults.length}</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('done')}
-            className={`font-extrabold text-[13px] px-5 py-2.5 rounded-2xl transition flex items-center gap-2 ${activeTab === 'done' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
-          >
-             <Activity className="w-4 h-4"/>
-             Danh sách đã thông tim
-             <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${activeTab==='done'?'bg-indigo-500 text-white':'bg-slate-100 text-slate-500'}`}>{doneCathlabs.length}</span>
-          </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 shrink-0">
+           <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button 
+                onClick={() => setActiveTab('pending')}
+                className={`font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'pending' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
+              >
+                 <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0"/>
+                 <span className="hidden sm:inline">Danh sách chờ thông tim</span>
+                 <span className="sm:hidden">Chờ thông</span>
+                 <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${activeTab==='pending'?'bg-indigo-500 text-white':'bg-slate-100 text-slate-500'}`}>{pendingConsults.length}</span>
+              </button>
+              
+              <button 
+                onClick={() => setActiveTab('done')}
+                className={`font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'done' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
+              >
+                 <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0"/>
+                 <span className="hidden sm:inline">Danh sách đã thông tim</span>
+                 <span className="sm:hidden">Đã thông</span>
+                 <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${activeTab==='done'?'bg-indigo-500 text-white':'bg-slate-100 text-slate-500'}`}>{doneCathlabs.length}</span>
+              </button>
+           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-             <div className="flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-2.5">
-                <Search className="w-4 h-4 text-slate-400" />
-                <input 
-                   type="text" 
-                   placeholder="Tìm tên, mã ICD..."
-                   value={searchTerm}
-                   onChange={e => setSearchTerm(e.target.value)}
-                   className="bg-transparent border-none outline-none text-[13px] text-slate-700 w-56 font-bold placeholder:font-medium placeholder:text-slate-400"
-                />
-             </div>
-             <button
-                onClick={() => hisImportInputRef.current?.click()}
-                disabled={hisImporting}
-                className="font-extrabold text-[13px] px-4 py-2.5 rounded-2xl transition flex items-center gap-2 bg-white text-rose-700 border border-rose-200 shadow-sm hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed"
-             >
-                <Upload className="w-4 h-4" />
-                {hisImporting ? 'Đang import HIS...' : 'Import HIS'}
-             </button>
-             <input
-                ref={hisImportInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleHisImportFile}
-             />
-             <button
-                onClick={openAdHocForm}
-                className="font-extrabold text-[13px] px-5 py-2.5 rounded-2xl transition flex items-center gap-2 bg-rose-600 text-white shadow-md hover:bg-rose-700 ml-2"
-             >
-                <Plus className="w-4 h-4" />
-                Nhập TT cấp cứu
-             </button>
-          </div>
-       </div>
+           <div className="sm:ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex-1 sm:flex-initial flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5">
+                 <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                 <input 
+                    type="text" 
+                    placeholder="Tìm tên, mã ICD..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="bg-transparent border-none outline-none text-[12px] sm:text-[13px] text-slate-700 w-full sm:w-56 font-bold placeholder:font-medium placeholder:text-slate-400"
+                 />
+              </div>
+              <button
+                 onClick={() => hisImportInputRef.current?.click()}
+                 disabled={hisImporting}
+                 className="font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl transition flex items-center gap-1.5 sm:gap-2 bg-white text-rose-700 border border-rose-200 shadow-sm hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                 <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                 <span className="hidden sm:inline">{hisImporting ? 'Đang import HIS...' : 'Import HIS'}</span>
+                 <span className="sm:hidden">{hisImporting ? 'Đang import...' : 'Import'}</span>
+              </button>
+              <input
+                 ref={hisImportInputRef}
+                 type="file"
+                 accept=".xlsx,.xls"
+                 className="hidden"
+                 onChange={handleHisImportFile}
+              />
+              <button
+                 onClick={openAdHocForm}
+                 className="font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex items-center gap-1.5 sm:gap-2 bg-rose-600 text-white shadow-md hover:bg-rose-700 sm:ml-2"
+              >
+                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                 <span className="hidden sm:inline">Nhập TT cấp cứu</span>
+                 <span className="sm:hidden">Cấp cứu</span>
+              </button>
+           </div>
+        </div>
        {hisImportStatus && (
          <div className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-100 rounded-2xl px-3 py-2">
            {hisImportStatus}
@@ -1393,8 +1399,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
        {/* ===================== FORM MODAL ===================== */}
        {(selectedPending || selectedDone || isAdHocModalOpen) && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-           <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[96vh] md:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col text-sm font-medium overflow-hidden">
+          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-4xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col text-sm font-medium overflow-hidden">
               <div className="bg-[#1e293b] text-white px-5 py-3 flex justify-between items-center shrink-0 z-10">
                 <h3 className="font-extrabold uppercase tracking-wide flex items-center gap-2">
                    <Stethoscope /> 
