@@ -610,6 +610,8 @@ export default function App() {
         }
         if (isExpired) {
           localStorage.removeItem('CurrentStaffKey');
+          setLoginPassword('');
+          setLoginStaffKey('');
         } else {
           setCurrentStaff(parsed);
           localStorage.setItem(`LastActivity_${staffKey}`, Date.now().toString());
@@ -673,6 +675,8 @@ export default function App() {
           if (elapsed >= timeoutMs) {
             localStorage.removeItem('CurrentStaffKey');
             setCurrentStaff(null);
+            setLoginPassword('');
+            setLoginStaffKey('');
             alert('Phiên đăng nhập của bạn đã hết hạn do không hoạt động.');
           }
         }
@@ -699,7 +703,6 @@ export default function App() {
 
   useEffect(() => {
     if (currentStaff || staffList.length === 0) return;
-    setLoginStaffKey(prev => prev || staffList[0].StaffKey);
     setLoginLoadError('');
   }, [staffList, currentStaff]);
 
@@ -790,6 +793,11 @@ export default function App() {
     }
     // [END TEMP]
 
+    if (!loginStaffKey) {
+      setLoginError('Vui lòng chọn nhân viên để đăng nhập!');
+      return;
+    }
+
     const staffMember = staffList.find(s => s.StaffKey === loginStaffKey);
     if (!staffMember) {
       setLoginError('Mã nhân viên nhập vào không tồn tại trong hệ thống!');
@@ -822,6 +830,8 @@ export default function App() {
     }
     localStorage.removeItem('CurrentStaffKey');
     setCurrentStaff(null);
+    setLoginPassword('');
+    setLoginStaffKey('');
   };
 
   const navigateMenu = (menuTarget: typeof activeMenu | string) => {
@@ -1571,6 +1581,7 @@ export default function App() {
                 onChange={(e) => setLoginStaffKey(e.target.value)}
                 className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] transition-all font-semibold"
               >
+                <option value="" disabled>-- Chọn nhân viên --</option>
                 {staffList.map((s) => (
                   <option key={s.StaffKey} value={s.StaffKey}>
                     {s.Name || s.StaffName} ({s.Role})
