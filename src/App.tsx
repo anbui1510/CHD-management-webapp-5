@@ -1608,13 +1608,9 @@ export default function App() {
               type="submit"
               className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold rounded-xl py-2.5 text-xs transition shadow-lg shadow-pink-950/20 uppercase tracking-wider flex items-center justify-center gap-1.5"
             >
-              <UserCheck className="w-4 h-4" /> Đăng nhập hệ thống
+              <UserCheck className="w-4 h-4" /> Đăng nhập
             </button>
           </form>
-
-          <div className="mt-5 pt-5 border-t border-neutral-800 text-[10px] text-neutral-500 leading-relaxed text-center space-y-1 font-bold uppercase font-mono">
-            <p>Sử dụng mật khẩu trong danh sách Google Sheet để Đăng nhập</p>
-          </div>
         </div>
       </div>
     );
