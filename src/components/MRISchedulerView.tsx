@@ -119,6 +119,7 @@ export default function MRISchedulerView({
   onAddPatient
 }: MRISchedulerViewProps) {
   const [activeTab, setActiveTab] = useState<MriTab>('unscheduled');
+  const [mobileActiveTab, setMobileActiveTab] = useState<'unscheduled' | 'scheduled' | 'calendar'>('unscheduled');
 
   // Ad-hoc "Xếp bổ sung" modal states
   const [showAdHoc, setShowAdHoc] = useState(false);
@@ -946,8 +947,58 @@ export default function MRISchedulerView({
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans">
       <div className="flex-1 overflow-hidden p-3 lg:p-4 flex h-full min-h-0 gap-4">
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
-          <div className={`${isFilterExpanded ? 'hidden xl:flex xl:col-span-5' : 'lg:col-span-6'} bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
-            <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between gap-2">
+          <div className={`${isFilterExpanded ? 'hidden xl:flex xl:col-span-5' : 'lg:col-span-6'} ${selectedItem ? 'hidden lg:flex' : 'flex'} bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
+            {/* Mobile Tab bar: [Xếp bổ sung (+)] [Chờ xếp] [Đã xếp] [Lịch chụp] [Bộ lọc (hình tròn)] */}
+            <div className="flex sm:hidden items-center justify-between p-2 bg-slate-50 border-b border-slate-200 gap-1.5 shrink-0">
+               <button
+                 type="button"
+                 onClick={() => { resetAdHoc(); setShowAdHoc(true); }}
+                 className="bg-indigo-600 hover:bg-indigo-700 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-md transition shrink-0 cursor-pointer"
+                 title="Xếp bổ sung"
+               >
+                 <Plus className="w-4 h-4 text-white" />
+               </button>
+
+               <div className="flex-1 flex items-center bg-white border border-slate-200 rounded-xl p-0.5 text-[11px] font-semibold text-slate-600 overflow-hidden">
+                 <button
+                   onClick={() => { setActiveTab('unscheduled'); setMobileActiveTab('unscheduled'); }}
+                   className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+                     mobileActiveTab === 'unscheduled' ? 'bg-[#d2145a] text-white font-bold' : 'text-[#d2145a]'
+                   }`}
+                 >
+                   Chờ xếp <span className="text-[9px] opacity-75 font-mono">({segmentedItems.unscheduled.length})</span>
+                 </button>
+                 <button
+                   onClick={() => { setActiveTab('scheduled'); setMobileActiveTab('scheduled'); }}
+                   className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+                     mobileActiveTab === 'scheduled' ? 'bg-emerald-600 text-white font-bold' : 'text-emerald-700'
+                   }`}
+                 >
+                   Đã xếp <span className="text-[9px] opacity-75 font-mono">({segmentedItems.scheduled.length})</span>
+                 </button>
+                 <button
+                   onClick={() => setMobileActiveTab('calendar')}
+                   className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+                     mobileActiveTab === 'calendar' ? 'bg-indigo-600 text-white font-bold' : 'text-indigo-700'
+                   }`}
+                 >
+                   Lịch chụp
+                 </button>
+               </div>
+
+               <button
+                 type="button"
+                 onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                 className={`w-8 h-8 rounded-full border border-slate-250 flex items-center justify-center transition shrink-0 cursor-pointer ${
+                   isFilterExpanded ? 'bg-[#b31448] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                 }`}
+                 title="Bộ lọc"
+               >
+                 <Filter className="w-4 h-4" />
+               </button>
+            </div>
+
+            <div className="hidden sm:flex p-4 border-b border-slate-100 bg-slate-50 shrink-0 items-center justify-between gap-2">
               <div>
                 <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
                   <Activity className="w-4 h-4 text-[#d2145a]" />
@@ -966,7 +1017,7 @@ export default function MRISchedulerView({
               </button>
             </div>
 
-            <div className="px-4 py-2 bg-slate-50/75 border-b border-slate-150 flex gap-2 shrink-0">
+            <div className="hidden sm:flex px-4 py-2 bg-slate-50/75 border-b border-slate-150 gap-2 shrink-0">
               <button
                 onClick={() => setActiveTab('unscheduled')}
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition ${
@@ -1072,11 +1123,11 @@ export default function MRISchedulerView({
             </div>
           </div>
 
-          <div className={`${isFilterExpanded ? 'lg:col-span-12 xl:col-span-7' : 'lg:col-span-6'} bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
+          <div className={`${isFilterExpanded ? 'lg:col-span-12 xl:col-span-7' : 'lg:col-span-6'} ${!selectedItem && mobileActiveTab !== 'calendar' ? 'hidden lg:flex' : 'flex'} bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
             {!selectedItem ? (
               <>
-                <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                  <div>
+                <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+                  <div className="hidden sm:block">
                     <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-[#d2145a]" />
                       Lịch chụp MRI dự kiến
@@ -1085,11 +1136,11 @@ export default function MRISchedulerView({
                       Calendar lịch MRI tim bẩm sinh
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between w-full sm:w-auto gap-3">
                     <button onClick={() => setCurrentMonth(prev => prev === 0 ? 11 : prev - 1)} className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-100">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <span className="font-extrabold text-[13px] text-slate-800 uppercase tracking-wider">
+                    <span className="font-extrabold text-[12px] sm:text-[13px] text-slate-800 uppercase tracking-wider text-center flex-1 sm:flex-initial">
                       Tháng {currentMonth + 1} {currentYear}
                     </span>
                     <button onClick={() => setCurrentMonth(prev => prev === 11 ? 0 : prev + 1)} className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-100">
@@ -1097,7 +1148,6 @@ export default function MRISchedulerView({
                     </button>
                   </div>
                 </div>
-
                 <div className="flex-1 p-3 flex flex-col min-h-0">
                   <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[#d2145a] text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl">
                     <div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div><div>CN</div>
@@ -1144,7 +1194,7 @@ export default function MRISchedulerView({
               </>
             ) : (
               <form onSubmit={(e) => e.preventDefault()} className="flex-1 flex flex-col min-h-0 bg-white">
-                <div className="p-4 border-b border-indigo-100 bg-indigo-50/20 flex items-center justify-between gap-2 shrink-0">
+                <div className="hidden lg:flex p-4 border-b border-indigo-100 bg-indigo-50/20 items-center justify-between gap-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={requestExit} className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition">
                       ← Quay lại Lịch Tháng
@@ -1250,7 +1300,38 @@ export default function MRISchedulerView({
                   </div>
                 </div>
 
-                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center gap-3 shrink-0">
+                {/* Mobile Save Footer Bar (Single scrollable row) */}
+                <div className="flex lg:hidden items-center gap-1.5 p-2 bg-slate-50 border-t border-slate-200 overflow-x-auto whitespace-nowrap shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                   <button
+                     type="button"
+                     onClick={requestExit}
+                     className="bg-white hover:bg-slate-100 border border-slate-350 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center justify-center shrink-0 shadow-xs cursor-pointer"
+                   >
+                     ←
+                   </button>
+                   <button
+                     type="button"
+                     onClick={() => setSelectedItem(null)}
+                     className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                   >
+                     Đóng
+                   </button>
+                   <button
+                     type="button"
+                     onClick={requestSave}
+                     disabled={saving}
+                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10.5px] px-4 py-1.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
+                   >
+                     {saving ? 'Đang lưu...' : 'Lưu'}
+                   </button>
+                   {message && (
+                     <span className={`text-[10px] font-bold ml-2 shrink-0 ${message.includes('lỗi') || message.includes('Không') ? 'text-rose-600' : 'text-emerald-700'}`}>
+                       {message}
+                     </span>
+                   )}
+                </div>
+
+                <div className="hidden lg:flex p-4 border-t border-slate-100 bg-slate-50 justify-between items-center gap-3 shrink-0">
                   <span className={`text-[11px] font-bold ${message.includes('lỗi') || message.includes('Không') ? 'text-rose-600' : 'text-emerald-700'}`}>
                     {message}
                   </span>

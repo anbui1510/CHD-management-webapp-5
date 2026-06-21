@@ -496,7 +496,7 @@ export default function MRIRegisterView({
     <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50">
 
       {/* Title + action */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
+      <div className="shrink-0 hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
         <div>
           <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
             <Activity className="w-5 h-5 text-[#d2145a]" /> Danh sách đăng ký chụp MRI
@@ -517,7 +517,7 @@ export default function MRIRegisterView({
 
       {/* Tabs + search */}
       <div className="shrink-0 bg-white border border-slate-200 rounded-3xl shadow-sm p-4 space-y-3">
-        <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600">
+        <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 gap-1">
           <button
             onClick={() => setActiveTab('pending')}
             className={`flex-1 text-center py-2 rounded-lg transition-colors cursor-pointer ${
@@ -533,6 +533,17 @@ export default function MRIRegisterView({
             }`}
           >
             Đã chụp MRI <span className="text-[10px] opacity-75 font-mono">({segmented.done.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className="sm:hidden bg-indigo-600 hover:bg-indigo-700 text-white w-8 h-8 rounded-full transition duration-200 shrink-0 cursor-pointer flex items-center justify-center shadow-md ml-1"
+            title="Đăng ký chụp MRI"
+          >
+            <Plus className="w-4 h-4 text-white" />
           </button>
         </div>
 
@@ -640,8 +651,8 @@ export default function MRIRegisterView({
 
       {/* REGISTRATION MODAL */}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[96vh] md:max-h-[88vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[88vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
 
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
@@ -1022,8 +1033,8 @@ export default function MRIRegisterView({
         const patient = previewItem.__patient;
         const isPending = !getFormattedDateKey(previewItem.CMRDate);
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-2xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
 
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
