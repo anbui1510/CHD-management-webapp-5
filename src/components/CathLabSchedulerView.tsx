@@ -2350,7 +2350,28 @@ Xin cảm ơn!`;
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans transition-all duration-300">
       
       {/* Mobile Navigation Tabs + filters (single scrollable row) */}
-      <div className="lg:hidden shrink-0 px-3 py-2 bg-white border-b border-slate-200 flex gap-2 overflow-x-auto flex-nowrap shadow-xs z-20 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="lg:hidden shrink-0 px-3 py-2 bg-white border-b border-slate-200 flex gap-2 items-center overflow-x-auto flex-nowrap shadow-xs z-20 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {!pureCalendarMode && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdHocConsultDate(getTodayIsoDate());
+              setAdHocPlannedCathLabDate('');
+              setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
+              setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
+              setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
+              setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
+              setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
+              setAdHocErrors([]);
+              setAdHocValidationMsg('');
+              setShowAdHocModal(true);
+            }}
+            className="shrink-0 w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer"
+            title="Xếp bổ sung"
+          >
+            <Plus className="w-4 h-4 text-white" />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setMobileTab('waitlist')}
@@ -2412,25 +2433,6 @@ Xin cảm ơn!`;
             >
               <Filter className="w-3.5 h-3.5 text-emerald-600" />
               <span>Dụng cụ</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAdHocConsultDate(getTodayIsoDate());
-                setAdHocPlannedCathLabDate('');
-                setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
-                setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
-                setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
-                setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
-                setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
-                setAdHocErrors([]);
-                setAdHocValidationMsg('');
-                setShowAdHocModal(true);
-              }}
-              className="shrink-0 w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer"
-              title="Xếp bổ sung"
-            >
-              <Plus className="w-4 h-4 text-white" />
             </button>
           </>
         )}
@@ -3051,7 +3053,7 @@ Xin cảm ơn!`;
             <form onSubmit={handleSave} className="flex-1 flex flex-col justify-between h-full min-h-0 bg-white">
               
               {/* STICKY TOP HEADER CONTROL BAR */}
-              <div className="p-4 border-b border-indigo-100 bg-indigo-50/20 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="hidden lg:flex p-4 border-b border-indigo-100 bg-indigo-50/20 flex-wrap items-center justify-between gap-2 shrink-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
@@ -3534,8 +3536,99 @@ Xin cảm ơn!`;
 
               </div>
 
-              {/* Save Footer Bar */}
-              <div className="p-4 border-t border-slate-105 bg-slate-50 flex flex-col sm:flex-row sm:justify-between gap-3 shrink-0 flex-wrap">
+              {/* Mobile Save Footer Bar (Single scrollable row) */}
+              <div className="flex lg:hidden items-center gap-1.5 p-2 bg-slate-50 border-t border-slate-200 overflow-x-auto whitespace-nowrap shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {/* 1. Back button (moved from top) */}
+                <button
+                  type="button"
+                  onClick={handleCloseSchedulingView}
+                  className="bg-white hover:bg-slate-100 border border-slate-350 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center justify-center shrink-0 shadow-xs cursor-pointer"
+                >
+                  ←
+                </button>
+
+                {/* 2. Hồ sơ */}
+                {(() => {
+                  const pat = findPatientByKey(patients, selectedConsult.PatientKey);
+                  if (!pat) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onViewPatientRecord) {
+                          onViewPatientRecord(pat);
+                        }
+                      }}
+                      className="bg-indigo-50 hover:bg-indigo-100 text-[#d2145a] border border-indigo-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                    >
+                      <Heart className="w-3.5 h-3.5" /> Hồ sơ
+                    </button>
+                  );
+                })()}
+
+                {/* 3. Tóm tắt */}
+                <button
+                  type="button"
+                  onClick={() => setShowSummaryModal(true)}
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-250 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                >
+                  <Clipboard className="w-3.5 h-3.5 text-emerald-700" /> Tóm tắt
+                </button>
+
+                {/* 4. SMS */}
+                {(() => {
+                  const pat = findPatientByKey(patients, selectedConsult.PatientKey);
+                  if (!pat) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSmsModal(pat)}
+                      className="bg-rose-50 hover:bg-rose-100 text-[#d2145a] border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                    >
+                      <PhoneCall className="w-3.5 h-3.5" /> SMS
+                    </button>
+                  );
+                })()}
+
+                {/* 5. Loại */}
+                <button
+                  type="button"
+                  onClick={handleActionLoai}
+                  className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                >
+                  Loại
+                </button>
+
+                {/* 6. Chuyển phòng TT */}
+                <button
+                  type="button"
+                  onClick={handleActionTransfer}
+                  className={`bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs ${isTransferEnabled() ? 'hover:bg-sky-100 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
+                >
+                  Chuyển phòng TT
+                </button>
+
+                {/* 7. Đóng */}
+                <button
+                  type="button"
+                  onClick={handleCloseSchedulingView}
+                  className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                >
+                  Đóng
+                </button>
+
+                {/* 8. Lưu */}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10.5px] px-4 py-1.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? 'Đang lưu...' : 'Lưu'}
+                </button>
+              </div>
+
+              {/* Desktop Save Footer Bar */}
+              <div className="hidden lg:flex p-4 border-t border-slate-105 bg-slate-50 flex-row justify-between gap-3 shrink-0 flex-wrap">
                 <div className="flex gap-2 items-center flex-wrap">
                   {/* Xem hồ sơ */}
                   {(() => {
@@ -3596,25 +3689,25 @@ Xin cảm ơn!`;
                   <button
                     type="button"
                     onClick={handleActionTransfer}
-                    className={`bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shadow-xs ${isTransferEnabled() ? 'hover:bg-sky-100 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
+                    className={`bg-sky-50 text-sky-850 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shadow-xs ${isTransferEnabled() ? 'hover:bg-sky-100 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
                     title="Chuyển phòng thông tim. Ca vẫn được giữ trong Lịch thông tim dự kiến"
                   >
                      Chuyển phòng TT
                   </button>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+                <div className="flex flex-row gap-3 w-auto">
                   <button
                     type="button"
                     onClick={handleCloseSchedulingView}
-                    className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-2xl cursor-pointer transition min-h-[44px]"
+                    className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-2xl cursor-pointer transition min-h-[44px]"
                   >
                     Đóng lại
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2.5 rounded-2xl shadow-xs text-xs cursor-pointer transition flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-6 py-2.5 rounded-2xl shadow-xs text-xs cursor-pointer transition flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
                   >
                     {saving ? 'Đang lưu...' : 'Lưu kết quả xếp lịch'}
                   </button>
