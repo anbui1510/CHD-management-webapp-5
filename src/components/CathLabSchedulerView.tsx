@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
@@ -9,6 +9,7 @@ import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { 
   ClipboardList, 
   Search, 
@@ -288,13 +289,32 @@ export default function CathLabSchedulerView({
   // Waitlist Pagination
   const [waitlistCurrentPage, setWaitlistCurrentPage] = useState<number>(1);
   const rowsPerWaitlistPage = 50;
+  const isMobile = useIsMobile();
+  const MOBILE_WAITLIST_BATCH = 50;
+  const [mobileWaitlistVisibleCount, setMobileWaitlistVisibleCount] = useState(MOBILE_WAITLIST_BATCH);
+  const waitlistScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setWaitlistCurrentPage(1);
+    setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
   }, [activeTab, searchQuery, waitlistSortOrder]);
   
   // Selected consult for form editing
   const [selectedConsult, setSelectedConsult] = useState<Consult | null>(null);
+  
+  // Tab state for mobile layout
+  const [mobileTab, setMobileTab] = useState<'waitlist' | 'calendar' | 'editor'>('waitlist');
+
+  // Automatically switch tab on mobile when a patient is selected or deselected
+  useEffect(() => {
+    if (!selectedConsult) {
+      if (mobileTab === 'editor') {
+        setMobileTab('waitlist');
+      }
+    } else {
+      setMobileTab('editor');
+    }
+  }, [selectedConsult]);
   
   // Save notification states
   const [saving, setSaving] = useState(false);
@@ -1349,6 +1369,21 @@ Xin cảm ơn!`;
     return displayWaitlist.slice(startIndex, startIndex + rowsPerWaitlistPage);
   }, [displayWaitlist, waitlistCurrentPage]);
 
+  const mobileDisplayedWaitlist = useMemo(() => {
+    return displayWaitlist.slice(0, mobileWaitlistVisibleCount);
+  }, [displayWaitlist, mobileWaitlistVisibleCount]);
+
+  const handleWaitlistScroll = useCallback(() => {
+    if (!isMobile) return;
+    const el = waitlistScrollRef.current;
+    if (!el || mobileWaitlistVisibleCount >= displayWaitlist.length) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
+      setMobileWaitlistVisibleCount(prev =>
+        Math.min(prev + MOBILE_WAITLIST_BATCH, displayWaitlist.length)
+      );
+    }
+  }, [isMobile, mobileWaitlistVisibleCount, displayWaitlist.length]);
+
   // Filter existing patients for selection in ad-hoc modal
   const filteredSearchPatients = useMemo(() => {
     if (!adHocSearchQuery.trim()) return [];
@@ -2314,16 +2349,103 @@ Xin cảm ơn!`;
   return (
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans transition-all duration-300">
       
-      <div className="flex-1 overflow-hidden p-3 lg:p-4 flex flex-col lg:flex-row h-full min-h-0 gap-4">
+      {/* Mobile Navigation Tabs + filters (single scrollable row) */}
+      <div className="lg:hidden shrink-0 px-3 py-2 bg-white border-b border-slate-200 flex gap-2 overflow-x-auto flex-nowrap shadow-xs z-20 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileTab('waitlist')}
+          className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+            mobileTab === 'waitlist'
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600'
+          }`}
+        >
+          Chờ xếp lịch ({segmentedWaitlist.unscheduled.length + segmentedWaitlist.scheduled.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('calendar')}
+          className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+            mobileTab === 'calendar'
+              ? 'bg-[#d2145a] text-white shadow-xs'
+              : 'bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600'
+          }`}
+        >
+          Lịch dự kiến
+        </button>
+        {selectedConsult && (
+          <button
+            type="button"
+            onClick={() => setMobileTab('editor')}
+            className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center gap-1 ${
+              mobileTab === 'editor'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600'
+            }`}
+          >
+            <span>Xếp lịch</span>
+            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-extrabold uppercase font-mono">
+              {findPatientByKey(patients, selectedConsult.PatientKey)?.PatientName.split(' ').slice(-1)[0] || ''}
+            </span>
+          </button>
+        )}
+        {!pureCalendarMode && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setIsFilterExpanded(true);
+                setIsDeviceFilterExpanded(false);
+              }}
+              className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-[10.5px] font-black uppercase tracking-wider text-slate-700 active:bg-slate-100 transition shadow-xs cursor-pointer"
+            >
+              <Filter className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Lịch</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDeviceFilterExpanded(true);
+                setIsFilterExpanded(false);
+              }}
+              className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-[10.5px] font-black uppercase tracking-wider text-slate-700 active:bg-slate-100 transition shadow-xs cursor-pointer"
+            >
+              <Filter className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Dụng cụ</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdHocConsultDate(getTodayIsoDate());
+                setAdHocPlannedCathLabDate('');
+                setAdHocCheckDevice(DEFAULT_AD_HOC_CHECK_DEVICE);
+                setAdHocCallStatus(DEFAULT_AD_HOC_CALL_STATUS);
+                setAdHocPostCathDepart(DEFAULT_AD_HOC_POST_CATH_DEPART);
+                setAdHocScheduled1st(DEFAULT_AD_HOC_SCHEDULED_1ST);
+                setAdHocFundingRequest(DEFAULT_AD_HOC_FUNDING_REQUEST);
+                setAdHocErrors([]);
+                setAdHocValidationMsg('');
+                setShowAdHocModal(true);
+              }}
+              className="shrink-0 w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform cursor-pointer"
+              title="Xếp bổ sung"
+            >
+              <Plus className="w-4 h-4 text-white" />
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-hidden p-3 lg:p-4 flex flex-col lg:flex-row min-h-0 gap-4">
         
         {/* Main Workspace Frame */}
-        <div className={`flex-1 transition-all h-full min-h-0`}>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
+        <div className="flex-1 transition-all min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'hidden' : 'lg:col-span-6'}`}>
+        <div className={`flex-1 lg:flex-initial flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-0 ${pureCalendarMode ? 'hidden' : 'lg:col-span-6'} ${mobileTab === 'waitlist' ? 'flex' : 'hidden lg:flex'}`}>
           
-          <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between gap-2">
+          <div className="hidden lg:flex p-4 border-b border-slate-100 bg-slate-50 shrink-0 items-center justify-between gap-2">
             <div>
               <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide">
                 Danh sách chờ xếp lịch
@@ -2353,10 +2475,10 @@ Xin cảm ơn!`;
           </div>
 
           {/* Subtabs for "Chưa xếp lịch" / "Đã xếp lịch" / "Tất cả" with Count badges */}
-          <div className="px-4 py-2 bg-slate-50/75 border-b border-slate-150 flex flex-wrap gap-2 shrink-0">
+          <div className="px-3 lg:px-4 py-2 bg-slate-50/75 border-b border-slate-150 flex gap-2 shrink-0 overflow-x-auto flex-nowrap lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <button
               onClick={() => setActiveTab('unscheduled')}
-              className={`flex-1 min-w-[120px] py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+              className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'unscheduled'
                   ? 'bg-[#d2145a] text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
@@ -2371,7 +2493,7 @@ Xin cảm ơn!`;
             </button>
             <button
               onClick={() => setActiveTab('scheduled')}
-              className={`flex-1 min-w-[120px] py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+              className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'scheduled'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
@@ -2386,7 +2508,7 @@ Xin cảm ơn!`;
             </button>
             <button
               onClick={() => setActiveTab('all')}
-              className={`flex-1 min-w-[120px] py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+              className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'all'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
@@ -2431,15 +2553,19 @@ Xin cảm ơn!`;
           </div>
 
           {/* Internal scroll table container (Overflow horizontal and vertical is isolated within card!) */}
-          <div className="flex-1 overflow-x-auto overflow-y-auto max-h-full">
+          <div
+            ref={waitlistScrollRef}
+            onScroll={handleWaitlistScroll}
+            className="flex-1 min-h-0 overflow-x-auto overflow-y-auto"
+          >
             {displayWaitlist.length === 0 ? (
               <div className="p-8 text-center text-slate-400 italic">
                 {searchQuery ? 'Không tìm thấy bệnh nhi thích hợp' : 'Không có bệnh nhi nào trong danh sách hiển thị'}
               </div>
             ) : (
               <>
-              <div className="md:hidden divide-y divide-slate-150">
-                {paginatedWaitlist.map((c) => {
+              <div className="lg:hidden divide-y divide-slate-150">
+                {mobileDisplayedWaitlist.map((c) => {
                   const pat = findPatientByKey(patients, c.PatientKey);
                   if (!pat) return null;
                   const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
@@ -2476,13 +2602,18 @@ Xin cảm ơn!`;
                   );
                 })}
               </div>
-              <table className="hidden md:table w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
+              <table className="hidden lg:table w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
                 <thead className="bg-slate-50/70 text-slate-500 sticky top-0 border-b border-slate-200 uppercase text-[9px] font-extrabold tracking-wider z-10 shadow-xs">
                   <tr>
                     {activeTab === 'scheduled' && (
-                       <th className="py-3 px-2 border-b border-slate-200 text-center w-20">Hành động</th>
+                       <th className="py-3 px-2 border-b border-slate-200 text-center w-20 sticky left-0 bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200">Hành động</th>
                     )}
-                    <th className="py-3 px-3 border-b border-slate-200 min-w-[200px]">Họ và tên</th>
+                    <th 
+                      style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
+                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200"
+                    >
+                      Họ và tên
+                    </th>
                     <th className="py-3 px-2 border-b border-slate-200">ICD</th>
                     <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>
                     <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>
@@ -2509,7 +2640,10 @@ Xin cảm ơn!`;
                         }`}
                       >
                         {activeTab === 'scheduled' && (
-                          <td className="py-2 px-2 text-center" onClick={(e) => { e.stopPropagation(); }}>
+                          <td 
+                            className={`py-2 px-2 text-center sticky left-0 z-10 border-r border-slate-150 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${isSelected ? 'bg-indigo-50' : 'bg-white'}`}
+                            onClick={(e) => { e.stopPropagation(); }}
+                          >
                             <div className="flex items-center justify-center gap-1.5">
                               <button onClick={() => handleUndoScheduled(c, pat)} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded-lg border border-rose-200 cursor-pointer shadow-xs" title="Rút ca về Chưa xếp lịch">
                                 <Undo2 className="w-3.5 h-3.5" />
@@ -2524,7 +2658,12 @@ Xin cảm ơn!`;
                             </div>
                           </td>
                         )}
-                        <td className="py-3.5 px-3 min-w-[200px]">
+                        <td 
+                          style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
+                          className={`py-3.5 px-3 min-w-[160px] md:min-w-[200px] sticky z-10 border-r border-slate-150 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] transition-colors ${
+                            isSelected ? 'bg-indigo-50' : 'bg-white'
+                          }`}
+                        >
                           <span className="font-extrabold uppercase text-slate-900 block whitespace-normal break-words leading-snug">
                             {pat.PatientName}
                           </span>
@@ -2575,9 +2714,9 @@ Xin cảm ơn!`;
             )}
           </div>
           
-          {/* Pagination panel */}
+          {/* Pagination panel — desktop only; mobile uses infinite scroll */}
           {displayWaitlist.length > 0 && (
-            <div className="bg-white px-4 py-2 flex items-center justify-between border-t border-slate-200 shrink-0">
+            <div className="hidden lg:flex bg-white px-4 py-2 items-center justify-between border-t border-slate-200 shrink-0">
               <div className="text-xs text-slate-500 font-medium tracking-tight">
                 Trang <span className="font-bold text-indigo-700">{waitlistCurrentPage}</span> / <span className="font-bold">{totalWaitlistPages}</span> (Hiển thị {rowsPerWaitlistPage})
               </div>
@@ -2619,17 +2758,17 @@ Xin cảm ơn!`;
         </div>
 
         {/* RIGHT COLUMN: Selection Detailed Form Editor OR Preview List */}
-        <div className={`flex flex-col rounded-3xl shadow-sm overflow-hidden h-full min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'}`}>
+        <div className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm overflow-y-auto lg:overflow-hidden min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor') ? 'flex' : 'hidden lg:flex'}`}>
           {!isAnyFilterExpanded ? (
             <>
-              {(!selectedConsult || pureCalendarMode) ? (
+              {((!selectedConsult || pureCalendarMode || mobileTab === 'calendar') && mobileTab !== 'editor') ? (
             
             /* SHOW THE BEAUTIFUL INDEPENDENT CALENDAR WHEN NO PATIENT IS SELECTED (or in pure calendar mode) */
             <div className="flex-1 flex flex-col min-h-0 bg-white">
               
               {/* Calendar Title Bar */}
-              <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                <div>
+              <div className="p-2 lg:p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-2 lg:gap-3 shrink-0">
+                <div className="hidden lg:block">
                   <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-[#d2145a]" />
                     Lịch thông tim dự kiến
@@ -2640,7 +2779,7 @@ Xin cảm ơn!`;
                 </div>
                 
                 {/* Views and Today navigation */}
-                <div className="flex items-center gap-1 flex-wrap">
+                <div className="flex items-center gap-1 flex-wrap w-full lg:w-auto justify-center lg:justify-start">
                   <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-600">
                     <button 
                       onClick={() => setCalendarView('day')}
@@ -2673,7 +2812,7 @@ Xin cảm ơn!`;
 
               {/* Month Navigation & controls */}
               {calendarView === 'month' && (
-                <div className="p-3 bg-white/80 border-b border-slate-100 flex items-center justify-center gap-6 shrink-0">
+                <div className="p-1.5 lg:p-3 bg-white/80 border-b border-slate-100 flex items-center justify-center gap-6 shrink-0">
                   <button 
                     onClick={handlePrevMonth}
                     className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition border border-slate-150 cursor-pointer"
@@ -2693,13 +2832,13 @@ Xin cảm ơn!`;
               )}
 
               {/* Main Calendar Render Frame */}
-              <div className={`flex-1 p-3 flex flex-col min-h-0 justify-between ${calendarView === 'month' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+              <div className={`flex-1 p-1.5 lg:p-3 flex flex-col min-h-0 lg:justify-between ${calendarView === 'month' ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto'}`}>
                 
                 {/* 1. MONTH VIEW */}
                 {calendarView === 'month' && (
-                  <div className="flex-1 flex flex-col bg-white">
+                  <div className="flex flex-col bg-white shrink-0 lg:shrink lg:flex-1 lg:min-h-0">
                     {/* Day Headers (Vietnamese abbreviations) */}
-                    <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[#d2145a] text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl">
+                    <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[#d2145a] text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl shrink-0">
                       <div>T2</div>
                       <div>T3</div>
                       <div>T4</div>
@@ -2710,7 +2849,7 @@ Xin cảm ơn!`;
                     </div>
 
                     {/* Day Cards/Cells Grid */}
-                    <div className="grid grid-cols-7 gap-1 border-l border-r border-b border-slate-200 rounded-b-2xl bg-slate-100/50 p-1 flex-1 overflow-hidden">
+                    <div className="grid grid-cols-7 gap-1 border-l border-r border-b border-slate-200 rounded-b-2xl bg-slate-100/50 p-1 lg:flex-1 lg:overflow-hidden">
                       {calendarCells.map((cell, idx) => {
                         // Filter matching scheduled consults for this date string (YYYY-MM-DD)
                         const matchingConsults = segmentedWaitlist.scheduled.filter(c => {
@@ -2721,7 +2860,7 @@ Xin cảm ơn!`;
                         return (
                           <div
                             key={`${cell.dateStr}-${idx}`}
-                            className={`min-h-[70px] xl:min-h-[85px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between transition ${
+                            className={`min-h-[52px] lg:min-h-[70px] xl:min-h-[85px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between transition ${
                               cell.isCurrentMonth ? 'text-slate-800' : 'bg-slate-50/40 text-slate-300 pointer-events-none opacity-45'
                             } ${cell.isToday ? 'bg-[#d2145a]/5 border-[#d2145a]/30' : ''}`}
                           >
@@ -2891,7 +3030,7 @@ Xin cảm ơn!`;
                 )}
 
                 {/* Calendar Legend indicators bar */}
-                <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-[10px] text-slate-500 font-medium shrink-0">
+                <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-[10px] text-slate-500 font-medium shrink-0 lg:mt-4">
                   <div className="flex gap-4">
                     <span className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-[#b31448]"></span>
@@ -2919,13 +3058,14 @@ Xin cảm ơn!`;
                     onClick={handleCloseSchedulingView}
                     className="bg-white hover:bg-slate-100 border border-slate-350 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 select-none shadow-xs cursor-pointer"
                   >
-                    ← Quay lại Lịch Tháng
+                    <span>←</span>
+                    <span className="hidden lg:inline"> Quay lại Lịch Tháng</span>
                   </button>
-                  <span className="bg-[#d2145a] text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-xs select-none mr-2">
+                  <span className="hidden lg:inline-block bg-[#d2145a] text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-xs select-none mr-2">
                     Xếp lịch
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400 font-bold font-mono">
+                <span className="hidden lg:inline text-[10px] text-slate-400 font-bold font-mono">
                   Mã: {selectedConsult.ConsultKey}
                 </span>
               </div>
@@ -2964,7 +3104,7 @@ Xin cảm ơn!`;
                       
                       {/* Part 1: Administrative Details */}
                       <div className="bg-white border border-slate-150 p-3 rounded-2xl shadow-xs">
-                        <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1 mb-1.5">
+                        <span className="hidden lg:block font-extrabold text-slate-800 text-[10px] uppercase tracking-wider border-b border-slate-100 pb-1 mb-1.5">
                           THÔNG TIN HÀNH CHÍNH
                         </span>
                         {renderPatientAdminInfo(pat, 'form')}
@@ -3485,12 +3625,12 @@ Xin cảm ơn!`;
           )}
             </>
           ) : (
-            <div className="flex flex-col h-full min-h-0 p-4 relative bg-white">
+            <div className="flex flex-col flex-1 min-h-0 p-4 relative bg-white lg:h-full">
               <h3 className="font-extrabold text-[13px] uppercase tracking-wide text-slate-800 mb-4 flex items-center gap-2 shrink-0">
                 <Filter className={`w-5 h-5 ${isDeviceFilterExpanded ? 'text-teal-600' : 'text-emerald-600'}`}/> {isDeviceFilterExpanded ? `DANH SÁCH DỰ TRÙ DỤNG CỤ (${deviceFilteredConsults.length} ca)` : `DANH SÁCH BỆNH NHÂN DỰ KIẾN THÔNG TIM (${exportFilteredConsults.length} ca)`}
               </h3>
               
-              <div className="flex-1 overflow-x-auto overflow-y-auto border border-slate-200 rounded-xl custom-scrollbar">
+              <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto border border-slate-200 rounded-xl custom-scrollbar">
                 <table className="w-full text-left border-collapse min-w-[1200px]">
                   <thead className={`${isDeviceFilterExpanded ? 'bg-[#0d9488]' : 'bg-[#b31448]'} text-white text-[10px] uppercase font-black tracking-wider sticky top-0 z-10`}>
                     <tr>
@@ -3583,31 +3723,6 @@ Xin cảm ơn!`;
 
           </div>
         </div>
-
-        {!pureCalendarMode && (
-          <div className="lg:hidden flex gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setIsFilterExpanded(true);
-                setIsDeviceFilterExpanded(false);
-              }}
-              className="flex-1 min-h-[44px] px-3 py-2 rounded-2xl bg-white border border-slate-200 text-[11px] font-bold text-slate-700 shadow-sm"
-            >
-              Bộ lọc xuất lịch
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsDeviceFilterExpanded(true);
-                setIsFilterExpanded(false);
-              }}
-              className="flex-1 min-h-[44px] px-3 py-2 rounded-2xl bg-white border border-slate-200 text-[11px] font-bold text-slate-700 shadow-sm"
-            >
-              Bộ lọc duyệt DC
-            </button>
-          </div>
-        )}
 
         {/* Right Collapsible Panels Container */}
         <div className={`shrink-0 flex flex-col gap-4 self-start h-full min-h-0 w-full lg:w-auto ${
