@@ -4285,42 +4285,82 @@ Xin cảm ơn!`;
               const el = document.getElementById('screenshot-summary-card');
               if (!el) return;
               setIsCopyingImage(true);
-              try {
-                const html2canvasFn = typeof html2canvas === 'function' ? html2canvas : (html2canvas as any).default;
-                if (typeof html2canvasFn !== 'function') {
-                  throw new Error('Thư viện chụp ảnh (html2canvas) chưa được tải đúng cách.');
-                }
-                const canvas = await html2canvasFn(el, {
-                  backgroundColor: '#ffffff',
-                  scale: 2,
-                  logging: false,
-                  useCORS: true
-                });
-                const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-                if (blob) {
-                  try {
-                    if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
-                      throw new Error('Trình duyệt không hỗ trợ sao chép ảnh trực tiếp.');
-                    }
-                    await navigator.clipboard.write([
-                      new ClipboardItem({
-                        [blob.type]: blob
-                      })
-                    ]);
-                    setCopiedImageType('clipboard');
-                    setCopiedImage(true);
-                    setTimeout(() => setCopiedImage(false), 2550);
-                  } catch (clipboardErr) {
-                    console.warn('Clipboard write failed, falling back to download:', clipboardErr);
-                    const link = document.createElement('a');
-                    link.download = `TomTatXepLich_${pat.PatientID1 || pat.PatientName}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    
-                    setCopiedImageType('download');
-                    setCopiedImage(true);
-                    setTimeout(() => setCopiedImage(false), 2550);
+
+              const handleBlobResult = async (blob: Blob, sourceCanvas?: HTMLCanvasElement) => {
+                try {
+                  if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
+                    throw new Error('Trình duyệt không hỗ trợ sao chép ảnh trực tiếp.');
                   }
+                  await navigator.clipboard.write([
+                    new ClipboardItem({
+                      [blob.type]: blob
+                    })
+                  ]);
+                  setCopiedImageType('clipboard');
+                  setCopiedImage(true);
+                  setTimeout(() => setCopiedImage(false), 2550);
+                  return true;
+                } catch (clipboardErr) {
+                  console.warn('Clipboard write failed, falling back to download:', clipboardErr);
+                  const link = document.createElement('a');
+                  link.download = `TomTatXepLich_${pat.PatientID1 || pat.PatientName}.png`;
+                  
+                  if (sourceCanvas) {
+                    link.href = sourceCanvas.toDataURL('image/png');
+                  } else {
+                    link.href = URL.createObjectURL(blob);
+                  }
+                  
+                  link.click();
+                  if (!sourceCanvas) {
+                    setTimeout(() => URL.revokeObjectURL(link.href), 100);
+                  }
+
+                  setCopiedImageType('download');
+                  setCopiedImage(true);
+                  setTimeout(() => setCopiedImage(false), 2550);
+                  return true;
+                }
+              };
+
+              try {
+                // Try html-to-image first
+                try {
+                  console.log('Attempting to render using html-to-image...');
+                  const blob = await htmlToImageBlob(el, {
+                    backgroundColor: '#ffffff',
+                    style: {
+                      transform: 'scale(1)',
+                      transformOrigin: 'top left',
+                    },
+                    pixelRatio: 2,
+                    cacheBust: true,
+                  });
+                  if (blob) {
+                    await handleBlobResult(blob);
+                    return;
+                  }
+                  throw new Error('html-to-image returned empty blob');
+                } catch (htmlToImageErr) {
+                  console.warn('html-to-image failed, falling back to html2canvas:', htmlToImageErr);
+                  
+                  // Fallback to html2canvas
+                  const html2canvasFn = typeof html2canvas === 'function' ? html2canvas : (html2canvas as any).default;
+                  if (typeof html2canvasFn !== 'function') {
+                    throw new Error('Thư viện chụp ảnh (html2canvas) chưa được tải đúng cách.');
+                  }
+                  const canvas = await html2canvasFn(el, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    logging: false,
+                    useCORS: true
+                  });
+                  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+                  if (blob) {
+                    await handleBlobResult(blob, canvas);
+                    return;
+                  }
+                  throw new Error('html2canvas returned empty blob');
                 }
               } catch (err: any) {
                 console.error('Error copying image: ', err);
