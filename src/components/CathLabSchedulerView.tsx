@@ -295,6 +295,10 @@ export default function CathLabSchedulerView({
     ptvPhu1: true,
     plannedDate: true,
     checkDevice: true,
+    consultDate: false,
+    consultResultId: false,
+    callStatus: false,
+    missSchedule: false,
   });
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
   const columnDropdownRef = useRef<HTMLDivElement>(null);
@@ -536,6 +540,30 @@ export default function CathLabSchedulerView({
       }
     }
     return trimmed;
+  };
+
+  const getMissScheduleDays = (consultDateStr: string | undefined): number => {
+    if (!consultDateStr) return 0;
+    const formattedDateKey = getFormattedDateKey(consultDateStr);
+    if (!formattedDateKey) return 0;
+    
+    const parts = formattedDateKey.split('-');
+    if (parts.length !== 3) return 0;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1; // 0-indexed month
+    const d = parseInt(parts[2], 10);
+    
+    const consultDate = new Date(y, m, d);
+    if (isNaN(consultDate.getTime())) return 0;
+    
+    // Set time of both to midnight to count only full days
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    consultDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = today.getTime() - consultDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
   };
 
   const buildSnapshotFromConsult = (c: Consult): SchedulingFormSnapshot => {
@@ -1912,10 +1940,21 @@ Xin cảm ơn!`;
 
     setSuccessMsg('');
     setErrorMsg('');
+
+    const missingFields = [];
+    if (!checkDevice) missingFields.push('Kiểm dụng cụ');
+    if (!plannedCathLabDate) missingFields.push('Ngày thông dự kiến');
+    if (!callStatus) missingFields.push('Trạng thái gọi bệnh');
+
+    let confirmMsg = 'Bạn có muốn lưu thông tin xếp lịch cho bệnh nhân này không?';
+    if (missingFields.length > 0) {
+      confirmMsg = `Bạn chưa điền đầy đủ thông tin: ${missingFields.join(', ')}. Bạn có muốn tiếp tục lưu không?`;
+    }
+
     setActionConfirm({
       type: 'save_schedule',
       title: 'Xác nhận lưu thông tin',
-      message: 'Bạn có muốn lưu thông tin xếp lịch cho bệnh nhân này không?'
+      message: confirmMsg
     });
   };
 
@@ -1953,30 +1992,29 @@ Xin cảm ơn!`;
       }, 3000);
     }
 
-    try {
-      const response = await fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData)
+    setSaving(false);
+
+    // Run fetch in the background to be instantaneous
+    fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedData)
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const d = await response.json();
+          throw new Error(d.error || 'Failed to update consult');
+        }
+        onRefreshData();
+      })
+      .catch((err) => {
+        console.error('Error saving consult in background:', err);
+        const msg = err.message || 'Error saving data';
+        setErrorMsg(`Lỗi khi đồng bộ dữ liệu: ${msg}`);
+        onRefreshData();
       });
-      if (!response.ok) {
-        const d = await response.json();
-        throw new Error(d.error || 'Failed to update consult');
-      }
-      onRefreshData();
-      return true;
-    } catch (err: any) {
-      const msg = err.message || 'Error saving data';
-      if (exitConfirmOpen) {
-        setExitConfirmError(msg);
-      } else {
-        setErrorMsg(msg);
-      }
-      onRefreshData();
-      return false;
-    } finally {
-      setSaving(false);
-    }
+
+    return true;
   };
 
   const handleActionLoai = () => {
@@ -2596,6 +2634,20 @@ Xin cảm ơn!`;
                   const pat = findPatientByKey(patients, c.PatientKey);
                   if (!pat) return null;
                   const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
+
+                  const missedDays = getMissScheduleDays(c.ConsultDate);
+                  let warningIcon = null;
+                  if (missedDays >= 14) {
+                    const isRed = missedDays > 30;
+                    const iconColor = isRed ? 'text-rose-600' : 'text-amber-500';
+                    warningIcon = (
+                      <AlertTriangle 
+                        className={`w-4 h-4 shrink-0 ${iconColor}`} 
+                        title={`Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`}
+                      />
+                    );
+                  }
+
                   return (
                     <button
                       key={c.ConsultKey}
@@ -2605,11 +2657,16 @@ Xin cảm ơn!`;
                         isSelected ? 'bg-indigo-50/90 border-l-4 border-indigo-600' : 'hover:bg-indigo-50/45'
                       }`}
                     >
-                      <div className="font-extrabold uppercase text-slate-900 leading-snug break-words">
-                        {pat.PatientName}
-                      </div>
-                      <div className="text-[9px] text-slate-400 font-bold font-mono mt-0.5">
-                        ID1: {pat.PatientID1}
+                      <div className="flex items-center gap-1.5">
+                        {warningIcon}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-extrabold uppercase text-slate-900 leading-snug break-words">
+                            {pat.PatientName}
+                          </div>
+                          <div className="text-[9px] text-slate-400 font-bold font-mono mt-0.5">
+                            ID1: {pat.PatientID1}
+                          </div>
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 mt-2 text-[10px]">
                         <span className="bg-slate-100 text-slate-800 font-extrabold px-1.5 py-0.5 rounded font-mono">
@@ -2645,8 +2702,12 @@ Xin cảm ơn!`;
                     {visibleColumns.priority && <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>}
                     {visibleColumns.requestBy && <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>}
                     {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>}
-                    {visibleColumns.plannedDate && <th className="py-3 px-2 border-b border-slate-200 text-center">Lịch mổ dự kiến</th>}
+                    {visibleColumns.consultDate && <th className="py-3 px-2 border-b border-slate-200">Ngày hội chẩn</th>}
+                    {visibleColumns.consultResultId && <th className="py-3 px-2 border-b border-slate-200">Kết luận chính</th>}
+                    {visibleColumns.plannedDate && <th className="py-3 px-2 border-b border-slate-200 text-center">Dự kiến ngày thông tim</th>}
                     {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>}
+                    {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200">Trạng thái gọi</th>}
+                    {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center">Trễ xếp lịch</th>}
                     <th className="py-3 px-2 border-b border-slate-200 text-center w-12 sticky right-0 bg-slate-50 z-20 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] border-l border-slate-200">
                       <div className="relative inline-block text-left" ref={columnDropdownRef}>
                         <button
@@ -2703,11 +2764,29 @@ Xin cảm ơn!`;
                               <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
                                 <input
                                   type="checkbox"
+                                  checked={visibleColumns.consultDate}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, consultDate: !prev.consultDate }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>Ngày hội chẩn</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.consultResultId}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, consultResultId: !prev.consultResultId }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>Kết luận chính</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
                                   checked={visibleColumns.plannedDate}
                                   onChange={() => setVisibleColumns(prev => ({ ...prev, plannedDate: !prev.plannedDate }))}
                                   className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
                                 />
-                                <span>Lịch mổ dự kiến</span>
+                                <span>Dự kiến ngày thông tim</span>
                               </label>
                               <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
                                 <input
@@ -2717,6 +2796,24 @@ Xin cảm ơn!`;
                                   className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
                                 />
                                 <span>Kiểm dụng cụ</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.callStatus}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, callStatus: !prev.callStatus }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>Trạng thái gọi</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.missSchedule}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, missSchedule: !prev.missSchedule }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>Trễ xếp lịch</span>
                               </label>
                             </div>
                           </div>
@@ -2733,6 +2830,19 @@ Xin cảm ơn!`;
                     
                     // Display value for scheduled 2nd interventionist (auto-fills if empty in storage)
                     const dispScheduled2nd = getAutoScheduled2nd(c.RequestBy || '') || c.Scheduled2ndInterventionist || '';
+
+                    const missedDays = getMissScheduleDays(c.ConsultDate);
+                    let warningIcon = null;
+                    if (missedDays >= 14) {
+                      const isRed = missedDays > 30;
+                      const iconColor = isRed ? 'text-rose-600' : 'text-amber-500';
+                      warningIcon = (
+                        <AlertTriangle 
+                          className={`w-4 h-4 shrink-0 ${iconColor}`} 
+                          title={`Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`}
+                        />
+                      );
+                    }
 
                     return (
                       <tr 
@@ -2767,12 +2877,17 @@ Xin cảm ơn!`;
                             isSelected ? 'bg-indigo-50' : 'bg-white'
                           }`}
                         >
-                          <span className="font-extrabold uppercase text-slate-900 block whitespace-normal break-words leading-snug">
-                            {pat.PatientName}
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-bold font-mono">
-                            ID1: {pat.PatientID1}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {warningIcon}
+                            <div className="min-w-0 flex-1">
+                              <span className="font-extrabold uppercase text-slate-900 block whitespace-normal break-words leading-snug">
+                                {pat.PatientName}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-bold font-mono">
+                                ID1: {pat.PatientID1}
+                              </span>
+                            </div>
+                          </div>
                         </td>
                         {visibleColumns.icd && (
                           <td className="py-3.5 px-2">
@@ -2798,6 +2913,16 @@ Xin cảm ơn!`;
                             {dispScheduled2nd || <span className="text-slate-300 font-normal italic">—</span>}
                           </td>
                         )}
+                        {visibleColumns.consultDate && (
+                          <td className="py-3.5 px-2 font-semibold text-slate-600">
+                            {c.ConsultDate ? formatVNTime(c.ConsultDate) : <span className="text-slate-300">—</span>}
+                          </td>
+                        )}
+                        {visibleColumns.consultResultId && (
+                          <td className="py-3.5 px-2 font-semibold text-slate-600">
+                            {c.ConsultResultID || <span className="text-slate-300">—</span>}
+                          </td>
+                        )}
                         {visibleColumns.plannedDate && (
                           <td className="py-3.5 px-2 text-center font-bold font-mono text-slate-600">
                             {c.PlannedCathLabDate ? formatVNTime(c.PlannedCathLabDate) : <span className="text-slate-350">—</span>}
@@ -2818,6 +2943,16 @@ Xin cảm ơn!`;
                             {!c.CheckDevice && (
                               <span className="text-slate-350 text-[10px] italic">Chưa check</span>
                             )}
+                          </td>
+                        )}
+                        {visibleColumns.callStatus && (
+                          <td className="py-3.5 px-2 font-semibold text-slate-600">
+                            {c.CallStatus || <span className="text-slate-300">—</span>}
+                          </td>
+                        )}
+                        {visibleColumns.missSchedule && (
+                          <td className="py-3.5 px-2 text-center font-bold text-slate-600">
+                            {missedDays > 0 ? `${missedDays} ngày` : '0 ngày'}
                           </td>
                         )}
                         <td className={`py-3.5 px-2 text-center sticky right-0 z-10 border-l border-slate-150 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
@@ -3383,7 +3518,7 @@ Xin cảm ơn!`;
 
                     {/* Device Stock Check - Enum Cards button style */}
                     <div>
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kiểm dụng cụ *</label>
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kiểm dụng cụ</label>
                       <div className="flex gap-2 h-[35px]">
                         {(['Đủ', 'Thiếu'] as const).map((opt) => (
                           <button
