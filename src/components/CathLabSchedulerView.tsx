@@ -762,6 +762,12 @@ Xin cảm ơn!`;
       const pOut = String(pat.Outcome || '').toLowerCase().trim();
       if (pOut === "tử vong" || pOut === "nặng xin về") { return false; }
 
+      const isTransferred = c.TransferredToCathLab === true
+        || String(c.TransferredToCathLab || '').trim().toLowerCase() === 'true'
+        || String(c.TransferredToCathLab || '').trim().toLowerCase() === 'yes'
+        || String(c.TransferredToCathLab || '').trim().toLowerCase() === 'có';
+      if (isTransferred) { return false; }
+
       return true;
     });
     
@@ -1977,16 +1983,20 @@ Xin cảm ơn!`;
     onPatchConsult?.(selectedConsult.ConsultKey, updatedData);
     setSelectedConsult(merged);
     setFormSnapshot(buildSnapshotFromConsult(merged));
-    setSuccessMsg('Đã lưu thông tin xếp lịch thành công!');
+    const isTransfer = updatedData.TransferredToCathLab === true;
+    const successText = isTransfer
+      ? 'Đã chuyển phòng thông tim thành công! Ca được giữ trong Lịch thông tim dự kiến.'
+      : 'Đã lưu thông tin xếp lịch thành công!';
+    setSuccessMsg(successText);
 
     if (closeOnSuccess) {
       setTimeout(() => {
         setSuccessMsg('');
-        if (updatedData.CallStatus === 'Loại') {
+        if (updatedData.CallStatus === 'Loại' || isTransfer) {
           setSelectedConsult(null);
           setFormSnapshot(null);
         }
-      }, 3000);
+      }, isTransfer ? 1500 : 3000);
     }
 
     setSaving(false);
