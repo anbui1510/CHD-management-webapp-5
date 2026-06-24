@@ -1571,11 +1571,8 @@ Xin cảm ơn!`;
   };
 
   const getMissingTransferRequiredFields = () => {
-    const missing: string[] = [];
-    if (!checkDevice) missing.push('Kiểm dụng cụ');
-    if (!callStatus) missing.push('Trạng thái gọi bệnh');
-    if (!plannedCathLabDate) missing.push('Ngày thông dự kiến');
-    return missing;
+    // No longer blocking - CheckDevice, CallStatus, PlannedCathLabDate are optional
+    return [];
   };
 
   const requestCloseScheduling = (onClose: () => void) => {
@@ -2026,19 +2023,10 @@ Xin cảm ơn!`;
   };
 
   const isTransferEnabled = () => {
-    return checkDevice === "Đủ" && callStatus === "Đồng ý" && !!plannedCathLabDate;
+    return true;
   };
 
   const handleActionTransfer = () => {
-    const missing = getMissingTransferRequiredFields();
-    if (missing.length > 0) {
-      setActionAlert(`Vui lòng điền đầy đủ trước khi chuyển phòng TT: ${missing.join(', ')}`);
-      return;
-    }
-    if (!isTransferEnabled()) {
-      setActionAlert("Chỉ có thể chuyển phòng TT khi Đã kiểm đủ dụng cụ, Gia đình đồng ý, và có Ngày dự kiến thông tim!");
-      return;
-    }
     setActionConfirm({
       type: 'transfer',
       title: 'Chuyển phòng thông tim',
@@ -2056,7 +2044,7 @@ Xin cảm ơn!`;
   };
 
   const isTransferRowEnabled = (c: Consult) => {
-    return c.CheckDevice === "Đủ" && c.CallStatus === "Đồng ý" && !!c.PlannedCathLabDate;
+    return true;
   };
 
   const handleRowTransfer = (c: Consult, p: Patient) => {
@@ -2863,7 +2851,7 @@ Xin cảm ơn!`;
                               </button>
                               <button 
                                 onClick={() => handleRowTransfer(c, pat)} 
-                                className={`${isTransferRowEnabled(c) ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border-indigo-200 cursor-pointer' : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'} p-1.5 rounded-lg border shadow-xs transition-opacity`} 
+                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border-indigo-200 cursor-pointer p-1.5 rounded-lg border shadow-xs transition-opacity" 
                                 title="Chuyển phòng TT"
                               >
                                 <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -3849,7 +3837,7 @@ Xin cảm ơn!`;
                 <button
                   type="button"
                   onClick={handleActionTransfer}
-                  className={`bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs ${isTransferEnabled() ? 'hover:bg-sky-100 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
+                  className="bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs hover:bg-sky-100 cursor-pointer"
                 >
                   Chuyển phòng TT
                 </button>
@@ -3935,7 +3923,7 @@ Xin cảm ơn!`;
                   <button
                     type="button"
                     onClick={handleActionTransfer}
-                    className={`bg-sky-50 text-sky-850 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shadow-xs ${isTransferEnabled() ? 'hover:bg-sky-100 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
+                    className="bg-sky-50 text-sky-850 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shadow-xs hover:bg-sky-100 cursor-pointer"
                     title="Chuyển phòng thông tim. Ca vẫn được giữ trong Lịch thông tim dự kiến"
                   >
                      Chuyển phòng TT
@@ -4341,7 +4329,7 @@ Xin cảm ơn!`;
                 Bạn có thay đổi chưa được lưu. Bạn có muốn lưu kết quả xếp lịch không?
               </p>
               <p className="text-[11px] text-slate-500 font-semibold">
-                Có thể lưu bất kỳ trường nào đã nhập. Chỉ nút &quot;Chuyển phòng TT&quot; yêu cầu đủ Kiểm dụng cụ, Trạng thái gọi bệnh và Ngày thông dự kiến.
+                Có thể lưu bất kỳ trường nào đã nhập. Nút &quot;Chuyển phòng TT&quot; có thể thực hiện bất cứ lúc nào mà không cần đủ Kiểm dụng cụ, Trạng thái gọi bệnh hay Ngày thông dự kiến.
               </p>
               {exitConfirmError && (
                 <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">

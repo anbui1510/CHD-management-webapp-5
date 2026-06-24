@@ -161,6 +161,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [detailDiagnosis, setDetailDiagnosis] = useState<string>('');
   
   const [consultMembers, setConsultMembers] = useState<string[]>([]);
+  const [scheduled1st, setScheduled1st] = useState<string>('');
   
   // 4. Clinical Result outcome fields
   const [consultResultID, setConsultResultID] = useState<string>('');
@@ -220,6 +221,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     setShowAddDeptInput(false);
     setCustomDeptVal('');
     setConsultMembers([]);
+    setScheduled1st('');
     setDiagnosisID('');
     setDetailDiagnosis('');
     setConsultResultID('');
@@ -311,6 +313,14 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       const chosenDept = showAddDeptInput ? customDeptVal : department;
       const chosenDoc = showAddDocInput ? customDocVal : requestBy;
 
+      // For "Staff thông": auto-fill Scheduled1stInterventionist & Scheduled2ndInterventionist
+      const isCathStaff = consultType === 'Staff thông';
+      if (isCathStaff && !scheduled1st) {
+        setSubmitLoading(false);
+        setErrorMsg('Vui lòng chọn PTV chính (Hội chẩn PTV chính)!');
+        return;
+      }
+
       const consultPayload: Consult = {
         ConsultKey: `con_${Date.now()}`,
         PatientKey: finalPatientKey,
@@ -319,7 +329,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         PatientHeight: patHeight || '',
         ConsultDate: consultDate,
         RequestBy: chosenDoc || 'BS Hội đồng',
-        ConsultMember: consultMembers,
+        ConsultMember: isCathStaff ? [] : consultMembers,
         DiagnosisID: diagnosisID,
         DetailDiagnosis: detailDiagnosis,
         Department: chosenDept || 'Tim Mạch',
@@ -335,7 +345,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         CheckDevice: checkDevice,
         ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
         ConsultResultUpdatedTime: new Date().toISOString(),
-        PDFTrigger: false
+        PDFTrigger: false,
+        ...(isCathStaff && {
+          Scheduled1stInterventionist: scheduled1st,
+          Scheduled2ndInterventionist: chosenDoc || '',
+        }),
       };
 
       onAddConsult?.(consultPayload);
@@ -1573,22 +1587,40 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       </div>
                     </div>
 
-                    <div className="pb-0.5">
-                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                      <SearchableEnumSelect
-                        multiple
-                        required
-                        options={[
-                          ...staffList.map(s => getShortStaffName(s.StaffName, staffList)),
-                          ...Array.from(new Set(consults.flatMap(c => Array.isArray(c.ConsultMember) ? c.ConsultMember : String(c.ConsultMember || '').split(',').map(s => s.trim()).filter(Boolean))))
-                        ]}
-                        values={consultMembers}
-                        onMultiChange={(members) => setConsultMembers(members)}
-                        placeholder="-- Bấm hoặc tìm để chọn bác sĩ --"
-                        searchPlaceholder="Gõ tìm bác sĩ..."
-                        direction="up"
-                      />
-                    </div>
+                    {consultType === 'Staff thông' ? (
+                      <div className="pb-0.5">
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Hội chẩn PTV chính <span className="text-red-500">*</span></label>
+                        <SearchableEnumSelect
+                          required
+                          options={[
+                            'BS. Phụng', 'BS. Lợi', 'BS. Thịnh', 'BS. Ân', 'BS. Hiếu', 'BS. Tài', 'BS. Hùng', 'BS. Tĩnh',
+                            ...Array.from(new Set(consults.map(c => String(c.Scheduled1stInterventionist || '')).filter(Boolean)))
+                          ]}
+                          value={scheduled1st}
+                          onChange={setScheduled1st}
+                          placeholder="-- Chọn PTV chính --"
+                          searchPlaceholder="Gõ tìm PTV chính..."
+                          direction="up"
+                        />
+                      </div>
+                    ) : (
+                      <div className="pb-0.5">
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
+                        <SearchableEnumSelect
+                          multiple
+                          required
+                          options={[
+                            ...staffList.map(s => getShortStaffName(s.StaffName, staffList)),
+                            ...Array.from(new Set(consults.flatMap(c => Array.isArray(c.ConsultMember) ? c.ConsultMember : String(c.ConsultMember || '').split(',').map(s => s.trim()).filter(Boolean))))
+                          ]}
+                          values={consultMembers}
+                          onMultiChange={(members) => setConsultMembers(members)}
+                          placeholder="-- Bấm hoặc tìm để chọn bác sĩ --"
+                          searchPlaceholder="Gõ tìm bác sĩ..."
+                          direction="up"
+                        />
+                      </div>
+                    )}
 
                   </div>
                 </div>
