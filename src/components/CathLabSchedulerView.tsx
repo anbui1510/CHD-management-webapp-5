@@ -3121,7 +3121,7 @@ Xin cảm ơn!`;
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Ngày staff</label>
-                            {renderScheduleDatePicker(schedConsultDate, setSchedConsultDate)}
+                            <VNDateInput value={schedConsultDate} onChange={setSchedConsultDate} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800" />
                           </div>
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Người đăng ký</label>
@@ -3396,20 +3396,11 @@ Xin cảm ơn!`;
                           {/* Planned Cath Date (type="date") */}
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày thông dự kiến</label>
-                            <div className="relative w-full">
-                              <input
-                                type="date"
-                                value={plannedCathLabDate}
-                                onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
-                                onChange={(e) => setPlannedCathLabDate(e.target.value)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                              />
-                              <div className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 font-bold text-xs text-slate-800 flex items-center justify-between min-h-[32px]">
-                                <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2 pointer-events-none" />
-                                <span>{plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'dd/mm/yyyy'}</span>
-                                <Calendar className="w-3.5 h-3.5 text-slate-350 shrink-0" />
-                              </div>
-                            </div>
+                            <VNDateInput
+                              value={plannedCathLabDate}
+                              onChange={setPlannedCathLabDate}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800"
+                            />
                           </div>
 
                           {/* Post Cath Department */}
@@ -4993,7 +4984,7 @@ Xin cảm ơn!`;
                         {renderAdHocRow('Ghi chú gọi bệnh', (
                           <textarea rows={1} placeholder="Ghi chú gọi bệnh..." value={adHocCallNote} onChange={(e) => setAdHocCallNote(e.target.value)} className={`${adHocInputCls} resize-y`} />
                         ), { alignTop: true })}
-                        {renderAdHocRow('Ngày thông tim dự kiến', renderAdHocDatePicker(adHocPlannedCathLabDate, setAdHocPlannedCathLabDate))}
+                        {renderAdHocRow('Ngày thông tim dự kiến', <VNDateInput value={adHocPlannedCathLabDate} onChange={setAdHocPlannedCathLabDate} className={`${adHocInputCls} font-mono font-bold`} />)}
                         {renderAdHocRow('Hỗ trợ tài chính', (
                           <select value={adHocFundingRequest} onChange={(e) => setAdHocFundingRequest(e.target.value)} className={adHocSelectCls}>
                             <option value="">— Chưa chọn —</option>
