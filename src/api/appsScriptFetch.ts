@@ -350,7 +350,7 @@ const loadStaffOnly = async (force = false): Promise<any[]> => {
 
   if (!force) {
     const cachedStaff = await getPersistedData('staff_data');
-    if (cachedStaff && Array.isArray(cachedStaff)) {
+    if (cachedStaff && Array.isArray(cachedStaff) && cachedStaff.length > 0 && cachedStaff[0].Role !== undefined) {
       staffCache = cachedStaff;
       return staffCache;
     }
@@ -396,7 +396,7 @@ const loadAllData = async (force = false): Promise<SheetData> => {
 
   if (!force) {
     const cachedAll = await getPersistedData('all_data');
-    if (cachedAll) {
+    if (cachedAll && cachedAll.staff && Array.isArray(cachedAll.staff) && cachedAll.staff.length > 0 && cachedAll.staff[0].Role !== undefined) {
       cache = normalizeData(cachedAll);
       return cache;
     }
