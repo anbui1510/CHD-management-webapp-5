@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Patient, Consult, CathLab, findPatientByKey, normalizePatientKey } from '../types';
 import ChdDailyBriefHomeWidget from './ChdDailyBriefHomeWidget';
+import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
 
 interface HomeDashboardProps {
   onNavigate: (menu: string) => void;
@@ -269,6 +270,8 @@ export default function HomeDashboard({
     return map;
   }, [consults]);
 
+  const cathlabsByPatientKey = useMemo(() => buildCathlabsByPatientKey(cathlabs || []), [cathlabs]);
+
   const eligibleWaitlist = useMemo(() => {
     const ELIGIBLE_RESULTS = [
       "Can thiệp thông tim",
@@ -281,30 +284,42 @@ export default function HomeDashboard({
     ];
 
     return (consults || []).filter(c => {
-      // Must have ConsultDate of 2026-01-01 or later
       if (!c.ConsultDate) return false;
-      const formattedConsultDate = getFormattedDateKey(c.ConsultDate);
-      if (formattedConsultDate < '2026-01-01') return false;
 
       if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) return false;
+      if (isConsultCathCompleted(c, cathlabsByPatientKey.get(normalizePatientKey(c.PatientKey)))) return false;
+      if (isConsultWaitlistExcludedByStatus(c.Status)) return false;
+
       const removed = c.Removed === true || String((c as any).Removed || '').trim().toLowerCase() === 'true' || String((c as any).Removed || '').trim().toLowerCase() === 'có' || String((c as any).Removed || '').trim().toLowerCase() === 'yes';
       if (removed) return false;
-      if (!ELIGIBLE_RESULTS.includes(c.ConsultResultID || '')) return false;
 
+      const resID = (c.ConsultResultID || '').trim();
+      let matchRes = false;
+      if (ELIGIBLE_RESULTS.includes(resID)) {
+        matchRes = true;
+      } else {
+        const normalized = ELIGIBLE_RESULTS.map(e => e.trim().toLowerCase());
+        if (normalized.includes(resID.toLowerCase())) matchRes = true;
+      }
+      if (!matchRes) return false;
+
+      const callSt = String(c.CallStatus || '').trim().toLowerCase();
       if (
-        c.CallStatus === "Đã can thiệp/mổ" || 
-        c.CallStatus === "Loại" || 
-        c.CallStatus === "Đã làm nơi khác" || 
-        c.CallStatus === "Muốn theo dõi nơi khác"
+        callSt === "đã can thiệp/mổ" || 
+        callSt === "loại" || 
+        callSt === "đã làm nơi khác" || 
+        callSt === "muốn theo dõi nơi khác"
       ) return false;
 
       const pat = findPatientByKey(patients || [], c.PatientKey);
       if (!pat) return false;
-      if (pat.Outcome === "Tử vong" || pat.Outcome === "Nặng xin về") return false;
+      
+      const pOut = String(pat.Outcome || '').toLowerCase().trim();
+      if (pOut === "tử vong" || pOut === "nặng xin về") return false;
 
       return true;
     });
-  }, [consults, patients, latestConsultsMap]);
+  }, [consults, patients, latestConsultsMap, cathlabsByPatientKey]);
 
   const scheduledCathLabCount = useMemo(() => {
     return eligibleWaitlist.filter(c => !!c.PlannedCathLabDate).length;
