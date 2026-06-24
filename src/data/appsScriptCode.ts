@@ -35,6 +35,17 @@ function getOrCreateSheet(sheetName, headers) {
     headerRange.setFontWeight("bold");
     headerRange.setBackground("#E8F5E9"); // light green for Patients, or customize
     sheet.setFrozenRows(1);
+    
+    // Set number format of string columns to Plain Text to preserve leading zeros (only on creation)
+    for (var col = 0; col < headers.length; col++) {
+      var header = headers[col];
+      if (header === "PatientID1" || header === "PatientID2" || header === "PatientPhone1" || header === "PatientPhone2" || header === "StaffPhone") {
+        var numRows = sheet.getMaxRows() - 1;
+        if (numRows > 0) {
+          sheet.getRange(2, col + 1, numRows, 1).setNumberFormat("@");
+        }
+      }
+    }
   } else {
     var existingLastCol = Math.max(sheet.getLastColumn(), 1);
     var existingHeaders = sheet.getRange(1, 1, 1, existingLastCol).getValues()[0];
@@ -51,17 +62,6 @@ function getOrCreateSheet(sheetName, headers) {
       updatedHeaderRange.setFontWeight("bold");
       updatedHeaderRange.setBackground("#E8F5E9");
       sheet.setFrozenRows(1);
-    }
-  }
-  
-  // Set number format of string columns to Plain Text to preserve leading zeros
-  for (var col = 0; col < headers.length; col++) {
-    var header = headers[col];
-    if (header === "PatientID1" || header === "PatientID2" || header === "PatientPhone1" || header === "PatientPhone2" || header === "StaffPhone") {
-      var numRows = sheet.getMaxRows() - 1;
-      if (numRows > 0) {
-        sheet.getRange(2, col + 1, numRows, 1).setNumberFormat("@");
-      }
     }
   }
   return sheet;
@@ -160,10 +160,14 @@ function initializeDatabase() {
 
 // GET Requests - Returns JSON of all data
 function doGet(e) {
-  initializeDatabase();
-  
-  // Protect against manual clicks on the "Run / Chạy" button inside Apps Script Editor where e is undefined
   var action = (e && e.parameter) ? e.parameter.action : "test";
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Fast path: Only initialize database if "Patient" sheet is missing or we are testing connection
+  if (action === "test" || !ss.getSheetByName("Patient")) {
+    initializeDatabase();
+    ss = SpreadsheetApp.getActiveSpreadsheet(); // Refresh spreadsheet reference after creation
+  }
   
   if (action === "test") {
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Connected successfully to Google Sheet!" }))
@@ -171,39 +175,39 @@ function doGet(e) {
   }
 
   if (action === "getStaff") {
-    var staff = readSheetAsJson("Staff");
+    var staff = readSheetAsJson(ss, "Staff");
     if (staff.length === 0) {
-      var staffSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Staff");
+      var staffSheet = ss.getSheetByName("Staff");
       if (staffSheet) {
         staffSheet.appendRow(["01378", "BS Minh Tuấn (Admin)", "BS Minh Tuấn", "Nam", "", "", "", "", "", "admin", "Admin", "", "admin-khoa", "tuan.nguyen@company.com", ""]);
         staffSheet.appendRow(["11111", "BS Thu Hà (User)", "BS Thu Hà", "Nữ", "", "", "", "", "", "user", "User", "", "tuy-chinh", "ha.thu@company.com", ""]);
-        staff = readSheetAsJson("Staff");
+        staff = readSheetAsJson(ss, "Staff");
       }
     }
     return ContentService.createTextOutput(JSON.stringify({ staff: staff }))
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Fetch all sheets
-  var patients = readSheetAsJson("Patient");
-  var consults = readSheetAsJson("Consult");
-  var staff = readSheetAsJson("Staff");
-  var cathlabs = readSheetAsJson("CathLab");
-  var operations = readSheetAsJson("Operation");
-  var cmrs = readSheetAsJson("CMR");
-  var sources = readSheetAsJson("Source");
-  var deviceTemplates = readSheetAsJson("DeviceTemplate");
-  var rolePresets = readSheetAsJson("RolePreset");
-  var notifications = readSheetAsJson("Notification");
-  var doctorPerformanceMarks = readSheetAsJson("DoctorPerformanceMark");
+  // Fetch all sheets using the cached Spreadsheet object
+  var patients = readSheetAsJson(ss, "Patient");
+  var consults = readSheetAsJson(ss, "Consult");
+  var staff = readSheetAsJson(ss, "Staff");
+  var cathlabs = readSheetAsJson(ss, "CathLab");
+  var operations = readSheetAsJson(ss, "Operation");
+  var cmrs = readSheetAsJson(ss, "CMR");
+  var sources = readSheetAsJson(ss, "Source");
+  var deviceTemplates = readSheetAsJson(ss, "DeviceTemplate");
+  var rolePresets = readSheetAsJson(ss, "RolePreset");
+  var notifications = readSheetAsJson(ss, "Notification");
+  var doctorPerformanceMarks = readSheetAsJson(ss, "DoctorPerformanceMark");
 
   // If Staff is completely empty, populate with some default users so admin can login
   if (staff.length === 0) {
-    var staffSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Staff");
+    var staffSheet = ss.getSheetByName("Staff");
     if (staffSheet) {
       staffSheet.appendRow(["01378", "BS Minh Tuấn (Admin)", "BS Minh Tuấn", "Nam", "", "", "", "", "", "admin", "Admin", "", "admin-khoa", "tuan.nguyen@company.com", ""]);
       staffSheet.appendRow(["11111", "BS Thu Hà (User)", "BS Thu Hà", "Nữ", "", "", "", "", "", "user", "User", "", "tuy-chinh", "ha.thu@company.com", ""]);
-      staff = readSheetAsJson("Staff");
+      staff = readSheetAsJson(ss, "Staff");
     }
   }
 
@@ -337,8 +341,7 @@ function doPost(e) {
 }
 
 // Convert Sheet into Array of JSON Objects
-function readSheetAsJson(sheetName) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+function readSheetAsJson(ss, sheetName) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
 
