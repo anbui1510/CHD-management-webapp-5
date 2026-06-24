@@ -4471,9 +4471,9 @@ Xin cảm ơn!`;
                               </span>
                             </div>
 
-                            <div className="flex justify-between items-center pt-0.5 px-1">
-                              <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Lưu ý / Ưu tiên:</span>
-                              <span className="font-bold text-slate-800 truncate text-[11.5px] max-w-[130px]" title={callNote ? `${priorityOrder} (${callNote})` : priorityOrder}>
+                            <div className="flex justify-between items-start gap-2 pt-0.5 px-1">
+                              <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase shrink-0">Lưu ý / Ưu tiên:</span>
+                              <span className="font-bold text-slate-800 text-[11.5px] text-right break-words max-w-[70%]" title={callNote ? `${priorityOrder} (${callNote})` : priorityOrder}>
                                 {callNote ? `${priorityOrder} (${callNote})` : priorityOrder}
                               </span>
                             </div>
