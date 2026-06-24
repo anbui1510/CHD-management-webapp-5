@@ -149,8 +149,27 @@ app.post('/api/auth/login', async (req, res) => {
     const config = getSyncConfig();
     let staffMember: Staff | undefined;
 
-    if (config.scriptUrl) {
-      // Delegated authentication via Google Sheets (Apps Script)
+    // 1. Try local verification first for instant login
+    const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const localStaff = staffList.find(s => String(s.StaffKey || '').trim() === String(StaffKey).trim());
+    if (localStaff) {
+      const hashedInput = hashPassword(Password, String(StaffKey));
+      const isPlaintextMatch = (String(localStaff.Password || '').trim() === String(Password).trim());
+      const isHashedMatch = (String(localStaff.Password || '').trim() === String(hashedInput).trim());
+      if (isPlaintextMatch || isHashedMatch) {
+        staffMember = localStaff;
+        if (isPlaintextMatch && !isHashedMatch) {
+          localStaff.Password = hashedInput;
+          writeDB(STAFF_FILE, staffList);
+          if (config.scriptUrl) {
+            syncToGoogleSheets('Staff', 'update', localStaff.StaffKey, localStaff).catch(() => {});
+          }
+        }
+      }
+    }
+
+    // 2. Fallback to Google Sheets (Apps Script) delegation if local match didn't succeed
+    if (!staffMember && config.scriptUrl) {
       try {
         console.log(`Verifying credentials with Google Sheets for StaffKey: ${StaffKey}`);
         const response = await fetchWithTimeout(config.scriptUrl, {
@@ -180,42 +199,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
       } catch (err) {
         console.error('Apps Script login check failed, falling back to local verification:', err);
-        // Offline / failure fallback: verify locally
-        const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
-        const localStaff = staffList.find(s => String(s.StaffKey || '').trim() === String(StaffKey).trim());
-        const hashedInput = hashPassword(Password, String(StaffKey));
-        const isPlaintextMatch = (localStaff && String(localStaff.Password || '').trim() === String(Password).trim());
-        const isHashedMatch = (localStaff && String(localStaff.Password || '').trim() === String(hashedInput).trim());
-
-        if (localStaff && (isPlaintextMatch || isHashedMatch)) {
-          staffMember = localStaff;
-          if (isPlaintextMatch && !isHashedMatch) {
-            localStaff.Password = hashedInput;
-            writeDB(STAFF_FILE, staffList);
-            if (config.scriptUrl) {
-              syncToGoogleSheets('Staff', 'update', localStaff.StaffKey, localStaff).catch(() => {});
-            }
-          }
-        } else {
-          res.status(401).json({ error: 'Mã nhân viên hoặc mật khẩu không đúng.' });
-          return;
-        }
-      }
-    } else {
-      // Offline mode: verify locally
-      const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
-      const localStaff = staffList.find(s => String(s.StaffKey || '').trim() === String(StaffKey).trim());
-      const hashedInput = hashPassword(Password, String(StaffKey));
-      const isPlaintextMatch = (localStaff && String(localStaff.Password || '').trim() === String(Password).trim());
-      const isHashedMatch = (localStaff && String(localStaff.Password || '').trim() === String(hashedInput).trim());
-
-      if (localStaff && (isPlaintextMatch || isHashedMatch)) {
-        staffMember = localStaff;
-        if (isPlaintextMatch && !isHashedMatch) {
-          localStaff.Password = hashedInput;
-          writeDB(STAFF_FILE, staffList);
-        }
-      } else {
+        // Already tried local verification, so if it failed there too, we fail
         res.status(401).json({ error: 'Mã nhân viên hoặc mật khẩu không đúng.' });
         return;
       }
@@ -269,14 +253,20 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
   res.json(stripPassword(staff));
 });
 
-// Public staff list — only StaffKey + StaffName + Avatar for login dropdown
+// Public staff list — only StaffKey + StaffName + Name + Role + Avatar for login dropdown
 // No auth required, no sensitive fields exposed
 app.get('/api/staff/public', async (_req, res) => {
   await syncFromGoogleSheets();
   const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
   const publicList = staffList
     .filter(s => !s.FireDate || !String(s.FireDate).trim())
-    .map(s => ({ StaffKey: s.StaffKey, StaffName: s.StaffName, Avatar: (s as any).Avatar || '' }));
+    .map(s => ({
+      StaffKey: s.StaffKey,
+      StaffName: s.StaffName,
+      Name: s.Name || '',
+      Role: s.Role || '',
+      Avatar: (s as any).Avatar || ''
+    }));
   res.json(publicList);
 });
 

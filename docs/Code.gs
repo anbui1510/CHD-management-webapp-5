@@ -208,6 +208,8 @@ function doGet(e) {
       publicStaff.push({
         StaffKey: staff[i].StaffKey || "",
         StaffName: staff[i].StaffName || "",
+        Name: staff[i].Name || "",
+        Role: staff[i].Role || "",
         Avatar: staff[i].Avatar || "",
         FireDate: staff[i].FireDate || ""
       });
@@ -226,9 +228,6 @@ function doGet(e) {
         staff = readSheetAsJson(ss, "Staff");
       }
     }
-    for (var i = 0; i < staff.length; i++) {
-      delete staff[i].Password;
-    }
     return ContentService.createTextOutput(JSON.stringify({ staff: staff }))
                          .setMimeType(ContentService.MimeType.JSON);
   }
@@ -237,9 +236,6 @@ function doGet(e) {
   var patients = readSheetAsJson(ss, "Patient");
   var consults = readSheetAsJson(ss, "Consult");
   var staff = readSheetAsJson(ss, "Staff");
-  for (var i = 0; i < staff.length; i++) {
-    delete staff[i].Password;
-  }
   var cathlabs = readSheetAsJson(ss, "CathLab");
   var operations = readSheetAsJson(ss, "Operation");
   var cmrs = readSheetAsJson(ss, "CMR");
@@ -467,7 +463,42 @@ function readSheetAsJson(ss, sheetName) {
   var lastCol = sheet.getLastColumn();
   if (lastRow <= 1) return []; // Only headers
 
-  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var schemaKeys = [
+    // Staff
+    "StaffKey", "StaffName", "Name", "StaffSex", "Avatar", "StaffDOB", "Department", "Career", "StaffPhone", "Password", "Role", "Permissions", "StaffRolePreset", "Email", "FireDate",
+    // Patient
+    "PatientKey", "PatientID1", "PatientID2", "PatientName", "OtherPatientName", "PatientDOB", "PatientSex", "PatientAddress", "PatientPhone1", "PatientPhone2", "PatientCreateBy", "PatientCreateTime", "Outcome", "PatientAddressDefaultWarning",
+    // Consult
+    "ConsultKey", "ConsultType", "PatientWeight", "PatientHeight", "ConsultDate", "RequestBy", "DiagnosisID", "DetailDiagnosis", "ConsultCreateBy", "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote", "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy", "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback", "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate", "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist", "Scheduled2ndInterventionist", "Scheduled3rdInterventionist",
+    // CathLab
+    "CathKey", "CathDate", "PostDiagnosisID", "PostDiagnosis", "CathResultID", "CathMethod", "CathPlan", "CathNote", "_1stInterventionist", "_2ndInterventionist", "_3rdInterventionist", "_4thInterventionist", "PlannedFollowUpDate", "CathUpdatedBy", "CathUpdatedTime",
+    // Operation
+    "SurgKey", "SurgDate", "DetailDiagnosisManual", "SurgResultID", "SurgNote", "SurgMethod", "1stSurgeon", "2ndSurgeon", "3rdSurgeon", "4thSurgeon", "SurgCreateTime", "SurgUpdatedBy",
+    // CMR
+    "CMRKey", "CMRkey", "MBN", "Họ và tên", "Tình trạng", "CMRDiagnosisID", "CMRDiagnosis", "CMRRequest", "DepartRequest", "CMRMethod", "CMRDevice", "PostDepart", "Anesthesia", "CMRScheduledDate", "DayOfWeek", "CMRCallStatus", "CMRCallStatusNote", "CMRDate", "CMRResult", "CMRNote", "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime",
+    // DeviceTemplate
+    "PHƯƠNG PHÁP PHẪU THUẬT", "DeviceName", "FullDeviceName", "Size", "Price", "bhyt",
+    // RolePreset
+    "RolePresetID", "RolePresetLabel", "RolePresetDescription", "SortOrder", "IsSystem"
+  ];
+
+  var normalizationMap = {};
+  for (var k = 0; k < schemaKeys.length; k++) {
+    normalizationMap[schemaKeys[k].toLowerCase()] = schemaKeys[k];
+  }
+
+  var rawHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var headers = [];
+  for (var h = 0; h < rawHeaders.length; h++) {
+    var rawH = String(rawHeaders[h] || "").trim();
+    var lowerH = rawH.toLowerCase();
+    if (normalizationMap[lowerH]) {
+      headers.push(normalizationMap[lowerH]);
+    } else {
+      headers.push(rawH);
+    }
+  }
+
   var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
   var values = dataRange.getValues();
   
@@ -478,12 +509,13 @@ function readSheetAsJson(ss, sheetName) {
     var emptyRow = true;
     for (var c = 0; c < headers.length; c++) {
       var cellVal = row[c];
+      var headerName = headers[c];
       
       // Convert Date objects to ISO string
       if (cellVal instanceof Date) {
         // Skip invalid dates (empty/broken cells) - toISOString() throws RangeError otherwise
         if (isNaN(cellVal.getTime())) {
-          obj[headers[c]] = "";
+          obj[headerName] = "";
         } else {
           try {
             if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {
@@ -491,16 +523,15 @@ function readSheetAsJson(ss, sheetName) {
               var year = cellVal.getFullYear();
               var month = ("0" + (cellVal.getMonth() + 1)).slice(-2);
               var day = ("0" + cellVal.getDate()).slice(-2);
-              obj[headers[c]] = year + "-" + month + "-" + day;
+              obj[headerName] = year + "-" + month + "-" + day;
             } else {
-              obj[headers[c]] = cellVal.toISOString();
+              obj[headerName] = cellVal.toISOString();
             }
           } catch (dateErr) {
-            obj[headers[c]] = "";
+            obj[headerName] = "";
           }
         }
       } else {
-        var headerName = headers[c];
         if (cellVal !== undefined && cellVal !== null) {
           if (headerName === "PatientID1" || headerName === "PatientID2" || headerName === "PatientPhone1" || headerName === "PatientPhone2" || headerName === "StaffPhone") {
             var strVal = String(cellVal).trim();

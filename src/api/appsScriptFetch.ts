@@ -357,7 +357,7 @@ const loadStaffOnly = async (force = false): Promise<any[]> => {
   }
 
   const apiKey = getScriptSecret();
-  let fetchUrl = `${scriptUrl}?action=getStaffPublic`;
+  let fetchUrl = `${scriptUrl}?action=getStaff`;
   if (apiKey) {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
@@ -796,6 +796,17 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
         return jsonResponse({ token, staff: stripBridgePassword(localStaff) });
       };
 
+      // Try local verification first for instant login
+      try {
+        const localRes = await verifyLocally();
+        if (localRes.status === 200) {
+          console.log('Instant local login verification succeeded!');
+          return localRes;
+        }
+      } catch (err) {
+        console.warn('Local verification failed, falling back to Apps Script delegation:', err);
+      }
+
       if (!scriptUrl) {
         return verifyLocally();
       }
@@ -870,7 +881,7 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return jsonResponse({ error: 'Không tìm thấy endpoint auth.' }, { status: 404 });
   }
 
-  // GET /api/staff/public — only StaffKey + StaffName + Avatar, no auth required
+  // GET /api/staff/public — only StaffKey + StaffName + Avatar + Name + Role, no auth required
   if (endpoint === 'staff' && key === 'public' && method === 'GET') {
     let staffList: any[];
     try {
@@ -880,7 +891,13 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     }
     const publicList = staffList
       .filter((s: any) => !s.FireDate || !String(s.FireDate).trim())
-      .map((s: any) => ({ StaffKey: s.StaffKey, StaffName: s.StaffName, Avatar: s.Avatar || '' }));
+      .map((s: any) => ({
+        StaffKey: s.StaffKey,
+        StaffName: s.StaffName,
+        Name: s.Name || '',
+        Role: s.Role || '',
+        Avatar: s.Avatar || ''
+      }));
     return jsonResponse(publicList);
   }
 
