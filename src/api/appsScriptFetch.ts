@@ -1,4 +1,5 @@
 import { handleChdBriefRequest } from './chdBriefBridge';
+import type { Staff } from '../types';
 
 type SheetData = {
   patients: any[];
@@ -153,6 +154,60 @@ const loadAllData = async (force = false): Promise<SheetData> => {
     });
 
   return pendingLoad;
+};
+
+let staffCache: Staff[] | null = null;
+let pendingStaffLoad: Promise<Staff[]> | null = null;
+
+const loadStaffOnly = async (force = false): Promise<Staff[]> => {
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
+  if (cache && cache.staff && cache.staff.length > 0 && !force) return cache.staff;
+  if (staffCache && !force) return staffCache;
+  if (pendingStaffLoad && !force) return pendingStaffLoad;
+
+  pendingStaffLoad = fetch(`${scriptUrl}?action=getStaff`)
+    .then(async res => {
+      const contentType = res.headers.get('Content-Type') || '';
+      const text = await res.text();
+      if (!res.ok) throw new Error(`Apps Script trả về HTTP ${res.status}`);
+      if (contentType.includes('text/html') || text.trim().startsWith('<')) {
+        const scriptError = text.match(/<div[^>]*>([^<]+)<\/div>\s*<\/body>/i)?.[1]?.trim();
+        throw new Error(
+          scriptError
+            ? `Apps Script lỗi: ${scriptError}`
+            : 'Apps Script đang trả về HTML. Hãy deploy Web app với quyền truy cập Anyone và copy đúng Web app URL.'
+        );
+      }
+      const parsed = JSON.parse(text);
+      staffCache = Array.isArray(parsed.staff) ? parsed.staff : [];
+      if (cache) {
+        cache.staff = staffCache;
+      }
+      return staffCache;
+    })
+    .catch(async err => {
+      if (isLocalHost()) {
+        console.warn('Google Apps Script connection failed. Falling back to local offline Express database for staff...', err);
+        const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ || window.fetch;
+        try {
+          const localRes = await nativeFetch('/api/staff');
+          if (localRes.ok) {
+            const localData = await localRes.json();
+            staffCache = Array.isArray(localData) ? localData : [];
+            return staffCache;
+          }
+        } catch (fallbackErr) {
+          console.error('Local Express staff fallback also failed:', fallbackErr);
+        }
+      }
+      throw err;
+    })
+    .finally(() => {
+      pendingStaffLoad = null;
+    });
+
+  return pendingStaffLoad;
 };
 
 const findCachedRecord = (
@@ -446,6 +501,15 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
 
   if (endpoint === 'workflow-monitor') {
     return null;
+  }
+
+  if (endpoint === 'staff' && method === 'GET') {
+    if (!scriptUrl) {
+      if (isLocalHost()) return null;
+      return jsonResponse(EMPTY_DATA.staff);
+    }
+    const staffData = await loadStaffOnly();
+    return jsonResponse(staffData);
   }
 
   const config = endpointMap[endpoint];

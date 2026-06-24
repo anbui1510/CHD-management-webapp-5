@@ -582,21 +582,15 @@ export default function App() {
   }, [refreshMedicalData]);
 
   useEffect(() => {
-    void refreshMedicalData('full', true).catch(err => {
-      const msg = err instanceof Error ? err.message : String(err);
-      setLoginLoadError(
-        msg.includes('Failed to fetch')
-          ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
-          : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
-      );
-    });
-
     // Recover logged-in session if exists
     const storedStaff = localStorage.getItem('CurrentStaffKey');
+    let hasValidSession = false;
+    let parsedStaff: Staff | null = null;
+
     if (storedStaff) {
       try {
-        const parsed = JSON.parse(storedStaff) as Staff;
-        const staffKey = parsed.StaffKey;
+        parsedStaff = JSON.parse(storedStaff) as Staff;
+        const staffKey = parsedStaff.StaffKey;
         const timeoutSetting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
         let isExpired = false;
         if (timeoutSetting !== 'unlimit') {
@@ -614,12 +608,40 @@ export default function App() {
           setLoginPassword('');
           setLoginStaffKey('');
         } else {
-          setCurrentStaff(parsed);
+          hasValidSession = true;
+          setCurrentStaff(parsedStaff);
           localStorage.setItem(`LastActivity_${staffKey}`, Date.now().toString());
         }
       } catch (e) {
         localStorage.removeItem('CurrentStaffKey');
       }
+    }
+
+    if (hasValidSession) {
+      void refreshMedicalData('full', true).catch(err => {
+        console.error('Failed to load full data on mount:', err);
+      });
+    } else {
+      // Fetch only staff to make login screen render instantly
+      fetch('/api/staff')
+        .then(res => {
+          if (!res.ok) throw new Error('Không tải được danh sách nhân viên từ Google Sheets.');
+          return res.json();
+        })
+        .then(data => {
+          setStaffList(data);
+          if (data.length > 0) {
+            setLoginStaffKey(data[0].StaffKey);
+          }
+        })
+        .catch(err => {
+          const msg = err instanceof Error ? err.message : String(err);
+          setLoginLoadError(
+            msg.includes('Failed to fetch')
+              ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
+              : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
+          );
+        });
     }
   }, []);
 
@@ -790,6 +812,9 @@ export default function App() {
       localStorage.setItem(`LastActivity_${bypassStaff.StaffKey}`, Date.now().toString());
       setCurrentStaff(bypassStaff);
       setNewConsultData(prev => ({ ...prev, RequestBy: bypassStaff.StaffName }));
+      void refreshMedicalData('full', true).catch(err => {
+        console.error('Failed to load full clinical data:', err);
+      });
       return;
     }
     // [END TEMP]
@@ -822,6 +847,9 @@ export default function App() {
       ...prev,
       RequestBy: staffMember.StaffName
     }));
+    void refreshMedicalData('full', true).catch(err => {
+      console.error('Failed to load full clinical data:', err);
+    });
   };
 
   // Logout handler

@@ -170,6 +170,20 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "getStaff") {
+    var staff = readSheetAsJson("Staff");
+    if (staff.length === 0) {
+      var staffSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Staff");
+      if (staffSheet) {
+        staffSheet.appendRow(["01378", "BS Minh Tuấn (Admin)", "BS Minh Tuấn", "Nam", "", "", "", "", "", "admin", "Admin", "", "admin-khoa", "tuan.nguyen@company.com", ""]);
+        staffSheet.appendRow(["11111", "BS Thu Hà (User)", "BS Thu Hà", "Nữ", "", "", "", "", "", "user", "User", "", "tuy-chinh", "ha.thu@company.com", ""]);
+        staff = readSheetAsJson("Staff");
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ staff: staff }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // Fetch all sheets
   var patients = readSheetAsJson("Patient");
   var consults = readSheetAsJson("Consult");
