@@ -2765,7 +2765,7 @@ Xin cảm ơn!`;
         <div className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm overflow-y-auto lg:overflow-hidden min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor') ? 'flex' : 'hidden lg:flex'}`}>
           {!isAnyFilterExpanded ? (
             <>
-              {((!selectedConsult || pureCalendarMode || mobileTab === 'calendar') && mobileTab !== 'editor') ? (
+              {(!selectedConsult || pureCalendarMode || mobileTab !== 'editor') ? (
             
             /* SHOW THE BEAUTIFUL INDEPENDENT CALENDAR WHEN NO PATIENT IS SELECTED (or in pure calendar mode) */
             <div className="flex-1 flex flex-col min-h-0 bg-white">
