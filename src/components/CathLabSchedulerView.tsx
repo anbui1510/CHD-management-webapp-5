@@ -460,6 +460,7 @@ export default function CathLabSchedulerView({
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
+  const [copiedImageType, setCopiedImageType] = useState<'clipboard' | 'download'>('clipboard');
   const [isCopyingImage, setIsCopyingImage] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [smsMessage, setSmsMessage] = useState('');
@@ -4292,13 +4293,26 @@ Xin cảm ơn!`;
                 });
                 const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
                 if (blob) {
-                  await navigator.clipboard.write([
-                    new ClipboardItem({
-                      [blob.type]: blob
-                    })
-                  ]);
-                  setCopiedImage(true);
-                  setTimeout(() => setCopiedImage(false), 2550);
+                  try {
+                    await navigator.clipboard.write([
+                      new ClipboardItem({
+                        [blob.type]: blob
+                      })
+                    ]);
+                    setCopiedImageType('clipboard');
+                    setCopiedImage(true);
+                    setTimeout(() => setCopiedImage(false), 2550);
+                  } catch (clipboardErr) {
+                    console.warn('Clipboard write failed, falling back to download:', clipboardErr);
+                    const link = document.createElement('a');
+                    link.download = `TomTatXepLich_${pat.PatientID1 || pat.PatientName}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    
+                    setCopiedImageType('download');
+                    setCopiedImage(true);
+                    setTimeout(() => setCopiedImage(false), 2550);
+                  }
                 }
               } catch (err) {
                 console.error('Error copying image: ', err);
@@ -4516,7 +4530,7 @@ Xin cảm ơn!`;
                       ) : (
                         <>
                           <Check className="w-3.5 h-3.5 shrink-0" />
-                          <span>{copiedImage ? 'Đã copy ảnh!' : 'Sao chép Hình ảnh'}</span>
+                          <span>{copiedImage ? (copiedImageType === 'download' ? 'Đã tải ảnh về!' : 'Đã copy ảnh!') : 'Sao chép Hình ảnh'}</span>
                         </>
                       )}
                     </button>
