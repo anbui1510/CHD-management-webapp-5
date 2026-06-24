@@ -4285,7 +4285,11 @@ Xin cảm ơn!`;
               if (!el) return;
               setIsCopyingImage(true);
               try {
-                const canvas = await html2canvas(el, {
+                const html2canvasFn = typeof html2canvas === 'function' ? html2canvas : (html2canvas as any).default;
+                if (typeof html2canvasFn !== 'function') {
+                  throw new Error('Thư viện chụp ảnh (html2canvas) chưa được tải đúng cách.');
+                }
+                const canvas = await html2canvasFn(el, {
                   backgroundColor: '#ffffff',
                   scale: 2,
                   logging: false,
@@ -4294,6 +4298,9 @@ Xin cảm ơn!`;
                 const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
                 if (blob) {
                   try {
+                    if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
+                      throw new Error('Trình duyệt không hỗ trợ sao chép ảnh trực tiếp.');
+                    }
                     await navigator.clipboard.write([
                       new ClipboardItem({
                         [blob.type]: blob
@@ -4314,8 +4321,9 @@ Xin cảm ơn!`;
                     setTimeout(() => setCopiedImage(false), 2550);
                   }
                 }
-              } catch (err) {
+              } catch (err: any) {
                 console.error('Error copying image: ', err);
+                setActionAlert(`Không thể tạo ảnh: ${err.message || String(err)}`);
               } finally {
                 setIsCopyingImage(false);
               }
