@@ -4009,7 +4009,19 @@ Xin cảm ơn!`;
                            </div>
                          </div>
                          <div className="flex-1">
-                           <input type="date" value={deviceEndDate} onClick={(e: any) => e.target.showPicker && e.target.showPicker()} onChange={e => setDeviceEndDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 text-[10px] font-bold" />
+                            <div className="relative w-full">
+                              <input 
+                                type="date" 
+                                value={deviceEndDate} 
+                                onClick={(e: any) => e.target.showPicker && e.target.showPicker()} 
+                                onChange={e => setDeviceEndDate(e.target.value)} 
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                              />
+                              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold text-slate-700 flex items-center justify-between min-h-[24px]">
+                                <span>{deviceEndDate ? formatVNTime(deviceEndDate) : 'Đến ngày'}</span>
+                                <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                              </div>
+                            </div>
                          </div>
                        </div>
                      ) : (
