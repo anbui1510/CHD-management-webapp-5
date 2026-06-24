@@ -102,6 +102,7 @@ import {
   Clock, 
   Workflow, 
   RefreshCw,
+  Unlink,
   Home,
   Menu,
   ChevronRight,
@@ -1566,9 +1567,34 @@ export default function App() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             {((loginLoadError && staffList.length === 0) || loginError) && (
-              <div className="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-3 text-xs leading-relaxed flex gap-1.5">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{(loginLoadError && staffList.length === 0) ? loginLoadError : loginError}</span>
+              <div className="space-y-2">
+                <div className="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-3 text-xs leading-relaxed flex gap-1.5 animate-in fade-in duration-200">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{(loginLoadError && staffList.length === 0) ? loginLoadError : loginError}</span>
+                </div>
+                {loginLoadError && staffList.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem('chd_apps_script_url');
+                      fetch('/api/sync-config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ scriptUrl: '' })
+                      })
+                        .then(() => {
+                          window.location.reload();
+                        })
+                        .catch(() => {
+                          window.location.reload();
+                        });
+                    }}
+                    className="w-full bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl py-2.5 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
+                  >
+                    <Unlink className="w-3.5 h-3.5" />
+                    Sử dụng Database Offline (Hủy liên kết Sheets)
+                  </button>
+                )}
               </div>
             )}
 

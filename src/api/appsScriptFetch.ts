@@ -131,6 +131,23 @@ const loadAllData = async (force = false): Promise<SheetData> => {
       cache = normalizeData(parsed);
       return cache;
     })
+    .catch(async err => {
+      if (isLocalHost()) {
+        console.warn('Google Apps Script connection failed. Falling back to local offline Express database...', err);
+        const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ || window.fetch;
+        try {
+          const localRes = await nativeFetch('/api/all');
+          if (localRes.ok) {
+            const localData = await localRes.json();
+            cache = normalizeData(localData);
+            return cache;
+          }
+        } catch (fallbackErr) {
+          console.error('Local Express database fallback also failed:', fallbackErr);
+        }
+      }
+      throw err;
+    })
     .finally(() => {
       pendingLoad = null;
     });
