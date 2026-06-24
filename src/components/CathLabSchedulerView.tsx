@@ -2977,24 +2977,16 @@ Xin cảm ơn!`;
                         <h4 className="text-slate-800 font-extrabold text-xs uppercase">Báo cáo lịch ngày: {getFormattedDateKey(activeDate.toISOString().split('T')[0])}</h4>
                         <p className="text-[9px] text-slate-400">Danh sách kíp can thiệp ngày hôm nay</p>
                       </div>
-                      <div className="relative">
-                        <input 
-                          type="date" 
-                          value={getFormattedDateKey(activeDate.toISOString().split('T')[0])} 
-                          onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              const parts = e.target.value.split('-');
-                              setActiveDate(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
-                            }
-                          }}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                        />
-                        <div className="bg-white text-xs border border-slate-250 rounded-xl px-2.5 py-1 font-bold text-slate-700 flex items-center gap-1.5 min-h-[26px]">
-                          <span>{formatVNTime(getFormattedDateKey(activeDate.toISOString().split('T')[0]))}</span>
-                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        </div>
-                      </div>
+                      <VNDateInput 
+                        value={getFormattedDateKey(activeDate.toISOString().split('T')[0])} 
+                        onChange={(val) => {
+                          if (val) {
+                            const parts = val.split('-');
+                            setActiveDate(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+                          }
+                        }}
+                        className="bg-white text-xs border border-slate-250 rounded-xl px-2.5 py-1 font-bold text-slate-700 w-[120px] focus:outline-none" 
+                      />
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-2">
