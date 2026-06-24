@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import html2canvas from 'html2canvas';
+import { toBlob as htmlToImageBlob } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
