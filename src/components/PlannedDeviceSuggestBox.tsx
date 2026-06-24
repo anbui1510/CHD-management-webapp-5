@@ -53,6 +53,19 @@ const getTemplateValue = (template: DeviceTemplate) =>
 const getTemplateLabel = (template: DeviceTemplate) =>
   normalizeText(template.DeviceName) || normalizeText(template.FullDeviceName);
 
+/** Parse a date string (dd/mm/yyyy or yyyy-mm-dd) to ms timestamp, returns 0 if invalid. */
+const getDateMs = (dateStr?: string): number => {
+  if (!dateStr) return 0;
+  const s = dateStr.trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('/');
+    const ms = new Date(`${y}-${m}-${d}`).getTime();
+    return isNaN(ms) ? 0 : ms;
+  }
+  const ms = new Date(s).getTime();
+  return isNaN(ms) ? 0 : ms;
+};
+
 export function PlannedDeviceSuggestBox({
   diagnosisID,
   value,
@@ -71,13 +84,10 @@ export function PlannedDeviceSuggestBox({
   const suggestions = useMemo<PlannedDeviceSuggestion[]>(() => {
     if (!normalizedDiagnosisID) return [];
 
+    // Use a Map keyed by lowercase value to deduplicate
     const map = new Map<string, PlannedDeviceSuggestion>();
-    const addSuggestion = (suggestion: PlannedDeviceSuggestion) => {
-      const normalizedValue = trimSentence(suggestion.value).toLowerCase();
-      if (!normalizedValue || map.has(normalizedValue)) return;
-      map.set(normalizedValue, suggestion);
-    };
 
+    // 1. Templates from DeviceTemplate (no count limit, appear first)
     deviceTemplates
       .filter(template => normalizeDiagnosisID(template.DiagnosisID) === normalizedDiagnosisID)
       .forEach((template, index) => {
@@ -89,7 +99,9 @@ export function PlannedDeviceSuggestBox({
           normalizeText(template.bhyt)
         ].filter(Boolean).join(' • ');
 
-        addSuggestion({
+        const key = trimSentence(suggestionValue).toLowerCase();
+        if (!key || map.has(key)) return;
+        map.set(key, {
           key: `template-${index}-${labelText}`,
           value: suggestionValue,
           label: labelText,
@@ -98,20 +110,38 @@ export function PlannedDeviceSuggestBox({
         });
       });
 
-    consults
-      .filter(consult => normalizeDiagnosisID(consult.DiagnosisID) === normalizedDiagnosisID)
-      .flatMap(consult => normalizeText(consult.PlannedDevice).split('.'))
-      .map(trimSentence)
-      .filter(Boolean)
-      .forEach((device, index) => {
-        addSuggestion({
-          key: `history-${index}-${device}`,
-          value: device,
-          label: device,
-          meta: 'Từ lịch sử cùng mã bệnh',
-          source: 'history'
-        });
+    // 2. History from consults – sort newest → oldest, cap at 10 unique history devices
+    const sortedConsults = [...consults]
+      .filter(c => normalizeDiagnosisID(c.DiagnosisID) === normalizedDiagnosisID && normalizeText(c.PlannedDevice))
+      .sort((a, b) => {
+        const dateA = getDateMs(a.PlannedCathLabDate || a.ConsultDate);
+        const dateB = getDateMs(b.PlannedCathLabDate || b.ConsultDate);
+        return dateB - dateA; // descending: newest first
       });
+
+    let historyCount = 0;
+    for (const consult of sortedConsults) {
+      if (historyCount >= 10) break;
+      const devices = normalizeText(consult.PlannedDevice)
+        .split('.')
+        .map(trimSentence)
+        .filter(Boolean);
+
+      for (const device of devices) {
+        if (historyCount >= 10) break;
+        const key = device.toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, {
+            key: `history-${historyCount}-${device}`,
+            value: device,
+            label: device,
+            meta: 'Từ lịch sử cùng mã bệnh',
+            source: 'history'
+          });
+          historyCount++;
+        }
+      }
+    }
 
     return Array.from(map.values());
   }, [consults, deviceTemplates, normalizedDiagnosisID]);
