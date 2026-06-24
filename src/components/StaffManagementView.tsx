@@ -253,10 +253,6 @@ export default function StaffManagementView({
       triggerAlert?.('Vui lòng nhập Họ tên hiển thị (StaffName)!', 'Thiếu thông tin');
       return;
     }
-    if (!draft.Password?.trim()) {
-      triggerAlert?.('Mật khẩu không được để trống!', 'Thiếu thông tin');
-      return;
-    }
 
     setSaving(true);
 
@@ -267,7 +263,6 @@ export default function StaffManagementView({
       Career: draft.Career?.trim() || '',
       Email: draft.Email?.trim() || '',
       StaffPhone: draft.StaffPhone?.trim() || '',
-      Password: draft.Password,
       Role: draft.Role || 'User',
       FireDate: draft.FireDate || '',
       StaffRolePreset: isAdminStaff({ ...selectedStaff, Role: draft.Role }) ? 'admin-khoa' : draft.StaffRolePreset,
@@ -275,6 +270,10 @@ export default function StaffManagementView({
         ? serializePermissions(ALL_APP_MODULES)
         : serializePermissions(draft.moduleSet),
     };
+
+    if (draft.Password && draft.Password.trim() !== '') {
+      payload.Password = draft.Password.trim();
+    }
 
     onPatchStaff?.(draft.StaffKey, payload);
     triggerAlert?.('Đã cập nhật nhân sự và phân quyền thành công!', 'Lưu thành công');
@@ -712,6 +711,7 @@ export default function StaffManagementView({
                         type="text"
                         value={draft.Password || ''}
                         onChange={(e) => setDraft(prev => ({ ...prev, Password: e.target.value }))}
+                        placeholder="Để trống để giữ nguyên mật khẩu cũ"
                         className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
                       />
                     </label>

@@ -53,6 +53,7 @@ import BellNotificationMenu from './components/BellNotificationMenu';
 import StaffProfileView from './components/StaffProfileView';
 import ResultStaffDrawer from './components/ResultStaffDrawer';
 import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
+import { clearLocalCache } from './api/appsScriptFetch';
 import {
   createLatestDiagnosisResolver,
 } from './utils/latestDiagnosis';
@@ -181,6 +182,7 @@ const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] 
 export default function App() {
   // Session State
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
+  const [authToken, setAuthToken] = useState<string>(() => localStorage.getItem('CHD_AUTH_TOKEN') || '');
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [consults, setConsults] = useState<Consult[]>([]);
@@ -289,6 +291,10 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoadError, setLoginLoadError] = useState<string>('');
+
+  // States for Code Auto-Update & Background Polling
+  const [runningBuildTime, setRunningBuildTime] = useState<string | null>(null);
+  const [showUpdateBanner, setShowUpdateBanner] = useState<boolean>(false);
 
   // Search Filter State (Patient List & Globals)
   const [patientSearch, setPatientSearch] = useState<string>('');
@@ -582,59 +588,46 @@ export default function App() {
   }, [refreshMedicalData]);
 
   useEffect(() => {
-    // Recover logged-in session if exists
-    const storedStaff = localStorage.getItem('CurrentStaffKey');
-    let hasValidSession = false;
-    let parsedStaff: Staff | null = null;
-
-    if (storedStaff) {
-      try {
-        parsedStaff = JSON.parse(storedStaff) as Staff;
-        const staffKey = parsedStaff.StaffKey;
-        const timeoutSetting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
-        let isExpired = false;
-        if (timeoutSetting !== 'unlimit') {
-          const timeoutMs = timeoutSetting === '1' ? 60 * 1000 : (timeoutSetting === '30' ? 30 * 60 * 1000 : (timeoutSetting === '60' ? 60 * 60 * 1000 : 0));
-          const lastActivityStr = localStorage.getItem(`LastActivity_${staffKey}`);
-          if (lastActivityStr && timeoutMs > 0) {
-            const lastActivity = parseInt(lastActivityStr, 10);
-            if (!isNaN(lastActivity) && (Date.now() - lastActivity >= timeoutMs)) {
-              isExpired = true;
-            }
-          }
-        }
-        if (isExpired) {
-          localStorage.removeItem('CurrentStaffKey');
-          setLoginPassword('');
-          setLoginStaffKey('');
-        } else {
-          hasValidSession = true;
-          setCurrentStaff(parsedStaff);
-          localStorage.setItem(`LastActivity_${staffKey}`, Date.now().toString());
-        }
-      } catch (e) {
-        localStorage.removeItem('CurrentStaffKey');
-      }
-    }
-
-    if (hasValidSession) {
-      void refreshMedicalData('full', true).catch(err => {
-        console.error('Failed to load full data on mount:', err);
-      });
-    } else {
-      // Fetch only staff to make login screen render instantly
-      fetch('/api/staff')
+    // 1. Recover logged-in session via server token or cookie
+    const storedToken = localStorage.getItem('CHD_AUTH_TOKEN') || (['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname) ? 'cookie-session' : '');
+    if (storedToken) {
+      // Validate token with server and get current staff info
+      fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${storedToken}` }
+      })
         .then(res => {
-          if (!res.ok) throw new Error('Không tải được danh sách nhân viên từ Google Sheets.');
+          if (!res.ok) throw new Error('Token expired');
           return res.json();
         })
-        .then(data => {
-          setStaffList(data);
-          if (data.length > 0) {
-            setLoginStaffKey(data[0].StaffKey);
-          }
+        .then((staffData: Staff) => {
+          setAuthToken(storedToken);
+          setCurrentStaff(staffData);
+          // Load full database (SWR)
+          void refreshMedicalData('full', false).then(() => {
+            void refreshMedicalData('full', true).catch(err => {
+              console.warn('Background sync failed:', err);
+            });
+          }).catch(err => {
+            void refreshMedicalData('full', true).catch(err => {
+              const msg = err instanceof Error ? err.message : String(err);
+              setLoginLoadError(msg || 'Không tải được dữ liệu từ Google Sheets.');
+            });
+          });
         })
-        .catch(err => {
+        .catch(() => {
+          // Token invalid/expired — clear and show login screen
+          localStorage.removeItem('CHD_AUTH_TOKEN');
+          setAuthToken('');
+          setCurrentStaff(null);
+          // Load public staff list for login dropdown
+          void refreshMedicalData('staff', false).then(() => {
+            void refreshMedicalData('staff', true).catch(() => {});
+          }).catch(() => {});
+        });
+    } else {
+      // Not logged in: load public staff list only
+      void refreshMedicalData('staff', false).then(() => {
+        void refreshMedicalData('staff', true).catch(err => {
           const msg = err instanceof Error ? err.message : String(err);
           setLoginLoadError(
             msg.includes('Failed to fetch')
@@ -642,78 +635,63 @@ export default function App() {
               : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
           );
         });
+      }).catch(err => {
+        void refreshMedicalData('staff', true).catch(err => {
+          const msg = err instanceof Error ? err.message : String(err);
+          setLoginLoadError(
+            msg.includes('Failed to fetch')
+              ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
+              : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
+          );
+        });
+      });
     }
   }, []);
 
-  // Auto logout / session timeout logic
+  // Background Code Version Polling (Check every 5 minutes)
+  useEffect(() => {
+    const checkVersion = () => {
+      fetch('/api/version')
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error('Version endpoint returned error');
+        })
+        .then(data => {
+          if (data && data.buildTime) {
+            setRunningBuildTime(prev => {
+              if (!prev) {
+                return data.buildTime;
+              }
+              if (prev !== data.buildTime) {
+                setShowUpdateBanner(true);
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to check app build version:', err);
+        });
+    };
+
+    checkVersion();
+    const interval = setInterval(checkVersion, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Background Clinical Data Polling (Refresh every 60 seconds when logged in)
   useEffect(() => {
     if (!currentStaff?.StaffKey) return;
 
-    const staffKey = currentStaff.StaffKey;
-    
-    const getTimeoutMs = () => {
-      const setting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
-      if (setting === '1') return 60 * 1000;
-      if (setting === '30') return 30 * 60 * 1000;
-      if (setting === '60') return 60 * 60 * 1000;
-      return 0; // 0 means unlimit
-    };
-
-    let timeoutMs = getTimeoutMs();
-
-    const handleStorageChange = () => {
-      timeoutMs = getTimeoutMs();
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-    const updateActivity = () => {
-      localStorage.setItem(`LastActivity_${staffKey}`, Date.now().toString());
-    };
-
-    if (!localStorage.getItem(`LastActivity_${staffKey}`)) {
-      updateActivity();
-    }
-
-    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    let lastWrite = 0;
-    const handleUserActivity = () => {
-      const now = Date.now();
-      if (now - lastWrite > 2000) { // Throttle writes
-        updateActivity();
-        lastWrite = now;
-      }
-    };
-
-    activityEvents.forEach(evt => {
-      window.addEventListener(evt, handleUserActivity);
-    });
-
     const interval = setInterval(() => {
-      if (timeoutMs <= 0) return;
-      const lastActivityStr = localStorage.getItem(`LastActivity_${staffKey}`);
-      if (lastActivityStr) {
-        const lastActivity = parseInt(lastActivityStr, 10);
-        if (!isNaN(lastActivity)) {
-          const elapsed = Date.now() - lastActivity;
-          if (elapsed >= timeoutMs) {
-            localStorage.removeItem('CurrentStaffKey');
-            setCurrentStaff(null);
-            setLoginPassword('');
-            setLoginStaffKey('');
-            alert('Phiên đăng nhập của bạn đã hết hạn do không hoạt động.');
-          }
-        }
-      }
-    }, 5000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      activityEvents.forEach(evt => {
-        window.removeEventListener(evt, handleUserActivity);
+      if (document.hidden) return; // Skip update if browser tab is minimized or in background
+      void refreshMedicalData('full', false).catch(err => {
+        console.warn('Background auto data sync failed:', err);
       });
-      clearInterval(interval);
-    };
-  }, [currentStaff]);
+    }, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [currentStaff?.StaffKey, refreshMedicalData]);
 
   useEffect(() => {
     if (!currentStaff?.StaffKey || staffList.length === 0) return;
@@ -792,76 +770,156 @@ export default function App() {
       .then(data => setConsults(data));
   };
 
-  // Login handler
-  const handleLogin = (e: React.FormEvent) => {
+  // Login handler — server-side authentication
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
-    // [TEMP] Hardcode bypass: tài khoản Admin/123 để test giao diện Dashboard
-    if (loginPassword === '123') {
-      const found = staffList.find(s => s.StaffKey === loginStaffKey);
-      const bypassStaff: Staff = found ?? ({
-        StaffKey: loginStaffKey || 'Admin',
-        StaffName: 'Admin (Test)',
-        Password: '123',
-        Role: 'Admin',
-        Email: '',
-        FireDate: ''
-      } as Staff);
-      localStorage.setItem('CurrentStaffKey', JSON.stringify(bypassStaff));
-      localStorage.setItem(`LastActivity_${bypassStaff.StaffKey}`, Date.now().toString());
-      setCurrentStaff(bypassStaff);
-      setNewConsultData(prev => ({ ...prev, RequestBy: bypassStaff.StaffName }));
-      void refreshMedicalData('full', true).catch(err => {
-        console.error('Failed to load full clinical data:', err);
-      });
-      return;
-    }
-    // [END TEMP]
 
     if (!loginStaffKey) {
-      setLoginError('Vui lòng chọn nhân viên để đăng nhập!');
+      setLoginError('Vui l\u00f2ng ch\u1ecdn nh\u00e2n vi\u00ean \u0111\u1ec3 \u0111\u0103ng nh\u1eadp!');
+      return;
+    }
+    if (!loginPassword) {
+      setLoginError('Vui l\u00f2ng nh\u1eadp m\u1eadt kh\u1ea9u!');
       return;
     }
 
-    const staffMember = staffList.find(s => s.StaffKey === loginStaffKey);
-    if (!staffMember) {
-      setLoginError('Mã nhân viên nhập vào không tồn tại trong hệ thống!');
-      return;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ StaffKey: loginStaffKey, Password: loginPassword })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginError(data.error || 'M\u1eadt kh\u1ea9u kh\u00f4ng \u0111\u00fang. Vui l\u00f2ng th\u1eed l\u1ea1i!');
+        return;
+      }
+      const { token, staff: staffData } = data as { token: string; staff: Staff };
+      // Store ONLY the token — no password, no sensitive data in localStorage
+      localStorage.setItem('CHD_AUTH_TOKEN', token);
+      // Remove legacy storage key if present
+      localStorage.removeItem('CurrentStaffKey');
+      setAuthToken(token);
+      setCurrentStaff(staffData);
+      setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
+
+      // Load full database (SWR)
+      void refreshMedicalData('full', false).then(() => {
+        void refreshMedicalData('full', true).catch(() => {});
+      }).catch(() => {
+        void refreshMedicalData('full', true).catch(err => {
+          const msg = err instanceof Error ? err.message : String(err);
+          setLoginError(msg || 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c d\u1eef li\u1ec7u t\u1eeb Google Sheets.');
+        });
+      });
+    } catch (err) {
+      setLoginError('L\u1ed7i k\u1ebft n\u1ed1i. Vui l\u00f2ng ki\u1ec3m tra m\u1ea1ng v\u00e0 th\u1eed l\u1ea1i.');
     }
 
-    if (staffMember.Password !== loginPassword) {
-      setLoginError('Mật khẩu đăng nhập không trùng khớp. Vui lòng nhập lại!');
-      return;
-    }
-
-    if (staffMember.FireDate) {
-      setLoginError(`Tài khoản nhân viên đã bị vô hiệu hóa! Người này đã nghỉ việc vào ngày: ${staffMember.FireDate}`);
-      return;
-    }
-
-    localStorage.setItem('CurrentStaffKey', JSON.stringify(staffMember));
-    localStorage.setItem(`LastActivity_${staffMember.StaffKey}`, Date.now().toString());
-    setCurrentStaff(staffMember);
-    setNewConsultData(prev => ({
-      ...prev,
-      RequestBy: staffMember.StaffName
-    }));
-    void refreshMedicalData('full', true).catch(err => {
-      console.error('Failed to load full clinical data:', err);
-    });
   };
 
   // Logout handler
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
+    const token = localStorage.getItem('CHD_AUTH_TOKEN');
+    if (token) {
+      // Revoke token on server (fire-and-forget)
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(() => {});
+    }
+    localStorage.removeItem('CHD_AUTH_TOKEN');
+    // Also clean up legacy keys
+    localStorage.removeItem('CurrentStaffKey');
     if (currentStaff?.StaffKey) {
       localStorage.removeItem(`LastActivity_${currentStaff.StaffKey}`);
     }
-    localStorage.removeItem('CurrentStaffKey');
+    setAuthToken('');
     setCurrentStaff(null);
     setLoginPassword('');
     setLoginStaffKey('');
-  };
+
+    // Reset React states of medical data to prevent data leakage
+    setPatients([]);
+    setConsults([]);
+    setCathlabs([]);
+    setOperations([]);
+    setCmrs([]);
+    setNotifications([]);
+    setDoctorPerformanceMarks([]);
+
+    // Clear IndexedDB cache and bridge memory cache
+    void clearLocalCache().catch(err => console.warn('Failed to clear local cache on logout:', err));
+  }, [currentStaff]);
+
+  // Auto logout / session timeout logic
+  useEffect(() => {
+    if (!currentStaff?.StaffKey) return;
+
+    const staffKey = currentStaff.StaffKey;
+    
+    const getTimeoutMs = () => {
+      const setting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
+      if (setting === '1') return 60 * 1000;
+      if (setting === '30') return 30 * 60 * 1000;
+      if (setting === '60') return 60 * 60 * 1000;
+      return 0; // 0 means unlimit
+    };
+
+    let timeoutMs = getTimeoutMs();
+
+    const handleStorageChange = () => {
+      timeoutMs = getTimeoutMs();
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    const updateActivity = () => {
+      localStorage.setItem(`LastActivity_${staffKey}`, Date.now().toString());
+    };
+
+    if (!localStorage.getItem(`LastActivity_${staffKey}`)) {
+      updateActivity();
+    }
+
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    let lastWrite = 0;
+    const handleUserActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite > 2000) { // Throttle writes
+        updateActivity();
+        lastWrite = now;
+      }
+    };
+
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, handleUserActivity);
+    });
+
+    const interval = setInterval(() => {
+      if (timeoutMs <= 0) return;
+      const lastActivityStr = localStorage.getItem(`LastActivity_${staffKey}`);
+      if (lastActivityStr) {
+        const lastActivity = parseInt(lastActivityStr, 10);
+        if (!isNaN(lastActivity)) {
+          const elapsed = Date.now() - lastActivity;
+          if (elapsed >= timeoutMs) {
+            handleLogout();
+            alert('Phiên đăng nhập của bạn đã hết hạn do không hoạt động.');
+          }
+        }
+      }
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      activityEvents.forEach(evt => {
+        window.removeEventListener(evt, handleUserActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [currentStaff, handleLogout]);
 
   const navigateMenu = (menuTarget: typeof activeMenu | string) => {
     const menu = menuTarget === 'staff-mgmt:marks' ? 'staff-mgmt' : menuTarget as typeof activeMenu;
@@ -4028,6 +4086,51 @@ export default function App() {
                   className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
                 >
                   Xác nhận
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Auto-Update Code Banner */}
+      <AnimatePresence>
+        {showUpdateBanner && (
+          <div className="fixed bottom-14 md:bottom-8 right-4 md:right-6 z-50 max-w-sm w-full p-0.5 shadow-2xl rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-[#d2145a] font-sans">
+            <motion.div 
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-slate-900/90 backdrop-blur-xl rounded-[14px] p-4 text-white space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <div className="bg-pink-500/20 text-[#d2145a] rounded-full p-2 flex items-center justify-center shrink-0">
+                  <RefreshCw className="w-5 h-5 animate-spin" style={{ animationDuration: '4s' }} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400">
+                    Hệ thống đã cập nhật
+                  </h4>
+                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed mt-1">
+                    Phiên bản mới đã được xuất bản trên Cloudflare. Vui lòng làm mới để áp dụng các cải tiến.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowUpdateBanner(false)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer text-[10px] font-black uppercase tracking-wider"
+                >
+                  Để sau
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-[#d2145a] hover:from-pink-600 hover:to-rose-600 text-white shadow-md hover:shadow-pink-500/20 transition cursor-pointer text-[10px] font-black uppercase tracking-wider"
+                >
+                  Tải lại ngay
                 </button>
               </div>
             </motion.div>

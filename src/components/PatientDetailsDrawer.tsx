@@ -97,12 +97,29 @@ export default function PatientDetailsDrawer({
     operations: patientOperations
   });
 
-  const cathConsultKeys = new Set(patientCathlabs.map(cath => normalizeRecordKey(cath.ConsultKey)).filter(Boolean));
-  const latestPendingPrep = patientConsults.find(c =>
-    INTERVENTION_RESULTS.has(String(c.ConsultResultID || '').trim().toLowerCase()) &&
-    normalizeRecordKey(c.ConsultKey) &&
-    !cathConsultKeys.has(normalizeRecordKey(c.ConsultKey))
-  );
+  const latestPendingPrep = patientConsults.find(c => {
+    const isCathLabIndication = INTERVENTION_RESULTS.has(String(c.ConsultResultID || '').trim().toLowerCase());
+    if (!isCathLabIndication) return false;
+
+    const cKey = normalizeRecordKey(c.ConsultKey);
+    if (!cKey) return false;
+
+    // Kiểm tra xem đã có bản ghi thông tim tương ứng nào chưa
+    const hasMatchingCath = patientCathlabs.some(cath => {
+      const cathConsultKey = normalizeRecordKey(cath.ConsultKey);
+      if (cathConsultKey === cKey) return true;
+
+      // Dự phòng: Nếu bản ghi thông tim không liên kết rõ ràng với hội chẩn nào, đối khớp theo ngày
+      if (!cathConsultKey) {
+        const cathTime = parseMedicalDateTime(cath.CathDate);
+        const consultTime = parseMedicalDateTime(c.ConsultDate);
+        return cathTime >= consultTime;
+      }
+      return false;
+    });
+
+    return !hasMatchingCath;
+  });
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-200">

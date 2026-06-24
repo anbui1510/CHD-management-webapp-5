@@ -169,8 +169,50 @@ function doGet(e) {
     ss = SpreadsheetApp.getActiveSpreadsheet(); // Refresh spreadsheet reference after creation
   }
   
+  // 1. Handle API Key setup if requested
+  if (action === "setup") {
+    var existingKey = PropertiesService.getScriptProperties().getProperty("API_KEY");
+    var keyToSet = (e && e.parameter) ? e.parameter.apiKey : "";
+    if (!keyToSet) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Missing apiKey parameter for setup" }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (existingKey && existingKey !== keyToSet) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: API Key is already set." }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+    PropertiesService.getScriptProperties().setProperty("API_KEY", keyToSet);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "API Key configured successfully!" }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 2. Validate API Key for all other actions
+  var apiKey = PropertiesService.getScriptProperties().getProperty("API_KEY");
+  if (apiKey) {
+    var reqKey = (e && e.parameter) ? e.parameter.apiKey : "";
+    if (reqKey !== apiKey) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Invalid or missing API Key" }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (action === "test") {
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Connected successfully to Google Sheet!" }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "getStaffPublic") {
+    var staff = readSheetAsJson(ss, "Staff");
+    var publicStaff = [];
+    for (var i = 0; i < staff.length; i++) {
+      publicStaff.push({
+        StaffKey: staff[i].StaffKey || "",
+        StaffName: staff[i].StaffName || "",
+        Avatar: staff[i].Avatar || "",
+        FireDate: staff[i].FireDate || ""
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify({ staff: publicStaff }))
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -184,6 +226,9 @@ function doGet(e) {
         staff = readSheetAsJson(ss, "Staff");
       }
     }
+    for (var i = 0; i < staff.length; i++) {
+      delete staff[i].Password;
+    }
     return ContentService.createTextOutput(JSON.stringify({ staff: staff }))
                          .setMimeType(ContentService.MimeType.JSON);
   }
@@ -192,6 +237,9 @@ function doGet(e) {
   var patients = readSheetAsJson(ss, "Patient");
   var consults = readSheetAsJson(ss, "Consult");
   var staff = readSheetAsJson(ss, "Staff");
+  for (var i = 0; i < staff.length; i++) {
+    delete staff[i].Password;
+  }
   var cathlabs = readSheetAsJson(ss, "CathLab");
   var operations = readSheetAsJson(ss, "Operation");
   var cmrs = readSheetAsJson(ss, "CMR");
@@ -208,6 +256,9 @@ function doGet(e) {
       staffSheet.appendRow(["01378", "BS Minh Tuấn (Admin)", "BS Minh Tuấn", "Nam", "", "", "", "", "", "admin", "Admin", "", "admin-khoa", "tuan.nguyen@company.com", ""]);
       staffSheet.appendRow(["11111", "BS Thu Hà (User)", "BS Thu Hà", "Nữ", "", "", "", "", "", "user", "User", "", "tuy-chinh", "ha.thu@company.com", ""]);
       staff = readSheetAsJson(ss, "Staff");
+      for (var i = 0; i < staff.length; i++) {
+        delete staff[i].Password;
+      }
     }
   }
 
@@ -307,6 +358,28 @@ function writeRecordToSheet(type, action, key, record) {
 // POST Requests - Inserts or Updates records
 function doPost(e) {
   initializeDatabase();
+  
+  // Validate API Key for POST requests
+  var apiKey = PropertiesService.getScriptProperties().getProperty("API_KEY");
+  if (apiKey) {
+    var reqKey = "";
+    try {
+      if (e && e.postData && e.postData.contents) {
+        var payload = JSON.parse(e.postData.contents);
+        reqKey = payload.apiKey || "";
+      }
+    } catch (err) {}
+    
+    if (!reqKey && e && e.parameter) {
+      reqKey = e.parameter.apiKey || "";
+    }
+    
+    if (reqKey !== apiKey) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Invalid or missing API Key" }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   var result = { status: "error", message: "Unknown action" };
   
   try {
@@ -316,6 +389,51 @@ function doPost(e) {
     var type = payload.type; // "Patient" | "Consult" | "Staff"
     var key = payload.key; // Unique key to find
     var record = payload.data; // JSON Object
+
+    if (action === "login") {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var staffList = readSheetAsJson(ss, "Staff");
+      var inputStaffKey = String(payload.staffKey || "").trim();
+      var inputPassword = String(payload.password || "").trim();
+      
+      var matchedStaff = null;
+      for (var i = 0; i < staffList.length; i++) {
+        if (String(staffList[i].StaffKey || "").trim() === inputStaffKey) {
+          matchedStaff = staffList[i];
+          break;
+        }
+      }
+      
+      if (!matchedStaff) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Mã nhân viên không tồn tại!" }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      var hashedInput = hashPassword(inputPassword, inputStaffKey);
+      var isPlaintextMatch = (String(matchedStaff.Password || "") === inputPassword);
+      var isHashedMatch = (String(matchedStaff.Password || "") === hashedInput);
+      
+      if (!isPlaintextMatch && !isHashedMatch) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Mật khẩu không đúng. Vui lòng thử lại!" }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      // Auto-migrate plaintext password to hash
+      if (isPlaintextMatch && !isHashedMatch) {
+        matchedStaff.Password = hashedInput;
+        writeRecordToSheet("Staff", "update", matchedStaff.StaffKey, matchedStaff);
+      }
+      
+      if (matchedStaff.FireDate && String(matchedStaff.FireDate).trim() !== "") {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Tài khoản đã bị vô hiệu hóa (nghỉ việc)." }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      delete matchedStaff.Password;
+      
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", staff: matchedStaff }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
 
     if (action === "batch") {
       var operations = Array.isArray(payload.operations) ? payload.operations : [];
@@ -407,5 +525,29 @@ function readSheetAsJson(ss, sheetName) {
     }
   }
   return jsonArray;
+}
+
+// Hash password with per-user salt (StaffKey) using SHA-256
+function hashPassword(password, salt) {
+  var input = password + ":" + salt;
+  var rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input, Utilities.Charset.UTF_8);
+  var output = "";
+  for (var i = 0; i < rawHash.length; i++) {
+    var val = rawHash[i];
+    if (val < 0) {
+      val += 256;
+    }
+    var byteString = val.toString(16);
+    if (byteString.length == 1) {
+      byteString = "0" + byteString;
+    }
+    output += byteString;
+  }
+  return output;
+}
+
+// Check if a string is a 64-character SHA-256 hash (hexadecimal)
+function isSHA256(str) {
+  return /^[0-9a-f]{64}$/i.test(str);
 }
 `;

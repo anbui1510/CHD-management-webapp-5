@@ -17,7 +17,7 @@ export function useRefreshMedicalData(setters: MedicalDataSetters) {
     if (!force && meta.pending) return meta.pending;
     if (!force && now - meta.lastAt < REFRESH_COOLDOWN_MS) return;
 
-    meta.pending = fetchMedicalDataBundle()
+    meta.pending = fetchMedicalDataBundle(force)
       .then(bundle => {
         applyMedicalDataBundle(bundle, scope, setters);
         meta.lastAt = Date.now();

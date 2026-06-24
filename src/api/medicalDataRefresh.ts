@@ -30,8 +30,44 @@ const EMPTY_BUNDLE: MedicalDataBundle = {
   doctorPerformanceMarks: []
 };
 
-export async function fetchMedicalDataBundle(): Promise<MedicalDataBundle> {
-  const res = await fetch('/api/all');
+/** Get the stored auth token from localStorage */
+function getAuthToken(): string {
+  return localStorage.getItem('CHD_AUTH_TOKEN') || '';
+}
+
+/** Build fetch headers with optional Authorization */
+function authHeaders(token?: string): HeadersInit {
+  const t = token || getAuthToken();
+  return t ? { 'Authorization': `Bearer ${t}` } : {};
+}
+
+export async function fetchMedicalDataBundle(force = false): Promise<MedicalDataBundle> {
+  const token = getAuthToken();
+
+  // If no token, only fetch public staff list (for login dropdown)
+  // This avoids exposing any patient data before authentication
+  if (!token) {
+    try {
+      const res = await fetch('/api/staff/public');
+      if (!res.ok) return EMPTY_BUNDLE;
+      const publicStaff = await res.json();
+      // Map public staff (StaffKey, StaffName only) to Staff type
+      return {
+        ...EMPTY_BUNDLE,
+        staff: Array.isArray(publicStaff) ? publicStaff : []
+      };
+    } catch {
+      return EMPTY_BUNDLE;
+    }
+  }
+
+  const url = force ? '/api/all?force=true' : '/api/all';
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (res.status === 401) {
+    // Token expired — clear it
+    localStorage.removeItem('CHD_AUTH_TOKEN');
+    return EMPTY_BUNDLE;
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Không thể tải dữ liệu (HTTP ${res.status})`);
@@ -51,6 +87,7 @@ export async function fetchMedicalDataBundle(): Promise<MedicalDataBundle> {
     doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks) ? data.doctorPerformanceMarks : EMPTY_BUNDLE.doctorPerformanceMarks
   };
 }
+
 
 export type MedicalDataSetters = {
   setPatients: (value: Patient[]) => void;

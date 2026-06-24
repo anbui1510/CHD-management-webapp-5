@@ -38,9 +38,10 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
   }, [activeTab]);
 
   // Real Sync State
-  const [syncConfig, setSyncConfig] = useState<{ scriptUrl: string; isSynced: boolean }>({ scriptUrl: '', isSynced: false });
+  const [syncConfig, setSyncConfig] = useState<{ scriptUrl: string; scriptSecret?: string; isSynced: boolean }>({ scriptUrl: '', scriptSecret: '', isSynced: false });
   const [loadingConfig, setLoadingConfig] = useState<boolean>(true);
   const [inputUrl, setInputUrl] = useState<string>('');
+  const [inputSecret, setInputSecret] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -64,6 +65,9 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
         setSyncConfig(data);
         if (data.scriptUrl) {
           setInputUrl(data.scriptUrl);
+        }
+        if (data.scriptSecret) {
+          setInputSecret(data.scriptSecret);
         }
         setLoadingConfig(false);
       })
@@ -92,7 +96,7 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
     fetch('/api/sync-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptUrl: inputUrl.trim() })
+      body: JSON.stringify({ scriptUrl: inputUrl.trim(), scriptSecret: inputSecret.trim() })
     })
       .then(async res => {
         const data = await res.json();
@@ -104,7 +108,7 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
       .then(data => {
         setActionLoading(false);
         setActionSuccess(data.message);
-        setSyncConfig({ scriptUrl: inputUrl.trim(), isSynced: true });
+        setSyncConfig({ scriptUrl: inputUrl.trim(), scriptSecret: inputSecret.trim(), isSynced: true });
         if (onRefreshData) {
           onRefreshData(); // Reload parent medical data from new Sheet!
         }
@@ -127,14 +131,15 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
     fetch('/api/sync-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptUrl: '' })
+      body: JSON.stringify({ scriptUrl: '', scriptSecret: '' })
     })
       .then(res => res.json())
       .then(data => {
         setActionLoading(false);
         setActionSuccess('Đã hủy liên kết thành công!');
         setInputUrl('');
-        setSyncConfig({ scriptUrl: '', isSynced: false });
+        setInputSecret('');
+        setSyncConfig({ scriptUrl: '', scriptSecret: '', isSynced: false });
         if (onRefreshData) {
           onRefreshData(); // Redraw with local offline database
         }
@@ -372,7 +377,13 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
           <div className="px-5 py-3 bg-slate-50 border-b border-gray-200 text-xs text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span className="truncate flex-grow">
               <strong>URL Web App liên kết: </strong>
-              <code className="bg-slate-100 p-1 rounded border border-slate-200 font-mono text-slate-700 select-all">{syncConfig.scriptUrl}</code>
+              <code className="bg-slate-100 p-1 rounded border border-slate-200 font-mono text-slate-700 select-all mr-3">{syncConfig.scriptUrl}</code>
+              {syncConfig.scriptSecret && (
+                <>
+                  <strong>API Key: </strong>
+                  <code className="bg-slate-100 p-1 rounded border border-slate-200 font-mono text-slate-700 select-all">{syncConfig.scriptSecret}</code>
+                </>
+              )}
             </span>
             <div className="flex items-center gap-3 shrink-0">
               <button
@@ -525,9 +536,10 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
               </li>
             </ol>
 
-            {/* Input target URL */}
-            <form onSubmit={handleConnect} className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-stretch gap-2">
-              <div className="relative flex-1">
+            {/* Input target URL and Secret Key */}
+            <form onSubmit={handleConnect} className="pt-4 border-t border-gray-100 space-y-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-gray-700">Web App URL:</label>
                 <input
                   type="url"
                   placeholder="Dán Web app URL (bắt đầu bằng https://script.google.com/...)"
@@ -537,14 +549,44 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
                   disabled={actionLoading}
                 />
               </div>
-              <button
-                type="submit"
-                disabled={actionLoading}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-extrabold text-xs px-5 py-2 rounded-xl transition shadow flex items-center justify-center gap-1 border-b-2 border-emerald-900"
-              >
-                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Lưu kết nối
-              </button>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-gray-700 flex items-center justify-between">
+                  <span>Mã bảo mật Apps Script (API Key):</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rand = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join('');
+                      setInputSecret(rand);
+                    }}
+                    className="text-[10px] text-emerald-700 hover:underline font-bold"
+                    disabled={actionLoading}
+                  >
+                    🎲 Tự sinh mã ngẫu nhiên
+                  </button>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nhập hoặc tạo mã bảo mật để bảo vệ Apps Script"
+                  value={inputSecret}
+                  onChange={(e) => setInputSecret(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none font-mono"
+                  disabled={actionLoading}
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl transition shadow flex items-center justify-center gap-1.5 border-b-2 border-emerald-900 cursor-pointer"
+                >
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Lưu & Thiết lập kết nối
+                </button>
+              </div>
             </form>
           </div>
 

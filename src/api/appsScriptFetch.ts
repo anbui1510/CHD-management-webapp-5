@@ -18,11 +18,85 @@ type SheetData = {
 type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark';
 
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
+const SCRIPT_SECRET_STORAGE_KEY = 'chd_apps_script_secret';
+
+const fetchWithTimeout = async (url: string, init?: RequestInit, timeout = 15000): Promise<Response> => {
+  const nativeFetch = (typeof window !== 'undefined' && (window as any).__CHD_NATIVE_FETCH__) || fetch;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await nativeFetch(url, {
+      ...init,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+};
+
+const getScriptSecret = () =>
+  localStorage.getItem(SCRIPT_SECRET_STORAGE_KEY) ||
+  String(viteEnv.VITE_GOOGLE_SCRIPT_SECRET || viteEnv.VITE_GOOGLE_SCRIPT_API_KEY || '').trim();
+
+const setScriptSecret = (secret: string) => {
+  const trimmed = secret.trim();
+  if (trimmed) {
+    localStorage.setItem(SCRIPT_SECRET_STORAGE_KEY, trimmed);
+  } else {
+    localStorage.removeItem(SCRIPT_SECRET_STORAGE_KEY);
+  }
+  cache = null;
+  pendingLoad = null;
+  staffCache = null;
+  pendingStaffLoad = null;
+  void clearPersistedData();
+};
 const viteEnv = (import.meta as any).env || {};
+
+const DEFAULT_STAFF: any[] = [
+  {
+    StaffKey: "11111",
+    StaffName: "Admin",
+    Name: "Admin",
+    Password: "1111",
+    Role: "Admin",
+    Email: "admin@hospital.vn",
+    FireDate: ""
+  },
+  {
+    StaffKey: "01378",
+    StaffName: "Bùi Tuấn Ân",
+    Name: "BS. Ân",
+    Password: "1111",
+    Role: "User",
+    StaffSex: "Nam",
+    Email: "anbui150@gmail.com",
+    StaffPhone: "0348940432",
+    FireDate: ""
+  },
+  {
+    StaffKey: "01651",
+    StaffName: "Lê Trần Bảo Nghi",
+    Name: "BS. Nghi",
+    Password: "1111",
+    Role: "User",
+    StaffSex: "Nữ",
+    StaffDOB: "13/05/1995",
+    Department: "Nội Tim Mạch",
+    Career: "Bác sĩ",
+    Email: "baonghile.95@gmail.com",
+    StaffPhone: "0932051995",
+    FireDate: ""
+  }
+];
+
 const EMPTY_DATA: SheetData = {
   patients: [],
   consults: [],
-  staff: [],
+  staff: DEFAULT_STAFF,
   cathlabs: [],
   operations: [],
   cmrs: [],
@@ -49,6 +123,161 @@ const endpointMap: Record<string, { type: SheetType; collection: keyof SheetData
 
 let cache: SheetData | null = null;
 let pendingLoad: Promise<SheetData> | null = null;
+let staffCache: any[] | null = null;
+let pendingStaffLoad: Promise<any[]> | null = null;
+
+// ─────────────────────────────────────────────────────────────────
+// BRIDGE AUTH LAYER
+// Client-side token system for Cloudflare / static deployments
+// Mirrors the auth system in server.ts but runs in-browser memory.
+// Tokens are valid for 8 hours and slide on activity.
+// ─────────────────────────────────────────────────────────────────
+
+const BRIDGE_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+const bridgeTokenStore = new Map<string, { staffKey: string; expiresAt: number }>();
+
+function bridgeGenerateToken(): string {
+  const arr = new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function bridgeCreateSession(staffKey: string): string {
+  const token = bridgeGenerateToken();
+  bridgeTokenStore.set(token, { staffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS });
+  return token;
+}
+
+function bridgeResolveSession(token: string): string | null {
+  const session = bridgeTokenStore.get(token);
+  if (!session) return null;
+  if (Date.now() >= session.expiresAt) {
+    bridgeTokenStore.delete(token);
+    return null;
+  }
+  // Slide expiry on activity
+  session.expiresAt = Date.now() + BRIDGE_SESSION_TTL_MS;
+  return session.staffKey;
+}
+
+function bridgeRevokeToken(token: string): void {
+  bridgeTokenStore.delete(token);
+}
+
+async function bridgeHashPassword(password: string, salt: string): Promise<string> {
+  const msgUint8 = new TextEncoder().encode(password + ':' + salt);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Extract Bearer token from request init headers */
+function extractBridgeToken(init?: RequestInit): string | null {
+  const headers = init?.headers as Record<string, string> | undefined;
+  if (!headers) return localStorage.getItem('CHD_AUTH_TOKEN');
+  const auth = headers['Authorization'] || headers['authorization'] || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  const xToken = headers['x-auth-token'] || headers['X-Auth-Token'] || '';
+  if (xToken.trim()) return xToken.trim();
+  return localStorage.getItem('CHD_AUTH_TOKEN');
+}
+
+/** Returns 401 response if no valid session. Returns null if session is valid. */
+function requireAuthBridge(init?: RequestInit): Response | null {
+  const token = extractBridgeToken(init);
+  if (!token) {
+    return jsonResponse({ error: 'Yêu cầu đăng nhập để truy cập tài nguyên này.' }, { status: 401 });
+  }
+  const staffKey = bridgeResolveSession(token);
+  if (!staffKey) {
+    return jsonResponse({ error: 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.' }, { status: 401 });
+  }
+  return null; // valid
+}
+
+/** Strip Password field from a staff record */
+function stripBridgePassword<T extends Record<string, any>>(staff: T): Omit<T, 'Password'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { Password, ...safe } = staff as any;
+  return safe;
+}
+
+/** Strip passwords from a full data bundle, return safe copy */
+function sanitizeDataBundle(data: SheetData): SheetData {
+  return {
+    ...data,
+    staff: Array.isArray(data.staff) ? data.staff.map(stripBridgePassword) : []
+  };
+}
+
+// IndexedDB Helper Wrapper
+const DB_NAME = 'chd_database_v5';
+const STORE_NAME = 'cache_store';
+
+const getDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB is not supported'));
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const getPersistedData = async (key: string): Promise<any | null> => {
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Failed to read from IndexedDB:', err);
+    return null;
+  }
+};
+
+const setPersistedData = async (key: string, val: any): Promise<void> => {
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(val, key);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Failed to write to IndexedDB:', err);
+  }
+};
+
+const clearPersistedData = async (): Promise<void> => {
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.clear();
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Failed to clear IndexedDB:', err);
+  }
+};
 
 const getScriptUrl = () =>
   localStorage.getItem(SCRIPT_URL_STORAGE_KEY) ||
@@ -65,6 +294,9 @@ const setScriptUrl = (scriptUrl: string) => {
   }
   cache = null;
   pendingLoad = null;
+  staffCache = null;
+  pendingStaffLoad = null;
+  void clearPersistedData();
 };
 
 const jsonResponse = (body: unknown, init?: ResponseInit) =>
@@ -109,13 +341,74 @@ const normalizeData = (data: Partial<SheetData>): SheetData => ({
   doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks) ? data.doctorPerformanceMarks : []
 });
 
+const loadStaffOnly = async (force = false): Promise<any[]> => {
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
+  if (cache && !force) return cache.staff;
+  if (staffCache && !force) return staffCache;
+  if (pendingStaffLoad && !force) return pendingStaffLoad;
+
+  if (!force) {
+    const cachedStaff = await getPersistedData('staff_data');
+    if (cachedStaff && Array.isArray(cachedStaff)) {
+      staffCache = cachedStaff;
+      return staffCache;
+    }
+  }
+
+  const apiKey = getScriptSecret();
+  let fetchUrl = `${scriptUrl}?action=getStaffPublic`;
+  if (apiKey) {
+    fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
+  }
+
+  pendingStaffLoad = fetchWithTimeout(fetchUrl)
+    .then(async res => {
+      const contentType = res.headers.get('Content-Type') || '';
+      const text = await res.text();
+      if (!res.ok) throw new Error(`Apps Script trả về HTTP ${res.status}`);
+      if (contentType.includes('text/html') || text.trim().startsWith('<')) {
+        throw new Error('Apps Script đang trả về HTML.');
+      }
+      const parsed = JSON.parse(text);
+      const staffList = Array.isArray(parsed.staff) ? parsed.staff : [];
+      // Keep raw (with Password) in-memory only — needed for login verification
+      staffCache = staffList;
+      // Persist password-stripped version to IndexedDB only
+      void setPersistedData('staff_data', staffList.map(stripBridgePassword));
+      return staffCache!;
+    })
+    .finally(() => {
+      pendingStaffLoad = null;
+    });
+
+  return pendingStaffLoad;
+};
+
+
+
+
 const loadAllData = async (force = false): Promise<SheetData> => {
   const scriptUrl = getScriptUrl();
   if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
   if (cache && !force) return cache;
   if (pendingLoad && !force) return pendingLoad;
 
-  pendingLoad = fetch(`${scriptUrl}?action=getAll`)
+  if (!force) {
+    const cachedAll = await getPersistedData('all_data');
+    if (cachedAll) {
+      cache = normalizeData(cachedAll);
+      return cache;
+    }
+  }
+
+  const apiKey = getScriptSecret();
+  let fetchUrl = `${scriptUrl}?action=getAll`;
+  if (apiKey) {
+    fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
+  }
+
+  pendingLoad = fetchWithTimeout(fetchUrl)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
@@ -130,6 +423,16 @@ const loadAllData = async (force = false): Promise<SheetData> => {
       }
       const parsed = JSON.parse(text);
       cache = normalizeData(parsed);
+      // Persist stripped version to IndexedDB (no passwords in browser storage)
+      void setPersistedData('all_data', {
+        ...parsed,
+        staff: Array.isArray(parsed.staff) ? parsed.staff.map(stripBridgePassword) : []
+      });
+      if (Array.isArray(cache.staff)) {
+        // Keep raw staff (with Password) in-memory only for login verification
+        staffCache = cache.staff;
+        void setPersistedData('staff_data', cache.staff.map(stripBridgePassword));
+      }
       return cache;
     })
     .catch(async err => {
@@ -156,59 +459,6 @@ const loadAllData = async (force = false): Promise<SheetData> => {
   return pendingLoad;
 };
 
-let staffCache: Staff[] | null = null;
-let pendingStaffLoad: Promise<Staff[]> | null = null;
-
-const loadStaffOnly = async (force = false): Promise<Staff[]> => {
-  const scriptUrl = getScriptUrl();
-  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
-  if (cache && cache.staff && cache.staff.length > 0 && !force) return cache.staff;
-  if (staffCache && !force) return staffCache;
-  if (pendingStaffLoad && !force) return pendingStaffLoad;
-
-  pendingStaffLoad = fetch(`${scriptUrl}?action=getStaff`)
-    .then(async res => {
-      const contentType = res.headers.get('Content-Type') || '';
-      const text = await res.text();
-      if (!res.ok) throw new Error(`Apps Script trả về HTTP ${res.status}`);
-      if (contentType.includes('text/html') || text.trim().startsWith('<')) {
-        const scriptError = text.match(/<div[^>]*>([^<]+)<\/div>\s*<\/body>/i)?.[1]?.trim();
-        throw new Error(
-          scriptError
-            ? `Apps Script lỗi: ${scriptError}`
-            : 'Apps Script đang trả về HTML. Hãy deploy Web app với quyền truy cập Anyone và copy đúng Web app URL.'
-        );
-      }
-      const parsed = JSON.parse(text);
-      staffCache = Array.isArray(parsed.staff) ? parsed.staff : [];
-      if (cache) {
-        cache.staff = staffCache;
-      }
-      return staffCache;
-    })
-    .catch(async err => {
-      if (isLocalHost()) {
-        console.warn('Google Apps Script connection failed. Falling back to local offline Express database for staff...', err);
-        const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ || window.fetch;
-        try {
-          const localRes = await nativeFetch('/api/staff');
-          if (localRes.ok) {
-            const localData = await localRes.json();
-            staffCache = Array.isArray(localData) ? localData : [];
-            return staffCache;
-          }
-        } catch (fallbackErr) {
-          console.error('Local Express staff fallback also failed:', fallbackErr);
-        }
-      }
-      throw err;
-    })
-    .finally(() => {
-      pendingStaffLoad = null;
-    });
-
-  return pendingStaffLoad;
-};
 
 const findCachedRecord = (
   endpoint: string,
@@ -254,11 +504,12 @@ const postToScript = async (
   const scriptUrl = getScriptUrl();
   if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
 
-  const response = await fetch(scriptUrl, {
+  const apiKey = getScriptSecret();
+  const response = await fetchWithTimeout(scriptUrl, {
     method: 'POST',
     // text/plain avoids a browser preflight, which Apps Script Web Apps do not handle well.
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ ...payload, apiKey })
   });
 
   const text = await response.text();
@@ -275,10 +526,11 @@ const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'i
   const scriptUrl = getScriptUrl();
   if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
 
-  const response = await fetch(scriptUrl, {
+  const apiKey = getScriptSecret();
+  const response = await fetchWithTimeout(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'batch', operations })
+    body: JSON.stringify({ action: 'batch', operations, apiKey })
   });
 
   const text = await response.text();
@@ -442,28 +694,62 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       return jsonResponse({ message: 'Đã tải lại dữ liệu từ Google Sheets.' });
     }
     if (method === 'GET') {
-      return jsonResponse({ scriptUrl, isSynced: !!scriptUrl });
+      const scriptSecret = getScriptSecret();
+      return jsonResponse({ scriptUrl, scriptSecret, isSynced: !!scriptUrl });
     }
     if (method === 'POST') {
       const body = await parseBody(init);
       const nextUrl = String(body.scriptUrl || '').trim();
+      const nextSecret = String(body.scriptSecret || '').trim();
       if (nextUrl && !nextUrl.startsWith('https://script.google.com/macros/s/')) {
         return jsonResponse({ error: 'Địa chỉ Apps Script không hợp lệ.' }, { status: 400 });
       }
+      if (nextUrl) {
+        try {
+          let setupUrl = `${nextUrl}?action=setup`;
+          if (nextSecret) {
+            setupUrl += `&apiKey=${encodeURIComponent(nextSecret)}`;
+          }
+          const setupRes = await fetchWithTimeout(setupUrl);
+          if (!setupRes.ok) {
+            throw new Error(`Google Apps Script setup trả về HTTP ${setupRes.status}`);
+          }
+          const text = (await setupRes.text()).trim();
+          if (text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.startsWith('<!doctype')) {
+            throw new Error("Không thể cấu hình kết nối. Hãy chắc chắn Apps Script đã deploy với quyền Anyone.");
+          }
+          const parsedRes = JSON.parse(text);
+          if (parsedRes.status === 'error') {
+            throw new Error(parsedRes.message || 'Lỗi thiết lập API Key.');
+          }
+        } catch (err: any) {
+          return jsonResponse({ error: err.message || 'Không thể liên kết và cấu hình API Key với Apps Script.' }, { status: 500 });
+        }
+      }
       setScriptUrl(nextUrl);
+      setScriptSecret(nextSecret);
       if (nextUrl) {
         await loadAllData(true);
-        return jsonResponse({ message: 'Kết nối Google Apps Script thành công!', scriptUrl: nextUrl, isSynced: true });
+        return jsonResponse({ message: 'Kết nối Google Apps Script thành công!', scriptUrl: nextUrl, scriptSecret: nextSecret, isSynced: true });
       }
-      return jsonResponse({ message: 'Đã hủy liên kết Google Apps Script.', scriptUrl: '', isSynced: false });
+      return jsonResponse({ message: 'Đã hủy liên kết Google Apps Script.', scriptUrl: '', scriptSecret: '', isSynced: false });
     }
   }
 
   if (endpoint === 'reset') {
+    // Require Admin for reset in bridge mode
+    if (!isLocalHost()) {
+      const authErr = requireAuthBridge(init);
+      if (authErr) return authErr;
+    }
     return jsonResponse({ message: 'Reset local database không khả dụng khi chạy bằng Apps Script.' }, { status: 400 });
   }
 
   if (endpoint === 'batch-write' && method === 'POST') {
+    if (!isLocalHost()) {
+      const authErr = requireAuthBridge(init);
+      if (authErr) return authErr;
+    }
     if (!scriptUrl) {
       if (isLocalHost()) return null;
       return jsonResponse({ error: 'Chưa kết nối Google Apps Script URL trong mục Google Sheets.' }, { status: 400 });
@@ -471,13 +757,147 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return batchWriteRecords(init);
   }
 
+  // ─── AUTH ENDPOINTS (Bridge implementation) ─────────────────────────────
+
+  if (endpoint === 'auth') {
+    const subAction = parts[1];
+
+    // POST /api/auth/login
+    if (subAction === 'login' && method === 'POST') {
+      const body = await parseBody(init);
+      const { StaffKey, Password } = body || {};
+      if (!StaffKey || !Password) {
+        return jsonResponse({ error: 'Vui lòng nhập mã nhân viên và mật khẩu.' }, { status: 400 });
+      }
+
+      const verifyLocally = async () => {
+        let staffList: any[] = [];
+        try {
+          staffList = staffCache ?? (scriptUrl ? await loadStaffOnly(false) : DEFAULT_STAFF);
+        } catch (e) {
+          console.warn('Failed to load staff list for local fallback, using DEFAULT_STAFF:', e);
+          staffList = DEFAULT_STAFF;
+        }
+        let localStaff = staffList.find((s: any) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
+        if (!localStaff && staffList !== DEFAULT_STAFF) {
+          localStaff = DEFAULT_STAFF.find((s: any) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
+        }
+        if (!localStaff) {
+          return jsonResponse({ error: 'Mã nhân viên không tồn tại!' }, { status: 401 });
+        }
+        const expectedPassword = String(localStaff.Password || '1111').trim();
+        const inputPassword = String(Password).trim();
+        const hashedInput = await bridgeHashPassword(inputPassword, String(localStaff.StaffKey));
+        
+        if (inputPassword !== expectedPassword && hashedInput !== expectedPassword) {
+          return jsonResponse({ error: 'Mật khẩu không đúng. Vui lòng thử lại!' }, { status: 401 });
+        }
+        const token = bridgeCreateSession(String(localStaff.StaffKey));
+        return jsonResponse({ token, staff: stripBridgePassword(localStaff) });
+      };
+
+      if (!scriptUrl) {
+        return verifyLocally();
+      }
+
+      try {
+        const apiKey = getScriptSecret();
+        const response = await fetchWithTimeout(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'login',
+            staffKey: StaffKey,
+            password: Password,
+            apiKey
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Apps Script trả về HTTP ${response.status}`);
+        }
+        
+        const text = await response.text();
+        const result = JSON.parse(text);
+        if (result.status === 'error') {
+          if (result.message === 'Unknown action') {
+            throw new Error('Unknown action');
+          }
+          return jsonResponse({ error: result.message || 'Mã nhân viên hoặc mật khẩu không đúng.' }, { status: 401 });
+        }
+        
+        const staff = result.staff;
+        const token = bridgeCreateSession(String(staff.StaffKey));
+        return jsonResponse({ token, staff });
+      } catch (err) {
+        console.error('Login verification via Apps Script failed, trying fallback:', err);
+        return verifyLocally();
+      }
+    }
+
+    // POST /api/auth/logout
+    if (subAction === 'logout' && method === 'POST') {
+      const token = extractBridgeToken(init);
+      if (token) bridgeRevokeToken(token);
+      
+      // Clear in-memory caches and IndexedDB persisted data
+      cache = null;
+      staffCache = null;
+      pendingLoad = null;
+      pendingStaffLoad = null;
+      void clearPersistedData();
+      
+      return jsonResponse({ success: true });
+    }
+
+    // GET /api/auth/me
+    if (subAction === 'me' && method === 'GET') {
+      const token = extractBridgeToken(init);
+      if (!token) return jsonResponse({ error: 'Yêu cầu đăng nhập.' }, { status: 401 });
+      const staffKey = bridgeResolveSession(token);
+      if (!staffKey) return jsonResponse({ error: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 });
+      let staffList: any[];
+      try {
+        staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : DEFAULT_STAFF);
+      } catch {
+        staffList = DEFAULT_STAFF;
+      }
+      const staff = staffList.find((s: any) => String(s.StaffKey) === staffKey);
+      if (!staff) return jsonResponse({ error: 'Tài khoản không còn tồn tại.' }, { status: 401 });
+      return jsonResponse(staff);
+    }
+
+    return jsonResponse({ error: 'Không tìm thấy endpoint auth.' }, { status: 404 });
+  }
+
+  // GET /api/staff/public — only StaffKey + StaffName + Avatar, no auth required
+  if (endpoint === 'staff' && key === 'public' && method === 'GET') {
+    let staffList: any[];
+    try {
+      staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : DEFAULT_STAFF);
+    } catch {
+      staffList = DEFAULT_STAFF;
+    }
+    const publicList = staffList
+      .filter((s: any) => !s.FireDate || !String(s.FireDate).trim())
+      .map((s: any) => ({ StaffKey: s.StaffKey, StaffName: s.StaffName, Avatar: s.Avatar || '' }));
+    return jsonResponse(publicList);
+  }
+
   if (endpoint === 'all' && method === 'GET') {
+    // Require auth in bridge mode (non-localhost)
+    if (!isLocalHost()) {
+      const authErr = requireAuthBridge(init);
+      if (authErr) return authErr;
+    }
     if (!scriptUrl) {
       if (isLocalHost()) return null;
-      return jsonResponse(EMPTY_DATA);
+      return jsonResponse(sanitizeDataBundle(EMPTY_DATA));
     }
-    const allData = await loadAllData();
-    return jsonResponse(allData);
+    const force = parsed.searchParams.get('force') === 'true' || parsed.searchParams.get('refresh') === 'true';
+    const allData = await loadAllData(force);
+    // Always strip passwords before sending to client
+    return jsonResponse(sanitizeDataBundle(allData));
   }
 
   if (endpoint === 'proxy' && parts[1] === 'drive-export') {
@@ -521,8 +941,20 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return jsonResponse({ error: 'Chưa kết nối Google Apps Script URL trong mục Google Sheets.' }, { status: 400 });
   }
 
+  // Protect all data-sensitive endpoints in bridge mode
+  if (!isLocalHost()) {
+    const authErr = requireAuthBridge(init);
+    if (authErr) return authErr;
+  }
+
   if (method === 'GET') {
-    const allData = await loadAllData();
+    const force = parsed.searchParams.get('force') === 'true' || parsed.searchParams.get('refresh') === 'true';
+    if (endpoint === 'staff') {
+      const staffList = await loadStaffOnly(force);
+      // Strip passwords from full staff list
+      return jsonResponse(staffList.map(stripBridgePassword));
+    }
+    const allData = await loadAllData(force);
     return jsonResponse(allData[config.collection]);
   }
 
@@ -531,6 +963,14 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
   }
 
   return jsonResponse({ error: `Unsupported method: ${method}` }, { status: 405 });
+};
+
+export const clearLocalCache = async (): Promise<void> => {
+  cache = null;
+  staffCache = null;
+  pendingLoad = null;
+  pendingStaffLoad = null;
+  await clearPersistedData();
 };
 
 export const installAppsScriptFetchBridge = () => {

@@ -739,6 +739,7 @@ export default function StaffProfileView({
                       label="Mật khẩu đăng nhập"
                       value={adminDraft.Password || ''}
                       onChange={value => setAdminDraft(prev => ({ ...prev, Password: value }))}
+                      placeholder="Để trống để giữ nguyên mật khẩu cũ"
                       type={showEditPassword ? 'text' : 'password'}
                     />
                     <button

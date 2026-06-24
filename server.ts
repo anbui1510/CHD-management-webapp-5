@@ -6,6 +6,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
 import { Patient, Consult, Staff, CathLab, CMR, Source, DeviceTemplate, RolePreset, Operation, Notification, DoctorPerformanceMark } from './src/types';
@@ -29,6 +30,264 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
 
 app.use(express.json({ limit: '5mb' }));
 
+// ─────────────────────────────────────────────────────────────────
+// AUTH TOKEN SYSTEM
+// ─────────────────────────────────────────────────────────────────
+
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+const tokenStore = new Map<string, { staffKey: string; expiresAt: number }>();
+
+// Periodically clean up expired tokens
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of tokenStore.entries()) {
+    if (now >= session.expiresAt) tokenStore.delete(token);
+  }
+}, 30 * 60 * 1000);
+
+function generateToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function createSession(staffKey: string): string {
+  const token = generateToken();
+  tokenStore.set(token, { staffKey, expiresAt: Date.now() + SESSION_TTL_MS });
+  return token;
+}
+
+function resolveSession(token: string): string | null {
+  const session = tokenStore.get(token);
+  if (!session) return null;
+  if (Date.now() >= session.expiresAt) {
+    tokenStore.delete(token);
+    return null;
+  }
+  // Slide expiry on activity
+  session.expiresAt = Date.now() + SESSION_TTL_MS;
+  return session.staffKey;
+}
+
+function revokeToken(token: string): void {
+  tokenStore.delete(token);
+}
+
+/** Strip the Password field from a Staff record before sending to client */
+function stripPassword<T extends Record<string, any>>(staff: T): Omit<T, 'Password'> {
+  const { Password, ...safe } = staff as any;
+  return safe;
+}
+
+/** Hash password with per-user salt (StaffKey) using SHA-256 */
+function hashPassword(password: string, salt: string): string {
+  return crypto.createHash('sha256').update(password + ':' + salt, 'utf8').digest('hex');
+}
+
+/** Check if a string is a 64-character SHA-255 hash (hexadecimal) */
+function isSHA256(str: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(str);
+}
+
+/** Extract Bearer token from Authorization header or cookie */
+function extractBearerToken(req: express.Request): string | null {
+  // 1. Try to extract from HttpOnly cookie first
+  const cookieHeader = req.headers['cookie'] || '';
+  const match = cookieHeader.match(/(?:^|;)\s*CHD_AUTH_TOKEN\s*=\s*([^;]+)/);
+  if (match) {
+    return match[1].trim();
+  }
+
+  // 2. Fall back to Authorization header
+  const auth = req.headers['authorization'] || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  // Also accept token from x-auth-token header for legacy support
+  const xToken = req.headers['x-auth-token'];
+  if (typeof xToken === 'string' && xToken.trim()) return xToken.trim();
+  return null;
+}
+
+/** Middleware: require valid session token */
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const token = extractBearerToken(req);
+  if (!token) {
+    res.status(401).json({ error: 'Yêu cầu đăng nhập để truy cập tài nguyên này.' });
+    return;
+  }
+  const staffKey = resolveSession(token);
+  if (!staffKey) {
+    res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.' });
+    return;
+  }
+  (req as any).staffKey = staffKey;
+  (req as any).authToken = token;
+  next();
+}
+
+/** Middleware: require Admin role */
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  requireAuth(req, res, () => {
+    const staffKey = (req as any).staffKey as string;
+    const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const staff = staffList.find(s => String(s.StaffKey) === staffKey);
+    if (!staff || staff.Role !== 'Admin') {
+      res.status(403).json({ error: 'Chỉ Admin mới có quyền thực hiện hành động này.' });
+      return;
+    }
+    next();
+  });
+}
+
+// ─── Auth Endpoints ───────────────────────────────────────────────
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { StaffKey, Password } = req.body || {};
+    if (!StaffKey || !Password) {
+      res.status(400).json({ error: 'Vui lòng nhập mã nhân viên và mật khẩu.' });
+      return;
+    }
+
+    const config = getSyncConfig();
+    let staffMember: Staff | undefined;
+
+    if (config.scriptUrl) {
+      // Delegated authentication via Google Sheets (Apps Script)
+      try {
+        console.log(`Verifying credentials with Google Sheets for StaffKey: ${StaffKey}`);
+        const response = await fetchWithTimeout(config.scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'login',
+            staffKey: StaffKey,
+            password: Password,
+            apiKey: config.scriptSecret || ''
+          })
+        }, 10000);
+
+        if (response.ok) {
+          const resData = await response.json() as any;
+          if (resData && resData.status === 'success') {
+            staffMember = resData.staff as Staff;
+          } else {
+            if (resData && resData.message === 'Unknown action') {
+              throw new Error('Unknown action');
+            }
+            res.status(401).json({ error: resData.message || 'Mật khẩu hoặc mã nhân viên không đúng.' });
+            return;
+          }
+        } else {
+          throw new Error(`Google Sheets responded with HTTP status ${response.status}`);
+        }
+      } catch (err) {
+        console.error('Apps Script login check failed, falling back to local verification:', err);
+        // Offline / failure fallback: verify locally
+        const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+        const localStaff = staffList.find(s => String(s.StaffKey || '').trim() === String(StaffKey).trim());
+        const hashedInput = hashPassword(Password, String(StaffKey));
+        const isPlaintextMatch = (localStaff && String(localStaff.Password || '').trim() === String(Password).trim());
+        const isHashedMatch = (localStaff && String(localStaff.Password || '').trim() === String(hashedInput).trim());
+
+        if (localStaff && (isPlaintextMatch || isHashedMatch)) {
+          staffMember = localStaff;
+          if (isPlaintextMatch && !isHashedMatch) {
+            localStaff.Password = hashedInput;
+            writeDB(STAFF_FILE, staffList);
+            if (config.scriptUrl) {
+              syncToGoogleSheets('Staff', 'update', localStaff.StaffKey, localStaff).catch(() => {});
+            }
+          }
+        } else {
+          res.status(401).json({ error: 'Mã nhân viên hoặc mật khẩu không đúng.' });
+          return;
+        }
+      }
+    } else {
+      // Offline mode: verify locally
+      const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+      const localStaff = staffList.find(s => String(s.StaffKey || '').trim() === String(StaffKey).trim());
+      const hashedInput = hashPassword(Password, String(StaffKey));
+      const isPlaintextMatch = (localStaff && String(localStaff.Password || '').trim() === String(Password).trim());
+      const isHashedMatch = (localStaff && String(localStaff.Password || '').trim() === String(hashedInput).trim());
+
+      if (localStaff && (isPlaintextMatch || isHashedMatch)) {
+        staffMember = localStaff;
+        if (isPlaintextMatch && !isHashedMatch) {
+          localStaff.Password = hashedInput;
+          writeDB(STAFF_FILE, staffList);
+        }
+      } else {
+        res.status(401).json({ error: 'Mã nhân viên hoặc mật khẩu không đúng.' });
+        return;
+      }
+    }
+
+    if (!staffMember) {
+      res.status(401).json({ error: 'Xác thực thất bại.' });
+      return;
+    }
+
+    if (staffMember.FireDate && String(staffMember.FireDate).trim()) {
+      res.status(403).json({ error: `Tài khoản đã bị vô hiệu hóa (nghỉ việc ngày: ${staffMember.FireDate}).` });
+      return;
+    }
+
+    const token = createSession(String(staffMember.StaffKey));
+    res.cookie('CHD_AUTH_TOKEN', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_TTL_MS
+    });
+    res.json({ token: 'cookie-session', staff: stripPassword(staffMember) });
+  } catch (err) {
+    console.error('Error in POST /api/auth/login:', err);
+    res.status(500).json({ error: 'Lỗi máy chủ nội bộ.' });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = extractBearerToken(req);
+  if (token) revokeToken(token);
+  res.clearCookie('CHD_AUTH_TOKEN', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/'
+  });
+  res.json({ success: true });
+});
+
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  const staffKey = (req as any).staffKey as string;
+  const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+  const staff = staffList.find(s => String(s.StaffKey) === staffKey);
+  if (!staff) {
+    res.status(401).json({ error: 'Tài khoản không còn tồn tại.' });
+    return;
+  }
+  res.json(stripPassword(staff));
+});
+
+// Public staff list — only StaffKey + StaffName + Avatar for login dropdown
+// No auth required, no sensitive fields exposed
+app.get('/api/staff/public', async (_req, res) => {
+  await syncFromGoogleSheets();
+  const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+  const publicList = staffList
+    .filter(s => !s.FireDate || !String(s.FireDate).trim())
+    .map(s => ({ StaffKey: s.StaffKey, StaffName: s.StaffName, Avatar: (s as any).Avatar || '' }));
+  res.json(publicList);
+});
+
+const BUILD_TIMESTAMP = String(Date.now());
+
+// Version endpoint — public, does not require authentication
+app.get('/api/version', (_req, res) => {
+  res.json({ version: '5.0.0', buildTime: BUILD_TIMESTAMP });
+});
+
+// ─────────────────────────────────────────────────────────────────
 // Proxy endpoint to bypass CORS for Google Drive Export
 app.get('/api/proxy/drive-export', async (req, res) => {
   const { url } = req.query;
@@ -72,21 +331,29 @@ if (!fs.existsSync(DB_DIR)) {
 // Google Sheets Sync Config Interface & Helpers
 interface SyncConfig {
   scriptUrl: string;
+  scriptSecret?: string;
 }
 
 function getSyncConfig(): SyncConfig {
   if (process.env.GOOGLE_SCRIPT_URL) {
-    return { scriptUrl: process.env.GOOGLE_SCRIPT_URL };
+    return { 
+      scriptUrl: process.env.GOOGLE_SCRIPT_URL,
+      scriptSecret: process.env.GOOGLE_SCRIPT_SECRET || process.env.GOOGLE_SCRIPT_API_KEY || ''
+    };
   }
   try {
     if (fs.existsSync(SYNC_CONFIG_FILE)) {
       const content = fs.readFileSync(SYNC_CONFIG_FILE, 'utf-8');
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return {
+        scriptUrl: parsed.scriptUrl || '',
+        scriptSecret: parsed.scriptSecret || ''
+      };
     }
   } catch (err) {
     console.error('Error reading sync config:', err);
   }
-  return { scriptUrl: '' };
+  return { scriptUrl: '', scriptSecret: '' };
 }
 
 function saveSyncConfig(config: SyncConfig): void {
@@ -185,8 +452,12 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   }
 
   try {
+    let fetchUrl = `${config.scriptUrl}?action=getAll`;
+    if (config.scriptSecret) {
+      fetchUrl += `&apiKey=${encodeURIComponent(config.scriptSecret)}`;
+    }
     console.log(`Pulling data from Google Sheets: ${config.scriptUrl}`);
-    const response = await fetchWithTimeout(`${config.scriptUrl}?action=getAll`, {
+    const response = await fetchWithTimeout(fetchUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     }, 15000);
@@ -403,7 +674,8 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
         action,
         type,
         key,
-        data: dataToPush
+        data: dataToPush,
+        apiKey: config.scriptSecret || ''
       })
     }, 15000);
 
@@ -733,16 +1005,17 @@ app.get('/api/sync-config', (req, res) => {
   const config = getSyncConfig();
   res.json({
     scriptUrl: config.scriptUrl,
+    scriptSecret: config.scriptSecret || '',
     isSynced: !!config.scriptUrl
   });
 });
 
 app.post('/api/sync-config', async (req, res) => {
-  const { scriptUrl } = req.body;
+  const { scriptUrl, scriptSecret } = req.body;
   
   if (!scriptUrl) {
     // Disconnect sync
-    saveSyncConfig({ scriptUrl: '' });
+    saveSyncConfig({ scriptUrl: '', scriptSecret: '' });
     return res.json({ success: true, message: "Disconnected visual sheet integration. Switched back to local database." });
   }
 
@@ -752,19 +1025,19 @@ app.post('/api/sync-config', async (req, res) => {
   }
 
   try {
-    // Verify scriptUrl responds properly
-    console.log(`Testing connection & initializing database worksheets on URL: ${scriptUrl}`);
-    const testRes = await fetchWithTimeout(`${scriptUrl}?action=test`, { method: 'GET' }, 10000);
-    
-    if (!testRes.ok) {
-      throw new Error(`Google Apps Script trả về lỗi HTTP ${testRes.status}`);
+    // First, call action=setup to configure the API key in the Apps Script
+    let setupUrl = `${scriptUrl}?action=setup`;
+    if (scriptSecret) {
+      setupUrl += `&apiKey=${encodeURIComponent(scriptSecret)}`;
+    }
+    console.log(`Setting up API Key on Google Sheet: ${setupUrl}`);
+    const setupRes = await fetchWithTimeout(setupUrl, { method: 'GET' }, 10000);
+    if (!setupRes.ok) {
+      throw new Error(`Google Apps Script setup trả về lỗi HTTP ${setupRes.status}`);
     }
 
-    const testText = await testRes.text();
-    const cleanText = testText.trim();
-
-    // Check if the script returned an HTML page (Google login or error document) instead of JSON
-    if (cleanText.startsWith('<!DOCTYPE') || cleanText.startsWith('<html') || cleanText.startsWith('<!doctype')) {
+    const setupText = (await setupRes.text()).trim();
+    if (setupText.startsWith('<!DOCTYPE') || setupText.startsWith('<html') || setupText.startsWith('<!doctype')) {
       throw new Error(
         "Apps Script của bạn đang trả về một trang Web HTML thay vì dữ liệu JSON. Điều này thường do 2 nguyên nhân sau:\n\n" +
         "1. Bạn chưa cấp quyền 'Anyone' (Bất kỳ ai) khi deploy: Trong Google Apps Script, hãy nhấn 'Triển khai mới' (New deployment) -> phần 'Who has access' (Ai có quyền truy cập) bắt buộc phải chọn 'Anyone' (Bất kỳ ai) sau đó nhấn Deploy rồi lấy link mới.\n\n" +
@@ -772,19 +1045,39 @@ app.post('/api/sync-config', async (req, res) => {
       );
     }
 
-    let testData;
+    let setupData;
     try {
-      testData = JSON.parse(cleanText);
+      setupData = JSON.parse(setupText);
     } catch (parseErr) {
-      throw new Error(`Đầu ra nhận được từ Apps Script không phải là JSON hợp lệ. Vui lòng kiểm tra lại nội dung dán vào Code.gs. Phản hồi thô: ${cleanText.substring(0, 150)}...`);
+      throw new Error(`Đầu ra nhận được từ Apps Script không phải là JSON hợp lệ. Vui lòng kiểm tra lại nội dung dán vào Code.gs. Phản hồi thô: ${setupText.substring(0, 150)}...`);
     }
+
+    if (setupData.status === 'error') {
+      throw new Error(setupData.message || "Không thể cấu hình mã API Key cho Apps Script.");
+    }
+
+    // Verify scriptUrl responds properly with test action
+    let testUrl = `${scriptUrl}?action=test`;
+    if (scriptSecret) {
+      testUrl += `&apiKey=${encodeURIComponent(scriptSecret)}`;
+    }
+    console.log(`Testing connection & initializing database worksheets on URL: ${testUrl}`);
+    const testRes = await fetchWithTimeout(testUrl, { method: 'GET' }, 10000);
+    
+    if (!testRes.ok) {
+      throw new Error(`Google Apps Script test trả về lỗi HTTP ${testRes.status}`);
+    }
+
+    const testText = await testRes.text();
+    const cleanText = testText.trim();
+    const testData = JSON.parse(cleanText);
 
     if (testData.status !== 'success') {
       throw new Error(testData.message || "Không thể khởi động kết nối dữ liệu! Hãy đảm bảo Apps Script được triển khai đúng quyền truy cập ('Anyone').");
     }
 
     // Save and immediately trigger full initial pull sync
-    saveSyncConfig({ scriptUrl });
+    saveSyncConfig({ scriptUrl, scriptSecret });
     const pullSuccess = await syncFromGoogleSheets(true);
 
     res.json({
@@ -1126,12 +1419,13 @@ function runWorkflowMonitor() {
   };
 }
 
-app.get('/api/all', async (_req, res) => {
+app.get('/api/all', requireAuth, async (_req, res) => {
   await syncFromGoogleSheets();
+  const rawStaff = readDB<Staff>(STAFF_FILE, defaultStaff);
   res.json({
     patients: readDB<Patient>(PATIENTS_FILE, defaultPatients),
     consults: readDB<Consult>(CONSULTS_FILE, defaultConsults),
-    staff: readDB<Staff>(STAFF_FILE, defaultStaff),
+    staff: rawStaff.map(stripPassword),
     cathlabs: readDB<CathLab>(CATHLABS_FILE, defaultCathlabs),
     operations: readDB<Operation>(OPERATIONS_FILE, []),
     cmrs: readDB<CMR>(CMRS_FILE, defaultCmrs),
@@ -1143,7 +1437,7 @@ app.get('/api/all', async (_req, res) => {
   });
 });
 
-app.get('/api/notifications', async (req, res) => {
+app.get('/api/notifications', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const staffKey = String(req.query.staffKey || '').trim();
   let notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
@@ -1154,12 +1448,12 @@ app.get('/api/notifications', async (req, res) => {
   res.json(notifications);
 });
 
-app.post('/api/notifications', async (req, res) => {
+app.post('/api/notifications', requireAuth, async (req, res) => {
   const record = appendNotificationIfMissing(req.body);
   res.status(record ? 201 : 400).json(record || { error: 'Notification requires StaffKey and DedupKey' });
 });
 
-app.put('/api/notifications/:key/read', async (req, res) => {
+app.put('/api/notifications/:key/read', requireAuth, async (req, res) => {
   const notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
   const key = req.params.key;
   const index = notifications.findIndex(item => item.NotificationKey === key);
@@ -1182,7 +1476,7 @@ app.put('/api/notifications/:key/read', async (req, res) => {
   res.json(notifications[index]);
 });
 
-app.get('/api/doctor-performance-marks', async (req, res) => {
+app.get('/api/doctor-performance-marks', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const staffKey = String(req.query.staffKey || '').trim();
   let marks = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []);
@@ -1193,7 +1487,7 @@ app.get('/api/doctor-performance-marks', async (req, res) => {
   res.json(marks);
 });
 
-app.post('/api/doctor-performance-marks', async (req, res) => {
+app.post('/api/doctor-performance-marks', requireAuth, async (req, res) => {
   const record = appendDoctorMarkIfMissing(req.body);
   res.status(record ? 201 : 400).json(record || { error: 'Doctor performance mark requires StaffKey and DedupKey' });
 });
@@ -1232,7 +1526,7 @@ function getBatchEndpointConfig(endpoint: string): BatchEndpointConfig<any> | nu
   return configs[endpoint] || null;
 }
 
-app.post('/api/batch-write', async (req, res) => {
+app.post('/api/batch-write', requireAuth, async (req, res) => {
   try {
     const operations = Array.isArray(req.body?.operations) ? req.body.operations : [];
     if (operations.length === 0) {
@@ -1296,7 +1590,7 @@ app.post('/api/batch-write', async (req, res) => {
   }
 });
 
-app.post('/api/workflow-monitor/run', async (_req, res) => {
+app.post('/api/workflow-monitor/run', requireAuth, async (_req, res) => {
   try {
     await syncFromGoogleSheets();
     const result = runWorkflowMonitor();
@@ -1411,13 +1705,14 @@ app.get('/api/chd-brief/status', (_req, res) => {
 });
 
 // Routes
-app.get('/api/staff', async (req, res) => {
+// Full staff list — requires auth, strips passwords
+app.get('/api/staff', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const staff = readDB<Staff>(STAFF_FILE, defaultStaff);
-  res.json(staff);
+  res.json(staff.map(stripPassword));
 });
 
-app.put('/api/staff/:key', async (req, res) => {
+app.put('/api/staff/:key', requireAuth, async (req, res) => {
   try {
     const staff = readDB<Staff>(STAFF_FILE, defaultStaff);
     const key = req.params.key;
@@ -1431,6 +1726,12 @@ app.put('/api/staff/:key', async (req, res) => {
     const updateData = req.body || {};
     if (updateData.StaffPhone !== undefined && updateData.StaffPhone !== null) {
       updateData.StaffPhone = cleanSheetText(updateData.StaffPhone);
+    }
+
+    if (updateData.Password === undefined || updateData.Password === null || String(updateData.Password).trim() === '') {
+      delete updateData.Password;
+    } else {
+      updateData.Password = hashPassword(String(updateData.Password).trim(), staff[index].StaffKey);
     }
 
     staff[index] = { ...staff[index], ...updateData, StaffKey: staff[index].StaffKey };
@@ -1450,12 +1751,12 @@ app.put('/api/staff/:key', async (req, res) => {
   }
 });
 
-app.get('/api/role-presets', async (req, res) => {
+app.get('/api/role-presets', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   res.json(ensureRolePresetsDB());
 });
 
-app.post('/api/role-presets', async (req, res) => {
+app.post('/api/role-presets', requireAdmin, async (req, res) => {
   try {
     const presets = ensureRolePresetsDB();
     const body = req.body || {};
@@ -1504,7 +1805,7 @@ app.post('/api/role-presets', async (req, res) => {
   }
 });
 
-app.put('/api/role-presets/:key', async (req, res) => {
+app.put('/api/role-presets/:key', requireAdmin, async (req, res) => {
   try {
     const presets = ensureRolePresetsDB();
     const key = req.params.key;
@@ -1548,7 +1849,7 @@ app.put('/api/role-presets/:key', async (req, res) => {
   }
 });
 
-app.delete('/api/role-presets/:key', async (req, res) => {
+app.delete('/api/role-presets/:key', requireAdmin, async (req, res) => {
   try {
     const presets = ensureRolePresetsDB();
     const key = req.params.key;
@@ -1575,13 +1876,13 @@ app.delete('/api/role-presets/:key', async (req, res) => {
   }
 });
 
-app.get('/api/patients', async (req, res) => {
+app.get('/api/patients', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
   res.json(patients);
 });
 
-app.post('/api/patients', async (req, res) => {
+app.post('/api/patients', requireAuth, async (req, res) => {
   const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
   const newPatient: Patient = req.body;
   
@@ -1617,7 +1918,7 @@ app.post('/api/patients', async (req, res) => {
   res.status(201).json(newPatient);
 });
 
-app.put('/api/patients/:key', async (req, res) => {
+app.put('/api/patients/:key', requireAuth, async (req, res) => {
   const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
   const key = req.params.key;
   const updateData: Partial<Patient> = req.body;
@@ -1658,25 +1959,25 @@ app.put('/api/patients/:key', async (req, res) => {
   }
 });
 
-app.get('/api/consults', async (req, res) => {
+app.get('/api/consults', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
   res.json(consults);
 });
 
-app.get('/api/operations', async (req, res) => {
+app.get('/api/operations', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const operations = readDB<any>(OPERATIONS_FILE, []);
   res.json(operations);
 });
 
-app.get('/api/cmrs', async (req, res) => {
+app.get('/api/cmrs', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
   res.json(cmrs);
 });
 
-app.post('/api/cmrs', async (req, res) => {
+app.post('/api/cmrs', requireAuth, async (req, res) => {
   const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
   const newCmr: CMR = applyDiagnosisNormalization(req.body, ['CMRDiagnosisID']);
 
@@ -1697,7 +1998,7 @@ app.post('/api/cmrs', async (req, res) => {
   res.status(201).json(newCmr);
 });
 
-app.put('/api/cmrs/:key', async (req, res) => {
+app.put('/api/cmrs/:key', requireAuth, async (req, res) => {
   try {
     const cmrs = readDB<CMR>(CMRS_FILE, defaultCmrs);
     const key = req.params.key;
@@ -1731,19 +2032,19 @@ app.put('/api/cmrs/:key', async (req, res) => {
   }
 });
 
-app.get('/api/sources', async (req, res) => {
+app.get('/api/sources', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const sources = readDB<Source>(SOURCES_FILE, []);
   res.json(sources);
 });
 
-app.get('/api/device-templates', async (req, res) => {
+app.get('/api/device-templates', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const deviceTemplates = readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []);
   res.json(deviceTemplates);
 });
 
-app.post('/api/sources', async (req, res) => {
+app.post('/api/sources', requireAuth, async (req, res) => {
   const sources = readDB<Source>(SOURCES_FILE, []);
   const diagnosisID = normalizeDiagnosisID(req.body?.DiagnosisID);
 
@@ -1776,7 +2077,7 @@ app.post('/api/sources', async (req, res) => {
   res.status(existingIndex >= 0 ? 200 : 201).json(sourceRecord);
 });
 
-app.post('/api/consults', async (req, res) => {
+app.post('/api/consults', requireAuth, async (req, res) => {
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
   const newConsult: Consult = applyDiagnosisNormalization(req.body, ['DiagnosisID']);
   
@@ -1802,7 +2103,7 @@ app.post('/api/consults', async (req, res) => {
 });
 
 // Update an existing consult result (or details)
-app.put('/api/consults/:key', async (req, res) => {
+app.put('/api/consults/:key', requireAuth, async (req, res) => {
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
   const key = req.params.key;
   const updateData: Partial<Consult> = req.body;
@@ -1839,13 +2140,13 @@ app.put('/api/consults/:key', async (req, res) => {
   }
 });
 
-app.get('/api/cathlabs', async (req, res) => {
+app.get('/api/cathlabs', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
   res.json(cathlabs);
 });
 
-app.post('/api/cathlabs', async (req, res) => {
+app.post('/api/cathlabs', requireAuth, async (req, res) => {
   const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
   const newCathLab: CathLab = applyDiagnosisNormalization(req.body, ['DiagnosisID', 'PostDiagnosisID']);
   
@@ -1867,7 +2168,7 @@ app.post('/api/cathlabs', async (req, res) => {
   res.status(201).json(newCathLab);
 });
 
-app.put('/api/cathlabs/:key', async (req, res) => {
+app.put('/api/cathlabs/:key', requireAuth, async (req, res) => {
   const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
   const key = req.params.key;
   const index = cathlabs.findIndex(c => c.CathKey === key);
@@ -1910,8 +2211,8 @@ function applyDiagnosisNormalization<T extends Record<string, unknown>>(
   return normalized as T;
 }
 
-// Reset Database API (Useful for testing)
-app.post('/api/reset', (req, res) => {
+// Reset Database API — Admin only
+app.post('/api/reset', requireAdmin, (req, res) => {
   writeDB<Patient>(PATIENTS_FILE, defaultPatients);
   writeDB<Consult>(CONSULTS_FILE, defaultConsults);
   writeDB<Staff>(STAFF_FILE, defaultStaff);

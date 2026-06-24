@@ -286,7 +286,30 @@ export default function CathLabSchedulerView({
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
-  
+
+  // Column visibility settings for the waitlist table
+  const [visibleColumns, setVisibleColumns] = useState({
+    icd: true,
+    priority: true,
+    requestBy: true,
+    ptvPhu1: true,
+    plannedDate: true,
+    checkDevice: true,
+  });
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false);
+  const columnDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close column visibility dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (columnDropdownRef.current && !columnDropdownRef.current.contains(e.target as Node)) {
+        setShowColumnDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Waitlist Pagination
   const [waitlistCurrentPage, setWaitlistCurrentPage] = useState<number>(1);
   const rowsPerWaitlistPage = 50;
@@ -2618,12 +2641,88 @@ Xin cảm ơn!`;
                     >
                       Họ và tên
                     </th>
-                    <th className="py-3 px-2 border-b border-slate-200">ICD</th>
-                    <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>
-                    <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>
-                    <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>
-                    <th className="py-3 px-2 border-b border-slate-200 text-center">Lịch mổ dự kiến</th>
-                    <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>
+                    {visibleColumns.icd && <th className="py-3 px-2 border-b border-slate-200">ICD</th>}
+                    {visibleColumns.priority && <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>}
+                    {visibleColumns.requestBy && <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>}
+                    {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>}
+                    {visibleColumns.plannedDate && <th className="py-3 px-2 border-b border-slate-200 text-center">Lịch mổ dự kiến</th>}
+                    {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>}
+                    <th className="py-3 px-2 border-b border-slate-200 text-center w-12 sticky right-0 bg-slate-50 z-20 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] border-l border-slate-200">
+                      <div className="relative inline-block text-left" ref={columnDropdownRef}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowColumnDropdown(!showColumnDropdown);
+                          }}
+                          className="flex items-center justify-center p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-650 hover:text-indigo-600 transition cursor-pointer shadow-xs"
+                          title="Tùy chọn hiển thị cột"
+                        >
+                          <Filter className="w-3.5 h-3.5" />
+                        </button>
+                        
+                        {showColumnDropdown && (
+                          <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-xl z-50 text-slate-700 normal-case font-normal text-left">
+                            <p className="font-semibold text-xs text-slate-500 mb-2 border-b border-slate-100 pb-1.5">Hiển thị cột</p>
+                            <div className="space-y-2">
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.icd}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, icd: !prev.icd }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>ICD</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.priority}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, priority: !prev.priority }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>Ưu tiên</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.requestBy}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, requestBy: !prev.requestBy }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>BS Đăng ký</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.ptvPhu1}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, ptvPhu1: !prev.ptvPhu1 }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>PTV Phụ 1</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.plannedDate}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, plannedDate: !prev.plannedDate }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>Lịch mổ dự kiến</span>
+                              </label>
+                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns.checkDevice}
+                                  onChange={() => setVisibleColumns(prev => ({ ...prev, checkDevice: !prev.checkDevice }))}
+                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                                />
+                                <span>Kiểm dụng cụ</span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150">
@@ -2675,40 +2774,55 @@ Xin cảm ơn!`;
                             ID1: {pat.PatientID1}
                           </span>
                         </td>
-                        <td className="py-3.5 px-2">
-                          <span className="bg-slate-100 text-slate-800 font-extrabold px-1.5 py-0.5 rounded text-[9px] font-mono select-all">
-                            {c.DiagnosisID || '—'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-2 text-center">
-                          <span className={`font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full inline-block border ${getPriorityBadgeClass(c.PriorityOrder || '')}`}>
-                            {normalizePriorityOrder(c.PriorityOrder)}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-2 font-semibold text-slate-600">
-                          {c.RequestBy || '—'}
-                        </td>
-                        <td className="py-3.5 px-2 font-extrabold text-indigo-750">
-                          {dispScheduled2nd || <span className="text-slate-300 font-normal italic">—</span>}
-                        </td>
-                        <td className="py-3.5 px-2 text-center font-bold font-mono text-slate-600">
-                          {c.PlannedCathLabDate ? formatVNTime(c.PlannedCathLabDate) : <span className="text-slate-350">—</span>}
-                        </td>
-                        <td className="py-3.5 px-2 text-center">
-                          {c.CheckDevice === 'Đủ' && (
-                            <span className="bg-emerald-100 text-emerald-850 border border-emerald-200 font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full inline-block">
-                              ĐỦ
+                        {visibleColumns.icd && (
+                          <td className="py-3.5 px-2">
+                            <span className="bg-slate-100 text-slate-800 font-extrabold px-1.5 py-0.5 rounded text-[9px] font-mono select-all">
+                              {c.DiagnosisID || '—'}
                             </span>
-                          )}
-                          {c.CheckDevice === 'Thiếu' && (
-                            <span className="bg-rose-100 text-rose-850 border border-rose-200 font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full inline-block">
-                              THIẾU
+                          </td>
+                        )}
+                        {visibleColumns.priority && (
+                          <td className="py-3.5 px-2 text-center">
+                            <span className={`font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full inline-block border ${getPriorityBadgeClass(c.PriorityOrder || '')}`}>
+                              {normalizePriorityOrder(c.PriorityOrder)}
                             </span>
-                          )}
-                          {!c.CheckDevice && (
-                            <span className="text-slate-350 text-[10px] italic">Chưa check</span>
-                          )}
-                        </td>
+                          </td>
+                        )}
+                        {visibleColumns.requestBy && (
+                          <td className="py-3.5 px-2 font-semibold text-slate-600">
+                            {c.RequestBy || '—'}
+                          </td>
+                        )}
+                        {visibleColumns.ptvPhu1 && (
+                          <td className="py-3.5 px-2 font-extrabold text-indigo-750">
+                            {dispScheduled2nd || <span className="text-slate-300 font-normal italic">—</span>}
+                          </td>
+                        )}
+                        {visibleColumns.plannedDate && (
+                          <td className="py-3.5 px-2 text-center font-bold font-mono text-slate-600">
+                            {c.PlannedCathLabDate ? formatVNTime(c.PlannedCathLabDate) : <span className="text-slate-350">—</span>}
+                          </td>
+                        )}
+                        {visibleColumns.checkDevice && (
+                          <td className="py-3.5 px-2 text-center">
+                            {c.CheckDevice === 'Đủ' && (
+                              <span className="bg-emerald-100 text-emerald-850 border border-emerald-200 font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full inline-block">
+                                ĐỦ
+                              </span>
+                            )}
+                            {c.CheckDevice === 'Thiếu' && (
+                              <span className="bg-rose-100 text-rose-850 border border-rose-200 font-extrabold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full inline-block">
+                                THIẾU
+                              </span>
+                            )}
+                            {!c.CheckDevice && (
+                              <span className="text-slate-350 text-[10px] italic">Chưa check</span>
+                            )}
+                          </td>
+                        )}
+                        <td className={`py-3.5 px-2 text-center sticky right-0 z-10 border-l border-slate-150 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
+                          isSelected ? 'bg-indigo-50' : 'bg-white'
+                        }`} />
                       </tr>
                     );
                   })}
