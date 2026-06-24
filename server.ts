@@ -355,7 +355,7 @@ function saveSyncConfig(config: SyncConfig): void {
 }
 
 // Helper to fetch with timeout to prevent server hanging if Apps Script is slow
-async function fetchWithTimeout(url: string, options: any = {}, timeout = 15000) {
+async function fetchWithTimeout(url: string, options: any = {}, timeout = 60000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
@@ -450,7 +450,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
     const response = await fetchWithTimeout(fetchUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
-    }, 15000);
+    }, 60000);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -667,7 +667,7 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
         data: dataToPush,
         apiKey: config.scriptSecret || ''
       })
-    }, 15000);
+    }, 60000);
 
     if (response.ok) {
       const resData = await response.json() as any;

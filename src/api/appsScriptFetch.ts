@@ -20,7 +20,7 @@ type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CM
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
 const SCRIPT_SECRET_STORAGE_KEY = 'chd_apps_script_secret';
 
-const fetchWithTimeout = async (url: string, init?: RequestInit, timeout = 15000): Promise<Response> => {
+const fetchWithTimeout = async (url: string, init?: RequestInit, timeout = 60000): Promise<Response> => {
   const nativeFetch = (typeof window !== 'undefined' && (window as any).__CHD_NATIVE_FETCH__) || fetch;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
