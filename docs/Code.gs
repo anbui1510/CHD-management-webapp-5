@@ -349,14 +349,20 @@ function readSheetAsJson(sheetName) {
         // Skip invalid dates (empty/broken cells) - toISOString() throws RangeError otherwise
         if (isNaN(cellVal.getTime())) {
           obj[headers[c]] = "";
-        } else if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {
-          // Format as YYYY-MM-DD
-          var year = cellVal.getFullYear();
-          var month = ("0" + (cellVal.getMonth() + 1)).slice(-2);
-          var day = ("0" + cellVal.getDate()).slice(-2);
-          obj[headers[c]] = year + "-" + month + "-" + day;
         } else {
-          obj[headers[c]] = cellVal.toISOString();
+          try {
+            if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {
+              // Format as YYYY-MM-DD
+              var year = cellVal.getFullYear();
+              var month = ("0" + (cellVal.getMonth() + 1)).slice(-2);
+              var day = ("0" + cellVal.getDate()).slice(-2);
+              obj[headers[c]] = year + "-" + month + "-" + day;
+            } else {
+              obj[headers[c]] = cellVal.toISOString();
+            }
+          } catch (dateErr) {
+            obj[headers[c]] = "";
+          }
         }
       } else {
         var headerName = headers[c];
