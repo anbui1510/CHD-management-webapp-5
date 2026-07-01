@@ -330,7 +330,9 @@ function writeRecordToSheet(type, action, key, record) {
         header === "PatientID2" || 
         header === "PatientPhone1" || 
         header === "PatientPhone2" || 
-        header === "StaffPhone"
+        header === "StaffPhone" ||
+        header === "PatientWeight" ||
+        header === "PatientHeight"
       );
       if (isNumericTextCol && strVal !== "") {
         if (!strVal.startsWith("'")) {
@@ -533,7 +535,7 @@ function readSheetAsJson(ss, sheetName) {
         }
       } else {
         if (cellVal !== undefined && cellVal !== null) {
-          if (headerName === "PatientID1" || headerName === "PatientID2" || headerName === "PatientPhone1" || headerName === "PatientPhone2" || headerName === "StaffPhone") {
+          if (headerName === "PatientID1" || headerName === "PatientID2" || headerName === "PatientPhone1" || headerName === "PatientPhone2" || headerName === "StaffPhone" || headerName === "PatientWeight" || headerName === "PatientHeight") {
             var strVal = String(cellVal).trim();
             if (strVal.startsWith("'")) {
               strVal = strVal.substring(1);

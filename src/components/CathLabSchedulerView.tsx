@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import html2canvas from 'html2canvas';
 import { toBlob as htmlToImageBlob } from 'html-to-image';
 import * as XLSX from 'xlsx';
-import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder } from '../types';
+import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder, restoreWeightFromDate } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
 import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
@@ -102,10 +102,10 @@ const formatCalendarPatientTooltip = (patientName: string, diagnosisID: string, 
 const normalizeRefKey = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
 const parseWeightForInput = (value?: string) =>
-  String(value || '').replace(/\s*kg\s*/gi, '').trim();
+  restoreWeightFromDate(String(value || '').replace(/\s*kg\s*/gi, '').trim());
 
 const parseHeightForInput = (value?: string) =>
-  String(value || '').replace(/\s*cm\s*/gi, '').trim();
+  restoreWeightFromDate(String(value || '').replace(/\s*cm\s*/gi, '').trim());
 
 const formatWeightForSave = (value: string) => {
   const trimmed = value.trim();
@@ -968,7 +968,7 @@ Xin cảm ơn!`;
         const dobFormatted = p?.PatientDOB ? formatVNTime(p.PatientDOB) : '';
         const ageDesc = p?.PatientDOB ? getPatientAgeDescription(p.PatientDOB) : '';
 
-        const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
+        const weightStr = c.PatientWeight ? restoreWeightFromDate(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
         const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAddress || ''}` : '';
         
         const chanDoan = c.DetailDiagnosis || '';
@@ -1261,7 +1261,7 @@ Xin cảm ơn!`;
       const dobFormatted = formatVNTime(p?.PatientDOB);
       const ageDesc = p?.PatientDOB ? getPatientAgeDescription(p.PatientDOB) : '';
 
-      const weightStr = c.PatientWeight ? String(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
+      const weightStr = c.PatientWeight ? restoreWeightFromDate(c.PatientWeight) + (String(c.PatientWeight).includes('kg') ? '' : ' kg') : '';
       const thongTin = p ? `${p.PatientSex || ''}\n${dobFormatted}\n(${ageDesc})\n${weightStr}\n${p.PatientAddress || (p as any).PatientAddress || ''}` : '';
       
       const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join('\n');
@@ -1749,6 +1749,18 @@ Xin cảm ơn!`;
     }
     setAdHocErrors([]);
     setAdHocValidationMsg('');
+
+    if (adHocPatientMode === 'new') {
+      const cleanID1 = adHocPatientID1.trim().toLowerCase();
+      const duplicatePatient = patients.find(p => 
+        String(p.PatientID1 || '').trim().toLowerCase() === cleanID1
+      );
+      if (duplicatePatient) {
+        setAdHocErrors(['PatientID1']);
+        setAdHocValidationMsg(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${duplicatePatient.PatientName}). Đề nghị chọn bệnh nhi sẵn có hoặc kiểm tra lại thông tin!`);
+        return;
+      }
+    }
 
     const pendingOverride = resolvePendingConsultForAdHoc();
     if (pendingOverride) {
@@ -4503,8 +4515,8 @@ Xin cảm ơn!`;
             );
 
             const generateTextSummary = (pObj: Patient, cObj: Consult) => {
-              const weightDisplay = selectedConsult?.PatientWeight ? `${selectedConsult.PatientWeight} kg` : '—';
-              const heightDisplay = selectedConsult?.PatientHeight ? `${selectedConsult.PatientHeight} cm` : '—';
+              const weightDisplay = selectedConsult?.PatientWeight ? `${restoreWeightFromDate(selectedConsult.PatientWeight)} kg` : '—';
+              const heightDisplay = selectedConsult?.PatientHeight ? `${restoreWeightFromDate(selectedConsult.PatientHeight)} cm` : '—';
               const ageDesc = getPatientAgeDescription(pObj.PatientDOB) || '—';
               const addressDisplay = pObj.PatientAddress || (pObj as any).PatientAddress || '';
               const phoneList = [pObj.PatientPhone1, pObj.PatientPhone2].filter(Boolean).join(' | ');
@@ -4701,11 +4713,11 @@ Xin cảm ơn!`;
                         </div>
                         <div>
                           <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Cân nặng:</span>
-                          <span className="font-extrabold text-slate-800 font-mono text-[12.5px]">{selectedConsult.PatientWeight ? `${selectedConsult.PatientWeight} kg` : '—'}</span>
+                          <span className="font-extrabold text-slate-800 font-mono text-[12.5px]">{selectedConsult.PatientWeight ? `${restoreWeightFromDate(selectedConsult.PatientWeight)} kg` : '—'}</span>
                         </div>
                         <div>
                           <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Chiều cao:</span>
-                          <span className="font-semibold text-slate-700 font-mono text-[12.5px]">{selectedConsult.PatientHeight ? `${selectedConsult.PatientHeight} cm` : '—'}</span>
+                          <span className="font-semibold text-slate-700 font-mono text-[12.5px]">{selectedConsult.PatientHeight ? `${restoreWeightFromDate(selectedConsult.PatientHeight)} cm` : '—'}</span>
                         </div>
                       </div>
 

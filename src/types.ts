@@ -350,3 +350,17 @@ export function findPatientByKey(patients: Patient[], patientKey: any): Patient 
   });
 }
 
+export function restoreWeightFromDate(val: any): string {
+  if (val === undefined || val === null) return '';
+  const str = String(val).trim();
+  const datePart = str.split('T')[0].split(' ')[0];
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const month = parseInt(match[2], 10);
+    const day = parseInt(match[3], 10);
+    return `${day}.${month}`;
+  }
+  return str;
+}
+
+

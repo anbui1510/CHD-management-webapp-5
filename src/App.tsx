@@ -27,7 +27,8 @@ import {
   formatVNTime,
   removeDiacritics,
   findPatientByKey,
-  normalizePatientKey
+  normalizePatientKey,
+  restoreWeightFromDate
 } from './types';
 import * as XLSX from 'xlsx';
 import VirtualSheets from './components/VirtualSheets';
@@ -500,6 +501,7 @@ export default function App() {
     onConfirm: () => void;
     onCancel?: () => void;
   } | null>(null);
+  const confirmPendingRef = useRef(false);
 
   const triggerAlert = (message: string, title = 'Thông báo') => {
     setCustomAlert({ message, title });
@@ -1409,9 +1411,9 @@ export default function App() {
               infoText = lines.filter(Boolean).join('\n');
             }
 
-            const weightClean = item.PatientWeight ? item.PatientWeight.toString().replace(/kg/gi, '').trim() : '';
+            const weightClean = item.PatientWeight ? restoreWeightFromDate(item.PatientWeight).replace(/kg/gi, '').trim() : '';
             const weightDisplay = weightClean ? `${weightClean} (kg)` : '';
-            const heightClean = item.PatientHeight ? item.PatientHeight.toString().replace(/cm/gi, '').trim() : '';
+            const heightClean = item.PatientHeight ? restoreWeightFromDate(item.PatientHeight).replace(/cm/gi, '').trim() : '';
             const heightDisplay = heightClean ? `${heightClean} (cm)` : '';
 
             const weightHeightLines = [];
@@ -4080,8 +4082,16 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    customConfirm.onConfirm();
+                    if (confirmPendingRef.current) return;
+                    confirmPendingRef.current = true;
                     setCustomConfirm(null);
+                    setTimeout(() => {
+                      try {
+                        customConfirm.onConfirm();
+                      } finally {
+                        confirmPendingRef.current = false;
+                      }
+                    }, 50);
                   }}
                   className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
                 >

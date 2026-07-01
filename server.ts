@@ -431,6 +431,19 @@ function cleanSheetText(val: any): string {
   return str;
 }
 
+function restoreWeightFromDate(val: any): string {
+  if (val === undefined || val === null) return '';
+  const str = String(val).trim();
+  const datePart = str.split('T')[0].split(' ')[0];
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const month = parseInt(match[2], 10);
+    const day = parseInt(match[3], 10);
+    return `${day}.${month}`;
+  }
+  return str;
+}
+
 async function syncFromGoogleSheets(force = false): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
@@ -509,6 +522,13 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           const k = c.ConsultKey || `con_no_key_${i}`;
           c.ConsultKey = k;
           
+          if (c.PatientWeight !== undefined && c.PatientWeight !== null) {
+            c.PatientWeight = restoreWeightFromDate(cleanSheetText(c.PatientWeight));
+          }
+          if (c.PatientHeight !== undefined && c.PatientHeight !== null) {
+            c.PatientHeight = restoreWeightFromDate(cleanSheetText(c.PatientHeight));
+          }
+
           // Overlay recent local edit if < 45s old to avoid overwriting with stale Sheets data
           const recent = recentLocalEdits.get(`Consult_${k}`);
           if (recent && (Date.now() - recent.timestamp < 45000)) {
@@ -556,6 +576,10 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         data.cmrs.forEach((m: any, i: number) => {
           const k = m.CMRKey || m.CMRkey || `cmr_no_key_${i}`;
           m.CMRKey = k;
+
+          if (m.PatientWeight !== undefined && m.PatientWeight !== null) {
+            m.PatientWeight = restoreWeightFromDate(cleanSheetText(m.PatientWeight));
+          }
 
           const recent = recentLocalEdits.get(`CMR_${k}`);
           if (recent && (Date.now() - recent.timestamp < 45000)) {
@@ -639,7 +663,7 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
 
   // Clone record to format fields safely without polluting the database cache
   const dataToPush = { ...record };
-  const numericTextCols = ['PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone'];
+  const numericTextCols = ['PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight'];
   
   numericTextCols.forEach(col => {
     if (dataToPush[col] !== undefined && dataToPush[col] !== null) {

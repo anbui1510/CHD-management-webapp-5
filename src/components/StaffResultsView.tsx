@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS } from '../types';
+import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, restoreWeightFromDate } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
