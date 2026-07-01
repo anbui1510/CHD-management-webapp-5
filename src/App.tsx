@@ -1210,8 +1210,8 @@ export default function App() {
     setEditingRegConsultKey(c.ConsultKey);
     setEditConsultData({
       ConsultType: c.ConsultType || 'Staff mổ',
-      PatientWeight: c.PatientWeight || '',
-      PatientHeight: c.PatientHeight || '',
+      PatientWeight: restoreWeightFromDate(c.PatientWeight) || '',
+      PatientHeight: restoreWeightFromDate(c.PatientHeight) || '',
       ConsultDate: c.ConsultDate || '',
       RequestBy: c.RequestBy || '',
       DiagnosisID: c.DiagnosisID || '',
@@ -1421,11 +1421,11 @@ export default function App() {
             if (heightDisplay) weightHeightLines.push(heightDisplay);
             const weightHeightDisplay = weightHeightLines.join('\n');
 
-            const dangKy = item.RequestBy || '';
-            const chanDoan = item.DetailDiagnosis || item.DiagnosisID || '';
-            const ketQua = item.ConsultResultID || '';
-            const dungCu = item.PlannedDevice || '';
-            const luuY = item.ConsultNote || '';
+            const dangKy = String(item.RequestBy || '');
+            const chanDoan = String(item.DetailDiagnosis || item.DiagnosisID || '');
+            const ketQua = String(item.ConsultResultID || '');
+            const dungCu = String(item.PlannedDevice || '');
+            const luuY = String(item.ConsultNote || '');
 
             const dataRow = worksheet.addRow([
               stt,
@@ -1444,7 +1444,12 @@ export default function App() {
             const infoLinesCount = infoText.split('\n').length;
             const weightLinesCount = weightHeightDisplay.split('\n').length;
             const maxTextLines = Math.max(infoLinesCount, weightLinesCount);
-            const maxCharsInCell = Math.max(chanDoan.length, ketQua.length, dungCu.length, luuY.length);
+            const maxCharsInCell = Math.max(
+              String(chanDoan).length,
+              String(ketQua).length,
+              String(dungCu).length,
+              String(luuY).length
+            );
             dataRow.height = Math.max(30, maxTextLines * 16, Math.ceil(maxCharsInCell / 32) * 15);
 
             // Style data row cells - Times New Roman, thin borders, centered alignment matching requested design

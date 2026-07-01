@@ -480,7 +480,7 @@ export default function MRISchedulerView({
 
         const row = worksheet.addRow(rowData);
         const thongTinLineCount = thongTin.split('\n').length;
-        const maxChars = Math.max(chanDoan.length, phuongPhap.length, duTru.length);
+        const maxChars = Math.max(String(chanDoan).length, String(phuongPhap).length, String(duTru).length);
         row.height = Math.max(
           36,
           thongTinLineCount * EXCEL_LINE_HEIGHT_PT + EXCEL_ROW_PADDING_PT,

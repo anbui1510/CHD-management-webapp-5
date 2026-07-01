@@ -995,7 +995,7 @@ Xin cảm ơn!`;
         const row = worksheet.addRow(rowData);
         
         const thongTinLines = thongTin.split('\n').length;
-        const maxChars = Math.max(chanDoan.length, keHoach.length, duTru.length);
+        const maxChars = Math.max(String(chanDoan).length, String(keHoach).length, String(duTru).length);
         row.height = Math.max(30, thongTinLines * 16, Math.ceil(maxChars / 32) * 15);
 
         row.eachCell((cell) => {
@@ -1290,7 +1290,7 @@ Xin cảm ơn!`;
       
       // Auto row height calculation
       const thongTinLines = thongTin.split('\n').length;
-      const maxChars = Math.max(chanDoan.length, ppThuThuat.length, duTru.length);
+      const maxChars = Math.max(String(chanDoan).length, String(ppThuThuat).length, String(duTru).length);
       row.height = Math.max(30, thongTinLines * 16, Math.ceil(maxChars / 32) * 15);
 
       row.eachCell((cell) => {
