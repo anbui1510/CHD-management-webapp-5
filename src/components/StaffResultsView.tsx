@@ -409,31 +409,16 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     }
   };
 
-  // Search filter strings
-  const [cathSearch, setCathSearch] = useState<string>('');
-  const [surgSearch, setSurgSearch] = useState<string>('');
-
-  // Filters state for Column 1 (Staff thông) and Column 2 (Staff mổ)
-  const [cathTab, setCathTab] = useState<'all' | 'pending' | 'completed'>('all');
-  const [surgTab, setSurgTab] = useState<'all' | 'pending' | 'completed'>('all');
-
-  // Pagination state
-  const [cathPage, setCathPage] = useState<number>(1);
-  const [surgPage, setSurgPage] = useState<number>(1);
-
-  const handleCathTabChange = (tab: 'all' | 'pending' | 'completed') => {
-    setCathTab(tab);
-    setCathPage(1);
-  };
-
-  const handleSurgTabChange = (tab: 'all' | 'pending' | 'completed') => {
-    setSurgTab(tab);
-    setSurgPage(1);
-  };
+  // Combined state variables for filter and pagination
+  const [staffType, setStaffType] = useState<'cath' | 'surg'>('cath');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusTab, setStatusTab] = useState<'all' | 'pending' | 'completed'>('all');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Categorize based on ConsultType
-  const cathConsults = consults.filter(c => c.ConsultType === 'Staff thông');
-  const surgConsults = consults.filter(c => c.ConsultType === 'Staff mổ');
+  const cathConsults = useMemo(() => consults.filter(c => c.ConsultType === 'Staff thông'), [consults]);
+  const surgConsults = useMemo(() => consults.filter(c => c.ConsultType === 'Staff mổ'), [consults]);
 
   const isPendingResult = (resultId: any) => {
     if (!resultId) return true;
@@ -446,99 +431,39 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     [cathlabs]
   );
 
-  const isPendingStaffResult = (consult: Consult) => {
+  const isPendingStaffResult = useCallback((consult: Consult) => {
     if (!isPendingResult(consult.ConsultResultID)) return false;
     const consultKey = normalizeRefKey(consult.ConsultKey);
     return !consultKey || !cathConsultKeys.has(consultKey);
-  };
+  }, [cathConsultKeys]);
 
   // Counters
-  const cathStats = {
+  const cathStats = useMemo(() => ({
     all: cathConsults.length,
     pending: cathConsults.filter(isPendingStaffResult).length,
     completed: cathConsults.filter(c => !isPendingStaffResult(c)).length
-  };
+  }), [cathConsults, isPendingStaffResult]);
 
-  const surgStats = {
+  const surgStats = useMemo(() => ({
     all: surgConsults.length,
     pending: surgConsults.filter(isPendingStaffResult).length,
     completed: surgConsults.filter(c => !isPendingStaffResult(c)).length
-  };
-
-  const [cathSortOrder, setCathSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [surgSortOrder, setSurgSortOrder] = useState<'desc' | 'asc'>('desc');
+  }), [surgConsults, isPendingStaffResult]);
 
   // Filter lists with pagination support
-  const filteredCathAll = cathConsults.filter(c => {
-    // 1. Tab filtering
-    if (cathTab === 'pending' && !isPendingStaffResult(c)) return false;
-    if (cathTab === 'completed' && isPendingStaffResult(c)) return false;
+  const activeConsults = useMemo(() => {
+    return staffType === 'cath' ? cathConsults : surgConsults;
+  }, [staffType, cathConsults, surgConsults]);
 
-    // 2. Search query filtering
-    if (cathSearch.trim() !== '') {
-      const q = removeDiacritics(cathSearch).toLowerCase().trim();
-      const pat = findPatientByKey(patients, c.PatientKey);
-      const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
-      const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
-      const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
-      const diagMatch = c.DiagnosisID ? removeDiacritics(String(c.DiagnosisID)).toLowerCase().includes(q) : false;
-      return nameMatch || id1Match || id2Match || diagMatch;
-    }
+  const filteredConsultsAll = useMemo(() => {
+    return activeConsults.filter(c => {
+      // 1. Tab filtering
+      if (statusTab === 'pending' && !isPendingStaffResult(c)) return false;
+      if (statusTab === 'completed' && isPendingStaffResult(c)) return false;
 
-    return true;
-  }).sort((a, b) => {
-    const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-    const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-    return cathSortOrder === 'asc' ? da - db : db - da;
-  });
-
-  const filteredSurgAll = surgConsults.filter(c => {
-    // 1. Tab filtering
-    if (surgTab === 'pending' && !isPendingStaffResult(c)) return false;
-    if (surgTab === 'completed' && isPendingStaffResult(c)) return false;
-
-    // 2. Search query filtering
-    if (surgSearch.trim() !== '') {
-      const q = removeDiacritics(surgSearch).toLowerCase().trim();
-      const pat = findPatientByKey(patients, c.PatientKey);
-      const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
-      const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
-      const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
-      const diagMatch = c.DiagnosisID ? removeDiacritics(String(c.DiagnosisID)).toLowerCase().includes(q) : false;
-      return nameMatch || id1Match || id2Match || diagMatch;
-    }
-
-    return true;
-  }).sort((a, b) => {
-    const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-    const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-    return surgSortOrder === 'asc' ? da - db : db - da;
-  });
-
-  const totalCathPages = Math.max(1, Math.ceil(filteredCathAll.length / ITEMS_PER_PAGE));
-  const totalSurgPages = Math.max(1, Math.ceil(filteredSurgAll.length / ITEMS_PER_PAGE));
-
-  const filteredCath = filteredCathAll.slice((cathPage - 1) * ITEMS_PER_PAGE, cathPage * ITEMS_PER_PAGE);
-  const filteredSurg = filteredSurgAll.slice((surgPage - 1) * ITEMS_PER_PAGE, surgPage * ITEMS_PER_PAGE);
-
-  const isMobile = useIsMobile();
-  const MOBILE_STAFF_BATCH = 50;
-  const [mobileStaffCol, setMobileStaffCol] = useState<'cath' | 'surg'>('cath');
-  const [mobileSearch, setMobileSearch] = useState('');
-  const [mobileStatusTab, setMobileStatusTab] = useState<'all' | 'pending' | 'completed'>('all');
-  const [mobileVisibleCount, setMobileVisibleCount] = useState(MOBILE_STAFF_BATCH);
-  const mobileTableScrollRef = useRef<HTMLDivElement>(null);
-
-  const mobileActiveConsults = mobileStaffCol === 'cath' ? cathConsults : surgConsults;
-  const mobileActiveSort = mobileStaffCol === 'cath' ? cathSortOrder : surgSortOrder;
-
-  const mobileFilteredAll = useMemo(() => {
-    return mobileActiveConsults.filter(c => {
-      if (mobileStatusTab === 'pending' && !isPendingStaffResult(c)) return false;
-      if (mobileStatusTab === 'completed' && isPendingStaffResult(c)) return false;
-
-      if (mobileSearch.trim() !== '') {
-        const q = removeDiacritics(mobileSearch).toLowerCase().trim();
+      // 2. Search query filtering
+      if (searchTerm.trim() !== '') {
+        const q = removeDiacritics(searchTerm).toLowerCase().trim();
         const pat = findPatientByKey(patients, c.PatientKey);
         const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
         const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
@@ -551,51 +476,27 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     }).sort((a, b) => {
       const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
       const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-      return mobileActiveSort === 'asc' ? da - db : db - da;
+      return sortOrder === 'asc' ? da - db : db - da;
     });
-  }, [mobileActiveConsults, mobileStatusTab, mobileSearch, mobileActiveSort, patients]);
+  }, [activeConsults, statusTab, searchTerm, sortOrder, patients, isPendingStaffResult]);
 
-  const mobileStats = useMemo(() => ({
-    all: mobileActiveConsults.length,
-    pending: mobileActiveConsults.filter(isPendingStaffResult).length,
-    completed: mobileActiveConsults.filter(c => !isPendingStaffResult(c)).length,
-  }), [mobileActiveConsults]);
-
-  useEffect(() => {
-    setMobileVisibleCount(MOBILE_STAFF_BATCH);
-  }, [mobileStaffCol, mobileStatusTab, mobileSearch]);
-
-  const displayedMobileConsults = mobileFilteredAll.slice(0, mobileVisibleCount);
-
-  const handleMobileTableScroll = useCallback(() => {
-    if (!isMobile) return;
-    const el = mobileTableScrollRef.current;
-    if (!el || mobileVisibleCount >= mobileFilteredAll.length) return;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
-      setMobileVisibleCount(prev => Math.min(prev + MOBILE_STAFF_BATCH, mobileFilteredAll.length));
-    }
-  }, [isMobile, mobileVisibleCount, mobileFilteredAll.length]);
-
-  const toggleMobileSort = () => {
-    if (mobileStaffCol === 'cath') {
-      setCathSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
-    } else {
-      setSurgSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
-    }
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredConsultsAll.length / ITEMS_PER_PAGE));
+  const displayedConsults = useMemo(() => {
+    return filteredConsultsAll.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filteredConsultsAll, currentPage]);
 
   // Render lists helper
   const renderList = (filtered: Consult[]) => {
     if (filtered.length === 0) {
       return (
-        <p className="text-center italic text-xs text-slate-400 py-8 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+        <div className="col-span-full py-12 text-center italic text-xs text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
           Không có ca nào trong trạng thái đã chọn.
-        </p>
+        </div>
       );
     }
 
     return (
-      <div className="space-y-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {filtered.map((c) => {
           const pat = findPatientByKey(patients, c.PatientKey);
           if (!pat) return null;
@@ -603,6 +504,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           return (
             <button
               key={c.ConsultKey}
+              type="button"
               onClick={() => onSelectConsult(c)}
               className="w-full text-left bg-white border border-slate-200 hover:border-[#d2145a] rounded-2xl p-4 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between items-start focus:outline-none focus:ring-1 focus:ring-pink-400 cursor-pointer"
             >
@@ -617,10 +519,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                 </div>
               </div>
 
-              <div className="mt-3 pt-2 border-t border-slate-100 w-full grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium font-sans font-sans">
+              <div className="mt-3 pt-2 border-t border-slate-100 w-full grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium font-sans">
                 <div>
                   <span className="text-slate-400">Chẩn đoán:</span>{' '}
-                  <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1 rounded">{c.DiagnosisID}</span>
+                  <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1 rounded">{c.DiagnosisID || '—'}</span>
                 </div>
                 <div>
                   <span className="text-slate-400">Ngày staff:</span>{' '}
@@ -635,467 +537,197 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col gap-2 md:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-4 lg:p-6 bg-slate-50 overflow-hidden">
+    <div className="flex-1 h-full flex flex-col gap-3 md:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-4 lg:p-6 bg-slate-50 overflow-hidden">
       
-      {/* Mobile: tab Staff thông / Staff mổ + nút (+) cùng hàng */}
-      <div className="md:hidden flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
-        <div className="shrink-0 flex items-center gap-2">
-          <div className="flex-1 flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 gap-1 min-w-0">
+      {/* Header Area (Responsive Title, Search and Actions) */}
+      <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
+        <div className="flex items-center gap-2 shrink-0">
+          <ClipboardList className="w-5 h-5 text-[#d2145a] animate-pulse" />
+          <h2 className="text-base font-extrabold text-neutral-[#d2145a] tracking-tight uppercase">
+            Nhập kết quả staff
+          </h2>
+        </div>
+
+        {/* Search box in the center */}
+        <div className="flex-1 w-full max-w-xl relative">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <Search className="h-4 w-4 text-slate-400" />
+          </span>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Tìm tên, mã NB, chẩn đoán..."
+            className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
+          />
+          {searchTerm && (
             <button
               type="button"
-              onClick={() => setMobileStaffCol('cath')}
-              className={`flex-1 text-center py-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
-                mobileStaffCol === 'cath'
-                  ? 'bg-teal-600 text-white font-bold'
-                  : 'hover:bg-slate-100 text-slate-700'
-              }`}
+              onClick={() => {
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
             >
-              <Stethoscope className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Staff thông</span>
-              <span className="text-[10px] opacity-80 font-mono shrink-0">({cathStats.all})</span>
+              <X className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setMobileStaffCol('surg')}
-              className={`flex-1 text-center py-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
-                mobileStaffCol === 'surg'
-                  ? 'bg-rose-600 text-white font-bold'
-                  : 'hover:bg-slate-100 text-slate-700'
-              }`}
-            >
-              <Scissors className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Staff mổ</span>
-              <span className="text-[10px] opacity-80 font-mono shrink-0">({surgStats.all})</span>
-            </button>
-          </div>
+          )}
+        </div>
+
+        {/* Action buttons (Sort and Add) */}
+        <div className="flex items-center justify-end gap-2 w-full md:w-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="bg-white border border-slate-200 text-slate-600 p-2.5 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            title="Sắp xếp theo thời gian"
+          >
+            <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+          </button>
+
           <button
             type="button"
             onClick={() => {
               resetForm();
               setShowCombinedForm(true);
             }}
-            className="w-10 h-10 shrink-0 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition duration-200 flex items-center justify-center cursor-pointer"
-            title="Staff bổ sung"
-            aria-label="Staff bổ sung"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition duration-200 cursor-pointer uppercase tracking-wider w-full md:w-auto text-center"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 text-white" /> Staff bổ sung
+          </button>
+        </div>
+      </div>
+
+      {/* Main List Box */}
+      <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-3xl p-4 lg:p-6 shadow-sm gap-4 overflow-hidden">
+        
+        {/* Tab "Staff thông" và "Staff mổ" cùng line */}
+        <div className="shrink-0 flex border-b border-slate-200 gap-6">
+          <button
+            type="button"
+            onClick={() => {
+              setStaffType('cath');
+              setCurrentPage(1);
+            }}
+            className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
+              staffType === 'cath' ? 'border-[#d2145a] text-[#d2145a]' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Stethoscope className="w-4 h-4 shrink-0" />
+            <span>Staff thông</span>
+            <span className="text-[10px] opacity-80 font-mono shrink-0">({cathStats.all})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStaffType('surg');
+              setCurrentPage(1);
+            }}
+            className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
+              staffType === 'surg' ? 'border-[#d2145a] text-[#d2145a]' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Scissors className="w-4 h-4 shrink-0" />
+            <span>Staff mổ</span>
+            <span className="text-[10px] opacity-80 font-mono shrink-0">({surgStats.all})</span>
           </button>
         </div>
 
-        <div className="shrink-0 flex flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 gap-1">
+        {/* Tag "All", "Chờ staff", "Đã staff" */}
+        <div className="shrink-0 flex flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 gap-1 max-w-md">
           <button
             type="button"
-            onClick={() => setMobileStatusTab('all')}
-            className={`flex-1 min-w-[72px] text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-              mobileStatusTab === 'all' ? 'bg-slate-900 text-white font-bold' : 'hover:bg-slate-100'
+            onClick={() => {
+              setStatusTab('all');
+              setCurrentPage(1);
+            }}
+            className={`flex-1 min-w-[80px] text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
+              statusTab === 'all' ? 'bg-slate-900 text-white font-bold' : 'hover:bg-slate-100'
             }`}
           >
-            All <span className="text-[10px] opacity-75 font-mono">({mobileStats.all})</span>
+            All <span className="text-[10px] opacity-75 font-mono">({staffType === 'cath' ? cathStats.all : surgStats.all})</span>
           </button>
           <button
             type="button"
-            onClick={() => setMobileStatusTab('pending')}
+            onClick={() => {
+              setStatusTab('pending');
+              setCurrentPage(1);
+            }}
             className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-              mobileStatusTab === 'pending' ? 'bg-amber-600 text-white font-bold' : 'text-amber-700 hover:bg-amber-50'
+              statusTab === 'pending' ? 'bg-amber-600 text-white font-bold' : 'text-amber-700 hover:bg-amber-50'
             }`}
           >
-            ⚠ Chờ staff <span className="text-[10px] opacity-75 font-mono">({mobileStats.pending})</span>
+            ⚠ Chờ staff <span className="text-[10px] opacity-75 font-mono">({staffType === 'cath' ? cathStats.pending : surgStats.pending})</span>
           </button>
           <button
             type="button"
-            onClick={() => setMobileStatusTab('completed')}
+            onClick={() => {
+              setStatusTab('completed');
+              setCurrentPage(1);
+            }}
             className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-              mobileStatusTab === 'completed' ? 'bg-green-700 text-white font-bold' : 'text-green-800 hover:bg-green-50'
+              statusTab === 'completed' ? 'bg-green-700 text-white font-bold' : 'text-green-800 hover:bg-green-50'
             }`}
           >
-            ✓ Đã staff <span className="text-[10px] opacity-75 font-mono">({mobileStats.completed})</span>
+            ✓ Đã staff <span className="text-[10px] opacity-75 font-mono">({staffType === 'cath' ? cathStats.completed : surgStats.completed})</span>
           </button>
         </div>
 
-        <div className="shrink-0 flex gap-2">
-          <div className="relative flex-1">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search className="h-4 w-4 text-slate-400" />
-            </span>
-            <input
-              type="text"
-              value={mobileSearch}
-              onChange={(e) => setMobileSearch(e.target.value)}
-              placeholder="Tìm tên, mã NB, chẩn đoán..."
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
-            />
-            {mobileSearch && (
+        {/* Cards Grid */}
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+          {renderList(displayedConsults)}
+        </div>
+
+        {/* Pagination control */}
+        {totalPages > 1 && (
+          <div className="shrink-0 pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs">
+            <div className="text-[10px] text-slate-500 font-semibold font-mono uppercase">
+              Trang {currentPage}/{totalPages} (Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} đến {Math.min(currentPage * ITEMS_PER_PAGE, filteredConsultsAll.length)})
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={() => setMobileSearch('')}
-                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                Đầu
               </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={toggleMobileSort}
-            className="bg-white border border-slate-200 text-slate-600 px-3 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shrink-0 shadow-sm cursor-pointer"
-            title="Sắp xếp theo thời gian"
-          >
-            <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${mobileActiveSort === 'asc' ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-
-        <div
-          ref={mobileTableScrollRef}
-          onScroll={handleMobileTableScroll}
-          className="flex-1 min-h-0 overflow-x-auto overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-sm custom-scrollbar"
-        >
-          <table className="w-full text-left text-xs border-collapse min-w-[520px]">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
-                <th className="py-2.5 px-3 sticky left-0 z-20 bg-slate-50 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]">Họ và tên</th>
-                <th className="py-2.5 px-3">Chẩn đoán</th>
-                <th className="py-2.5 px-3">Ngày staff</th>
-                <th className="py-2.5 px-3">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-              {displayedMobileConsults.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-10 italic text-slate-400">
-                    Không có ca nào trong trạng thái đã chọn.
-                  </td>
-                </tr>
-              ) : (
-                displayedMobileConsults.map((c) => {
-                  const pat = findPatientByKey(patients, c.PatientKey);
-                  if (!pat) return null;
-                  const pending = isPendingStaffResult(c);
-                  return (
-                    <tr
-                      key={c.ConsultKey}
-                      onClick={() => onSelectConsult(c)}
-                      className="hover:bg-pink-50/45 cursor-pointer transition duration-150 group"
-                    >
-                      <td className="py-3 px-3 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/45 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]">
-                        <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat.PatientName}</p>
-                        <p className="text-[10px] text-slate-500 font-mono">MNB: {pat.PatientID1}</p>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1 rounded text-[10px]">{c.DiagnosisID || '—'}</span>
-                      </td>
-                      <td className="py-3 px-3 font-mono text-slate-600">{formatVNTime(c.ConsultDate)}</td>
-                      <td className="py-3 px-3">
-                        {pending ? (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Chờ staff</span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-green-800 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">Đã staff</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-              {mobileFilteredAll.length > displayedMobileConsults.length && (
-                <tr>
-                  <td colSpan={4} className="text-center py-3 text-[10px] text-slate-400 font-medium">
-                    {displayedMobileConsults.length} / {mobileFilteredAll.length} · Cuộn để tải thêm
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Desktop: Title with Staff bổ sung action button */}
-      <div className="hidden md:flex shrink-0 flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
-        <div>
-          <h2 className="text-base font-extrabold text-neutral-[#d2145a] tracking-tight flex items-center gap-2 uppercase">
-            <ClipboardList className="w-5 h-5 text-[#d2145a] animate-pulse" /> Nhập kết quả staff
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5 font-medium">Điều phối viên và Hội đồng duyệt kết quả chỉ định can thiệp thông tim hoặc phẫu thuật tim hở.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            resetForm();
-            setShowCombinedForm(true);
-          }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition duration-200 shrink-0 cursor-pointer uppercase tracking-wider"
-        >
-          <Plus className="w-4 h-4 text-white" /> Staff bổ sung
-        </button>
-      </div>
-
-      {/* Desktop: Grid columns */}
-      <div className="hidden md:grid flex-1 min-h-0 grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* COLUMN 1: Staff thông */}
-        <div className="min-h-0 h-full flex flex-col bg-white border border-slate-200 rounded-3xl p-4 lg:p-5 shadow-sm">
-          <div className="shrink-0 flex items-center gap-1.5 border-b border-slate-200 pb-2.5 mb-4">
-            <Stethoscope className="w-5 h-5 text-teal-600" />
-            <h4 className="font-extrabold text-xs text-neutral-900 uppercase">Staff thông</h4>
-          </div>
-
-          {/* Filtering choice headers exactly matching screenshot 7 */}
-          <div className="shrink-0 flex flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 mb-4 gap-1">
-            <button
-              onClick={() => handleCathTabChange('all')}
-              className={`flex-1 min-w-[88px] text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-                cathTab === 'all' 
-                  ? 'bg-slate-900 text-white font-bold' 
-                  : 'hover:bg-slate-100'
-              }`}
-            >
-              All <span className="text-[10px] opacity-75 font-mono">({cathStats.all})</span>
-            </button>
-            <button
-              onClick={() => handleCathTabChange('pending')}
-              className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-                cathTab === 'pending' 
-                  ? 'bg-amber-600 text-white font-bold' 
-                  : 'text-amber-700 hover:bg-amber-50'
-              }`}
-            >
-              ⚠ Chờ staff <span className="text-[10px] opacity-75 font-mono">({cathStats.pending})</span>
-            </button>
-            <button
-              onClick={() => handleCathTabChange('completed')}
-              className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-                cathTab === 'completed' 
-                  ? 'bg-green-700 text-white font-bold' 
-                  : 'text-green-800 hover:bg-green-50'
-              }`}
-            >
-              ✓ Đã staff <span className="text-[10px] opacity-75 font-mono">({cathStats.completed})</span>
-            </button>
-          </div>
-
-          {/* Search bar & Sort Column 1 */}
-          <div className="shrink-0 flex gap-2 mb-4">
-            <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search className="h-4 w-4 text-slate-400" />
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Trước
+              </button>
+              
+              <span className="text-xs font-semibold text-slate-700 px-1 font-mono">
+                {currentPage} / {totalPages}
               </span>
-              <input
-                type="text"
-                value={cathSearch}
-                onChange={(e) => {
-                  setCathSearch(e.target.value);
-                  setCathPage(1);
-                }}
-                placeholder="Tìm tên, mã NB, chẩn đoán..."
-                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
-              />
-              {cathSearch && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCathSearch('');
-                    setCathPage(1);
-                  }}
-                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+              
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Sau
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Cuối
+              </button>
             </div>
-            <button
-              onClick={() => setCathSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-              className="bg-white border border-slate-200 text-slate-600 px-3 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shrink-0 shadow-sm cursor-pointer"
-              title="Sắp xếp theo thời gian"
-            >
-              <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 object-center ${cathSortOrder === 'asc' ? 'rotate-180' : ''}`} />
-            </button>
           </div>
-
-          {/* List area */}
-          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
-            {renderList(filteredCath)}
-          </div>
-
-          {/* Pagination for Column 1 */}
-          {totalCathPages > 1 && (
-            <div className="shrink-0 pt-3 mt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs">
-              <div className="text-[10px] text-slate-505 font-semibold font-mono uppercase text-slate-500">
-                Trang {cathPage}/{totalCathPages} (Hiển thị {(cathPage - 1) * ITEMS_PER_PAGE + 1} đến {Math.min(cathPage * ITEMS_PER_PAGE, filteredCathAll.length)})
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setCathPage(1)}
-                  disabled={cathPage === 1}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Đầu
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCathPage(p => Math.max(1, p - 1))}
-                  disabled={cathPage === 1}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Trước
-                </button>
-                
-                <span className="text-xs font-semibold text-slate-700 px-1 font-mono">
-                  {cathPage} / {totalCathPages}
-                </span>
-                
-                <button
-                  type="button"
-                  onClick={() => setCathPage(p => Math.min(totalCathPages, p + 1))}
-                  disabled={cathPage === totalCathPages}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Sau
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCathPage(totalCathPages)}
-                  disabled={cathPage === totalCathPages}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Cuối
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* COLUMN 2: Staff mổ */}
-        <div className="min-h-0 h-full flex flex-col bg-white border border-slate-200 rounded-3xl p-4 lg:p-5 shadow-sm">
-          <div className="shrink-0 flex items-center gap-1.5 border-b border-slate-200 pb-2.5 mb-4">
-            <Scissors className="w-5 h-5 text-rose-500" />
-            <h4 className="font-extrabold text-xs text-neutral-900 uppercase">Staff mổ</h4>
-          </div>
-
-          {/* Filtering choice headers exactly matching screenshot 7 */}
-          <div className="shrink-0 flex flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 mb-4 gap-1">
-            <button
-              onClick={() => handleSurgTabChange('all')}
-              className={`flex-1 min-w-[88px] text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-                surgTab === 'all' 
-                  ? 'bg-slate-900 text-white font-bold' 
-                  : 'hover:bg-slate-100'
-              }`}
-            >
-              All <span className="text-[10px] opacity-75 font-mono">({surgStats.all})</span>
-            </button>
-            <button
-              onClick={() => handleSurgTabChange('pending')}
-              className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-                surgTab === 'pending' 
-                  ? 'bg-amber-600 text-white font-bold' 
-                  : 'text-amber-700 hover:bg-amber-50'
-              }`}
-            >
-              ⚠ Chờ staff <span className="text-[10px] opacity-75 font-mono">({surgStats.pending})</span>
-            </button>
-            <button
-              onClick={() => handleSurgTabChange('completed')}
-              className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-                surgTab === 'completed' 
-                  ? 'bg-green-700 text-white font-bold' 
-                  : 'text-green-800 hover:bg-green-50'
-              }`}
-            >
-              ✓ Đã staff <span className="text-[10px] opacity-75 font-mono">({surgStats.completed})</span>
-            </button>
-          </div>
-
-          {/* Search bar & Sort Column 2 */}
-          <div className="shrink-0 flex gap-2 mb-4">
-            <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search className="h-4 w-4 text-slate-400" />
-              </span>
-              <input
-                type="text"
-                value={surgSearch}
-                onChange={(e) => {
-                  setSurgSearch(e.target.value);
-                  setSurgPage(1);
-                }}
-                placeholder="Tìm tên, mã NB, chẩn đoán..."
-                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
-              />
-              {surgSearch && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSurgSearch('');
-                    setSurgPage(1);
-                  }}
-                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={() => setSurgSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-              className="bg-white border border-slate-200 text-slate-600 px-3 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shrink-0 shadow-sm cursor-pointer"
-              title="Sắp xếp theo thời gian"
-            >
-              <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 object-center ${surgSortOrder === 'asc' ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-
-          {/* List area */}
-          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
-            {renderList(filteredSurg)}
-          </div>
-
-          {/* Pagination for Column 2 */}
-          {totalSurgPages > 1 && (
-            <div className="shrink-0 pt-3 mt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs">
-              <div className="text-[10px] text-slate-505 font-semibold font-mono uppercase text-slate-500">
-                Trang {surgPage}/{totalSurgPages} (Hiển thị {(surgPage - 1) * ITEMS_PER_PAGE + 1} đến {Math.min(surgPage * ITEMS_PER_PAGE, filteredSurgAll.length)})
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setSurgPage(1)}
-                  disabled={surgPage === 1}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Đầu
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSurgPage(p => Math.max(1, p - 1))}
-                  disabled={surgPage === 1}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Trước
-                </button>
-                
-                <span className="text-xs font-semibold text-slate-700 px-1 font-mono">
-                  {surgPage} / {totalSurgPages}
-                </span>
-                
-                <button
-                  type="button"
-                  onClick={() => setSurgPage(p => Math.min(totalSurgPages, p + 1))}
-                  disabled={surgPage === totalSurgPages}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Sau
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSurgPage(totalSurgPages)}
-                  disabled={surgPage === totalSurgPages}
-                  className="px-2 py-1 rounded text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Cuối
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
+        )}
       </div>
 
       {/* COMBINED STAFF BỔ SUNG MODAL */}
