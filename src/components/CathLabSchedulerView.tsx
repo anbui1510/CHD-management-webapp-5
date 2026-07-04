@@ -41,6 +41,14 @@ import {
   ChevronsRight
 } from 'lucide-react';
 
+const removeVietnameseTones = (str: any): string => {
+  if (!str) return '';
+  let s = String(str);
+  s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  s = s.replace(/đ/g, 'd').replace(/Đ/g, 'D');
+  return s;
+};
+
 interface CathLabSchedulerViewProps {
   patients: Patient[];
   consults: Consult[];
@@ -1535,8 +1543,12 @@ Xin cảm ơn!`;
 
     // Phạt sẹo BS thư ký (BS. Tài) khi BS xếp lịch phải vượt quyền kích hoạt
     try {
-      const bsTai = staffList?.find(s => s.StaffName?.includes('Tài') || s.Name?.includes('Tài'));
-      const keyTai = bsTai?.StaffKey || '10006';
+      const bsTai = staffList?.find(s => {
+        const name = removeVietnameseTones(s.Name || '').toLowerCase();
+        const staffName = removeVietnameseTones(s.StaffName || '').toLowerCase();
+        return name.includes('tai') || staffName.includes('tai');
+      });
+      const keyTai = bsTai?.StaffKey || '81442';
       const nameTai = bsTai?.StaffName || 'BS. Tài';
 
       const pat = patients.find(p => p.PatientKey === pendingConsult.PatientKey);
@@ -1568,6 +1580,34 @@ Xin cảm ơn!`;
       });
       if (!markRes.ok) {
         console.error('Không thể ghi sẹo phạt BS Tài:', markPayload);
+      }
+
+      // Gửi Notification tương ứng cho BS Tài
+      const notifPayload = {
+        NotificationKey: `notif_override_sched_${Date.now()}_tai`,
+        StaffKey: keyTai,
+        StaffName: nameTai,
+        Title: 'Phạt sẹo workflow',
+        Message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do bạn chưa điền kết quả hội chẩn đúng hạn. Bạn bị phạt 1 sẹo.`,
+        Severity: 'warning',
+        RelatedEntityType: 'Consult' as const,
+        RelatedEntityKey: pendingConsult.ConsultKey,
+        PatientKey: pendingConsult.PatientKey,
+        PatientID: patId,
+        PatientName: patName,
+        DedupKey: `override_sched_tai_notif:${pendingConsult.ConsultKey}`,
+        IsRead: false,
+        CreatedTime: new Date().toISOString(),
+        ReadTime: ''
+      };
+
+      const notifRes = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notifPayload)
+      });
+      if (!notifRes.ok) {
+        console.error('Không thể ghi thông báo phạt BS Tài:', notifPayload);
       }
     } catch (markErr) {
       console.error('Lỗi khi lưu sẹo phạt BS Tài:', markErr);
