@@ -96,5 +96,6 @@ export const SOURCE_CATH_METHOD = [
   'Nong hẹp eo động mạch chủ',
   'Đặt stent ống động mạch',
   'Đặt stent động mạch thận',
-  'Phá vách liên nhĩ'
+  'Phá vách liên nhĩ',
+  'Đặt máy tạo nhịp'
 ];
