@@ -8,7 +8,7 @@ export interface RolePresetRecord {
 }
 
 const ALL_MODULES_CSV =
-  'home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt,chd-daily-brief';
+  'home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt,chd-daily-brief,cathlab-report';
 
 export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
   {
@@ -37,14 +37,14 @@ export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
     RolePresetID: 'dieu-phoi-tt',
     RolePresetLabel: 'Điều phối thông tim',
     RolePresetDescription: 'Xếp lịch, dụng cụ, gọi bệnh, lưu trữ',
-    Permissions: 'home,workspace,schedule-tt,schedule-view,archive,patients',
+    Permissions: 'home,workspace,schedule-tt,schedule-view,archive,patients,cathlab-report',
     SortOrder: 4,
   },
   {
     RolePresetID: 'phong-tt',
     RolePresetLabel: 'Phòng thông tim (PTV/ĐD TT)',
     RolePresetDescription: 'Thực hiện và nhập kết quả can thiệp TT',
-    Permissions: 'home,workspace,cathlab-room,schedule-view,patients',
+    Permissions: 'home,workspace,cathlab-room,schedule-view,patients,cathlab-report',
     SortOrder: 5,
   },
   {

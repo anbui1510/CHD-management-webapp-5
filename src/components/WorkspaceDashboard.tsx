@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Scissors,
   UserCog,
+  FileText,
 } from 'lucide-react';
 import type { AppModule } from '../auth/permissions';
 
@@ -108,6 +109,13 @@ export default function WorkspaceDashboard({
             description: 'Kiểm soát ca thủ thuật',
             icon: <ShieldCheck className="w-6 h-6 text-teal-600" />,
             iconBg: 'bg-teal-50',
+          },
+          {
+            module: 'cathlab-report',
+            label: 'Báo cáo thông tim',
+            description: 'Thống kê & báo cáo số liệu',
+            icon: <FileText className="w-6 h-6 text-pink-650" />,
+            iconBg: 'bg-pink-50',
           },
           {
             module: 'archive',

@@ -25,7 +25,8 @@ export type AppModule =
   | 'excel-export'
   | 'google-sheets'
   | 'staff-mgmt'
-  | 'chd-daily-brief';
+  | 'chd-daily-brief'
+  | 'cathlab-report';
 
 export type AppModuleGroup =
   | 'Chung'
@@ -63,6 +64,7 @@ export const APP_MODULE_DEFINITIONS: AppModuleDefinition[] = [
   { id: 'google-sheets', label: 'Virtual Google Sheets', group: 'Quản trị', description: 'Sửa dữ liệu trực tiếp trên sheet ảo' },
   { id: 'staff-mgmt', label: 'Quản lý nhân sự', group: 'Quản trị', description: 'Phân quyền module cho nhân viên' },
   { id: 'chd-daily-brief', label: 'CHD Daily Brief', group: 'Chung', description: 'Bản tin y văn tim mạch nhi mỗi sáng 7h' },
+  { id: 'cathlab-report', label: 'Báo cáo thông tim', group: 'Thông tim', description: 'Xem báo cáo, thống kê ca thông tim' },
 ];
 
 export const ALL_APP_MODULES: AppModule[] = APP_MODULE_DEFINITIONS.map(item => item.id);

@@ -1,0 +1,711 @@
+import React, { useMemo, useState } from 'react';
+import { CathLab, Patient, Staff, Source, formatVNTime, findPatientByKey, removeDiacritics } from '../types';
+import { 
+  FileText, 
+  Filter, 
+  Download, 
+  Calendar, 
+  User, 
+  Search, 
+  X, 
+  Activity, 
+  CheckCircle2, 
+  XCircle, 
+  AlertCircle,
+  Users,
+  ChevronDown
+} from 'lucide-react';
+
+interface CathLabReportViewProps {
+  patients: Patient[];
+  cathlabs: CathLab[];
+  sources?: Source[];
+  staffList?: Staff[];
+  onViewPatientRecord?: (patient: Patient) => void;
+}
+
+export default function CathLabReportView({
+  patients,
+  cathlabs = [],
+  sources = [],
+  staffList = [],
+  onViewPatientRecord
+}: CathLabReportViewProps) {
+  // Filter States
+  const [timeMode, setTimeMode] = useState<'preset' | 'range'>('preset');
+  const [yearFilter, setYearFilter] = useState<string>('all');
+  const [monthFilter, setMonthFilter] = useState<string>('all');
+  const [quarterFilter, setQuarterFilter] = useState<string>('all');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+  
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [diagnosisFilter, setDiagnosisFilter] = useState<string>('all');
+  const [methodFilter, setMethodFilter] = useState<string>('all');
+  const [primaryInterv, setPrimaryInterv] = useState<string>('all');
+  const [assistant1, setAssistant1] = useState<string>('all');
+  const [assistant2, setAssistant2] = useState<string>('all');
+  const [assistant3, setAssistant3] = useState<string>('all');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const ITEMS_PER_PAGE = 50;
+
+  // Extract unique filter options dynamically from data
+  const filterOptions = useMemo(() => {
+    const years = new Set<string>();
+    const diagnoses = new Set<string>();
+    const methods = new Set<string>();
+    const primaryIntervs = new Set<string>();
+    const assist1s = new Set<string>();
+    const assist2s = new Set<string>();
+    const assist3s = new Set<string>();
+
+    cathlabs.forEach(c => {
+      if (c.CathDate) {
+        try {
+          const yr = c.CathDate.split('-')[0] || c.CathDate.split('/')[2];
+          if (yr && yr.length === 4) years.add(yr);
+        } catch(e) {}
+      }
+      if (c.DiagnosisID) diagnoses.add(c.DiagnosisID);
+      if (c.PostDiagnosisID) diagnoses.add(c.PostDiagnosisID);
+      if (Array.isArray(c.CathMethod)) {
+        c.CathMethod.forEach(m => {
+          if (m) methods.add(m);
+        });
+      }
+      if (c._1stInterventionist) primaryIntervs.add(c._1stInterventionist);
+      if (c._2ndInterventionist) assist1s.add(c._2ndInterventionist);
+      if (c._3rdInterventionist) assist2s.add(c._3rdInterventionist);
+      if (c._4thInterventionist) assist3s.add(c._4thInterventionist);
+    });
+
+    return {
+      years: Array.from(years).sort((a, b) => b.localeCompare(a)),
+      diagnoses: Array.from(diagnoses).sort(),
+      methods: Array.from(methods).sort(),
+      primaryIntervs: Array.from(primaryIntervs).sort(),
+      assist1s: Array.from(assist1s).sort(),
+      assist2s: Array.from(assist2s).sort(),
+      assist3s: Array.from(assist3s).sort()
+    };
+  }, [cathlabs]);
+
+  // Helper to parse quarters
+  const getQuarter = (month: number): number => {
+    return Math.ceil(month / 3);
+  };
+
+  // Filter Logic
+  const filteredCathLabs = useMemo(() => {
+    return cathlabs.filter(c => {
+      // 1. Time Filtering
+      if (c.CathDate) {
+        const dateObj = new Date(c.CathDate);
+        if (!isNaN(dateObj.getTime())) {
+          if (timeMode === 'range') {
+            if (fromDate) {
+              const fromTime = new Date(fromDate).getTime();
+              if (dateObj.getTime() < fromTime) return false;
+            }
+            if (toDate) {
+              const toTime = new Date(toDate).getTime();
+              // Add 1 day to make toDate inclusive
+              const inclusiveToTime = toTime + 24 * 60 * 60 * 1000;
+              if (dateObj.getTime() > inclusiveToTime) return false;
+            }
+          } else {
+            const yearStr = String(dateObj.getFullYear());
+            const monthStr = String(dateObj.getMonth() + 1);
+            const quarterStr = String(getQuarter(dateObj.getMonth() + 1));
+
+            if (yearFilter !== 'all' && yearStr !== yearFilter) return false;
+            if (monthFilter !== 'all' && monthStr !== monthFilter) return false;
+            if (quarterFilter !== 'all' && quarterStr !== quarterFilter) return false;
+          }
+        }
+      } else {
+        // If no date, only show if no date filter is active
+        if (timeMode === 'range' && (fromDate || toDate)) return false;
+        if (timeMode === 'preset' && (yearFilter !== 'all' || monthFilter !== 'all' || quarterFilter !== 'all')) return false;
+      }
+
+      // 2. Diagnosis ID Filtering
+      if (diagnosisFilter !== 'all') {
+        const d1 = c.DiagnosisID ? c.DiagnosisID.trim().toLowerCase() : '';
+        const d2 = c.PostDiagnosisID ? c.PostDiagnosisID.trim().toLowerCase() : '';
+        const target = diagnosisFilter.trim().toLowerCase();
+        if (d1 !== target && d2 !== target) return false;
+      }
+
+      // 3. Cath Method Filtering
+      if (methodFilter !== 'all') {
+        if (!Array.isArray(c.CathMethod) || !c.CathMethod.includes(methodFilter)) return false;
+      }
+
+      // 4. Interventionists Filtering
+      if (primaryInterv !== 'all' && c._1stInterventionist !== primaryInterv) return false;
+      if (assistant1 !== 'all' && c._2ndInterventionist !== assistant1) return false;
+      if (assistant2 !== 'all' && c._3rdInterventionist !== assistant2) return false;
+      if (assistant3 !== 'all' && c._4thInterventionist !== assistant3) return false;
+
+      // 5. Search Query (Patient Name / ID)
+      if (searchQuery.trim() !== '') {
+        const pat = findPatientByKey(patients, c.PatientKey);
+        const q = removeDiacritics(searchQuery).toLowerCase().trim();
+        const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
+        const idMatch = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
+        const diagMatch = c.DiagnosisID ? removeDiacritics(String(c.DiagnosisID)).toLowerCase().includes(q) : false;
+        const postDiagMatch = c.PostDiagnosisID ? removeDiacritics(String(c.PostDiagnosisID)).toLowerCase().includes(q) : false;
+        return nameMatch || idMatch || diagMatch || postDiagMatch;
+      }
+
+      return true;
+    });
+  }, [
+    cathlabs, patients, timeMode, yearFilter, monthFilter, quarterFilter, 
+    fromDate, toDate, diagnosisFilter, methodFilter, primaryInterv, 
+    assistant1, assistant2, assistant3, searchQuery
+  ]);
+
+  // Stats Calculation
+  const stats = useMemo(() => {
+    let success = 0;
+    let failed = 0;
+    let postponed = 0;
+
+    filteredCathLabs.forEach(c => {
+      if (c.CathResultID === 'Thành công') success++;
+      else if (c.CathResultID === 'Không thành công') failed++;
+      else if (c.CathResultID === 'Hoãn') postponed++;
+    });
+
+    const total = filteredCathLabs.length;
+    const successRate = total > 0 ? Math.round((success / total) * 100) : 0;
+
+    return { total, success, failed, postponed, successRate };
+  }, [filteredCathLabs]);
+
+  // Paginated Results
+  const totalPages = Math.max(1, Math.ceil(filteredCathLabs.length / ITEMS_PER_PAGE));
+  const paginatedCathLabs = useMemo(() => {
+    return filteredCathLabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filteredCathLabs, currentPage]);
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    try {
+      const headers = [
+        'STT', 'Mã Bệnh Nhân (ID1)', 'Họ Tên', 'Ngày sinh', 'Giới tính', 
+        'Ngày Thông Tim', 'ICD Chỉ định', 'ICD Sau TT', 'Kết Quả', 
+        'Phương Pháp Can Thiệp', 'PTV Chính', 'PTV Phụ 1', 'PTV Phụ 2', 'PTV Phụ 3', 'Kế Hoạch Tiếp Theo', 'Ghi Chú'
+      ];
+
+      const csvRows = [headers.join(',')];
+
+      filteredCathLabs.forEach((c, index) => {
+        const pat = findPatientByKey(patients, c.PatientKey);
+        const row = [
+          index + 1,
+          `"${pat?.PatientID1 || ''}"`,
+          `"${pat?.PatientName || ''}"`,
+          `"${pat?.PatientDOB ? formatVNTime(pat.PatientDOB) : ''}"`,
+          `"${pat?.PatientSex || ''}"`,
+          `"${c.CathDate ? formatVNTime(c.CathDate) : ''}"`,
+          `"${c.DiagnosisID || ''}"`,
+          `"${c.PostDiagnosisID || ''}"`,
+          `"${c.CathResultID || ''}"`,
+          `"${Array.isArray(c.CathMethod) ? c.CathMethod.join('; ') : ''}"`,
+          `"${c._1stInterventionist || ''}"`,
+          `"${c._2ndInterventionist || ''}"`,
+          `"${c._3rdInterventionist || ''}"`,
+          `"${c._4thInterventionist || ''}"`,
+          `"${c.CathPlan || ''}"`,
+          `"${(c.CathNote || '').replace(/"/g, '""')}"`
+        ];
+        csvRows.push(row.join(','));
+      });
+
+      const csvString = '\uFEFF' + csvRows.join('\n'); // Adding BOM for UTF-8 Excel compatibility
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Bao_cao_thong_tim_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      alert('Lỗi xuất báo cáo CSV: ' + e);
+    }
+  };
+
+  const handleResetFilters = () => {
+    setYearFilter('all');
+    setMonthFilter('all');
+    setQuarterFilter('all');
+    setFromDate('');
+    setToDate('');
+    setDiagnosisFilter('all');
+    setMethodFilter('all');
+    setPrimaryInterv('all');
+    setAssistant1('all');
+    setAssistant2('all');
+    setAssistant3('all');
+    setSearchQuery('');
+    setCurrentPage(1);
+  };
+
+  return (
+    <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50 overflow-y-auto">
+      
+      {/* Title Header */}
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 border border-slate-200 rounded-3xl shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-pink-50 flex items-center justify-center text-[#d2145a] shadow-sm">
+            <FileText className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-neutral-900 tracking-tight uppercase">Báo cáo & Thống kê thông tim</h2>
+            <p className="text-xs text-slate-500 font-medium">Truy xuất, thống kê số liệu và xuất báo cáo ca can thiệp tim mạch</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleExportCSV}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition duration-200 uppercase tracking-wider cursor-pointer"
+        >
+          <Download className="w-4 h-4 text-white" /> Xuất báo cáo Excel
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
+        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400">Tổng số ca thông tim</span>
+            <h3 className="text-2xl font-black text-slate-900 mt-1 font-mono">{stats.total}</h3>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center">
+            <Activity className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-emerald-500">Can thiệp Thành công</span>
+            <h3 className="text-2xl font-black text-emerald-600 mt-1 font-mono">{stats.success} <span className="text-xs font-semibold text-slate-400">({stats.successRate}%)</span></h3>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-rose-500 font-bold">Không thành công</span>
+            <h3 className="text-2xl font-black text-rose-600 mt-1 font-mono">{stats.failed}</h3>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <XCircle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-amber-500 font-bold">Hoãn thủ thuật</span>
+            <h3 className="text-2xl font-black text-amber-600 mt-1 font-mono">{stats.postponed}</h3>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters Box */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 shrink-0">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-[#d2145a]" />
+            <h4 className="font-extrabold text-xs text-neutral-900 uppercase">Bộ lọc báo cáo chuyên sâu</h4>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="text-[#d2145a] hover:underline text-xs font-bold transition cursor-pointer"
+          >
+            Xóa tất cả bộ lọc
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 text-xs font-semibold text-slate-700">
+          {/* Column 1: Time Filters */}
+          <div className="md:col-span-5 space-y-3 border-r border-slate-100 pr-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" /> Lọc thời gian (CathDate)
+              </span>
+              <div className="flex bg-slate-100 rounded-lg p-0.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setTimeMode('preset')}
+                  className={`px-2 py-0.5 rounded-md font-extrabold cursor-pointer ${timeMode === 'preset' ? 'bg-white shadow-xs text-[#d2145a]' : 'text-slate-500'}`}
+                >
+                  Mặc định
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeMode('range')}
+                  className={`px-2 py-0.5 rounded-md font-extrabold cursor-pointer ${timeMode === 'range' ? 'bg-white shadow-xs text-[#d2145a]' : 'text-slate-500'}`}
+                >
+                  Khoảng ngày
+                </button>
+              </div>
+            </div>
+
+            {timeMode === 'preset' ? (
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Năm</label>
+                  <select
+                    value={yearFilter}
+                    onChange={(e) => { setYearFilter(e.target.value); setCurrentPage(1); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+                  >
+                    <option value="all">Tất cả năm</option>
+                    {filterOptions.years.map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Quý</label>
+                  <select
+                    value={quarterFilter}
+                    onChange={(e) => { setQuarterFilter(e.target.value); setCurrentPage(1); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+                  >
+                    <option value="all">Tất cả quý</option>
+                    <option value="1">Quý 1 (T1-T3)</option>
+                    <option value="2">Quý 2 (T4-T6)</option>
+                    <option value="3">Quý 3 (T7-T9)</option>
+                    <option value="4">Quý 4 (T10-T12)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Tháng</label>
+                  <select
+                    value={monthFilter}
+                    onChange={(e) => { setMonthFilter(e.target.value); setCurrentPage(1); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+                  >
+                    <option value="all">Tất cả tháng</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                      <option key={m} value={m}>Tháng {m}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Từ ngày</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 font-bold font-mono focus:outline-none focus:ring-1 focus:ring-pink-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Đến ngày</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 font-bold font-mono focus:outline-none focus:ring-1 focus:ring-pink-400"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* General Text Search */}
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Search className="h-4 w-4 text-slate-400" />
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                placeholder="Tìm tên bệnh nhi, mã NB, mã ICD..."
+                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Column 2: Clinical Filters */}
+          <div className="md:col-span-3 space-y-3 border-r border-slate-100 pr-4">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+              <Activity className="w-3.5 h-3.5" /> Lọc ICD & Phương pháp
+            </span>
+
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-1">Bệnh chính (DiagnosisID)</label>
+              <select
+                value={diagnosisFilter}
+                onChange={(e) => { setDiagnosisFilter(e.target.value); setCurrentPage(1); }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+              >
+                <option value="all">Tất cả bệnh chính</option>
+                {filterOptions.diagnoses.map(diag => (
+                  <option key={diag} value={diag}>{diag}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-1">Phương pháp can thiệp</label>
+              <select
+                value={methodFilter}
+                onChange={(e) => { setMethodFilter(e.target.value); setCurrentPage(1); }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+              >
+                <option value="all">Tất cả phương pháp</option>
+                {filterOptions.methods.map(met => (
+                  <option key={met} value={met}>{met}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Column 3: Operator Filters */}
+          <div className="md:col-span-4 space-y-3">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" /> Lọc Kíp can thiệp
+            </span>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1">PTV Chính</label>
+                <select
+                  value={primaryInterv}
+                  onChange={(e) => { setPrimaryInterv(e.target.value); setCurrentPage(1); }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+                >
+                  <option value="all">Tất cả</option>
+                  {filterOptions.primaryIntervs.map(ptv => (
+                    <option key={ptv} value={ptv}>{ptv}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1">PTV Phụ 1</label>
+                <select
+                  value={assistant1}
+                  onChange={(e) => { setAssistant1(e.target.value); setCurrentPage(1); }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+                >
+                  <option value="all">Tất cả</option>
+                  {filterOptions.assist1s.map(ptv => (
+                    <option key={ptv} value={ptv}>{ptv}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1">PTV Phụ 2</label>
+                <select
+                  value={assistant2}
+                  onChange={(e) => { setAssistant2(e.target.value); setCurrentPage(1); }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+                >
+                  <option value="all">Tất cả</option>
+                  {filterOptions.assist2s.map(ptv => (
+                    <option key={ptv} value={ptv}>{ptv}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1">PTV Phụ 3</label>
+                <select
+                  value={assistant3}
+                  onChange={(e) => { setAssistant3(e.target.value); setCurrentPage(1); }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
+                >
+                  <option value="all">Tất cả</option>
+                  {filterOptions.assist3s.map(ptv => (
+                    <option key={ptv} value={ptv}>{ptv}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Table List */}
+      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
+          <table className="w-full text-left text-xs border-collapse min-w-[1200px]">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-slate-50 border-b border-slate-250 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
+                <th className="py-3 px-4 text-center w-12 bg-slate-50">STT</th>
+                <th className="py-3 px-4 sticky left-0 z-20 bg-slate-50 min-w-[200px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]">Họ và tên bệnh nhi</th>
+                <th className="py-3 px-4">Ngày thông tim</th>
+                <th className="py-3 px-4">ICD Chỉ định / Sau TT</th>
+                <th className="py-3 px-4">Phương pháp can thiệp</th>
+                <th className="py-3 px-4">Kíp can thiệp</th>
+                <th className="py-3 px-4">Kết luận</th>
+                <th className="py-3 px-4">Kế hoạch tiếp theo</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+              {paginatedCathLabs.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-16 italic text-slate-400 bg-slate-50/20">
+                    Không tìm thấy ca thông tim nào khớp với bộ lọc.
+                  </td>
+                </tr>
+              ) : (
+                paginatedCathLabs.map((c, index) => {
+                  const pat = findPatientByKey(patients, c.PatientKey);
+                  return (
+                    <tr
+                      key={c.CathKey}
+                      onClick={() => pat && onViewPatientRecord?.(pat)}
+                      className="hover:bg-pink-50/30 cursor-pointer transition duration-150 group"
+                    >
+                      <td className="py-3.5 px-4 text-center text-slate-400 font-mono">
+                        {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
+                      </td>
+                      <td className="py-3.5 px-4 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/30 min-w-[200px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]">
+                        <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat?.PatientName || '—'}</p>
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          MNB: {pat?.PatientID1 || '—'} | DOB: {pat?.PatientDOB ? formatVNTime(pat.PatientDOB) : '—'}
+                        </p>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-600">
+                        {c.CathDate ? formatVNTime(c.CathDate) : '—'}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="text-[10px] font-bold text-slate-650 bg-slate-100 border border-slate-200 px-1 rounded" title="Chẩn đoán lúc chỉ định">
+                            {c.DiagnosisID || '—'}
+                          </span>
+                          <span className="text-[10px] font-black text-red-650 bg-red-50 border border-red-200 px-1 rounded" title="Chẩn đoán sau can thiệp">
+                            {c.PostDiagnosisID || '—'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-650 text-[11px] max-w-[240px] truncate" title={Array.isArray(c.CathMethod) ? c.CathMethod.join(', ') : ''}>
+                        {Array.isArray(c.CathMethod) && c.CathMethod.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {c.CathMethod.map((m, idx) => (
+                              <span key={idx} className="bg-indigo-50 border border-indigo-100 text-indigo-850 px-1.5 py-0.5 rounded text-[10px]">
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600">
+                        <div className="text-[11px] leading-relaxed">
+                          <p><span className="text-slate-400">Chính:</span> <span className="font-bold text-slate-800">{c._1stInterventionist || '—'}</span></p>
+                          {(c._2ndInterventionist || c._3rdInterventionist || c._4thInterventionist) && (
+                            <p className="text-[10px] text-slate-400 truncate max-w-[200px]">
+                              Phụ: {[c._2ndInterventionist, c._3rdInterventionist, c._4thInterventionist].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {c.CathResultID === 'Thành công' ? (
+                          <span className="text-[10px] font-black text-green-800 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Thành công
+                          </span>
+                        ) : c.CathResultID === 'Không thành công' ? (
+                          <span className="text-[10px] font-black text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
+                            <XCircle className="w-3.5 h-3.5" /> Không thành công
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-black text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
+                            <AlertCircle className="w-3.5 h-3.5" /> Hoãn
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-655 max-w-[200px] truncate" title={c.CathPlan}>
+                        {c.CathPlan || '—'}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="shrink-0 bg-slate-50 border-t border-slate-200 px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="text-[10px] text-slate-505 font-semibold font-mono uppercase text-slate-500">
+              Trang {currentPage}/{totalPages} (Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} đến {Math.min(currentPage * ITEMS_PER_PAGE, filteredCathLabs.length)})
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Đầu
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Trước
+              </button>
+              
+              <span className="text-xs font-semibold text-slate-700 px-2 font-mono">
+                {currentPage} / {totalPages}
+              </span>
+              
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Sau
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Cuối
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
