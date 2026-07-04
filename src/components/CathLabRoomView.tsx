@@ -1379,6 +1379,16 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
          if (!markRes.ok) console.error('Lỗi khi lưu sẹo BS:', mark);
        }
 
+        // Save notifications if any
+        for (const notif of notificationsToCreate) {
+          const notifRes = await fetch('/api/notifications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(notif)
+          });
+          if (!notifRes.ok) console.error('Lỗi khi lưu thông báo:', notif);
+        }
+
        onRefreshData();
      };
 
