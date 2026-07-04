@@ -391,6 +391,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
   // AdHoc State
   const [adHocPatientMode, setAdHocPatientMode] = useState<'existing' | 'new'>('existing');
+  const [adHocPriorityOrder, setAdHocPriorityOrder] = useState<'Cấp cứu' | 'Chương trình'>('Cấp cứu');
   const [adHocSearchQuery, setAdHocSearchQuery] = useState('');
   const [adHocSelectedPatientKey, setAdHocSelectedPatientKey] = useState('');
   const [adHocSearchHasFocus, setAdHocSearchHasFocus] = useState(false);
@@ -442,6 +443,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     setSelectedPending(null);
     setSelectedDone(null);
     setIsAdHocModalOpen(false);
+    setAdHocPriorityOrder('Cấp cứu');
   };
 
   const openAdHocForm = () => {
@@ -462,6 +464,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     setAdHocPatientAddress('');
     setAdHocPatientPhone1('');
     setAdHocPatientPhone2('');
+    setAdHocPriorityOrder('Cấp cứu');
     setIsAdHocModalOpen(true);
   };
 
@@ -999,22 +1002,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       return;
     }
 
-    // TH(1)/(2) — Check 2: BN đang chờ trong view Xếp lịch (chưa chuyển phòng)
-    const waitlistConsult = getSchedulingWaitlistConsult(patient.PatientKey, consults, patients);
-    if (waitlistConsult) {
-      triggerConfirm(
-        'BN này đang chờ trong view Xếp lịch. Bạn có muốn tiếp tục chuyển phòng thông tim?',
-        () => {
-          activateEmergencyTransferFromScheduling(waitlistConsult, patient).catch((err) => {
-            console.error(err);
-            alert(err.message || 'Không thể chuyển phòng thông tim. Vui lòng thử lại.');
-          });
-        },
-        'Chuyển phòng thông tim'
-      );
-      return;
-    }
-
     setAdHocSelectedPatientKey(patient.PatientKey);
     setAdHocPatientName(patient.PatientName);
     setAdHocSearchQuery('');
@@ -1035,7 +1022,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      if (adHocPatientMode === 'existing' && adHocSelectedPatientKey) {
         const patient = findPatientByKey(patients, adHocSelectedPatientKey);
 
-        // TH(2) — Khi Lưu: check BN đã có trong danh sách chờ TT phòng cathlab
+        // TH(2) — Khi Lưu: check BN đã có trong danh sách chờ TT phòng cathlab (đã chuyển phòng, chưa có kết quả)
         const pendingCathConsult = getPatientPendingCathLabConsult(adHocSelectedPatientKey, consults, cathlabs);
         if (pendingCathConsult && patient) {
           triggerConfirm(
@@ -1050,22 +1037,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           );
           return;
         }
-
-        // TH(1)/(2) — Khi Lưu: check BN đang chờ trong view Xếp lịch
-        const waitlistConsult = getSchedulingWaitlistConsult(adHocSelectedPatientKey, consults, patients);
-        if (waitlistConsult && patient) {
-          triggerConfirm(
-            'BN này đang chờ trong view Xếp lịch. Bạn có muốn tiếp tục chuyển phòng thông tim?',
-            () => {
-              activateEmergencyTransferFromScheduling(waitlistConsult, patient).catch((err) => {
-                console.error(err);
-                alert(err.message || 'Không thể chuyển phòng thông tim. Vui lòng thử lại.');
-              });
-            },
-            'Chuyển phòng thông tim'
-          );
-          return;
-        }
      }
 
      if (adHocPatientMode === 'new' && (!adHocPatientID1 || !adHocPatientName || !adHocPatientDOB || !adHocPatientAddress)) {
@@ -1074,15 +1045,35 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      }
 
      const cathKey = `cath_${Date.now()}`;
-     const consultKey = `consult_${Date.now()}`;
      const patientKey = adHocPatientMode === 'existing' ? adHocSelectedPatientKey : `pat_${Date.now()}`;
 
      let pName = adHocPatientName;
-     // If existing patient, grab the name from existing pat
+     let existingPat: Patient | undefined = undefined;
      if (adHocPatientMode === 'existing') {
-        const pat = findPatientByKey(patients, patientKey);
-        if (pat) pName = pat.PatientName;
+        existingPat = findPatientByKey(patients, patientKey);
+        if (existingPat) pName = existingPat.PatientName;
      }
+
+     // Determine workflow case & perform scarring if priority order is 'Chương trình'
+     let latestConsult: Consult | undefined = undefined;
+     let consultCase: 'A' | 'B' | 'C' = 'A';
+
+     if (adHocPatientMode === 'existing') {
+       const patientConsults = consults.filter(c => normalizePatientKey(c.PatientKey) === normalizePatientKey(patientKey) && !c.Removed);
+       if (patientConsults.length > 0) {
+         // Sort descending by ConsultDate
+         latestConsult = [...patientConsults].sort((a, b) => String(b.ConsultDate || '').localeCompare(String(a.ConsultDate || '')))[0];
+         if (latestConsult) {
+           if (!hasConsultResult(latestConsult)) {
+             consultCase = 'B'; // Treo ở Chờ hội chẩn
+           } else if (!isTransferredToCathLab(latestConsult)) {
+             consultCase = 'C'; // Treo ở Xếp lịch
+           }
+         }
+       }
+     }
+
+     const consultKey = (consultCase === 'B' || consultCase === 'C') && latestConsult ? latestConsult.ConsultKey : `consult_${Date.now()}`;
 
      const cathPayload: CathLab = {
        ...formData,
@@ -1092,79 +1083,220 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        CathMethod: safeCathMethod.join(' + ')
      } as CathLab;
 
-     const consultPayload: Consult = {
-       ConsultKey: consultKey,
-       PatientKey: patientKey,
-       ConsultType: 'Staff thông',
-       ConsultDate: formData.CathDate,
-       RequestBy: loggedInStaff?.StaffName || '',
-       DiagnosisID: formData.PostDiagnosisID,
-       DetailDiagnosis: formData.PostDiagnosis,
-       ConsultCreateBy: loggedInStaffId,
-       ConsultCreateTime: new Date().toISOString(),
-       ConsultResultID: 'Can thiệp thông tim',
-       DetailConsultResult: 'Cấp cứu thông tim',
-       PriorityOrder: 'Cấp cứu',
-       PlannedCathLabDate: formData.CathDate,
-       TransferredToCathLab: true,
-       Scheduled1stInterventionist: formData._1stInterventionist,
-       Scheduled2ndInterventionist: formData._2ndInterventionist,
-       Scheduled3rdInterventionist: formData._3rdInterventionist
-     } as Consult;
-
-     if (adHocPatientMode === 'new') {
-       onAddPatient?.({
+     // Setup consult payload
+     let consultPayload: Consult;
+     if ((consultCase === 'B' || consultCase === 'C') && latestConsult) {
+       if (consultCase === 'B') {
+         consultPayload = {
+           ...latestConsult,
+           ConsultResultID: 'Can thiệp thông tim' as const,
+           DetailConsultResult: 'Tự động hoàn tất hội chẩn do làm chương trình vượt cấp cứu',
+           ConsultResultUpdatedBy: loggedInStaffId || 'SYSTEM',
+           ConsultResultUpdatedTime: new Date().toISOString(),
+           CallStatus: 'Đã can thiệp/mổ',
+           PlannedCathLabDate: formData.CathDate,
+           TransferredToCathLab: true,
+           CathMethod: safeCathMethod.join(' + '),
+           Scheduled1stInterventionist: formData._1stInterventionist,
+           Scheduled2ndInterventionist: formData._2ndInterventionist,
+           Scheduled3rdInterventionist: formData._3rdInterventionist,
+           CheckDevice: 'Đủ' as const,
+           PriorityOrder: 'Chương trình' as const,
+           CheckDeviceUpdatedBy: loggedInStaffId || 'SYSTEM',
+           CheckDeviceUpdatedTime: new Date().toISOString()
+         };
+       } else {
+         consultPayload = {
+           ...latestConsult,
+           TransferredToCathLab: true,
+           PlannedCathLabDate: formData.CathDate,
+           CallStatus: 'Đã can thiệp/mổ',
+           CheckDevice: 'Đủ' as const,
+           Scheduled1stInterventionist: formData._1stInterventionist,
+           Scheduled2ndInterventionist: formData._2ndInterventionist,
+           Scheduled3rdInterventionist: formData._3rdInterventionist,
+           CheckDeviceUpdatedBy: loggedInStaffId || 'SYSTEM',
+           CheckDeviceUpdatedTime: new Date().toISOString(),
+           PriorityOrder: 'Chương trình' as const
+         };
+       }
+     } else {
+       consultPayload = {
+         ConsultKey: consultKey,
          PatientKey: patientKey,
-         PatientID1: adHocPatientID1,
-         PatientID2: adHocPatientID2,
-         PatientName: adHocPatientName,
-         PatientDOB: adHocPatientDOB,
-         PatientSex: adHocPatientSex,
-         PatientAddress: adHocPatientAddress,
-         PatientPhone1: adHocPatientPhone1,
-         PatientPhone2: adHocPatientPhone2,
-         PatientCreateBy: loggedInStaffId,
-         PatientCreateTime: new Date().toISOString(),
-         Outcome: ''
-       } as Patient);
+         ConsultType: 'Staff thông',
+         ConsultDate: formData.CathDate,
+         RequestBy: loggedInStaff?.StaffName || '',
+         DiagnosisID: formData.PostDiagnosisID,
+         DetailDiagnosis: formData.PostDiagnosis,
+         ConsultCreateBy: loggedInStaffId,
+         ConsultCreateTime: new Date().toISOString(),
+         ConsultResultID: 'Can thiệp thông tim',
+         DetailConsultResult: 'Tạo mới thông tim chương trình vượt HC',
+         PriorityOrder: adHocPriorityOrder,
+         PlannedCathLabDate: formData.CathDate,
+         TransferredToCathLab: true,
+         Scheduled1stInterventionist: formData._1stInterventionist,
+         Scheduled2ndInterventionist: formData._2ndInterventionist,
+         Scheduled3rdInterventionist: formData._3rdInterventionist,
+         CheckDevice: 'Đủ' as const
+       } as Consult;
      }
-     onAddConsult?.(consultPayload);
+
+     // Build scars if Programme (Chương trình) is selected
+     const marksToCreate: any[] = [];
+     if (adHocPriorityOrder === 'Chương trình') {
+       const bsHieu = staffList?.find(s => s.StaffName?.includes('Hiếu') || s.Name?.includes('Hiếu'));
+       const bsTai = staffList?.find(s => s.StaffName?.includes('Tài') || s.Name?.includes('Tài'));
+
+       const keyHieu = bsHieu?.StaffKey || '10005';
+       const nameHieu = bsHieu?.StaffName || 'BS. Hiếu';
+
+       const keyTai = bsTai?.StaffKey || '10006';
+       const nameTai = bsTai?.StaffName || 'BS. Tài';
+
+       const patientIdVal = adHocPatientMode === 'existing' ? (existingPat?.PatientID1 || '') : adHocPatientID1;
+
+       if (consultCase === 'A') {
+         marksToCreate.push({
+           MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
+           StaffKey: keyHieu,
+           StaffName: nameHieu,
+           MarkType: 'scheduler_missing_transfer',
+           Score: 1,
+           Label: 'Thông tim CT bỏ qua hội chẩn',
+           Reason: `Bệnh nhi ${pName} (ID1: ${patientIdVal}) làm chương trình nhưng chưa được đăng ký hội chẩn. Phạt BS xếp lịch Hiếu không kiểm soát thông tin.`,
+           RelatedEntityType: 'Patient',
+           RelatedEntityKey: patientKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_hieu:${patientKey}`,
+           CreatedBy: loggedInStaffId || 'SYSTEM',
+           CreatedTime: new Date().toISOString()
+         });
+       } else if (consultCase === 'B' && latestConsult) {
+         marksToCreate.push({
+           MarkKey: `mark_emerg_prog_${Date.now()}_tai`,
+           StaffKey: keyTai,
+           StaffName: nameTai,
+           MarkType: 'missing_staff_result',
+           Score: 1,
+           Label: 'Trễ điền kết quả hội chẩn',
+           Reason: `Bệnh nhi ${pName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Phạt BS thư ký Tài.`,
+           RelatedEntityType: 'Consult',
+           RelatedEntityKey: latestConsult.ConsultKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_tai:${latestConsult.ConsultKey}`,
+           CreatedBy: loggedInStaffId || 'SYSTEM',
+           CreatedTime: new Date().toISOString()
+         });
+         marksToCreate.push({
+           MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
+           StaffKey: keyHieu,
+           StaffName: nameHieu,
+           MarkType: 'scheduler_missing_transfer',
+           Score: 1,
+           Label: 'Treo ca chờ hội chẩn',
+           Reason: `Bệnh nhi ${pName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Phạt BS xếp lịch Hiếu.`,
+           RelatedEntityType: 'Consult',
+           RelatedEntityKey: latestConsult.ConsultKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_hieu:${latestConsult.ConsultKey}`,
+           CreatedBy: loggedInStaffId || 'SYSTEM',
+           CreatedTime: new Date().toISOString()
+         });
+       } else if (consultCase === 'C' && latestConsult) {
+         marksToCreate.push({
+           MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
+           StaffKey: keyHieu,
+           StaffName: nameHieu,
+           MarkType: 'scheduler_missing_transfer',
+           Score: 1,
+           Label: 'Chậm chuyển phòng thông tim',
+           Reason: `Bệnh nhi ${pName} đã có chỉ định thông tim nhưng BS xếp lịch Hiếu không chuyển phòng đúng hạn.`,
+           RelatedEntityType: 'Consult',
+           RelatedEntityKey: latestConsult.ConsultKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_hieu:${latestConsult.ConsultKey}`,
+           CreatedBy: loggedInStaffId || 'SYSTEM',
+           CreatedTime: new Date().toISOString()
+         });
+       }
+     }
+
+     const newPatientObj: Patient = {
+       PatientKey: patientKey,
+       PatientID1: adHocPatientID1,
+       PatientID2: adHocPatientID2,
+       PatientName: adHocPatientName,
+       PatientDOB: adHocPatientDOB,
+       PatientSex: adHocPatientSex,
+       PatientAddress: adHocPatientAddress,
+       PatientPhone1: adHocPatientPhone1,
+       PatientPhone2: adHocPatientPhone2,
+       PatientCreateBy: loggedInStaffId,
+       PatientCreateTime: new Date().toISOString(),
+       Outcome: ''
+     } as Patient;
+
+     // Sync React Local State immediately
+     if (adHocPatientMode === 'new') {
+       onAddPatient?.(newPatientObj);
+     }
+     if (consultCase === 'A') {
+       onAddConsult?.(consultPayload);
+     } else {
+       onPatchConsult?.(consultPayload.ConsultKey, consultPayload);
+     }
      onAddCathlab?.(cathPayload);
      closeModal();
 
+     // Save to database
      const persist = async () => {
        if (adHocPatientMode === 'new') {
          const patRes = await fetch('/api/patients', {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-             PatientKey: patientKey,
-             PatientID1: adHocPatientID1,
-             PatientID2: adHocPatientID2,
-             PatientName: adHocPatientName,
-             PatientDOB: adHocPatientDOB,
-             PatientSex: adHocPatientSex,
-             PatientAddress: adHocPatientAddress,
-             PatientPhone1: adHocPatientPhone1,
-             PatientPhone2: adHocPatientPhone2,
-             PatientCreateBy: loggedInStaffId,
-             PatientCreateTime: new Date().toISOString()
-           })
+           body: JSON.stringify(newPatientObj)
          });
          if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
        }
-       const conRes = await fetch('/api/consults', {
-         method: 'POST',
+
+       // Save consult (either POST for Case A or PUT for Case B/C)
+       const consultUrl = consultCase === 'A' ? '/api/consults' : `/api/consults/${consultPayload.ConsultKey}`;
+       const consultMethod = consultCase === 'A' ? 'POST' : 'PUT';
+       const conRes = await fetch(consultUrl, {
+         method: consultMethod,
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify(consultPayload)
        });
-       if (!conRes.ok) throw new Error('Không thể tạo hội chẩn cấp cứu');
+       if (!conRes.ok) throw new Error('Không thể lưu thông tin hội chẩn/chuyển phòng');
+
+       // Save CathLab result
        const cathRes = await fetch('/api/cathlabs', {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify(cathPayload)
        });
        if (!cathRes.ok) throw new Error('Không thể lưu kết quả thông tim');
+
+       // Save scars if any
+       for (const mark of marksToCreate) {
+         const markRes = await fetch('/api/doctor-performance-marks', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(mark)
+         });
+         if (!markRes.ok) console.error('Lỗi khi lưu sẹo BS:', mark);
+       }
+
        onRefreshData();
      };
 
@@ -1726,6 +1858,20 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                          <option value="Hoãn">Hoãn</option>
                       </select>
                     </div>
+
+                    {isAdHocModalOpen && (
+                      <div>
+                        <label className="block text-[#d2145a] font-bold text-[10px] uppercase mb-1">Loại can thiệp (PriorityOrder) <span className="text-rose-500">*</span></label>
+                        <select 
+                          value={adHocPriorityOrder} 
+                          onChange={e => setAdHocPriorityOrder(e.target.value as any)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                        >
+                           <option value="Cấp cứu">Cấp cứu</option>
+                           <option value="Chương trình">Chương trình</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   {formData.CathResultID !== 'Hoãn' ? (
