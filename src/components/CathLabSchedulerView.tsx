@@ -1548,7 +1548,7 @@ Xin cảm ơn!`;
         const staffName = removeVietnameseTones(s.StaffName || '').toLowerCase();
         return name.includes('tai') || staffName.includes('tai');
       });
-      const keyTai = bsTai?.StaffKey || '81442';
+      const keyTai = bsTai?.StaffKey || '01442';
       const nameTai = bsTai?.StaffName || 'BS. Tài';
 
       const pat = patients.find(p => p.PatientKey === pendingConsult.PatientKey);

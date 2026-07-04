@@ -1158,10 +1158,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
          return name.includes('tai') || staffName.includes('tai');
        });
 
-       const keyHieu = bsHieu?.StaffKey || '81541';
+       const keyHieu = bsHieu?.StaffKey || '01541';
        const nameHieu = bsHieu?.StaffName || 'BS. Hiếu';
 
-       const keyTai = bsTai?.StaffKey || '81442';
+       const keyTai = bsTai?.StaffKey || '01442';
        const nameTai = bsTai?.StaffName || 'BS. Tài';
 
        const patientIdVal = adHocPatientMode === 'existing' ? (existingPat?.PatientID1 || '') : adHocPatientID1;
