@@ -5,15 +5,13 @@ import {
   Filter, 
   Download, 
   Calendar, 
-  User, 
   Search, 
   X, 
   Activity, 
   CheckCircle2, 
   XCircle, 
   AlertCircle,
-  Users,
-  ChevronDown
+  Users
 } from 'lucide-react';
 
 interface CathLabReportViewProps {
@@ -24,13 +22,46 @@ interface CathLabReportViewProps {
   onViewPatientRecord?: (patient: Patient) => void;
 }
 
-export default function CathLabReportView({
+// Safe helper to convert any object/value to string safely for rendering
+const safeString = (val: any): string => {
+  if (val === undefined || val === null) return '';
+  if (typeof val === 'object') {
+    if (val instanceof Date) return val.toLocaleDateString('vi-VN');
+    try {
+      return JSON.stringify(val);
+    } catch (e) {
+      return '[Object]';
+    }
+  }
+  return String(val);
+};
+
+// Safe helper to parse CathMethod from any format (string, csv, or array)
+const parseCathMethods = (methodStr: any): string[] => {
+  if (!methodStr) return [];
+  if (Array.isArray(methodStr)) return methodStr.filter(Boolean).map(safeString);
+  const s = String(methodStr).trim();
+  if (!s) return [];
+  if (s.includes('+')) {
+    return s.split('+').map(m => m.trim()).filter(Boolean);
+  }
+  if (s.includes(',')) {
+    return s.split(',').map(m => m.trim()).filter(Boolean);
+  }
+  return [s];
+};
+
+function CathLabReportViewInner({
   patients,
   cathlabs = [],
   sources = [],
   staffList = [],
   onViewPatientRecord
 }: CathLabReportViewProps) {
+  // Ensure we are working with arrays safely
+  const safeCathlabs = useMemo(() => Array.isArray(cathlabs) ? cathlabs : [], [cathlabs]);
+  const safePatients = useMemo(() => Array.isArray(patients) ? patients : [], [patients]);
+
   // Filter States
   const [timeMode, setTimeMode] = useState<'preset' | 'range'>('preset');
   const [yearFilter, setYearFilter] = useState<string>('all');
@@ -61,24 +92,25 @@ export default function CathLabReportView({
     const assist2s = new Set<string>();
     const assist3s = new Set<string>();
 
-    cathlabs.forEach(c => {
+    safeCathlabs.forEach(c => {
       if (c.CathDate) {
         try {
-          const yr = c.CathDate.split('-')[0] || c.CathDate.split('/')[2];
+          const yr = String(c.CathDate).split('-')[0] || String(c.CathDate).split('/')[2];
           if (yr && yr.length === 4) years.add(yr);
         } catch(e) {}
       }
-      if (c.DiagnosisID) diagnoses.add(c.DiagnosisID);
-      if (c.PostDiagnosisID) diagnoses.add(c.PostDiagnosisID);
-      if (Array.isArray(c.CathMethod)) {
-        c.CathMethod.forEach(m => {
-          if (m) methods.add(m);
-        });
-      }
-      if (c._1stInterventionist) primaryIntervs.add(c._1stInterventionist);
-      if (c._2ndInterventionist) assist1s.add(c._2ndInterventionist);
-      if (c._3rdInterventionist) assist2s.add(c._3rdInterventionist);
-      if (c._4thInterventionist) assist3s.add(c._4thInterventionist);
+      if (c.DiagnosisID) diagnoses.add(safeString(c.DiagnosisID));
+      if (c.PostDiagnosisID) diagnoses.add(safeString(c.PostDiagnosisID));
+      
+      const parsedMethods = parseCathMethods(c.CathMethod);
+      parsedMethods.forEach(m => {
+        if (m) methods.add(m);
+      });
+
+      if (c._1stInterventionist) primaryIntervs.add(safeString(c._1stInterventionist));
+      if (c._2ndInterventionist) assist1s.add(safeString(c._2ndInterventionist));
+      if (c._3rdInterventionist) assist2s.add(safeString(c._3rdInterventionist));
+      if (c._4thInterventionist) assist3s.add(safeString(c._4thInterventionist));
     });
 
     return {
@@ -90,7 +122,7 @@ export default function CathLabReportView({
       assist2s: Array.from(assist2s).sort(),
       assist3s: Array.from(assist3s).sort()
     };
-  }, [cathlabs]);
+  }, [safeCathlabs]);
 
   // Helper to parse quarters
   const getQuarter = (month: number): number => {
@@ -99,7 +131,7 @@ export default function CathLabReportView({
 
   // Filter Logic
   const filteredCathLabs = useMemo(() => {
-    return cathlabs.filter(c => {
+    return safeCathlabs.filter(c => {
       // 1. Time Filtering
       if (c.CathDate) {
         const dateObj = new Date(c.CathDate);
@@ -111,7 +143,6 @@ export default function CathLabReportView({
             }
             if (toDate) {
               const toTime = new Date(toDate).getTime();
-              // Add 1 day to make toDate inclusive
               const inclusiveToTime = toTime + 24 * 60 * 60 * 1000;
               if (dateObj.getTime() > inclusiveToTime) return false;
             }
@@ -126,45 +157,45 @@ export default function CathLabReportView({
           }
         }
       } else {
-        // If no date, only show if no date filter is active
         if (timeMode === 'range' && (fromDate || toDate)) return false;
         if (timeMode === 'preset' && (yearFilter !== 'all' || monthFilter !== 'all' || quarterFilter !== 'all')) return false;
       }
 
       // 2. Diagnosis ID Filtering
       if (diagnosisFilter !== 'all') {
-        const d1 = c.DiagnosisID ? c.DiagnosisID.trim().toLowerCase() : '';
-        const d2 = c.PostDiagnosisID ? c.PostDiagnosisID.trim().toLowerCase() : '';
+        const d1 = c.DiagnosisID ? safeString(c.DiagnosisID).trim().toLowerCase() : '';
+        const d2 = c.PostDiagnosisID ? safeString(c.PostDiagnosisID).trim().toLowerCase() : '';
         const target = diagnosisFilter.trim().toLowerCase();
         if (d1 !== target && d2 !== target) return false;
       }
 
       // 3. Cath Method Filtering
       if (methodFilter !== 'all') {
-        if (!Array.isArray(c.CathMethod) || !c.CathMethod.includes(methodFilter)) return false;
+        const parsed = parseCathMethods(c.CathMethod);
+        if (!parsed.includes(methodFilter)) return false;
       }
 
       // 4. Interventionists Filtering
-      if (primaryInterv !== 'all' && c._1stInterventionist !== primaryInterv) return false;
-      if (assistant1 !== 'all' && c._2ndInterventionist !== assistant1) return false;
-      if (assistant2 !== 'all' && c._3rdInterventionist !== assistant2) return false;
-      if (assistant3 !== 'all' && c._4thInterventionist !== assistant3) return false;
+      if (primaryInterv !== 'all' && safeString(c._1stInterventionist) !== primaryInterv) return false;
+      if (assistant1 !== 'all' && safeString(c._2ndInterventionist) !== assistant1) return false;
+      if (assistant2 !== 'all' && safeString(c._3rdInterventionist) !== assistant2) return false;
+      if (assistant3 !== 'all' && safeString(c._4thInterventionist) !== assistant3) return false;
 
       // 5. Search Query (Patient Name / ID)
       if (searchQuery.trim() !== '') {
-        const pat = findPatientByKey(patients, c.PatientKey);
+        const pat = findPatientByKey(safePatients, c.PatientKey);
         const q = removeDiacritics(searchQuery).toLowerCase().trim();
-        const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
-        const idMatch = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
-        const diagMatch = c.DiagnosisID ? removeDiacritics(String(c.DiagnosisID)).toLowerCase().includes(q) : false;
-        const postDiagMatch = c.PostDiagnosisID ? removeDiacritics(String(c.PostDiagnosisID)).toLowerCase().includes(q) : false;
+        const nameMatch = pat?.PatientName ? removeDiacritics(safeString(pat.PatientName)).toLowerCase().includes(q) : false;
+        const idMatch = pat?.PatientID1 ? removeDiacritics(safeString(pat.PatientID1)).toLowerCase().includes(q) : false;
+        const diagMatch = c.DiagnosisID ? removeDiacritics(safeString(c.DiagnosisID)).toLowerCase().includes(q) : false;
+        const postDiagMatch = c.PostDiagnosisID ? removeDiacritics(safeString(c.PostDiagnosisID)).toLowerCase().includes(q) : false;
         return nameMatch || idMatch || diagMatch || postDiagMatch;
       }
 
       return true;
     });
   }, [
-    cathlabs, patients, timeMode, yearFilter, monthFilter, quarterFilter, 
+    safeCathlabs, safePatients, timeMode, yearFilter, monthFilter, quarterFilter, 
     fromDate, toDate, diagnosisFilter, methodFilter, primaryInterv, 
     assistant1, assistant2, assistant3, searchQuery
   ]);
@@ -176,9 +207,10 @@ export default function CathLabReportView({
     let postponed = 0;
 
     filteredCathLabs.forEach(c => {
-      if (c.CathResultID === 'Thành công') success++;
-      else if (c.CathResultID === 'Không thành công') failed++;
-      else if (c.CathResultID === 'Hoãn') postponed++;
+      const res = safeString(c.CathResultID);
+      if (res === 'Thành công') success++;
+      else if (res === 'Không thành công') failed++;
+      else if (res === 'Hoãn') postponed++;
     });
 
     const total = filteredCathLabs.length;
@@ -205,24 +237,24 @@ export default function CathLabReportView({
       const csvRows = [headers.join(',')];
 
       filteredCathLabs.forEach((c, index) => {
-        const pat = findPatientByKey(patients, c.PatientKey);
+        const pat = findPatientByKey(safePatients, c.PatientKey);
         const row = [
           index + 1,
-          `"${pat?.PatientID1 || ''}"`,
-          `"${pat?.PatientName || ''}"`,
+          `"${safeString(pat?.PatientID1)}"`,
+          `"${safeString(pat?.PatientName)}"`,
           `"${pat?.PatientDOB ? formatVNTime(pat.PatientDOB) : ''}"`,
-          `"${pat?.PatientSex || ''}"`,
+          `"${safeString(pat?.PatientSex)}"`,
           `"${c.CathDate ? formatVNTime(c.CathDate) : ''}"`,
-          `"${c.DiagnosisID || ''}"`,
-          `"${c.PostDiagnosisID || ''}"`,
-          `"${c.CathResultID || ''}"`,
-          `"${Array.isArray(c.CathMethod) ? c.CathMethod.join('; ') : ''}"`,
-          `"${c._1stInterventionist || ''}"`,
-          `"${c._2ndInterventionist || ''}"`,
-          `"${c._3rdInterventionist || ''}"`,
-          `"${c._4thInterventionist || ''}"`,
-          `"${c.CathPlan || ''}"`,
-          `"${(c.CathNote || '').replace(/"/g, '""')}"`
+          `"${safeString(c.DiagnosisID)}"`,
+          `"${safeString(c.PostDiagnosisID)}"`,
+          `"${safeString(c.CathResultID)}"`,
+          `"${parseCathMethods(c.CathMethod).join('; ')}"`,
+          `"${safeString(c._1stInterventionist)}"`,
+          `"${safeString(c._2ndInterventionist)}"`,
+          `"${safeString(c._3rdInterventionist)}"`,
+          `"${safeString(c._4thInterventionist)}"`,
+          `"${safeString(c.CathPlan)}"`,
+          `"${safeString(c.CathNote).replace(/"/g, '""')}"`
         ];
         csvRows.push(row.join(','));
       });
@@ -581,7 +613,8 @@ export default function CathLabReportView({
                 </tr>
               ) : (
                 paginatedCathLabs.map((c, index) => {
-                  const pat = findPatientByKey(patients, c.PatientKey);
+                  const pat = findPatientByKey(safePatients, c.PatientKey);
+                  const parsedMethods = parseCathMethods(c.CathMethod);
                   return (
                     <tr
                       key={c.CathKey}
@@ -592,9 +625,9 @@ export default function CathLabReportView({
                         {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
                       </td>
                       <td className="py-3.5 px-4 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/30 min-w-[200px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]">
-                        <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat?.PatientName || '—'}</p>
+                        <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat?.PatientName ? safeString(pat.PatientName) : '—'}</p>
                         <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          MNB: {pat?.PatientID1 || '—'} | DOB: {pat?.PatientDOB ? formatVNTime(pat.PatientDOB) : '—'}
+                          MNB: {pat?.PatientID1 ? safeString(pat.PatientID1) : '—'} | DOB: {pat?.PatientDOB ? formatVNTime(pat.PatientDOB) : '—'}
                         </p>
                       </td>
                       <td className="py-3.5 px-4 font-mono text-slate-600">
@@ -603,17 +636,17 @@ export default function CathLabReportView({
                       <td className="py-3.5 px-4">
                         <div className="flex flex-col gap-1 items-start">
                           <span className="text-[10px] font-bold text-slate-650 bg-slate-100 border border-slate-200 px-1 rounded" title="Chẩn đoán lúc chỉ định">
-                            {c.DiagnosisID || '—'}
+                            {safeString(c.DiagnosisID) || '—'}
                           </span>
                           <span className="text-[10px] font-black text-red-650 bg-red-50 border border-red-200 px-1 rounded" title="Chẩn đoán sau can thiệp">
-                            {c.PostDiagnosisID || '—'}
+                            {safeString(c.PostDiagnosisID) || '—'}
                           </span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-650 text-[11px] max-w-[240px] truncate" title={Array.isArray(c.CathMethod) ? c.CathMethod.join(', ') : ''}>
-                        {Array.isArray(c.CathMethod) && c.CathMethod.length > 0 ? (
+                      <td className="py-3.5 px-4 text-slate-650 text-[11px] max-w-[240px] truncate" title={parsedMethods.join(', ')}>
+                        {parsedMethods.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {c.CathMethod.map((m, idx) => (
+                            {parsedMethods.map((m, idx) => (
                               <span key={idx} className="bg-indigo-50 border border-indigo-100 text-indigo-850 px-1.5 py-0.5 rounded text-[10px]">
                                 {m}
                               </span>
@@ -623,20 +656,20 @@ export default function CathLabReportView({
                       </td>
                       <td className="py-3.5 px-4 text-slate-600">
                         <div className="text-[11px] leading-relaxed">
-                          <p><span className="text-slate-400">Chính:</span> <span className="font-bold text-slate-800">{c._1stInterventionist || '—'}</span></p>
+                          <p><span className="text-slate-400">Chính:</span> <span className="font-bold text-slate-800">{safeString(c._1stInterventionist) || '—'}</span></p>
                           {(c._2ndInterventionist || c._3rdInterventionist || c._4thInterventionist) && (
                             <p className="text-[10px] text-slate-400 truncate max-w-[200px]">
-                              Phụ: {[c._2ndInterventionist, c._3rdInterventionist, c._4thInterventionist].filter(Boolean).join(', ')}
+                              Phụ: {[c._2ndInterventionist, c._3rdInterventionist, c._4thInterventionist].filter(Boolean).map(safeString).join(', ')}
                             </p>
                           )}
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        {c.CathResultID === 'Thành công' ? (
+                        {safeString(c.CathResultID) === 'Thành công' ? (
                           <span className="text-[10px] font-black text-green-800 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
                             <CheckCircle2 className="w-3.5 h-3.5" /> Thành công
                           </span>
-                        ) : c.CathResultID === 'Không thành công' ? (
+                        ) : safeString(c.CathResultID) === 'Không thành công' ? (
                           <span className="text-[10px] font-black text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
                             <XCircle className="w-3.5 h-3.5" /> Không thành công
                           </span>
@@ -646,8 +679,8 @@ export default function CathLabReportView({
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-655 max-w-[200px] truncate" title={c.CathPlan}>
-                        {c.CathPlan || '—'}
+                      <td className="py-3.5 px-4 text-slate-655 max-w-[200px] truncate" title={safeString(c.CathPlan)}>
+                        {safeString(c.CathPlan) || '—'}
                       </td>
                     </tr>
                   );
@@ -708,4 +741,20 @@ export default function CathLabReportView({
 
     </div>
   );
+}
+
+export default function CathLabReportView(props: CathLabReportViewProps) {
+  try {
+    return <CathLabReportViewInner {...props} />;
+  } catch (err: any) {
+    return (
+      <div className="p-6 bg-red-50 border border-red-200 rounded-3xl text-red-700 font-sans m-4">
+        <h3 className="font-extrabold text-base uppercase mb-2">Đã xảy ra lỗi khi tải Báo cáo</h3>
+        <p className="text-sm font-semibold mb-4">{err?.message || String(err)}</p>
+        <pre className="text-[10px] bg-red-100/50 p-4 rounded-xl overflow-auto max-h-[300px] font-mono leading-relaxed">
+          {err?.stack}
+        </pre>
+      </div>
+    );
+  }
 }
