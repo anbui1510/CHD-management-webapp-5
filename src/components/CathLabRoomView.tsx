@@ -1145,14 +1145,23 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
      // Build scars if Programme (Chương trình) is selected
      const marksToCreate: any[] = [];
+     const notificationsToCreate: any[] = [];
      if (adHocPriorityOrder === 'Chương trình') {
-       const bsHieu = staffList?.find(s => s.StaffName?.includes('Hiếu') || s.Name?.includes('Hiếu'));
-       const bsTai = staffList?.find(s => s.StaffName?.includes('Tài') || s.Name?.includes('Tài'));
+       const bsHieu = staffList?.find(s => {
+         const name = removeVietnameseTones(s.Name || '').toLowerCase();
+         const staffName = removeVietnameseTones(s.StaffName || '').toLowerCase();
+         return name.includes('hieu') || staffName.includes('hieu');
+       });
+       const bsTai = staffList?.find(s => {
+         const name = removeVietnameseTones(s.Name || '').toLowerCase();
+         const staffName = removeVietnameseTones(s.StaffName || '').toLowerCase();
+         return name.includes('tai') || staffName.includes('tai');
+       });
 
-       const keyHieu = bsHieu?.StaffKey || '10005';
+       const keyHieu = bsHieu?.StaffKey || '01541';
        const nameHieu = bsHieu?.StaffName || 'BS. Hiếu';
 
-       const keyTai = bsTai?.StaffKey || '10006';
+       const keyTai = bsTai?.StaffKey || '01442';
        const nameTai = bsTai?.StaffName || 'BS. Tài';
 
        const patientIdVal = adHocPatientMode === 'existing' ? (existingPat?.PatientID1 || '') : adHocPatientID1;
@@ -1175,6 +1184,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            CreatedBy: loggedInStaffId || 'SYSTEM',
            CreatedTime: new Date().toISOString()
          });
+
+         notificationsToCreate.push({
+           NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
+           StaffKey: keyHieu,
+           StaffName: nameHieu,
+           Title: 'Phạt sẹo workflow',
+           Message: `Bệnh nhi ${pName} (ID1: ${patientIdVal}) làm chương trình nhưng chưa được đăng ký hội chẩn. Bạn bị phạt 1 sẹo.`,
+           Severity: 'warning',
+           RelatedEntityType: 'Patient',
+           RelatedEntityKey: patientKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_hieu_notif:${patientKey}`,
+           IsRead: false,
+           CreatedTime: new Date().toISOString(),
+           ReadTime: ''
+         });
        } else if (consultCase === 'B' && latestConsult) {
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_tai`,
@@ -1193,6 +1220,25 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            CreatedBy: loggedInStaffId || 'SYSTEM',
            CreatedTime: new Date().toISOString()
          });
+
+         notificationsToCreate.push({
+           NotificationKey: `notif_emerg_prog_${Date.now()}_tai`,
+           StaffKey: keyTai,
+           StaffName: nameTai,
+           Title: 'Phạt sẹo workflow',
+           Message: `Bệnh nhi ${pName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Bạn bị phạt 1 sẹo.`,
+           Severity: 'warning',
+           RelatedEntityType: 'Consult',
+           RelatedEntityKey: latestConsult.ConsultKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_tai_notif:${latestConsult.ConsultKey}`,
+           IsRead: false,
+           CreatedTime: new Date().toISOString(),
+           ReadTime: ''
+         });
+
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
@@ -1209,6 +1255,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            DedupKey: `emerg_prog_hieu:${latestConsult.ConsultKey}`,
            CreatedBy: loggedInStaffId || 'SYSTEM',
            CreatedTime: new Date().toISOString()
+         });
+
+         notificationsToCreate.push({
+           NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
+           StaffKey: keyHieu,
+           StaffName: nameHieu,
+           Title: 'Phạt sẹo workflow',
+           Message: `Bệnh nhi ${pName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Bạn bị phạt 1 sẹo.`,
+           Severity: 'warning',
+           RelatedEntityType: 'Consult',
+           RelatedEntityKey: latestConsult.ConsultKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_hieu_notif:${latestConsult.ConsultKey}`,
+           IsRead: false,
+           CreatedTime: new Date().toISOString(),
+           ReadTime: ''
          });
        } else if (consultCase === 'C' && latestConsult) {
          marksToCreate.push({
@@ -1227,6 +1291,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            DedupKey: `emerg_prog_hieu:${latestConsult.ConsultKey}`,
            CreatedBy: loggedInStaffId || 'SYSTEM',
            CreatedTime: new Date().toISOString()
+         });
+
+         notificationsToCreate.push({
+           NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
+           StaffKey: keyHieu,
+           StaffName: nameHieu,
+           Title: 'Phạt sẹo workflow',
+           Message: `Bệnh nhi ${pName} đã có chỉ định thông tim nhưng bạn không chuyển phòng đúng hạn. Bạn bị phạt 1 sẹo.`,
+           Severity: 'warning',
+           RelatedEntityType: 'Consult',
+           RelatedEntityKey: latestConsult.ConsultKey,
+           PatientKey: patientKey,
+           PatientID: patientIdVal,
+           PatientName: pName,
+           DedupKey: `emerg_prog_hieu_notif:${latestConsult.ConsultKey}`,
+           IsRead: false,
+           CreatedTime: new Date().toISOString(),
+           ReadTime: ''
          });
        }
      }
