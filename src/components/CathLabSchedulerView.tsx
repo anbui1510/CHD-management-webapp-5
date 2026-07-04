@@ -1533,6 +1533,46 @@ Xin cảm ơn!`;
       throw new Error('Không thể kích hoạt lượt hội chẩn');
     }
 
+    // Phạt sẹo BS thư ký (BS. Tài) khi BS xếp lịch phải vượt quyền kích hoạt
+    try {
+      const bsTai = staffList?.find(s => s.StaffName?.includes('Tài') || s.Name?.includes('Tài'));
+      const keyTai = bsTai?.StaffKey || '10006';
+      const nameTai = bsTai?.StaffName || 'BS. Tài';
+
+      const pat = patients.find(p => p.PatientKey === pendingConsult.PatientKey);
+      const patName = pat?.PatientName || 'Bệnh nhi';
+      const patId = pat?.PatientID1 || '';
+
+      const markPayload = {
+        MarkKey: `mark_override_sched_${Date.now()}_tai`,
+        StaffKey: keyTai,
+        StaffName: nameTai,
+        MarkType: 'missing_staff_result' as const,
+        Score: 1,
+        Label: 'Trễ điền kết quả hội chẩn',
+        Reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do BS thư ký Tài chưa điền kết quả hội chẩn đúng hạn.`,
+        RelatedEntityType: 'Consult' as const,
+        RelatedEntityKey: pendingConsult.ConsultKey,
+        PatientKey: pendingConsult.PatientKey,
+        PatientID: patId,
+        PatientName: patName,
+        DedupKey: `override_sched_tai:${pendingConsult.ConsultKey}`,
+        CreatedBy: currentStaff?.StaffKey || 'SYSTEM',
+        CreatedTime: new Date().toISOString()
+      };
+
+      const markRes = await fetch('/api/doctor-performance-marks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(markPayload)
+      });
+      if (!markRes.ok) {
+        console.error('Không thể ghi sẹo phạt BS Tài:', markPayload);
+      }
+    } catch (markErr) {
+      console.error('Lỗi khi lưu sẹo phạt BS Tài:', markErr);
+    }
+
     const mergedConsult = { ...pendingConsult, ...payload } as Consult;
     setShowAdHocModal(false);
     handleClearSelectedPatient();
