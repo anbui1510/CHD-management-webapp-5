@@ -1382,7 +1382,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        for (const mark of marksToCreate) {
          const markRes = await fetch('/api/doctor-performance-marks', {
            method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+           },
            body: JSON.stringify(mark)
          });
           if (!markRes.ok) {

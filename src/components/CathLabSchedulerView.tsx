@@ -1575,7 +1575,10 @@ Xin cảm ơn!`;
 
       const markRes = await fetch('/api/doctor-performance-marks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+        },
         body: JSON.stringify(markPayload)
       });
       if (!markRes.ok) {
@@ -1603,7 +1606,10 @@ Xin cảm ơn!`;
 
       const notifRes = await fetch('/api/notifications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+        },
         body: JSON.stringify(notifPayload)
       });
       if (!notifRes.ok) {
