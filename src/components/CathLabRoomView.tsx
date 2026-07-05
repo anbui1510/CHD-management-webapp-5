@@ -1376,7 +1376,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify(mark)
          });
-         if (!markRes.ok) console.error('Lỗi khi lưu sẹo BS:', mark);
+          if (!markRes.ok) {
+            const errData = await markRes.json().catch(() => ({}));
+            const errMsg = errData.error || markRes.statusText || 'Lỗi không xác định';
+            alert(`Lỗi khi lưu sẹo workflow cho BS: ${errMsg}`);
+            console.error('Lỗi khi lưu sẹo BS:', mark, errMsg);
+          }
        }
 
         // Save notifications if any
@@ -1386,7 +1391,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(notif)
           });
-          if (!notifRes.ok) console.error('Lỗi khi lưu thông báo:', notif);
+          if (!notifRes.ok) {
+            const errData = await notifRes.json().catch(() => ({}));
+            const errMsg = errData.error || notifRes.statusText || 'Lỗi không xác định';
+            alert(`Lỗi khi lưu thông báo sẹo: ${errMsg}`);
+            console.error('Lỗi khi lưu thông báo:', notif, errMsg);
+          }
         }
 
        onRefreshData();
