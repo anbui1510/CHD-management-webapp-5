@@ -553,20 +553,20 @@ export default function App() {
     refreshConsultData();
   };
 
-  const refreshClinicalData = useCallback(() => {
-    void refreshMedicalData('clinical');
+  const refreshClinicalData = useCallback((force = false) => {
+    void refreshMedicalData('clinical', force);
   }, [refreshMedicalData]);
 
-  const refreshConsultData = useCallback(() => {
-    void refreshMedicalData('consult');
+  const refreshConsultData = useCallback((force = false) => {
+    void refreshMedicalData('consult', force);
   }, [refreshMedicalData]);
 
-  const refreshStaffData = useCallback(() => {
-    void refreshMedicalData('staff');
+  const refreshStaffData = useCallback((force = false) => {
+    void refreshMedicalData('staff', force);
   }, [refreshMedicalData]);
 
-  const refreshMriData = useCallback(() => {
-    void refreshMedicalData('mri');
+  const refreshMriData = useCallback((force = false) => {
+    void refreshMedicalData('mri', force);
   }, [refreshMedicalData]);
 
   const refreshFullData = useCallback((force = false) => {

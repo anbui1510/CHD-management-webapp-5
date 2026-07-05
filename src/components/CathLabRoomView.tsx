@@ -22,7 +22,7 @@ interface Props {
   cathlabs: CathLab[];
   sources: Source[];
   staffList: Staff[];
-  onRefreshData: () => void;
+  onRefreshData: (force?: boolean) => void;
   triggerConfirm: (msg: string, onConfirm: () => void, title?: string) => void;
   onViewPatientRecord: (pat: Patient) => void;
   onPatchConsult?: (consultKey: string, patch: Partial<Consult>) => void;
@@ -1399,13 +1399,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           }
         }
 
-       onRefreshData();
+       onRefreshData(true);
      };
 
      persist().catch(e => {
        console.error(e);
        alert(e instanceof Error ? e.message : 'Không thể lưu ca cấp cứu thông tim');
-       onRefreshData();
+       onRefreshData(true);
      });
   };
 

@@ -57,7 +57,7 @@ interface CathLabSchedulerViewProps {
   deviceTemplates?: DeviceTemplate[];
   staffList: Staff[];
   currentStaff?: Staff | null;
-  onRefreshData: () => void;
+  onRefreshData: (force?: boolean) => void;
   onPatchConsult?: (consultKey: string, patch: Partial<Consult>) => void;
   onPatchPatient?: (patientKey: string, patch: Partial<Patient>) => void;
   onAddPatient?: (patient: Patient) => void;
@@ -1619,7 +1619,7 @@ Xin cảm ơn!`;
     resetAdHocFormFields();
     setAdHocPatientMode('existing');
     setActiveTab('unscheduled');
-    onRefreshData();
+    onRefreshData(true);
     applySelectConsult(mergedConsult);
     setSuccessMsg('Đã kích hoạt lượt hội chẩn và mở form Xếp lịch.');
     setTimeout(() => setSuccessMsg(''), 4000);
