@@ -1345,7 +1345,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        if (adHocPatientMode === 'new') {
          const patRes = await fetch('/api/patients', {
            method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+           },
            body: JSON.stringify(newPatientObj)
          });
          if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
@@ -1356,7 +1359,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        const consultMethod = consultCase === 'A' ? 'POST' : 'PUT';
        const conRes = await fetch(consultUrl, {
          method: consultMethod,
-         headers: { 'Content-Type': 'application/json' },
+         headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+         },
          body: JSON.stringify(consultPayload)
        });
        if (!conRes.ok) throw new Error('Không thể lưu thông tin hội chẩn/chuyển phòng');
@@ -1364,7 +1370,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        // Save CathLab result
        const cathRes = await fetch('/api/cathlabs', {
          method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
+         headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+         },
          body: JSON.stringify(cathPayload)
        });
        if (!cathRes.ok) throw new Error('Không thể lưu kết quả thông tim');
@@ -1388,7 +1397,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         for (const notif of notificationsToCreate) {
           const notifRes = await fetch('/api/notifications', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+            },
             body: JSON.stringify(notif)
           });
           if (!notifRes.ok) {

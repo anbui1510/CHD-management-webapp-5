@@ -174,11 +174,28 @@ async function bridgeHashPassword(password: string, salt: string): Promise<strin
 
 /** Extract Bearer token from request init headers */
 function extractBridgeToken(init?: RequestInit): string | null {
-  const headers = init?.headers as Record<string, string> | undefined;
-  if (!headers) return localStorage.getItem('CHD_AUTH_TOKEN');
-  const auth = headers['Authorization'] || headers['authorization'] || '';
+  const rawHeaders = init?.headers;
+  if (!rawHeaders) return localStorage.getItem('CHD_AUTH_TOKEN');
+
+  let auth = '';
+  let xToken = '';
+
+  if (typeof Headers !== 'undefined' && rawHeaders instanceof Headers) {
+    auth = rawHeaders.get('Authorization') || rawHeaders.get('authorization') || '';
+    xToken = rawHeaders.get('x-auth-token') || rawHeaders.get('X-Auth-Token') || '';
+  } else if (Array.isArray(rawHeaders)) {
+    for (const [key, value] of rawHeaders) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === 'authorization') auth = value;
+      if (lowerKey === 'x-auth-token') xToken = value;
+    }
+  } else if (typeof rawHeaders === 'object') {
+    const record = rawHeaders as Record<string, string>;
+    auth = record['Authorization'] || record['authorization'] || '';
+    xToken = record['x-auth-token'] || record['X-Auth-Token'] || '';
+  }
+
   if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
-  const xToken = headers['x-auth-token'] || headers['X-Auth-Token'] || '';
   if (xToken.trim()) return xToken.trim();
   return localStorage.getItem('CHD_AUTH_TOKEN');
 }
