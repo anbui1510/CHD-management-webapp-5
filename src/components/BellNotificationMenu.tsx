@@ -4,6 +4,11 @@ import type { Consult, Notification, Patient, Staff } from '../types';
 import { formatVNTime } from '../types';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
+const isEqualStaffKey = (keyA: any, keyB: any): boolean => {
+  if (!keyA || !keyB) return false;
+  return String(keyA).trim().replace(/^0+/, '') === String(keyB).trim().replace(/^0+/, '');
+};
+
 interface BellNotificationMenuProps {
   staff: Staff;
   notifications: Notification[];
@@ -52,7 +57,7 @@ export default function BellNotificationMenu({
   const staffNotifications = useMemo(
     () =>
       notifications
-        .filter(item => String(item.StaffKey || '') === String(staff.StaffKey || ''))
+        .filter(item => isEqualStaffKey(item.StaffKey, staff.StaffKey))
         .sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || ''))),
     [notifications, staff.StaffKey]
   );

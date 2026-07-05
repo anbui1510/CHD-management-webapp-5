@@ -332,7 +332,8 @@ function writeRecordToSheet(type, action, key, record) {
         header === "PatientPhone2" || 
         header === "StaffPhone" ||
         header === "PatientWeight" ||
-        header === "PatientHeight"
+        header === "PatientHeight" ||
+        header === "StaffKey"
       );
       if (isNumericTextCol && strVal !== "") {
         if (!strVal.startsWith("'")) {

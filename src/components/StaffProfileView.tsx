@@ -30,6 +30,11 @@ import {
 } from '../utils/staffActivityStats';
 import { getStaffInitial } from '../utils/staffNameMatch';
 
+const isEqualStaffKey = (keyA: any, keyB: any): boolean => {
+  if (!keyA || !keyB) return false;
+  return String(keyA).trim().replace(/^0+/, '') === String(keyB).trim().replace(/^0+/, '');
+};
+
 interface StaffProfileViewProps {
   staff: Staff;
   staffList: Staff[];
@@ -250,7 +255,7 @@ export default function StaffProfileView({
   const filteredMarks = useMemo(() => {
     const range = resolveActivityRange(activeFilter);
     return doctorPerformanceMarks
-      .filter(mark => String(mark.StaffKey || '') === String(profileStaff.StaffKey || ''))
+      .filter(mark => isEqualStaffKey(mark.StaffKey, profileStaff.StaffKey))
       .filter(mark => dateInRange(parseDateKey(mark.CreatedTime), range.from, range.to))
       .sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || '')));
   }, [doctorPerformanceMarks, profileStaff.StaffKey, activeFilter]);
