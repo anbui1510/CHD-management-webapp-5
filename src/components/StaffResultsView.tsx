@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, restoreWeightFromDate } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
-import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
+import { getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceConsultResultOptions } from '../data/source';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
-const conclusionOptions = [
+const DEFAULT_CONCLUSION_OPTIONS = [
   "Can thiệp thông tim",
   "Chụp chẩn đoán-Đo kháng lực",
   "Chụp chẩn đoán +/- can thiệp",
@@ -110,6 +110,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [errorMsg, setErrorMsg] = useState<string>('');
   const diagnosisOptions = useMemo(
     () => getSourceDiagnosisOptions(sources),
+    [sources]
+  );
+  const conclusionOptions = useMemo(
+    () => getSourceConsultResultOptions(sources),
     [sources]
   );
 

@@ -2091,6 +2091,121 @@ app.post('/api/sources', requireAuth, async (req, res) => {
   res.status(existingIndex >= 0 ? 200 : 201).json(sourceRecord);
 });
 
+app.post('/api/sources/update-all', requireAuth, async (req, res) => {
+  try {
+    const { PatientAddress, DiagnosisID, ResultConsultID, CathMethod, diagnosisRenames } = req.body || {};
+
+    if (!Array.isArray(PatientAddress) || !Array.isArray(DiagnosisID) || !Array.isArray(ResultConsultID) || !Array.isArray(CathMethod)) {
+      res.status(400).json({ error: 'Invalid payload: expected arrays for PatientAddress, DiagnosisID, ResultConsultID, and CathMethod.' });
+      return;
+    }
+
+    // 1. Cascade DiagnosisID changes
+    if (Array.isArray(diagnosisRenames) && diagnosisRenames.length > 0) {
+      const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
+      let consultsChanged = false;
+      
+      const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
+      let cathlabsChanged = false;
+      
+      const cmrs = readDB<CMR>(CMRS_FILE, []);
+      let cmrsChanged = false;
+      
+      const templates = readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []);
+      let templatesChanged = false;
+
+      for (const rename of diagnosisRenames) {
+        const oldId = String(rename.oldVal || '').trim();
+        const newId = String(rename.newVal || '').trim();
+        if (oldId && newId && oldId !== newId) {
+          // Consults
+          consults.forEach(c => {
+            if (c.DiagnosisID === oldId) {
+              c.DiagnosisID = newId;
+              consultsChanged = true;
+              syncToGoogleSheets('Consult', 'update', c.ConsultKey, c).catch(() => {});
+            }
+          });
+          
+          // Cathlabs
+          cathlabs.forEach(cl => {
+            let clChanged = false;
+            if (cl.DiagnosisID === oldId) {
+              cl.DiagnosisID = newId;
+              clChanged = true;
+            }
+            if (cl.PostDiagnosisID === oldId) {
+              cl.PostDiagnosisID = newId;
+              clChanged = true;
+            }
+            if (clChanged) {
+              cathlabsChanged = true;
+              syncToGoogleSheets('CathLab', 'update', cl.CathKey, cl).catch(() => {});
+            }
+          });
+
+          // CMRs
+          cmrs.forEach(cmr => {
+            if (cmr.CMRDiagnosisID === oldId) {
+              cmr.CMRDiagnosisID = newId;
+              cmrsChanged = true;
+              syncToGoogleSheets('CMR', 'update', cmr.CMRKey, cmr).catch(() => {});
+            }
+          });
+
+          // DeviceTemplates
+          templates.forEach(t => {
+            if (t.DiagnosisID === oldId) {
+              t.DiagnosisID = newId;
+              templatesChanged = true;
+              syncToGoogleSheets('DeviceTemplate', 'update', t.DeviceName, t).catch(() => {});
+            }
+          });
+        }
+      }
+
+      if (consultsChanged) writeDB(CONSULTS_FILE, consults);
+      if (cathlabsChanged) writeDB(CATHLABS_FILE, cathlabs);
+      if (cmrsChanged) writeDB(CMRS_FILE, cmrs);
+      if (templatesChanged) writeDB(DEVICE_TEMPLATES_FILE, templates);
+    }
+
+    // 2. Reconstruct sources sheet
+    const existingSources = readDB<Source>(SOURCES_FILE, []);
+    const maxLen = Math.max(
+      PatientAddress.length,
+      DiagnosisID.length,
+      ResultConsultID.length,
+      CathMethod.length
+    );
+
+    const nextSources: Source[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      const existing = existingSources[i] || {};
+      nextSources.push({
+        ...existing,
+        PatientAddress: PatientAddress[i] || '',
+        DiagnosisID: DiagnosisID[i] || '',
+        ResultConsultID: ResultConsultID[i] || '',
+        CathMethod: CathMethod[i] || ''
+      });
+    }
+
+    writeDB<Source>(SOURCES_FILE, nextSources);
+    markLocalMutation();
+
+    // 3. Sync to Google Sheets
+    syncToGoogleSheets('Source', 'sync_sources' as any, '', nextSources).catch(err => {
+      console.error('Error syncing sources update-all to google sheets background:', err);
+    });
+
+    res.json({ success: true, count: nextSources.length });
+  } catch (err) {
+    console.error('Error in POST /api/sources/update-all:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/api/consults', requireAuth, async (req, res) => {
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
   const newConsult: Consult = applyDiagnosisNormalization(req.body, ['DiagnosisID']);

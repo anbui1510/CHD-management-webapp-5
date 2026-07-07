@@ -7,7 +7,7 @@ import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiag
 import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { VNDateInput } from './VNDateInput';
-import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
+import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceConsultResultOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -257,6 +257,14 @@ export default function CathLabSchedulerView({
 }: CathLabSchedulerViewProps) {
   const diagnosisOptions = useMemo(
     () => getSourceDiagnosisOptions(sources),
+    [sources]
+  );
+  const provinceOptions = useMemo(
+    () => getSourceProvinceOptions(sources),
+    [sources]
+  );
+  const conclusionOptions = useMemo(
+    () => getSourceConsultResultOptions(sources),
     [sources]
   );
 
@@ -3535,7 +3543,7 @@ Xin cảm ơn!`;
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Kết luận chính</label>
                             <SearchableEnumSelect
-                              options={CONCLUSION_OPTIONS}
+                              options={conclusionOptions}
                               value={schedConsultResultID}
                               onChange={setSchedConsultResultID}
                               placeholder="— Chọn kết luận —"
@@ -5200,7 +5208,7 @@ Xin cảm ơn!`;
                                   </div>
                                 ))}
                                 {renderAdHocRow(`Địa chỉ *${adHocErrors.includes('PatientAddress') ? ' !' : ''}`, (
-                                  <SearchableEnumSelect required options={SOURCE_PROVINCE} value={adHocPatientAddress} onChange={setAdHocPatientAddress} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." />
+                                  <SearchableEnumSelect required options={provinceOptions} value={adHocPatientAddress} onChange={setAdHocPatientAddress} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." />
                                 ))}
                                 {renderAdHocRow('SĐT 1', (
                                   <input type="text" placeholder="ĐT..." value={adHocPatientPhone1} onChange={(e) => setAdHocPatientPhone1(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />

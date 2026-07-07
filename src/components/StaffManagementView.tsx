@@ -13,9 +13,10 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from 'lucide-react';
-import type { DoctorPerformanceMark, Staff, RolePreset } from '../types';
+import type { DoctorPerformanceMark, Staff, RolePreset, Source } from '../types';
 import { formatVNTime, removeDiacritics } from '../types';
 import RolePresetMatrixPanel from './RolePresetMatrixPanel';
+import CategorySettingsPanel from './CategorySettingsPanel';
 import {
   ALL_APP_MODULES,
   AppModule,
@@ -36,7 +37,8 @@ interface StaffManagementViewProps {
   currentStaff: Staff | null;
   rolePresetRecords: RolePreset[];
   doctorPerformanceMarks?: DoctorPerformanceMark[];
-  initialTab?: 'edit' | 'matrix' | 'marks';
+  sources?: Source[];
+  initialTab?: 'edit' | 'matrix' | 'marks' | 'settings';
   onRefreshData: () => void;
   onRefreshRolePresets: () => void;
   onPatchStaff?: (staffKey: string, patch: Partial<Staff>) => void;
@@ -67,6 +69,7 @@ export default function StaffManagementView({
   currentStaff,
   rolePresetRecords,
   doctorPerformanceMarks = [],
+  sources = [],
   initialTab = 'edit',
   onRefreshData,
   onRefreshRolePresets,
@@ -80,7 +83,7 @@ export default function StaffManagementView({
   const [copyFromKey, setCopyFromKey] = useState('');
   const [draft, setDraft] = useState<StaffDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'edit' | 'matrix' | 'marks'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'edit' | 'matrix' | 'marks' | 'settings'>(initialTab);
 
   const rolePresets = getRuntimeRolePresets();
   const groupedModules = useMemo(() => modulesByGroup(), []);
@@ -383,6 +386,17 @@ export default function StaffManagementView({
           >
             Thống kê sẹo
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('settings')}
+            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+              activeTab === 'settings'
+                ? 'bg-[#d2145a] text-white border-[#d2145a]'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
+            }`}
+          >
+            Cài đặt danh mục
+          </button>
         </div>
       </div>
 
@@ -390,6 +404,13 @@ export default function StaffManagementView({
         <RolePresetMatrixPanel
           rolePresetRecords={rolePresetRecords}
           onRefresh={onRefreshRolePresets}
+          triggerAlert={triggerAlert}
+          triggerConfirm={triggerConfirm}
+        />
+      ) : activeTab === 'settings' ? (
+        <CategorySettingsPanel
+          sources={sources}
+          onRefreshData={onRefreshData}
           triggerAlert={triggerAlert}
           triggerConfirm={triggerConfirm}
         />

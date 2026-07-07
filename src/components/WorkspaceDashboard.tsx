@@ -196,6 +196,14 @@ export default function WorkspaceDashboard({
             icon: <Award className="w-6 h-6 text-red-600" />,
             iconBg: 'bg-red-50',
           },
+          {
+            module: 'staff-mgmt',
+            target: 'staff-mgmt:settings',
+            label: 'Cài đặt danh mục',
+            description: 'Tỉnh thành · chẩn đoán · phương pháp',
+            icon: <SlidersHorizontal className="w-6 h-6 text-pink-600" />,
+            iconBg: 'bg-pink-50',
+          },
         ],
       },
     ];

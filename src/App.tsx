@@ -62,7 +62,7 @@ import {
 import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
-import { SOURCE_PROVINCE, getSourceDiagnosisOptions } from './data/source';
+import { SOURCE_PROVINCE, getSourceDiagnosisOptions, getSourceProvinceOptions } from './data/source';
 import { AppModule, canAccessModule, canManageStaff, setRuntimeRolePresets } from './auth/permissions';
 import MobileBottomNav from './components/layout/MobileBottomNav';
 import MobileMoreMenu from './components/layout/MobileMoreMenu';
@@ -198,6 +198,7 @@ export default function App() {
   const [doctorPerformanceMarks, setDoctorPerformanceMarks] = useState<DoctorPerformanceMark[]>([]);
 
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
+  const provinceOptions = useMemo(() => getSourceProvinceOptions(sources), [sources]);
 
   const cathConsultKeySet = useMemo(
     () => new Set(cathlabs.map(cath => String(cath.ConsultKey || '').trim().toLowerCase()).filter(Boolean)),
@@ -925,9 +926,13 @@ export default function App() {
   }, [currentStaff, handleLogout]);
 
   const navigateMenu = (menuTarget: typeof activeMenu | string) => {
-    const menu = menuTarget === 'staff-mgmt:marks' ? 'staff-mgmt' : menuTarget as typeof activeMenu;
-    if (menuTarget === 'staff-mgmt:marks') {
+    const isMarks = menuTarget === 'staff-mgmt:marks';
+    const isSettings = menuTarget === 'staff-mgmt:settings';
+    const menu = (isMarks || isSettings) ? 'staff-mgmt' : menuTarget as typeof activeMenu;
+    if (isMarks) {
       setStaffManagementInitialTab('marks');
+    } else if (isSettings) {
+      setStaffManagementInitialTab('settings');
     } else if (menu === 'staff-mgmt') {
       setStaffManagementInitialTab('edit');
     }
@@ -1659,7 +1664,7 @@ export default function App() {
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
             {((loginLoadError && staffList.length === 0) || loginError) && (
               <div className="space-y-2">
                 <div className="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-3 text-xs leading-relaxed flex gap-1.5 animate-in fade-in duration-200">
@@ -1698,7 +1703,10 @@ export default function App() {
               </label>
               <select
                 value={loginStaffKey}
-                onChange={(e) => setLoginStaffKey(e.target.value)}
+                onChange={(e) => {
+                  setLoginStaffKey(e.target.value);
+                  setLoginPassword('');
+                }}
                 className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] transition-all font-semibold"
               >
                 <option value="" disabled>-- Chọn nhân viên --</option>
@@ -1717,10 +1725,12 @@ export default function App() {
               <input
                 type="password"
                 required
+                disabled={!loginStaffKey}
+                autoComplete="new-password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] placeholder:text-neutral-700 transition"
-                placeholder="Nhập Password nhân viên"
+                className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] placeholder:text-neutral-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder={loginStaffKey ? "Nhập Password nhân viên" : "Vui lòng chọn nhân viên trước"}
               />
             </div>
 
@@ -3418,6 +3428,7 @@ export default function App() {
               currentStaff={currentStaff}
               rolePresetRecords={rolePresetRecords}
               doctorPerformanceMarks={doctorPerformanceMarks}
+              sources={sources}
               initialTab={staffManagementInitialTab}
               onRefreshData={refreshStaffData}
               onRefreshRolePresets={refreshFullData}
@@ -3939,7 +3950,7 @@ export default function App() {
                   <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Địa chỉ *</label>
                   <SearchableEnumSelect
                     required
-                    options={SOURCE_PROVINCE}
+                    options={provinceOptions}
                     value={newPatientData.PatientAddress}
                     onChange={(value) => setNewPatientData(prev => ({ ...prev, PatientAddress: value }))}
                     placeholder="-- Chọn tỉnh/thành --"

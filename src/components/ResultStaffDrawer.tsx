@@ -18,7 +18,7 @@ import {
 } from '../types';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
-import { getSourceDiagnosisOptions } from '../data/source';
+import { getSourceDiagnosisOptions, getSourceConsultResultOptions } from '../data/source';
 import { getShortStaffName } from '../utils/staffNameMatch';
 import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
@@ -115,6 +115,7 @@ export default function ResultStaffDrawer({
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ResultFormState | null>(null);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
+  const conclusionOptions = useMemo(() => getSourceConsultResultOptions(sources), [sources]);
 
   const consult = consultKey ? consults.find(c => c.ConsultKey === consultKey) : undefined;
   const patient = consult ? findPatientByKey(patients, consult.PatientKey) : undefined;
@@ -488,7 +489,7 @@ export default function ResultStaffDrawer({
                                     </label>
                                     <SearchableEnumSelect
                                       required
-                                      options={CONCLUSION_OPTIONS}
+                                      options={conclusionOptions}
                                       value={formData.ConsultResultID}
                                       onChange={(value) => setFormData(prev => ({ ...prev, ConsultResultID: value as any }))}
                                       placeholder="-- Chọn Kết luận chính --"

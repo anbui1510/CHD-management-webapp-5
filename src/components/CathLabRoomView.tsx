@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User, Upload } from 'lucide-react';
-import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
+import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceCathMethodOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
 import { classifyDiagnosisText } from '../utils/diagnosisClassifier';
@@ -315,6 +315,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [searchTerm, setSearchTerm] = useState('');
   const [sortAsc, setSortAsc] = useState(true);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
+  const provinceOptions = useMemo(() => getSourceProvinceOptions(sources), [sources]);
+  const cathMethodOptions = useMemo(() => getSourceCathMethodOptions(sources), [sources]);
 
   const createDiagnosisSource = async (DiagnosisID: string) => {
     const trimmed = normalizeDiagnosisID(DiagnosisID);
@@ -1891,7 +1893,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                                      <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Địa chỉ <span className="text-rose-500">*</span></label>
                                      <SearchableEnumSelect
                                         required
-                                        options={SOURCE_PROVINCE}
+                                        options={provinceOptions}
                                         value={adHocPatientAddress}
                                         onChange={setAdHocPatientAddress}
                                         placeholder="-- Chọn tỉnh/thành --"
@@ -2040,7 +2042,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                          <SearchableEnumSelect
                            multiple
                            required
-                           options={SOURCE_CATH_METHOD}
+                           options={cathMethodOptions}
                            values={parseCathMethods(formData.CathMethod)}
                            onMultiChange={(methods) => setFormData({...formData, CathMethod: methods})}
                            placeholder="Chọn phương pháp..."
