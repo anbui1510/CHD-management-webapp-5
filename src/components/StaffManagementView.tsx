@@ -341,7 +341,7 @@ export default function StaffManagementView({
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0 animate-in fade-in duration-300">
+    <div className="h-full flex flex-col min-h-0 animate-in fade-in duration-300 p-6 md:p-8 bg-slate-50 overflow-hidden">
       <div className="shrink-0 mb-4 flex flex-col lg:flex-row lg:items-end justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-[#d2145a] mb-1 flex items-center gap-1.5">
