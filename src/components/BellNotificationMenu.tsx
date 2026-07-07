@@ -57,7 +57,7 @@ export default function BellNotificationMenu({
   const staffNotifications = useMemo(
     () =>
       notifications
-        .filter(item => isEqualStaffKey(item.StaffKey, staff.StaffKey))
+        .filter(item => isEqualStaffKey(item.StaffKey, staff.StaffKey) && !item.IsRead)
         .sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || ''))),
     [notifications, staff.StaffKey]
   );
