@@ -314,6 +314,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortAsc, setSortAsc] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm]);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
   const provinceOptions = useMemo(() => getSourceProvinceOptions(sources), [sources]);
   const cathMethodOptions = useMemo(() => getSourceCathMethodOptions(sources), [sources]);
@@ -379,6 +385,11 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      });
      return list;
   }, [cathlabs, patients, searchTerm, sortAsc]);
+
+  const totalPages = Math.max(1, Math.ceil(doneCathlabs.length / ITEMS_PER_PAGE));
+  const paginatedDoneCathlabs = useMemo(() => {
+    return doneCathlabs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [doneCathlabs, currentPage]);
 
   const [selectedPending, setSelectedPending] = useState<{c: Consult, p: Patient} | null>(null);
   const [selectedDone, setSelectedDone] = useState<{p: Patient, cath: CathLab} | null>(null);
@@ -1683,9 +1694,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                        <td colSpan={8} className="p-8 text-center text-slate-400 italic font-semibold">Chưa có ca đã thông tim</td>
                      </tr>
                    )}
-                   {doneCathlabs.map((cath, i) => {
+                   {paginatedDoneCathlabs.map((cath, index) => {
                       const p = findPatientByKey(patients, cath.PatientKey);
                       if (!p) return null;
+                      const i = (currentPage - 1) * ITEMS_PER_PAGE + index;
                       return (
                         <tr key={cath.CathKey} onClick={() => openDoneForm(cath)} className="hover:bg-slate-50 cursor-pointer transition">
                           <td className="py-4 px-4 text-center text-slate-400 font-bold">{i+1}</td>
@@ -1705,10 +1717,49 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
               </table>
             </div>
             {/* Footer */}
-            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-              <div className="text-[11px] text-slate-500 font-semibold font-mono uppercase">
-                TỔNG SỐ ĐÃ THÔNG TIM: {doneCathlabs.length} CA 
+            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 text-xs">
+              <div className="text-[10px] text-slate-500 font-semibold font-mono uppercase">
+                TỔNG SỐ ĐÃ THÔNG TIM: {doneCathlabs.length} CA {totalPages > 1 && `(Trang ${currentPage}/${totalPages})`}
               </div>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Đầu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Trước
+                  </button>
+                  <span className="text-xs font-semibold text-slate-700 px-2 font-mono">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Sau
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1.5 rounded-lg text-[9px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Cuối
+                  </button>
+                </div>
+              )}
             </div>
          </div>
        )}
