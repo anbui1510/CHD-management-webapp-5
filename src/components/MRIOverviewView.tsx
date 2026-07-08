@@ -65,6 +65,13 @@ const getFormattedDateKey = (str?: string): string => {
   return trimmed;
 };
 
+const formatDateToKey = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const getMonday = (date: Date): Date => {
   const day = date.getDay();
   const diff = date.getDate() - day + (day === 0 ? -6 : 1);
@@ -274,13 +281,6 @@ export default function MRIOverviewView({
       c.CMRScheduledDate && weekKeys.has(getFormattedDateKey(c.CMRScheduledDate))
     ).length;
   }, [stats.scheduledPendingList, referenceDate]);
-
-  const formatDateToKey = (date: Date) => {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
 
   const todayKey = formatDateToKey(new Date());
 
