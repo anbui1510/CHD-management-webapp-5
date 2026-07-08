@@ -417,7 +417,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [adHocPatientPhone1, setAdHocPatientPhone1] = useState('');
   const [adHocPatientPhone2, setAdHocPatientPhone2] = useState('');
 
-  const loggedInStaffId = localStorage.getItem('CurrentStaffKey') || '';
+  let loggedInStaffId = localStorage.getItem('CurrentStaffKey') || '';
+  if (loggedInStaffId.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(loggedInStaffId);
+      loggedInStaffId = parsed.StaffKey || '';
+    } catch (e) {
+      // ignore
+    }
+  }
   const loggedInStaff = staffList.find(s => s.StaffKey === loggedInStaffId);
   const loggedInStaffNameShort = loggedInStaff ? (['bs', 'bs.', 'pgs', 'gs', 'th.s', 'ths', 'pgs.ts', 'gs.ts'].includes(loggedInStaff.StaffName.split(' ')[0].toLowerCase()) ? loggedInStaff.StaffName : `BS. ${loggedInStaff.StaffName.split(' ').pop()}`) : '';
   

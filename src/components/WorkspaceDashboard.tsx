@@ -12,6 +12,8 @@ import {
   Scissors,
   UserCog,
   FileText,
+  HelpCircle,
+  LayoutDashboard,
 } from 'lucide-react';
 import type { AppModule } from '../auth/permissions';
 
@@ -156,6 +158,13 @@ export default function WorkspaceDashboard({
         title: '5. QUẢN LÝ MRI TIM',
         tiles: [
           {
+            module: 'mri-overview',
+            label: 'Tổng quan MRI',
+            description: 'Biểu đồ, số liệu & lịch chụp MRI',
+            icon: <LayoutDashboard className="w-6 h-6 text-purple-600" />,
+            iconBg: 'bg-purple-50',
+          },
+          {
             module: 'mri-register',
             label: 'Đăng ký MRI tim',
             description: 'Danh sách đăng ký chụp MRI',
@@ -203,6 +212,14 @@ export default function WorkspaceDashboard({
             description: 'Tỉnh thành · chẩn đoán · phương pháp',
             icon: <SlidersHorizontal className="w-6 h-6 text-pink-600" />,
             iconBg: 'bg-pink-50',
+          },
+          {
+            module: 'staff-mgmt',
+            target: 'staff-mgmt:guide',
+            label: 'Hướng dẫn sử dụng',
+            description: 'Quy trình · vượt quyền · phạt sẹo',
+            icon: <HelpCircle className="w-6 h-6 text-emerald-600" />,
+            iconBg: 'bg-emerald-50',
           },
         ],
       },

@@ -34,6 +34,7 @@ export const SIDEBAR_MENU_ITEMS: NavMenuItem[] = [
   { id: 'results-staff', label: 'Nhập kết quả staff' },
   { id: 'schedule-tt', label: 'Xếp lịch & Dụng cụ' },
   { id: 'cathlab-report', label: 'Báo cáo thông tim' },
+  { id: 'mri-overview', label: 'Tổng quan MRI' },
   { id: 'mri-register', label: 'Đăng ký MRI' },
   { id: 'mri-scheduler', label: 'Xếp lịch MRI' },
   { id: 'mri-result', label: 'Điền KQ MRI' },
@@ -59,6 +60,7 @@ const MOBILE_SHORT_LABELS: Partial<Record<ActiveMenuId, string>> = {
   'cathlab-room': 'P.TT',
   'cathlab-report': 'BC TT',
   archive: 'Lưu trữ',
+  'mri-overview': 'TQ MRI',
   'mri-register': 'ĐK MRI',
   'mri-scheduler': 'XL MRI',
   'mri-result': 'KQ MRI',
@@ -80,6 +82,7 @@ export const MOBILE_MORE_MENU_IDS: ActiveMenuId[] = [
   'cathlab-room',
   'cathlab-report',
   'archive',
+  'mri-overview',
   'mri-register',
   'mri-scheduler',
   'mri-result',
@@ -101,6 +104,7 @@ const MOBILE_MORE_LABELS: Partial<Record<ActiveMenuId, string>> = {
   'cathlab-room': 'Phòng thông tim',
   'cathlab-report': 'Báo cáo thông tim',
   archive: 'Lưu trữ',
+  'mri-overview': 'Tổng quan MRI',
   'mri-register': 'Đăng ký MRI',
   'mri-scheduler': 'Xếp lịch MRI',
   'mri-result': 'Điền KQ MRI',
@@ -126,6 +130,7 @@ export function getNavIcon(id: ActiveMenuId, className = 'w-4 h-4'): ReactNode {
     case 'home':
       return <Home className={className} />;
     case 'workspace':
+    case 'mri-overview':
       return <LayoutDashboard className={className} />;
     case 'patients':
       return <Heart className={className} />;

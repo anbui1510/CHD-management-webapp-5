@@ -15,6 +15,7 @@ export type AppModule =
   | 'schedule-view'
   | 'cathlab-room'
   | 'archive'
+  | 'mri-overview'
   | 'mri-register'
   | 'mri-scheduler'
   | 'mri-result'
@@ -53,6 +54,7 @@ export const APP_MODULE_DEFINITIONS: AppModuleDefinition[] = [
   { id: 'schedule-view', label: 'Lịch thông tim dự kiến', group: 'Thông tim', description: 'Xem lịch cathlab' },
   { id: 'cathlab-room', label: 'Phòng thông tim', group: 'Thông tim', description: 'Nhập kết quả can thiệp TT' },
   { id: 'archive', label: 'Lưu trữ TT', group: 'Thông tim', description: 'Ca đã chuyển phòng / lưu trữ' },
+  { id: 'mri-overview', label: 'Tổng quan MRI', group: 'MRI tim', description: 'Thống kê tổng quan và lịch chụp MRI tim' },
   { id: 'mri-register', label: 'Đăng ký MRI', group: 'MRI tim', description: 'Đăng ký chụp MRI tim' },
   { id: 'mri-scheduler', label: 'Xếp lịch MRI', group: 'MRI tim', description: 'Phân ca chụp MRI' },
   { id: 'mri-result', label: 'Điền KQ MRI', group: 'MRI tim', description: 'Nhập kết quả MRI tim' },

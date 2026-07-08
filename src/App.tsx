@@ -46,6 +46,7 @@ import MRISchedulerView from './components/MRISchedulerView';
 import MRIRegisterView from './components/MRIRegisterView';
 import MRIResultView from './components/MRIResultView';
 import MRICalendarView from './components/MRICalendarView';
+import MRIOverviewView from './components/MRIOverviewView';
 import SurgeryRoomView from './components/SurgeryRoomView';
 import DevelopingFeatureView from './components/DevelopingFeatureView';
 import ChdDailyBriefView from './components/ChdDailyBriefView';
@@ -273,11 +274,11 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'mri-overview' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
   const [profileReturnMenu, setProfileReturnMenu] = useState<typeof activeMenu>('home');
   const [isStaffAccountMenuOpen, setIsStaffAccountMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
-  const [staffManagementInitialTab, setStaffManagementInitialTab] = useState<'edit' | 'matrix' | 'marks'>('edit');
+  const [staffManagementInitialTab, setStaffManagementInitialTab] = useState<'edit' | 'matrix' | 'marks' | 'settings' | 'guide'>('edit');
   const [archiveInitialTab, setArchiveInitialTab] = useState<'transferred' | 'archive'>('archive');
 
   // Collapsible Sidebar State
@@ -702,7 +703,7 @@ export default function App() {
     const updated = staffList.find(staff => staff.StaffKey === currentStaff.StaffKey);
     if (updated && JSON.stringify(updated) !== JSON.stringify(currentStaff)) {
       setCurrentStaff(updated);
-      localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+      localStorage.setItem('CurrentStaffKey', updated.StaffKey);
     }
   }, [staffList, currentStaff?.StaffKey]);
 
@@ -928,11 +929,14 @@ export default function App() {
   const navigateMenu = (menuTarget: typeof activeMenu | string) => {
     const isMarks = menuTarget === 'staff-mgmt:marks';
     const isSettings = menuTarget === 'staff-mgmt:settings';
-    const menu = (isMarks || isSettings) ? 'staff-mgmt' : menuTarget as typeof activeMenu;
+    const isGuide = menuTarget === 'staff-mgmt:guide';
+    const menu = (isMarks || isSettings || isGuide) ? 'staff-mgmt' : menuTarget as typeof activeMenu;
     if (isMarks) {
       setStaffManagementInitialTab('marks');
     } else if (isSettings) {
       setStaffManagementInitialTab('settings');
+    } else if (isGuide) {
+      setStaffManagementInitialTab('guide');
     } else if (menu === 'staff-mgmt') {
       setStaffManagementInitialTab('edit');
     }
@@ -2054,7 +2058,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -2086,7 +2090,7 @@ export default function App() {
                 onClose={() => setActiveMenu(profileReturnMenu)}
                 onStaffUpdated={(updated) => {
                   setCurrentStaff(updated);
-                  localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+                  localStorage.setItem('CurrentStaffKey', updated.StaffKey);
                   refreshStaffData();
                 }}
                 triggerAlert={triggerAlert}
@@ -3314,6 +3318,19 @@ export default function App() {
                 setActiveMenu('patients');
                 setSelectedPatientForDetail(pat);
               }}
+            />
+          )}
+
+          {/* TỔNG QUAN MRI PANEL */}
+          {activeMenu === 'mri-overview' && (
+            <MRIOverviewView
+              patients={patients}
+              consults={consults}
+              cmrs={cmrs}
+              sources={sources}
+              staffList={staffList}
+              currentStaffName={currentStaff?.StaffName}
+              onNavigate={setActiveMenu}
             />
           )}
 

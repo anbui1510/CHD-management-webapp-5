@@ -39,7 +39,7 @@ function getOrCreateSheet(sheetName, headers) {
     // Set number format of string columns to Plain Text to preserve leading zeros (only on creation)
     for (var col = 0; col < headers.length; col++) {
       var header = headers[col];
-      if (header === "PatientID1" || header === "PatientID2" || header === "PatientPhone1" || header === "PatientPhone2" || header === "StaffPhone") {
+      if (header === "PatientID1" || header === "PatientID2" || header === "PatientPhone1" || header === "PatientPhone2" || header === "StaffPhone" || header === "PatientCreateBy" || header === "ConsultCreateBy" || header === "ConsultResultCreateBy" || header === "ConsultResultUpdatedBy" || header === "CheckDeviceBy" || header === "CheckDeviceUpdatedBy" || header === "CathUpdatedBy" || header === "SurgUpdatedBy" || header === "StaffKey" || header === "CreatedBy") {
         var numRows = sheet.getMaxRows() - 1;
         if (numRows > 0) {
           sheet.getRange(2, col + 1, numRows, 1).setNumberFormat("@");

@@ -663,7 +663,10 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
 
   // Clone record to format fields safely without polluting the database cache
   const dataToPush = { ...record };
-  const numericTextCols = ['PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight'];
+  const numericTextCols = [
+    'PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight',
+    'PatientCreateBy', 'ConsultCreateBy', 'ConsultResultCreateBy', 'ConsultResultUpdatedBy', 'CheckDeviceBy', 'CheckDeviceUpdatedBy', 'CathUpdatedBy', 'SurgUpdatedBy', 'StaffKey', 'CreatedBy'
+  ];
   
   numericTextCols.forEach(col => {
     if (dataToPush[col] !== undefined && dataToPush[col] !== null) {

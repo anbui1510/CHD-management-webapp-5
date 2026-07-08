@@ -12,6 +12,9 @@ import {
   ChevronRight,
   AlertTriangle,
   CheckCircle2,
+  HelpCircle,
+  Layers,
+  Info,
 } from 'lucide-react';
 import type { DoctorPerformanceMark, Staff, RolePreset, Source } from '../types';
 import { formatVNTime, removeDiacritics } from '../types';
@@ -38,7 +41,7 @@ interface StaffManagementViewProps {
   rolePresetRecords: RolePreset[];
   doctorPerformanceMarks?: DoctorPerformanceMark[];
   sources?: Source[];
-  initialTab?: 'edit' | 'matrix' | 'marks' | 'settings';
+  initialTab?: 'edit' | 'matrix' | 'marks' | 'settings' | 'guide';
   onRefreshData: () => void;
   onRefreshRolePresets: () => void;
   onPatchStaff?: (staffKey: string, patch: Partial<Staff>) => void;
@@ -83,7 +86,7 @@ export default function StaffManagementView({
   const [copyFromKey, setCopyFromKey] = useState('');
   const [draft, setDraft] = useState<StaffDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'edit' | 'matrix' | 'marks' | 'settings'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'edit' | 'matrix' | 'marks' | 'settings' | 'guide'>(initialTab);
 
   const rolePresets = getRuntimeRolePresets();
   const groupedModules = useMemo(() => modulesByGroup(), []);
@@ -397,6 +400,17 @@ export default function StaffManagementView({
           >
             Cài đặt danh mục
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('guide')}
+            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+              activeTab === 'guide'
+                ? 'bg-[#d2145a] text-white border-[#d2145a]'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
+            }`}
+          >
+            Hướng dẫn sử dụng
+          </button>
         </div>
       </div>
 
@@ -414,6 +428,202 @@ export default function StaffManagementView({
           triggerAlert={triggerAlert}
           triggerConfirm={triggerConfirm}
         />
+      ) : activeTab === 'guide' ? (
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-6 animate-in fade-in duration-200 pr-1 select-text">
+          {/* Card 1: Workflow */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
+              <span className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-650 shrink-0">
+                <Layers className="w-4 h-4" />
+              </span>
+              1. Quy trình Nghiệp vụ Chuẩn (Core System Workflow)
+            </h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Quy trình chuẩn của một bệnh nhi từ lúc tiếp nhận phòng khám đến khi thực hiện thủ thuật/phẫu thuật diễn ra qua 4 bước khép kín dưới đây:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 relative">
+              <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span className="inline-block text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full mb-2">Bước 1</span>
+                  <h4 className="text-xs font-bold text-slate-800 mb-1">Đăng ký Hội chẩn</h4>
+                  <p className="text-[11px] text-slate-500 leading-snug">Bác sĩ điều trị tạo phiếu hội chẩn (Staff mổ/Staff thông). Ca bệnh hiển thị trong Chờ hội chẩn.</p>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span className="inline-block text-[9px] font-black uppercase text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full mb-2">Bước 2</span>
+                  <h4 className="text-xs font-bold text-slate-800 mb-1">Hội chẩn & Kết luận</h4>
+                  <p className="text-[11px] text-slate-500 leading-snug">Hội đồng họp, BS thư ký hội chẩn nhập kết luận chính, dự kiến dụng cụ và giá tiền.</p>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span className="inline-block text-[9px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full mb-2">Bước 3</span>
+                  <h4 className="text-xs font-bold text-slate-800 mb-1">Xếp lịch & Duyệt dụng cụ</h4>
+                  <p className="text-[11px] text-slate-500 leading-snug">Check dụng cụ, BS xếp lịch chọn ngày can thiệp dự kiến, phân công kíp mổ/can thiệp và chuyển phòng.</p>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span className="inline-block text-[9px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mb-2">Bước 4</span>
+                  <h4 className="text-xs font-bold text-slate-800 mb-1">Cập nhật Kết quả</h4>
+                  <p className="text-[11px] text-slate-500 leading-snug">Sau can thiệp, kíp can thiệp cập nhật chẩn đoán/kết quả thực tế của bệnh nhân.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Scar Regulations */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
+              <span className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-650 shrink-0">
+                <Award className="w-4 h-4" />
+              </span>
+              2. Cơ chế giám sát tự động & Quy định phạt sẹo (Workflow Scars)
+            </h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Hệ thống tự động quét dữ liệu và chấm điểm phạt sẹo workflow đối với các bác sĩ/nhân sự vi phạm quy trình làm treo hoặc trễ dữ liệu:
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 bg-red-50/30 rounded-2xl border border-red-100">
+                <span className="shrink-0 text-red-700 bg-red-100 rounded-full px-2 py-0.5 text-[10px] font-black font-mono mt-0.5">-1 Sẹo</span>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Trễ điền kết quả hội chẩn (`missing_staff_result`)</h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    <strong>Điều kiện phạt:</strong> Ca chương trình thực hiện thông tim thực tế (ghi nhận từ HIS) hoặc bị vượt quyền xếp lịch, nhưng kết quả hội chẩn vẫn để trống.
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1"><strong>Người chịu trách nhiệm:</strong> Bác sĩ thư ký hội chẩn (BS. Tài) hoặc Bác sĩ đăng ký ca.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-red-50/30 rounded-2xl border border-red-100">
+                <span className="shrink-0 text-red-700 bg-red-100 rounded-full px-2 py-0.5 text-[10px] font-black font-mono mt-0.5">-1 Sẹo</span>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Chậm chuyển phòng / Bỏ qua hội chẩn (`scheduler_missing_transfer`)</h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    <strong>Điều kiện phạt:</strong> Bệnh nhi đã có kết quả chỉ định thông tim chương trình nhưng BS xếp lịch không thao tác chuyển phòng đúng hạn, hoặc ca chương trình được đưa thẳng vào CathLab mà không đi qua hội chẩn hệ thống.
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1"><strong>Người chịu trách nhiệm:</strong> Bác sĩ điều phối / Bác sĩ xếp lịch (BS. Hiếu) hoặc người kiểm dụng cụ.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-red-50/30 rounded-2xl border border-red-100">
+                <span className="shrink-0 text-red-750 bg-red-200 rounded-full px-2 py-0.5 text-[10px] font-black font-mono mt-0.5">-2 Sẹo</span>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    Chưa nhập kết quả thông tim thực tế (`missing_cath_result`)
+                    <span className="text-[9px] font-bold text-red-700 bg-red-100 px-1.5 py-0.2 rounded uppercase">Nghiêm trọng</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    <strong>Điều kiện phạt:</strong> Ca bệnh đã hoàn tất can thiệp thực tế theo số liệu từ HIS, nhưng kíp can thiệp chưa điền chi tiết kết luận, phương pháp và hướng điều trị tiếp theo của ca thông tim đó trên ứng dụng.
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1"><strong>Người chịu trách nhiệm:</strong> Phẫu thuật viên/Bác sĩ can thiệp chính (PTV chính / `_1stInterventionist`).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Override and Exemptions */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
+              <span className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </span>
+              3. Cơ chế Vượt quyền (Override) & Miễn trừ Cấp cứu (Exemptions)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-amber-50/40 rounded-2xl p-4 border border-amber-100">
+                <h4 className="text-xs font-bold text-amber-800 flex items-center gap-1.5 mb-1.5">
+                  <Lock className="w-3.5 h-3.5" /> Vượt quyền xếp lịch bổ sung
+                </h4>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Khi đến hạn xếp lịch cho bệnh nhi mà BS thư ký hội chẩn chưa nhập kết quả staff, BS điều phối được cấp quyền <strong>"Vượt quyền kích hoạt"</strong> để tiếp tục xếp lịch.
+                </p>
+                <p className="text-[11px] text-red-700 font-bold mt-2">
+                  ⚠️ Hậu quả: Hệ thống tự động phạt 1 sẹo đối với BS thư ký vì trễ việc điền thông tin và gửi thông báo cảnh báo.
+                </p>
+              </div>
+
+              <div className="bg-emerald-50/40 rounded-2xl p-4 border border-emerald-100">
+                <h4 className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 mb-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Miễn trừ đối với ca Cấp cứu
+                </h4>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Các ca có trạng thái ưu tiên là <strong>Cấp cứu (Emergency)</strong> hoặc <strong>Làm sớm (Ưu tiên)</strong> được phép bypass các bước đăng ký/hội chẩn trước để đẩy thẳng vào CathLab nhằm xử trí kịp thời.
+                </p>
+                <p className="text-[11px] text-emerald-700 font-bold mt-2">
+                  ✅ Miễn trừ: Hệ thống sẽ tự động miễn phạt sẹo cho kíp điều phối trong trường hợp vượt quyền cấp cứu này.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Address Warning */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
+              <span className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
+                <Info className="w-4 h-4" />
+              </span>
+              4. Cảnh báo hành chính & Địa chỉ mặc định
+            </h3>
+            <div className="flex flex-col md:flex-row gap-4 items-start">
+              <div className="flex-1">
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                  Khi dữ liệu bệnh nhân được import tự động từ cổng HIS bệnh viện mà chưa có thông tin địa chỉ thật, hệ thống sẽ tự động gán địa chỉ tạm kèm chuỗi cảnh báo đặc biệt:
+                </p>
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-3 text-[11px] font-bold flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>Cảnh báo: Bệnh nhân import tự động từ HIS chưa có địa chỉ thật. Vui lòng hỏi và cập nhật địa chỉ chính xác.</span>
+                </div>
+              </div>
+              <div className="md:w-64 bg-slate-50 border border-slate-100 rounded-2xl p-3 shrink-0">
+                <h4 className="text-[10px] font-black uppercase text-slate-400 mb-1">Hướng xử lý dành cho nhân viên</h4>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Khi mở Hồ sơ bệnh nhi, nếu thấy cảnh báo này xuất hiện, vui lòng cập nhật lại địa chỉ đúng bằng cách nhấn nút "Sửa hành chính", chọn tỉnh thành đúng và bấm Lưu để xóa cảnh báo.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 5: Role Matrix */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
+              <span className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-650 shrink-0">
+                <Shield className="w-4 h-4" />
+              </span>
+              5. Tóm tắt phân quyền theo vai trò mẫu (Role Presets)
+            </h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Các vai trò mẫu giúp gán nhanh tổ hợp quyền của các module chức năng. Dưới đây là tóm tắt phạm vi quyền hạn của các vị trí chủ chốt:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                <h4 className="text-xs font-black text-[#d2145a] mb-1">Admin khoa tim mạch</h4>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Có toàn quyền truy cập mọi module, quản lý nhân viên y tế, gán vai trò, cấu hình danh mục và chỉnh sửa các tham số nghiệp vụ.
+                </p>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                <h4 className="text-xs font-black text-indigo-700 mb-1">Bác sĩ hội chẩn</h4>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Quyền xem hồ sơ bệnh nhân, tham gia hội chẩn, tạo các phiếu chỉ định điều trị và theo dõi tiến trình ca bệnh.
+                </p>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                <h4 className="text-xs font-black text-amber-700 mb-1">Bác sĩ thư ký staff</h4>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Có thêm quyền ghi biên bản hội chẩn, nhập kết luận chính, chọn dụng cụ dự kiến và chịu trách nhiệm nhập dữ liệu kết quả staff.
+                </p>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                <h4 className="text-xs font-black text-emerald-700 mb-1">Điều phối & Xếp lịch</h4>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Quản lý sắp lịch phòng thông tim/mổ, kiểm tra dụng cụ và chuyển phòng các ca bệnh đã đủ điều kiện can thiệp.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : activeTab === 'marks' ? (
         <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-4">
           <div className="xl:col-span-4 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3 h-fit">
