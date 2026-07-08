@@ -382,25 +382,25 @@ export default function MRIOverviewView({
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:flex-1 md:min-h-0 min-w-0 pb-1">
         
-        {/* Left Column: Histogram */}
-        <div className="flex flex-col md:h-full md:min-h-0 w-full">
+        {/* Left Column: Histogram + Quick Access */}
+        <div className="flex flex-col space-y-4 md:h-full md:min-h-0 w-full">
           {/* Histogram */}
-          <div className="bg-white border border-slate-150 rounded-2xl p-4 shadow-sm flex flex-col flex-1 relative w-full overflow-hidden">
-            {/* Header info */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 mb-4 pb-2 border-b border-[#f1f5f9]">
-              <div className="flex items-center gap-2">
-                <LayoutDashboard className="w-4 h-4 text-purple-600 shrink-0" />
-                <span className="text-xs font-black uppercase text-slate-800 tracking-tight">
+          <div className="bg-white border border-slate-150 rounded-2xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 relative w-full min-h-[180px] z-20">
+            <div className="flex flex-col justify-center shrink-0 pr-16 sm:pr-3 sm:border-r border-[#f1f5f9] sm:h-full w-full sm:w-[155px]">
+              <span className="text-[10px] font-black uppercase text-purple-655 tracking-tight flex items-center gap-1 shrink-0">
+                <span className="leading-tight whitespace-normal break-words">
                   Histogram ca đã chụp MRI
                 </span>
-                <span className="text-[10px] font-black text-purple-650 font-mono bg-purple-100/50 border border-purple-150 px-2 py-0.5 rounded-full shrink-0">
-                  Tổng: {monthlyData.totalCount} ca
-                </span>
+              </span>
+              <div className="mt-1 flex items-baseline gap-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-0.5 max-w-max">
+                <span className="text-[10px] text-slate-500 font-bold">Tổng:</span>
+                <span className="text-xs font-black font-mono text-purple-655">{monthlyData.totalCount}</span>
+                <span className="text-[9px] text-slate-400 font-bold">ca</span>
               </div>
             </div>
 
             {/* Histogram Bars */}
-            <div className="flex-1 flex items-end justify-around h-48 sm:h-full px-2 my-2 min-h-[220px]">
+            <div className="flex-1 flex items-end justify-around h-28 sm:h-full px-2 my-0.5">
               {monthlyData.counts.map((d) => {
                 const percentage = Math.max((d.value / monthlyData.maxCount) * 100, 4);
                 return (
@@ -411,7 +411,7 @@ export default function MRIOverviewView({
                     </div>
 
                     {/* Bar visual */}
-                    <div className="w-4 bg-slate-50 rounded-t-md relative overflow-hidden flex-1 flex items-end">
+                    <div className="w-2.5 bg-slate-50 rounded-t-md relative overflow-hidden flex-1 flex items-end">
                       <motion.div
                         initial={{ height: 0 }}
                         animate={{ height: `${percentage}%` }}
@@ -421,7 +421,7 @@ export default function MRIOverviewView({
                     </div>
 
                     {/* Label */}
-                    <span className="text-[9px] font-black text-slate-500 font-mono mt-1.5 shrink-0">
+                    <span className="text-[8px] font-black text-slate-400 font-mono mt-1 shrink-0">
                       {String(d.monthKey).padStart(2, '0')}
                     </span>
                   </div>
@@ -430,39 +430,74 @@ export default function MRIOverviewView({
             </div>
 
             {/* Year Picker */}
-            <div className="absolute top-3 right-3 flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+            <div className="absolute top-3 right-3 flex flex-col items-center border border-slate-100 rounded-lg bg-slate-50 p-0.5 shadow-sm transition-all duration-200">
               <button 
                 type="button"
-                onClick={() => setChartYear(prev => prev - 1)}
-                className="p-1 text-slate-500 hover:text-purple-650 hover:bg-slate-50 cursor-pointer"
-                title="Năm trước"
+                onClick={() => setChartYear(prev => prev + 1)}
+                className="text-slate-400 hover:text-purple-655 p-0.5 line-none transition-colors"
+                title="Tăng năm"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronUp className="w-3.5 h-3.5" />
               </button>
-              <span className="px-2 text-[10px] font-black font-mono text-purple-650 min-w-[36px] text-center">
+              <span className="text-[9px] font-extrabold font-mono text-purple-655 leading-none my-0.5 px-1 min-w-[24px] text-center">
                 {chartYear}
               </span>
               <button 
                 type="button"
-                onClick={() => setChartYear(prev => prev + 1)}
-                className="p-1 text-slate-500 hover:text-purple-650 hover:bg-slate-50 cursor-pointer"
-                title="Năm sau"
+                onClick={() => setChartYear(prev => prev - 1)}
+                className="text-slate-400 hover:text-purple-655 p-0.5 line-none transition-colors"
+                title="Giảm năm"
               >
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronDown className="w-3.5 h-3.5" />
               </button>
             </div>
+          </div>
 
-            {/* Info definitions footer */}
-            <div className="mt-4 pt-3 border-t border-[#f1f5f9] text-[10px] text-slate-400 font-semibold space-y-1 shrink-0">
-              <p className="flex items-center gap-1 text-slate-500">
-                <Info className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span>Quy tắc thống kê số liệu:</span>
-              </p>
-              <ul className="list-disc pl-4 space-y-0.5 font-medium">
-                <li><strong className="text-slate-650">Đã chụp MRI:</strong> Bệnh nhi có ngày chụp thực tế (<code className="text-[9px] font-mono text-purple-600">CMRDate</code>) có giá trị.</li>
-                <li><strong className="text-slate-650">Đã xếp lịch (Chờ chụp):</strong> Bệnh nhi có ngày chụp dự kiến nhưng ngày chụp thực tế trống.</li>
-                <li><strong className="text-slate-650">Chờ xếp lịch chụp:</strong> Bệnh nhi được chỉ định chụp MRI nhưng chưa được xếp ngày dự kiến.</li>
-              </ul>
+          {/* Quick Access shortcuts */}
+          <div className="bg-white border border-slate-150 rounded-2xl p-4 shadow-sm flex flex-col flex-1 overflow-hidden">
+            <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2 mb-4 shrink-0">
+              <Activity className="w-4 h-4 text-purple-600" /> TRUY CẬP NHANH
+            </h3>
+            <div className="grid grid-cols-2 gap-3 flex-1 min-h-0 overflow-y-auto">
+              <button 
+                onClick={() => onNavigate('mri-register')}
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 hover:bg-purple-50 border border-slate-100 hover:border-purple-200 transition group text-center h-24 shadow-sm"
+              >
+                <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                  <Database className="w-4 h-4 text-slate-650 group-hover:text-purple-600" />
+                </div>
+                <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-purple-605">Đăng ký MRI</span>
+              </button>
+
+              <button 
+                onClick={() => onNavigate('mri-scheduler')}
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 hover:bg-purple-50 border border-slate-100 hover:border-purple-200 transition group text-center h-24 shadow-sm"
+              >
+                <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                  <SlidersHorizontal className="w-4 h-4 text-slate-650 group-hover:text-purple-600" />
+                </div>
+                <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-purple-655">Xếp lịch MRI</span>
+              </button>
+
+              <button 
+                onClick={() => onNavigate('mri-result')}
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 hover:bg-purple-50 border border-slate-100 hover:border-purple-200 transition group text-center h-24 shadow-sm"
+              >
+                <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                  <Download className="w-4 h-4 text-slate-650 group-hover:text-purple-600" />
+                </div>
+                <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-purple-655">Điền kết quả MRI</span>
+              </button>
+
+              <button 
+                onClick={() => onNavigate('mri-calendar')}
+                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 hover:bg-purple-50 border border-slate-100 hover:border-purple-200 transition group text-center h-24 shadow-sm"
+              >
+                <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                  <CalendarDays className="w-4 h-4 text-slate-650 group-hover:text-purple-600" />
+                </div>
+                <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-purple-655">Lịch chụp MRI</span>
+              </button>
             </div>
           </div>
         </div>
