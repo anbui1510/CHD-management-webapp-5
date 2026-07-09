@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, restoreWeightFromDate } from '../types';
-import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown } from 'lucide-react';
+import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown, Trash2 } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceConsultResultOptions } from '../data/source';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
@@ -102,6 +102,26 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   };
 
   const ITEMS_PER_PAGE = 100;
+
+  const patientMap = useMemo(() => {
+    const map = new Map<string, Patient>();
+    patients.forEach(p => {
+      if (!p.PatientKey) return;
+      const keyStr = normalizePatientKey(p.PatientKey);
+      map.set(keyStr, p);
+      const pid1 = String(p.PatientID1 || '').trim().toLowerCase();
+      if (pid1) {
+        map.set(pid1, p);
+      }
+    });
+    return map;
+  }, [patients]);
+
+  const getPatientByKey = useCallback((patientKey: any): Patient | undefined => {
+    if (!patientKey) return undefined;
+    const keyStr = normalizePatientKey(patientKey);
+    return patientMap.get(keyStr);
+  }, [patientMap]);
 
   // New Staff Registration combined states
   const [showCombinedForm, setShowCombinedForm] = useState<boolean>(false);
@@ -419,6 +439,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [statusTab, setStatusTab] = useState<'all' | 'pending' | 'completed'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
 
   // Categorize based on ConsultType
   const cathConsults = useMemo(() => consults.filter(c => c.ConsultType === 'Staff thông'), [consults]);
@@ -468,7 +489,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       // 2. Search query filtering
       if (searchTerm.trim() !== '') {
         const q = removeDiacritics(searchTerm).toLowerCase().trim();
-        const pat = findPatientByKey(patients, c.PatientKey);
+        const pat = getPatientByKey(c.PatientKey);
         const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
         const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
         const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
@@ -482,60 +503,109 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
       return sortOrder === 'asc' ? da - db : db - da;
     });
-  }, [activeConsults, statusTab, searchTerm, sortOrder, patients, isPendingStaffResult]);
+  }, [activeConsults, statusTab, searchTerm, sortOrder, getPatientByKey, isPendingStaffResult]);
 
   const totalPages = Math.max(1, Math.ceil(filteredConsultsAll.length / ITEMS_PER_PAGE));
   const displayedConsults = useMemo(() => {
     return filteredConsultsAll.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredConsultsAll, currentPage]);
 
-  // Render lists helper
+  // Render lists helper (Table View for Performance and aesthetics)
   const renderList = (filtered: Consult[]) => {
     if (filtered.length === 0) {
       return (
-        <div className="col-span-full py-12 text-center italic text-xs text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+        <div className="py-12 text-center italic text-xs text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
           Không có ca nào trong trạng thái đã chọn.
         </div>
       );
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {filtered.map((c) => {
-          const pat = findPatientByKey(patients, c.PatientKey);
-          if (!pat) return null;
+      <div className="overflow-x-auto w-full border border-slate-150 rounded-2xl shadow-xs bg-white custom-scrollbar">
+        <table className="min-w-full divide-y divide-slate-200 table-auto text-left font-sans text-xs">
+          <thead className="bg-slate-55 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-10">
+            <tr>
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Họ và tên</th>
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Mã bệnh nhi</th>
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Ngày sinh / GT</th>
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Chẩn đoán</th>
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Ngày staff</th>
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200 text-center">Hành động</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {filtered.map((c) => {
+              const pat = getPatientByKey(c.PatientKey);
+              if (!pat) return null;
 
-          return (
-            <button
-              key={c.ConsultKey}
-              type="button"
-              onClick={() => onSelectConsult(c)}
-              className="w-full text-left bg-white border border-slate-200 hover:border-[#d2145a] rounded-2xl p-4 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between items-start focus:outline-none focus:ring-1 focus:ring-pink-400 cursor-pointer"
-            >
-              <div className="flex justify-between items-start w-full">
-                <div>
-                  <h5 className="font-extrabold text-[#d2145a] text-sm uppercase leading-tight">
+              return (
+                <tr 
+                  key={c.ConsultKey}
+                  className="hover:bg-slate-50/80 transition duration-150 group"
+                >
+                  <td 
+                    onClick={() => onSelectConsult(c)}
+                    className="px-4 py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer min-w-[160px]"
+                  >
                     {pat.PatientName}
-                  </h5>
-                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                    Mã NB: {pat.PatientID1} | DOB: {formatVNTime(pat.PatientDOB)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-3 pt-2 border-t border-slate-100 w-full grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium font-sans">
-                <div>
-                  <span className="text-slate-400">Chẩn đoán:</span>{' '}
-                  <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-1 rounded">{c.DiagnosisID || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Ngày staff:</span>{' '}
-                  <span className="font-semibold text-slate-700 font-mono">{formatVNTime(c.ConsultDate)}</span>
-                </div>
-              </div>
-            </button>
-          );
-        })}
+                  </td>
+                  <td 
+                    onClick={() => onSelectConsult(c)}
+                    className="px-4 py-3 text-slate-700 font-mono font-bold cursor-pointer whitespace-nowrap"
+                  >
+                    {pat.PatientID1}
+                    {pat.PatientID2 && <span className="text-[9px] text-slate-450 font-semibold block font-sans">Mã phụ: {pat.PatientID2}</span>}
+                  </td>
+                  <td 
+                    onClick={() => onSelectConsult(c)}
+                    className="px-4 py-3 text-slate-600 font-medium cursor-pointer whitespace-nowrap"
+                  >
+                    <span className="font-mono">{formatVNTime(pat.PatientDOB)}</span>
+                    <span className="ml-2 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      {pat.PatientSex}
+                    </span>
+                  </td>
+                  <td 
+                    onClick={() => onSelectConsult(c)}
+                    className="px-4 py-3 cursor-pointer"
+                  >
+                    <span className="font-bold text-red-650 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[10px] font-mono">
+                      {c.DiagnosisID || '—'}
+                    </span>
+                  </td>
+                  <td 
+                    onClick={() => onSelectConsult(c)}
+                    className="px-4 py-3 text-slate-600 font-semibold font-mono cursor-pointer"
+                  >
+                    {formatVNTime(c.ConsultDate)}
+                  </td>
+                  <td className="px-4 py-3 text-center whitespace-nowrap min-w-[120px]">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onSelectConsult(c)}
+                        className="px-2 py-1 text-[10px] font-bold text-indigo-650 hover:text-indigo-850 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 rounded-lg shadow-xs transition cursor-pointer"
+                      >
+                        Chi tiết
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteKey(c.ConsultKey);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-lg transition cursor-pointer"
+                        title="Xoá ca hội chẩn"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -880,7 +950,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         )}
 
                         {selectedPatKey && (() => {
-                          const selectedPat = findPatientByKey(patients, selectedPatKey);
+                          const selectedPat = getPatientByKey(selectedPatKey);
                           if (!selectedPat) return null;
                           return (
                             <div className="bg-indigo-50/50 border border-indigo-150 rounded-xl p-2.5 text-slate-800 flex flex-col gap-1.5 animate-in zoom-in-95 duration-150 shadow-sm relative">
@@ -1428,6 +1498,87 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           </div>
         </div>
       )}
+      {/* CONFIRM DELETE MODAL */}
+      {confirmDeleteKey && (() => {
+        const consultToDelete = consults.find(c => c.ConsultKey === confirmDeleteKey);
+        const pat = consultToDelete ? getPatientByKey(consultToDelete.PatientKey) : null;
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 animate-in zoom-in-95 duration-150 text-slate-700 text-xs">
+              <div className="flex items-center gap-3 text-red-650 mb-3.5">
+                <div className="bg-red-50 p-2 rounded-full border border-red-150">
+                  <AlertTriangle className="w-6 h-6 animate-bounce text-red-600" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm uppercase font-sans tracking-wide text-red-600">
+                    Xác nhận xoá
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-semibold normal-case">Hành động này không thể hoàn tác</p>
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 mb-4 space-y-1.5">
+                {pat && (
+                  <p className="font-bold text-slate-800">
+                    Bệnh nhi: <span className="font-extrabold text-[#d2145a] uppercase">{pat.PatientName}</span>
+                  </p>
+                )}
+                {consultToDelete && (
+                  <>
+                    <p className="font-semibold text-slate-650">
+                      Mã bệnh nhân: <span className="font-bold font-mono text-slate-800">{pat?.PatientID1 || '—'}</span>
+                    </p>
+                    <p className="font-semibold text-slate-650">
+                      Loại hội chẩn: <span className="font-bold text-slate-800">{consultToDelete.ConsultType}</span>
+                    </p>
+                    <p className="font-semibold text-slate-650">
+                      Ngày hội chẩn: <span className="font-bold font-mono text-slate-800">{formatVNTime(consultToDelete.ConsultDate)}</span>
+                    </p>
+                  </>
+                )}
+              </div>
+              
+              <p className="text-slate-600 leading-relaxed mb-5 font-medium">
+                Bạn có chắc chắn muốn xoá lượt hội chẩn này khỏi hệ thống không?
+              </p>
+              
+              <div className="flex justify-end gap-3 font-extrabold uppercase">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteKey(null)}
+                  className="bg-white hover:bg-slate-100 border border-slate-250 text-slate-700 px-4 py-2 rounded-xl transition cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirmDeleteKey) return;
+                    try {
+                      const res = await fetch(`/api/consults/${confirmDeleteKey}`, {
+                        method: 'DELETE',
+                      });
+                      if (res.ok) {
+                        onRefreshData?.();
+                      } else {
+                        const errText = await res.text();
+                        alert(`Lỗi khi xoá: ${errText}`);
+                      }
+                    } catch (err: any) {
+                      alert(`Đã xảy ra lỗi: ${err.message || err}`);
+                    } finally {
+                      setConfirmDeleteKey(null);
+                    }
+                  }}
+                  className="bg-red-650 hover:bg-red-750 text-white px-5 py-2 rounded-xl transition shadow-md hover:shadow-lg cursor-pointer"
+                >
+                  Xoá ca
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

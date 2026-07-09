@@ -657,28 +657,30 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   return false;
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update' | 'delete', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
   // Clone record to format fields safely without polluting the database cache
-  const dataToPush = { ...record };
-  const numericTextCols = [
-    'PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight',
-    'PatientCreateBy', 'ConsultCreateBy', 'ConsultResultCreateBy', 'ConsultResultUpdatedBy', 'CheckDeviceBy', 'CheckDeviceUpdatedBy', 'CathUpdatedBy', 'SurgUpdatedBy', 'StaffKey', 'CreatedBy'
-  ];
-  
-  numericTextCols.forEach(col => {
-    if (dataToPush[col] !== undefined && dataToPush[col] !== null) {
-      let val = String(dataToPush[col]).trim();
-      if (val !== "") {
-        if (!val.startsWith("'")) {
-          val = "'" + val;
+  const dataToPush = record ? { ...record } : null;
+  if (dataToPush) {
+    const numericTextCols = [
+      'PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight',
+      'PatientCreateBy', 'ConsultCreateBy', 'ConsultResultCreateBy', 'ConsultResultUpdatedBy', 'CheckDeviceBy', 'CheckDeviceUpdatedBy', 'CathUpdatedBy', 'SurgUpdatedBy', 'StaffKey', 'CreatedBy'
+    ];
+    
+    numericTextCols.forEach(col => {
+      if (dataToPush[col] !== undefined && dataToPush[col] !== null) {
+        let val = String(dataToPush[col]).trim();
+        if (val !== "") {
+          if (!val.startsWith("'")) {
+            val = "'" + val;
+          }
+          dataToPush[col] = val;
         }
-        dataToPush[col] = val;
       }
-    }
-  });
+    });
+  }
 
   try {
     console.log(`Pushing mutation to Google Sheets: type=${type}, action=${action}, key=${key}`);
@@ -2269,6 +2271,37 @@ app.put('/api/consults/:key', requireAuth, async (req, res) => {
     res.json(consults[index]);
   } else {
     res.status(404).json({ error: 'Consult not found' });
+  }
+});
+
+// Delete an existing consult result
+app.delete('/api/consults/:key', requireAuth, async (req, res) => {
+  try {
+    const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
+    const key = req.params.key;
+    
+    const index = consults.findIndex(c => c.ConsultKey === key);
+    if (index === -1) {
+      res.status(404).json({ error: 'Consult not found' });
+      return;
+    }
+    
+    consults.splice(index, 1);
+    writeDB<Consult>(CONSULTS_FILE, consults);
+    markLocalMutation();
+    
+    // Track local deletion
+    recentLocalEdits.set(`Consult_${key}`, { timestamp: Date.now(), data: null });
+    
+    // Sync to Google Sheet asynchronously
+    syncToGoogleSheets('Consult', 'delete', key, null).catch(err => {
+      console.error('Error syncing consult deletion to google sheets background:', err);
+    });
+    
+    res.json({ success: true, ConsultKey: key });
+  } catch (err) {
+    console.error('Error in DELETE /api/consults/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

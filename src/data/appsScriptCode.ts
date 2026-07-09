@@ -354,6 +354,40 @@ function writeRecordToSheet(type, action, key, record) {
   return { status: "success", action: "inserted", key: key, rowIndex: sheet.getLastRow() };
 }
 
+function deleteRecordFromSheet(type, key) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
+  if (!sheet) {
+    throw new Error("Sheet not found: " + type);
+  }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var keyColumnName = getKeyColumnNameForType(type);
+  var keyColIndex = headers.indexOf(keyColumnName) + 1;
+
+  if (keyColIndex === 0) {
+    keyColIndex = 1;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var foundRowIndex = -1;
+  
+  if (lastRow > 1) {
+    var keyValues = sheet.getRange(2, keyColIndex, lastRow - 1, 1).getValues();
+    for (var i = 0; i < keyValues.length; i++) {
+      if (keyValues[i][0] == key) {
+        foundRowIndex = i + 2;
+        break;
+      }
+    }
+  }
+
+  if (foundRowIndex !== -1) {
+    sheet.deleteRow(foundRowIndex);
+    return { status: "success", action: "deleted", key: key, rowIndex: foundRowIndex };
+  }
+  return { status: "error", message: "Record not found to delete" };
+}
+
 // POST Requests - Inserts or Updates records
 function doPost(e) {
   initializeDatabase();
@@ -490,6 +524,8 @@ function doPost(e) {
 
     if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
+    } else if (action === "delete") {
+      result = deleteRecordFromSheet(type, key);
     }
   } catch (err) {
     result = { status: "error", message: err.toString() };
