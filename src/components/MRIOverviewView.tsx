@@ -106,10 +106,7 @@ export default function MRIOverviewView({
   onNavigate,
 }: MRIOverviewViewProps) {
   // Calendar states
-  const [referenceDate, setReferenceDate] = useState<Date>(() => {
-    const today = new Date();
-    return today.getFullYear() !== 2026 ? new Date(2026, 5, 10) : today;
-  });
+  const [referenceDate, setReferenceDate] = useState<Date>(() => new Date());
 
   // Histogram states
   const [chartYear, setChartYear] = useState<number>(2026);
@@ -301,8 +298,7 @@ export default function MRIOverviewView({
   };
 
   const handleResetToToday = () => {
-    const today = new Date();
-    setReferenceDate(today.getFullYear() !== 2026 ? new Date(2026, 5, 10) : today);
+    setReferenceDate(new Date());
   };
 
   return (

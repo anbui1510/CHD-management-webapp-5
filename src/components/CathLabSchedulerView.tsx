@@ -420,9 +420,9 @@ export default function CathLabSchedulerView({
 
   // Calendar view states
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
-  const [currentMonth, setCurrentMonth] = useState(5); // June (0-indexed, so 5 = June)
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [activeDate, setActiveDate] = useState<Date>(new Date(2026, 5, 6)); // Default focus: June 6th, 2026
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [activeDate, setActiveDate] = useState<Date>(() => new Date());
 
   // Editable Form states
   const [plannedDevice, setPlannedDevice] = useState('');
@@ -2492,8 +2492,9 @@ Xin cảm ơn!`;
       const dStr = String(d).padStart(2, '0');
       const dateStr = `${currentYear}-${mStr}-${dStr}`;
       
-      // Determine if cell points to June 6, 2026 (Local Time constraint)
-      const isToday = currentYear === 2026 && currentMonth === 5 && d === 6;
+      // Determine if cell points to today
+      const todayDate = new Date();
+      const isToday = todayDate.getFullYear() === currentYear && todayDate.getMonth() === currentMonth && d === todayDate.getDate();
 
       cells.push({
         day: d,
@@ -2539,7 +2540,7 @@ Xin cảm ơn!`;
       list.push({
         day: d.getDate(),
         dateStr: `${yStr}-${mStr}-${dStr}`,
-        isToday: d.getFullYear() === 2026 && d.getMonth() === 5 && d.getDate() === 6
+        isToday: d.getFullYear() === new Date().getFullYear() && d.getMonth() === new Date().getMonth() && d.getDate() === new Date().getDate()
       });
     }
     return list;
@@ -2565,9 +2566,10 @@ Xin cảm ơn!`;
   };
 
   const jumpToToday = () => {
-    setCurrentMonth(5); // June
-    setCurrentYear(2026);
-    setActiveDate(new Date(2026, 5, 6));
+    const today = new Date();
+    setCurrentMonth(today.getMonth());
+    setCurrentYear(today.getFullYear());
+    setActiveDate(today);
   };
 
   return (
