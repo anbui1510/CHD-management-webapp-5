@@ -555,7 +555,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   >
                     {pat.PatientID1}
                     {pat.PatientID2 && <span className="text-[9px] text-slate-450 font-semibold block font-sans">Mã phụ: {pat.PatientID2}</span>}
-                    <span className="text-[9px] text-slate-400 font-normal block font-sans mt-0.5">
+                    <span className="text-[9px] text-slate-400 font-normal block font-sans mt-0.5" title="RefKey: Mã BN trong ca hội chẩn | ConsultKey: Mã dòng ca hội chẩn">
                       RefKey: {c.PatientKey} | ConsultKey: {c.ConsultKey}
                     </span>
                   </td>
