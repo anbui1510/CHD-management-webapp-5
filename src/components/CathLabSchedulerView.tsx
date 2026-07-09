@@ -97,6 +97,28 @@ const getTodayIsoDate = (): string => {
   return `${y}-${m}-${d}`;
 };
 
+const FilledAlertTriangle = ({ className = '', fill = 'red' }: { className?: string; fill?: string }) => {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      className={className} 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path 
+        d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" 
+        fill={fill} 
+        stroke={fill}
+      />
+      <line x1="12" y1="9" x2="12" y2="13" stroke="white" strokeWidth="2.5" />
+      <line x1="12" y1="17" x2="12.01" y2="17" stroke="white" strokeWidth="3" />
+    </svg>
+  );
+};
+
 const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
   if (!ptvPhu?.trim()) return patientName;
   return `${patientName} - PTV phụ: ${ptvPhu}`;
@@ -301,6 +323,7 @@ export default function CathLabSchedulerView({
   const [activeTab, setActiveTab] = useState<'unscheduled' | 'scheduled' | 'all'>('unscheduled');
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
+  const [waitlistSortField, setWaitlistSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'date' | 'plannedDate'>('date');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Column visibility settings for the waitlist table
@@ -341,7 +364,7 @@ export default function CathLabSchedulerView({
   useEffect(() => {
     setWaitlistCurrentPage(1);
     setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
-  }, [activeTab, searchQuery, waitlistSortOrder]);
+  }, [activeTab, searchQuery, waitlistSortOrder, waitlistSortField]);
   
   // Selected consult for form editing
   const [selectedConsult, setSelectedConsult] = useState<Consult | null>(null);
@@ -1432,11 +1455,45 @@ Xin cảm ơn!`;
     }
 
     return result.sort((a, b) => {
-      const da = a.PlannedCathLabDate ? new Date(a.PlannedCathLabDate).getTime() : 0;
-      const db = b.PlannedCathLabDate ? new Date(b.PlannedCathLabDate).getTime() : 0;
-      return waitlistSortOrder === 'asc' ? da - db : db - da;
+      let comparison = 0;
+      if (waitlistSortField === 'date') {
+        const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
+        const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
+        comparison = da - db;
+      } else if (waitlistSortField === 'plannedDate') {
+        const da = a.PlannedCathLabDate ? new Date(a.PlannedCathLabDate).getTime() : 0;
+        const db = b.PlannedCathLabDate ? new Date(b.PlannedCathLabDate).getTime() : 0;
+        comparison = da - db;
+      } else if (waitlistSortField === 'name') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        const nameA = patA?.PatientName ? removeDiacritics(patA.PatientName).toLowerCase() : '';
+        const nameB = patB?.PatientName ? removeDiacritics(patB.PatientName).toLowerCase() : '';
+        comparison = nameA.localeCompare(nameB);
+      } else if (waitlistSortField === 'id') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        const idA = patA?.PatientID1 ? patA.PatientID1.toLowerCase() : '';
+        const idB = patB?.PatientID1 ? patB.PatientID1.toLowerCase() : '';
+        comparison = idA.localeCompare(idB);
+      } else if (waitlistSortField === 'dob') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        const dobA = patA?.PatientDOB ? new Date(patA.PatientDOB).getTime() : 0;
+        const dobB = patB?.PatientDOB ? new Date(patB.PatientDOB).getTime() : 0;
+        comparison = dobA - dobB;
+      } else if (waitlistSortField === 'diagnosis') {
+        const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
+        const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
+        comparison = diagA.localeCompare(diagB);
+      } else if (waitlistSortField === 'requestBy') {
+        const reqA = a.RequestBy ? removeDiacritics(a.RequestBy).toLowerCase() : '';
+        const reqB = b.RequestBy ? removeDiacritics(b.RequestBy).toLowerCase() : '';
+        comparison = reqA.localeCompare(reqB);
+      }
+      return waitlistSortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [segmentedWaitlist, activeTab, searchQuery, patients, waitlistSortOrder]);
+  }, [segmentedWaitlist, activeTab, searchQuery, patients, waitlistSortOrder, waitlistSortField]);
 
   const totalWaitlistPages = Math.ceil(displayWaitlist.length / rowsPerWaitlistPage) || 1;
   const paginatedWaitlist = useMemo(() => {
@@ -2742,25 +2799,40 @@ Xin cảm ơn!`;
                   const missedDays = getMissScheduleDays(c.ConsultDate);
                   let warningIcon = null;
                   if (missedDays >= 14) {
-                    let iconClass = '';
                     let titleText = `Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`;
                     if (missedDays >= 180) {
-                      iconClass = 'text-black fill-black';
                       titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 6 tháng chưa xếp lịch (${missedDays} ngày)`;
+                      warningIcon = (
+                        <FilledAlertTriangle 
+                          className="w-4 h-4 shrink-0" 
+                          fill="black"
+                          title={titleText}
+                        />
+                      );
                     } else if (missedDays >= 90) {
-                      iconClass = 'text-rose-600 fill-rose-600';
                       titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 3 tháng chưa xếp lịch (${missedDays} ngày)`;
+                      warningIcon = (
+                        <FilledAlertTriangle 
+                          className="w-4 h-4 shrink-0" 
+                          fill="#d2145a"
+                          title={titleText}
+                        />
+                      );
                     } else if (missedDays >= 30) {
-                      iconClass = 'text-rose-600';
+                      warningIcon = (
+                        <AlertTriangle 
+                          className="w-4 h-4 shrink-0 text-rose-600" 
+                          title={titleText}
+                        />
+                      );
                     } else {
-                      iconClass = 'text-amber-500';
+                      warningIcon = (
+                        <AlertTriangle 
+                          className="w-4 h-4 shrink-0 text-amber-500" 
+                          title={titleText}
+                        />
+                      );
                     }
-                    warningIcon = (
-                      <AlertTriangle 
-                        className={`w-4 h-4 shrink-0 ${iconClass}`} 
-                        title={titleText}
-                      />
-                    );
                   }
 
                   return (
@@ -2809,17 +2881,106 @@ Xin cảm ơn!`;
                     )}
                     <th 
                       style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
-                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)]"
+                      onClick={() => {
+                        if (waitlistSortField === 'name') {
+                          setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setWaitlistSortField('name');
+                          setWaitlistSortOrder('asc');
+                        }
+                      }}
+                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] cursor-pointer select-none hover:bg-slate-100 transition duration-150"
                     >
-                      Họ và tên
+                      <div className="flex items-center gap-1">
+                        <span>Họ và tên</span>
+                        <span className="text-[10px] text-slate-450 font-bold">
+                          {waitlistSortField === 'name' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
                     </th>
-                    {visibleColumns.icd && <th className="py-3 px-2 border-b border-slate-200">ICD</th>}
+                    {visibleColumns.icd && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'diagnosis') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('diagnosis');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>ICD</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'diagnosis' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
                     {visibleColumns.priority && <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>}
-                    {visibleColumns.requestBy && <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>}
+                    {visibleColumns.requestBy && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'requestBy') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('requestBy');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>BS Đăng ký</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'requestBy' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
                     {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>}
-                    {visibleColumns.consultDate && <th className="py-3 px-2 border-b border-slate-200">Ngày hội chẩn</th>}
+                    {visibleColumns.consultDate && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'date') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('date');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Ngày hội chẩn</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'date' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
                     {visibleColumns.consultResultId && <th className="py-3 px-2 border-b border-slate-200">Kết luận chính</th>}
-                    {visibleColumns.plannedDate && <th className="py-3 px-2 border-b border-slate-200 text-center">Dự kiến ngày thông tim</th>}
+                    {visibleColumns.plannedDate && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'plannedDate') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('plannedDate');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 text-center cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1 justify-center">
+                          <span>Dự kiến ngày thông tim</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'plannedDate' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
                     {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>}
                     {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200">Trạng thái gọi</th>}
                     {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center">Trễ xếp lịch</th>}
@@ -2949,25 +3110,40 @@ Xin cảm ơn!`;
                     const missedDays = getMissScheduleDays(c.ConsultDate);
                     let warningIcon = null;
                     if (missedDays >= 14) {
-                      let iconClass = '';
                       let titleText = `Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`;
                       if (missedDays >= 180) {
-                        iconClass = 'text-black fill-black';
                         titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 6 tháng chưa xếp lịch (${missedDays} ngày)`;
+                        warningIcon = (
+                          <FilledAlertTriangle 
+                            className="w-4 h-4 shrink-0" 
+                            fill="black"
+                            title={titleText}
+                          />
+                        );
                       } else if (missedDays >= 90) {
-                        iconClass = 'text-rose-600 fill-rose-600';
                         titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 3 tháng chưa xếp lịch (${missedDays} ngày)`;
+                        warningIcon = (
+                          <FilledAlertTriangle 
+                            className="w-4 h-4 shrink-0" 
+                            fill="#d2145a"
+                            title={titleText}
+                          />
+                        );
                       } else if (missedDays >= 30) {
-                        iconClass = 'text-rose-600';
+                        warningIcon = (
+                          <AlertTriangle 
+                            className="w-4 h-4 shrink-0 text-rose-600" 
+                            title={titleText}
+                          />
+                        );
                       } else {
-                        iconClass = 'text-amber-500';
+                        warningIcon = (
+                          <AlertTriangle 
+                            className="w-4 h-4 shrink-0 text-amber-500" 
+                            title={titleText}
+                          />
+                        );
                       }
-                      warningIcon = (
-                        <AlertTriangle 
-                          className={`w-4 h-4 shrink-0 ${iconClass}`} 
-                          title={titleText}
-                        />
-                      );
                     }
 
                     return (
