@@ -120,7 +120,7 @@ export interface Consult {
   PatientKey: string;
   Status?: string;
   ConsultType: ConsultTypeEnum;
-  ConsultMember?: string[];
+  ConsultMember?: string;
   PatientWeight: string;
   PatientHeight?: string;
   ConsultDate: string;

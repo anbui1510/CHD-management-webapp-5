@@ -187,7 +187,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [diagnosisID, setDiagnosisID] = useState<string>('');
   const [detailDiagnosis, setDetailDiagnosis] = useState<string>('');
   
-  const [consultMembers, setConsultMembers] = useState<string[]>([]);
+  const [consultMembers, setConsultMembers] = useState<string>('');
   const [scheduled1st, setScheduled1st] = useState<string>('');
   
   // 4. Clinical Result outcome fields
@@ -247,7 +247,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     setDepartment('Tim Mạch');
     setShowAddDeptInput(false);
     setCustomDeptVal('');
-    setConsultMembers([]);
+    setConsultMembers('');
     setScheduled1st('');
     setDiagnosisID('');
     setDetailDiagnosis('');
@@ -356,7 +356,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         PatientHeight: patHeight || '',
         ConsultDate: consultDate,
         RequestBy: chosenDoc || 'BS Hội đồng',
-        ConsultMember: isCathStaff ? [] : consultMembers,
+        ConsultMember: isCathStaff ? '' : consultMembers,
         DiagnosisID: diagnosisID,
         DetailDiagnosis: detailDiagnosis,
         Department: chosenDept || 'Tim Mạch',
@@ -1380,18 +1380,13 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     ) : (
                       <div className="pb-0.5">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                        <SearchableEnumSelect
-                          multiple
+                        <input
+                          type="text"
                           required
-                          options={[
-                            ...staffList.map(s => getShortStaffName(s.StaffName, staffList)),
-                            ...Array.from(new Set(consults.flatMap(c => Array.isArray(c.ConsultMember) ? c.ConsultMember : String(c.ConsultMember || '').split(',').map(s => s.trim()).filter(Boolean))))
-                          ]}
-                          values={consultMembers}
-                          onMultiChange={(members) => setConsultMembers(members)}
-                          placeholder="-- Bấm hoặc tìm để chọn bác sĩ --"
-                          searchPlaceholder="Gõ tìm bác sĩ..."
-                          direction="up"
+                          value={consultMembers}
+                          onChange={(e) => setConsultMembers(e.target.value)}
+                          placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
                         />
                       </div>
                     )}
