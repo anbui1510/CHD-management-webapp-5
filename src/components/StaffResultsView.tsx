@@ -120,8 +120,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const getPatientByKey = useCallback((patientKey: any): Patient | undefined => {
     if (!patientKey) return undefined;
     const keyStr = normalizePatientKey(patientKey);
+    // Prioritize direct match by PatientKey to prevent collisions with PatientID1 mapping
+    const directMatch = patients.find(p => p && normalizePatientKey(p.PatientKey) === keyStr);
+    if (directMatch) return directMatch;
     return patientMap.get(keyStr);
-  }, [patientMap]);
+  }, [patients, patientMap]);
 
   // New Staff Registration combined states
   const [showCombinedForm, setShowCombinedForm] = useState<boolean>(false);
@@ -441,9 +444,23 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
 
+  // Deduplicate consults client-side to ensure each ConsultKey has only 1 row on the UI
+  // and prevent React rendering key collision issues.
+  const uniqueConsults = useMemo(() => {
+    if (!Array.isArray(consults)) return [];
+    const seen = new Set<string>();
+    return consults.filter(c => {
+      if (!c.ConsultKey) return true;
+      const k = String(c.ConsultKey).trim().toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }, [consults]);
+
   // Categorize based on ConsultType
-  const cathConsults = useMemo(() => consults.filter(c => c.ConsultType === 'Staff thông'), [consults]);
-  const surgConsults = useMemo(() => consults.filter(c => c.ConsultType === 'Staff mổ'), [consults]);
+  const cathConsults = useMemo(() => uniqueConsults.filter(c => c.ConsultType === 'Staff thông'), [uniqueConsults]);
+  const surgConsults = useMemo(() => uniqueConsults.filter(c => c.ConsultType === 'Staff mổ'), [uniqueConsults]);
 
   const isPendingResult = (resultId: any) => {
     if (!resultId) return true;
