@@ -2508,7 +2508,8 @@ Xin cảm ơn!`;
     const nextMonthIndex = currentMonth === 11 ? 0 : currentMonth + 1;
     const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
     let nextDay = 1;
-    while (cells.length < 42) {
+    const targetLength = (startOffset + totalDays) <= 35 ? 35 : 42;
+    while (cells.length < targetLength) {
       const mStr = String(nextMonthIndex + 1).padStart(2, '0');
       const dStr = String(nextDay).padStart(2, '0');
       cells.push({
@@ -3330,9 +3331,6 @@ Xin cảm ơn!`;
                     <Calendar className="w-4 h-4 text-[#d2145a]" />
                     Lịch thông tim dự kiến
                   </h3>
-                  <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
-                    Hệ thống xếp lịch can thiệp phòng CathLab trực tuyến
-                  </p>
                 </div>
                 
                 {/* Views and Today navigation */}
@@ -3417,12 +3415,12 @@ Xin cảm ơn!`;
                         return (
                           <div
                             key={`${cell.dateStr}-${idx}`}
-                            className={`min-h-[52px] lg:min-h-[70px] xl:min-h-[85px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between transition ${
+                            className={`min-h-[60px] lg:min-h-[90px] xl:min-h-[100px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-start transition ${
                               cell.isCurrentMonth ? 'text-slate-800' : 'bg-slate-50/40 text-slate-300 pointer-events-none opacity-45'
                             } ${cell.isToday ? 'bg-[#d2145a]/5 border-[#d2145a]/30' : ''}`}
                           >
                             {/* Day Number inside the cell */}
-                            <div className="text-right">
+                            <div className="text-right shrink-0">
                               {cell.isToday ? (
                                 <span className="bg-[#d2145a] text-white font-black text-[10px] w-5 h-5 inline-flex items-center justify-center rounded-full shadow-xs">
                                   {cell.day}
@@ -3435,7 +3433,7 @@ Xin cảm ơn!`;
                             </div>
 
                             {/* Scheduled Patient badging inside day cell */}
-                            <div className="flex-1 overflow-y-auto mt-1 flex flex-col gap-1 pr-0.5 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto mt-0.5 flex flex-col gap-0.5 pr-0.5 custom-scrollbar">
                               {matchingConsults.map(c => {
                                 const pat = findPatientByKey(patients, c.PatientKey);
                                 const ptvPhu1Display = resolvePtvPhu1Display(
@@ -3450,7 +3448,7 @@ Xin cảm ơn!`;
                                       handleSelectConsult(c);
                                       if (pureCalendarMode) setShowSummaryModal(true);
                                     }}
-                                    className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight px-1.5 py-0.5 rounded-lg truncate cursor-pointer transition select-none tracking-wide text-center uppercase"
+                                    className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-bold leading-none py-0.5 px-1 rounded truncate cursor-pointer transition select-none tracking-wide text-center uppercase block w-full"
                                     title={formatCalendarPatientTooltip(pat?.PatientName || 'Unknown Patient', c.DiagnosisID || 'N/A', ptvPhu1Display)}
                                   >
                                     {pat?.PatientName ? pat.PatientName.split(' ').slice(-2).join(' ') : 'INFO'}
@@ -3585,20 +3583,7 @@ Xin cảm ơn!`;
                   </div>
                 )}
 
-                {/* Calendar Legend indicators bar */}
-                <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-[10px] text-slate-500 font-medium shrink-0 lg:mt-4">
-                  <div className="flex gap-4">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#b31448]"></span>
-                      Ca thông tim đã duyệt
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#d2145a]"></span>
-                      Đỉnh mốc "Hôm nay"
-                    </span>
-                  </div>
-                  <span className="text-[9px] text-[#d2145a] font-extrabold">AI Studio Scheduler v4.0</span>
-                </div>
+                {/* Calendar Legend indicators bar removed for cleaner layout */}
 
               </div>
 
