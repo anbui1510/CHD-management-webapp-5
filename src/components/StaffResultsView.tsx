@@ -441,6 +441,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusTab, setStatusTab] = useState<'all' | 'pending' | 'completed'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortField, setSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'date'>('date');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
 
@@ -516,18 +517,43 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
       return true;
     }).sort((a, b) => {
-      const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-      const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-      return sortOrder === 'asc' ? da - db : db - da;
+      let comparison = 0;
+      if (sortField === 'date') {
+        const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
+        const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
+        comparison = da - db;
+      } else if (sortField === 'name') {
+        const patA = getPatientByKey(a.PatientKey);
+        const patB = getPatientByKey(b.PatientKey);
+        const nameA = patA?.PatientName ? removeDiacritics(patA.PatientName).toLowerCase() : '';
+        const nameB = patB?.PatientName ? removeDiacritics(patB.PatientName).toLowerCase() : '';
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortField === 'id') {
+        const patA = getPatientByKey(a.PatientKey);
+        const patB = getPatientByKey(b.PatientKey);
+        const idA = patA?.PatientID1 ? patA.PatientID1.toLowerCase() : '';
+        const idB = patB?.PatientID1 ? patB.PatientID1.toLowerCase() : '';
+        comparison = idA.localeCompare(idB);
+      } else if (sortField === 'dob') {
+        const patA = getPatientByKey(a.PatientKey);
+        const patB = getPatientByKey(b.PatientKey);
+        const dobA = patA?.PatientDOB ? new Date(patA.PatientDOB).getTime() : 0;
+        const dobB = patB?.PatientDOB ? new Date(patB.PatientDOB).getTime() : 0;
+        comparison = dobA - dobB;
+      } else if (sortField === 'diagnosis') {
+        const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
+        const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
+        comparison = diagA.localeCompare(diagB);
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [activeConsults, statusTab, searchTerm, sortOrder, getPatientByKey, isPendingStaffResult]);
+  }, [activeConsults, statusTab, searchTerm, sortField, sortOrder, getPatientByKey, isPendingStaffResult]);
 
   const totalPages = Math.max(1, Math.ceil(filteredConsultsAll.length / ITEMS_PER_PAGE));
   const displayedConsults = useMemo(() => {
     return filteredConsultsAll.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredConsultsAll, currentPage]);
 
-  // Render lists helper (Table View for Performance and aesthetics)
   const renderList = (filtered: Consult[]) => {
     if (filtered.length === 0) {
       return (
@@ -537,17 +563,42 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       );
     }
 
+    const renderSortableHeader = (field: 'name' | 'id' | 'dob' | 'diagnosis' | 'date', label: string) => {
+      const isSorted = sortField === field;
+      return (
+        <th 
+          scope="col" 
+          onClick={() => {
+            if (isSorted) {
+              setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+            } else {
+              setSortField(field);
+              setSortOrder('asc');
+            }
+          }}
+          className="px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider"
+        >
+          <div className="flex items-center gap-1.5 justify-start">
+            <span>{label}</span>
+            <span className="text-[11px] text-slate-400 font-semibold inline-block">
+              {isSorted ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+            </span>
+          </div>
+        </th>
+      );
+    };
+
     return (
-      <div className="overflow-x-auto w-full border border-slate-150 rounded-2xl shadow-xs bg-white custom-scrollbar">
+      <div className="overflow-x-auto w-full rounded-2xl shadow-xs bg-white custom-scrollbar">
         <table className="min-w-full divide-y divide-slate-200 table-auto text-left font-sans text-xs">
           <thead className="bg-slate-55 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-10">
             <tr>
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Họ và tên</th>
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Mã bệnh nhi</th>
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Ngày sinh / GT</th>
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Chẩn đoán</th>
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200">Ngày staff</th>
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200 text-center">Hành động</th>
+              {renderSortableHeader('name', 'Họ và tên')}
+              {renderSortableHeader('id', 'Mã bệnh nhi')}
+              {renderSortableHeader('dob', 'Ngày sinh / GT')}
+              {renderSortableHeader('diagnosis', 'Chẩn đoán')}
+              {renderSortableHeader('date', 'Ngày staff')}
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200 text-center text-slate-500 font-extrabold uppercase text-[10px] tracking-wider">Hành động</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
@@ -572,9 +623,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   >
                     {pat.PatientID1}
                     {pat.PatientID2 && <span className="text-[9px] text-slate-450 font-semibold block font-sans">Mã phụ: {pat.PatientID2}</span>}
-                    <span className="text-[9px] text-slate-400 font-normal block font-sans mt-0.5" title="RefKey: Mã BN trong ca hội chẩn | ConsultKey: Mã dòng ca hội chẩn">
-                      RefKey: {c.PatientKey} | ConsultKey: {c.ConsultKey}
-                    </span>
                   </td>
                   <td 
                     onClick={() => onSelectConsult(c)}
