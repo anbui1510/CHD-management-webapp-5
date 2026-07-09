@@ -2742,12 +2742,23 @@ Xin cảm ơn!`;
                   const missedDays = getMissScheduleDays(c.ConsultDate);
                   let warningIcon = null;
                   if (missedDays >= 14) {
-                    const isRed = missedDays > 30;
-                    const iconColor = isRed ? 'text-rose-600' : 'text-amber-500';
+                    let iconClass = '';
+                    let titleText = `Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`;
+                    if (missedDays >= 180) {
+                      iconClass = 'text-black fill-black';
+                      titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 6 tháng chưa xếp lịch (${missedDays} ngày)`;
+                    } else if (missedDays >= 90) {
+                      iconClass = 'text-rose-600 fill-rose-600';
+                      titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 3 tháng chưa xếp lịch (${missedDays} ngày)`;
+                    } else if (missedDays >= 30) {
+                      iconClass = 'text-rose-600';
+                    } else {
+                      iconClass = 'text-amber-500';
+                    }
                     warningIcon = (
                       <AlertTriangle 
-                        className={`w-4 h-4 shrink-0 ${iconColor}`} 
-                        title={`Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`}
+                        className={`w-4 h-4 shrink-0 ${iconClass}`} 
+                        title={titleText}
                       />
                     );
                   }
@@ -2798,7 +2809,7 @@ Xin cảm ơn!`;
                     )}
                     <th 
                       style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
-                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200"
+                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)]"
                     >
                       Họ và tên
                     </th>
@@ -2938,12 +2949,23 @@ Xin cảm ơn!`;
                     const missedDays = getMissScheduleDays(c.ConsultDate);
                     let warningIcon = null;
                     if (missedDays >= 14) {
-                      const isRed = missedDays > 30;
-                      const iconColor = isRed ? 'text-rose-600' : 'text-amber-500';
+                      let iconClass = '';
+                      let titleText = `Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`;
+                      if (missedDays >= 180) {
+                        iconClass = 'text-black fill-black';
+                        titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 6 tháng chưa xếp lịch (${missedDays} ngày)`;
+                      } else if (missedDays >= 90) {
+                        iconClass = 'text-rose-600 fill-rose-600';
+                        titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 3 tháng chưa xếp lịch (${missedDays} ngày)`;
+                      } else if (missedDays >= 30) {
+                        iconClass = 'text-rose-600';
+                      } else {
+                        iconClass = 'text-amber-500';
+                      }
                       warningIcon = (
                         <AlertTriangle 
-                          className={`w-4 h-4 shrink-0 ${iconColor}`} 
-                          title={`Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`}
+                          className={`w-4 h-4 shrink-0 ${iconClass}`} 
+                          title={titleText}
                         />
                       );
                     }
@@ -2977,7 +2999,7 @@ Xin cảm ơn!`;
                         )}
                         <td 
                           style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
-                          className={`py-3.5 px-3 min-w-[160px] md:min-w-[200px] sticky z-10 border-r border-slate-150 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] transition-colors ${
+                          className={`py-3.5 px-3 min-w-[160px] md:min-w-[200px] sticky z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] transition-colors ${
                             isSelected ? 'bg-indigo-50' : 'bg-white'
                           }`}
                         >
