@@ -4,6 +4,7 @@ import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Pl
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceConsultResultOptions } from '../data/source';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
+import { VNDateInput } from './VNDateInput';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 const DEFAULT_CONCLUSION_OPTIONS = [
@@ -1134,12 +1135,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày sinh *</label>
-                            <input
-                              type="date"
+                            <VNDateInput
                               required
                               value={newPatDOB}
-                              onChange={(e) => setNewPatDOB(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-mono text-xs focus:outline-none"
+                              onChange={setNewPatDOB}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-sans text-xs focus:outline-none"
                             />
                           </div>
                           <div>
@@ -1213,12 +1213,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5 font-sans">Ngày Hội Chẩn *</label>
-                        <input
-                          type="date"
+                        <VNDateInput
                           required
                           value={consultDate}
-                          onChange={(e) => setConsultDate(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-mono text-xs focus:outline-none"
+                          onChange={setConsultDate}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-sans text-xs focus:outline-none"
                         />
                       </div>
                     </div>

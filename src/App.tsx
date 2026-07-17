@@ -2541,7 +2541,7 @@ export default function App() {
                           required
                           value={newConsultData.ConsultDate}
                           onChange={(val) => setNewConsultData(prev => ({ ...prev, ConsultDate: val }))}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                         />
                       </div>
                     </div>
@@ -3053,14 +3053,13 @@ export default function App() {
                     <div className="space-y-4 text-xs font-semibold text-slate-700">
                       <div>
                         <label className="block text-slate-400 font-bold uppercase text-[9px] mb-1">Chọn Ngày staff</label>
-                        <input
-                          type="date"
+                        <VNDateInput
                           value={filterDate}
-                          onChange={(e) => {
-                            setFilterDate(e.target.value);
+                          onChange={(val) => {
+                            setFilterDate(val);
                             setConsultCurrentPage(1);
                           }}
-                          className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                         />
                       </div>
                       <div>
@@ -3135,14 +3134,13 @@ export default function App() {
                     <div className="space-y-3 font-medium">
                     <div>
                       <label className="block text-slate-400 font-bold uppercase text-[9px] mb-1">Chọn Ngày staff</label>
-                      <input
-                        type="date"
+                      <VNDateInput
                         value={filterDate}
-                        onChange={(e) => {
-                          setFilterDate(e.target.value);
+                        onChange={(val) => {
+                          setFilterDate(val);
                           setConsultCurrentPage(1);
                         }}
-                        className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                        className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                       />
                     </div>
 
@@ -3685,7 +3683,7 @@ export default function App() {
                                 required
                                 value={editConsultData.ConsultDate}
                                 onChange={(val) => setEditConsultData(prev => ({ ...prev, ConsultDate: val }))}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:ring-1 focus:ring-pink-500 focus:outline-none"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans focus:ring-1 focus:ring-pink-500 focus:outline-none"
                               />
                             </div>
                           </div>
@@ -3848,7 +3846,7 @@ export default function App() {
       <AnimatePresence>
         {showAddPatient && (
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-4 sm:p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed">
+            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-4 sm:p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed font-sans">
               
               <div className="flex items-center justify-between border-b border-slate-150 pb-2.5 text-[#d2145a]">
                 <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
@@ -3924,7 +3922,7 @@ export default function App() {
                       required
                       value={newPatientData.PatientDOB}
                       onChange={(val) => setNewPatientData(prev => ({ ...prev, PatientDOB: val }))}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                     />
                   </div>
                   <div>

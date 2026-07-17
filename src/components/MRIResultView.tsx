@@ -17,6 +17,7 @@ import {
   removeDiacritics
 } from '../types';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
+import { VNDateInput } from './VNDateInput';
 
 interface MRIResultViewProps {
   patients: Patient[];
@@ -418,11 +419,10 @@ export default function MRIResultView({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày chụp thực tế</label>
-                            <input
-                              type="date"
+                            <VNDateInput
                               value={String(form.CMRDate || '')}
-                              onChange={(e) => setForm(prev => ({ ...prev, CMRDate: e.target.value }))}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold font-mono focus:outline-none text-xs"
+                              onChange={(val) => setForm(prev => ({ ...prev, CMRDate: val }))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold font-sans focus:outline-none text-xs"
                             />
                           </div>
                           <div>

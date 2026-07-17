@@ -2402,18 +2402,11 @@ Xin cảm ơn!`;
     'w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-200 text-[10.5px] text-slate-700 min-h-[32px]';
 
   const renderScheduleDatePicker = (value: string, onChange: (val: string) => void) => (
-    <div className="relative w-full">
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-      />
-      <div className={`${schedInputCls} font-mono font-bold flex items-center justify-between`}>
-        <span>{value ? formatVNTime(value) : 'dd/mm/yyyy'}</span>
-        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-      </div>
-    </div>
+    <VNDateInput
+      value={value}
+      onChange={onChange}
+      className={`${schedInputCls} font-sans font-bold`}
+    />
   );
 
   const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-[13px] text-slate-800 min-h-[34px]';
@@ -2441,18 +2434,11 @@ Xin cảm ơn!`;
   );
 
   const renderAdHocDatePicker = (value: string, onChange: (val: string) => void) => (
-    <div className="relative w-full">
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-      />
-      <div className={`${adHocInputCls} font-mono font-bold flex items-center justify-between`}>
-        <span>{value ? formatVNTime(value) : 'dd/mm/yyyy'}</span>
-        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-      </div>
-    </div>
+    <VNDateInput
+      value={value}
+      onChange={onChange}
+      className={`${adHocInputCls} font-sans font-bold`}
+    />
   );
 
   // Calendar rendering helper calculation list (Month View)
@@ -4415,21 +4401,11 @@ Xin cảm ơn!`;
                     <label className="block text-slate-500 font-bold text-[10px] uppercase mb-2 flex items-center gap-1.5">
                       <CalendarDays className="w-4 h-4" /> Chọn ngày đầu tuần
                     </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={exportStartDate}
-                        onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
-                        onChange={(e) => setExportStartDate(e.target.value)}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <div className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 flex justify-between items-center pointer-events-none shadow-sm">
-                        <span className={exportStartDate ? 'text-slate-800' : 'text-slate-400'}>
-                          {exportStartDate ? exportStartDate.split('-').reverse().join(' / ') : 'dd / mm / yyyy'}
-                        </span>
-                        <CalendarDays className="w-4 h-4 text-emerald-600" />
-                      </div>
-                    </div>
+                    <VNDateInput
+                      value={exportStartDate}
+                      onChange={setExportStartDate}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 font-sans shadow-sm focus:outline-none"
+                    />
                     {exportEndDateStr && (
                       <p className="mt-2 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 p-2 rounded-lg">
                         Lọc từ ngày: <strong>{exportStartDate.split('-').reverse().join('/')}</strong> <br/>
@@ -4516,32 +4492,20 @@ Xin cảm ơn!`;
                        <div className="flex gap-2">
                          <div className="flex-1">
                            <div className="relative w-full">
-                             <input 
-                               type="date" 
-                               value={deviceStartDate} 
-                               onClick={(e: any) => e.target.showPicker && e.target.showPicker()} 
-                               onChange={e => setDeviceStartDate(e.target.value)} 
-                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                             <VNDateInput
+                               value={deviceStartDate}
+                               onChange={setDeviceStartDate}
+                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold font-sans text-slate-700 focus:outline-none min-h-[24px]"
                              />
-                             <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold text-slate-700 flex items-center justify-between min-h-[24px]">
-                               <span>{deviceStartDate ? formatVNTime(deviceStartDate) : 'Từ ngày'}</span>
-                               <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                             </div>
                            </div>
                          </div>
                          <div className="flex-1">
                             <div className="relative w-full">
-                              <input 
-                                type="date" 
-                                value={deviceEndDate} 
-                                onClick={(e: any) => e.target.showPicker && e.target.showPicker()} 
-                                onChange={e => setDeviceEndDate(e.target.value)} 
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                              <VNDateInput
+                                value={deviceEndDate}
+                                onChange={setDeviceEndDate}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold font-sans text-slate-700 focus:outline-none min-h-[24px]"
                               />
-                              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold text-slate-700 flex items-center justify-between min-h-[24px]">
-                                <span>{deviceEndDate ? formatVNTime(deviceEndDate) : 'Đến ngày'}</span>
-                                <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                              </div>
                             </div>
                          </div>
                        </div>
@@ -5383,7 +5347,7 @@ Xin cảm ơn!`;
                                   <input type="text" required placeholder="Họ tên..." value={adHocPatientName} onChange={(e) => setAdHocPatientName(e.target.value)} className={`${adHocInputCls} font-black`} />
                                 ))}
                                 {renderAdHocRow(`Ngày sinh *${adHocErrors.includes('PatientDOB') ? ' !' : ''}`, (
-                                  <VNDateInput required value={adHocPatientDOB} onChange={(val) => setAdHocPatientDOB(val)} className={`${adHocInputCls} font-mono font-bold`} />
+                                  <VNDateInput required value={adHocPatientDOB} onChange={(val) => setAdHocPatientDOB(val)} className={`${adHocInputCls} font-sans font-bold`} />
                                 ))}
                                 {renderAdHocRow('Giới tính *', (
                                   <div className="flex gap-1">
@@ -5396,7 +5360,7 @@ Xin cảm ơn!`;
                                   <SearchableEnumSelect required options={provinceOptions} value={adHocPatientAddress} onChange={setAdHocPatientAddress} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." />
                                 ))}
                                 {renderAdHocRow('SĐT 1', (
-                                  <input type="text" placeholder="ĐT..." value={adHocPatientPhone1} onChange={(e) => setAdHocPatientPhone1(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />
+                                  <input type="text" placeholder="ĐT..." value={adHocPatientPhone1} onChange={(e) => setAdHocPatientPhone1(e.target.value)} className={`${adHocInputCls} font-sans font-bold`} />
                                 ))}
                                 {renderAdHocRow('SĐT 2', (
                                   <input type="text" placeholder="ĐT phụ..." value={adHocPatientPhone2} onChange={(e) => setAdHocPatientPhone2(e.target.value)} className={`${adHocInputCls} font-mono`} />
@@ -5498,7 +5462,7 @@ Xin cảm ơn!`;
                           />
                         ), { alignTop: true })}
                         {renderAdHocRow('Dự trù kinh phí', (
-                          <input type="text" placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />
+                          <input type="text" placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-sans font-bold`} />
                         ))}
                         {renderAdHocRow('Kiểm tra dụng cụ', (
                           <select value={adHocCheckDevice} onChange={(e) => setAdHocCheckDevice(e.target.value as any)} className={adHocSelectCls}>
@@ -5522,7 +5486,7 @@ Xin cảm ơn!`;
                         {renderAdHocRow('Ghi chú gọi bệnh', (
                           <textarea rows={1} placeholder="Ghi chú gọi bệnh..." value={adHocCallNote} onChange={(e) => setAdHocCallNote(e.target.value)} className={`${adHocInputCls} resize-y`} />
                         ), { alignTop: true })}
-                        {renderAdHocRow('Ngày thông tim dự kiến', <VNDateInput value={adHocPlannedCathLabDate} onChange={setAdHocPlannedCathLabDate} className={`${adHocInputCls} font-mono font-bold`} />)}
+                        {renderAdHocRow('Ngày thông tim dự kiến', <VNDateInput value={adHocPlannedCathLabDate} onChange={setAdHocPlannedCathLabDate} className={`${adHocInputCls} font-sans font-bold`} />)}
                         {renderAdHocRow('Hỗ trợ tài chính', (
                           <select value={adHocFundingRequest} onChange={(e) => setAdHocFundingRequest(e.target.value)} className={adHocSelectCls}>
                             <option value="">— Chưa chọn —</option>

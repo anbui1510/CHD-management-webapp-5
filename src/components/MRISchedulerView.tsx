@@ -24,6 +24,7 @@ import {
   resolveCMRMethod
 } from '../data/cmrDefaults';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
+import { VNDateInput } from './VNDateInput';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
@@ -1272,12 +1273,11 @@ export default function MRISchedulerView({
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
                           Ngày chụp MRI dự kiến<span className="text-[#d2145a] ml-0.5">*</span>
                         </label>
-                        <input
-                          type="date"
+                        <VNDateInput
                           value={String(formData.CMRScheduledDate || '')}
-                          onChange={(event) => updateField('CMRScheduledDate', event.target.value)}
+                          onChange={(val) => updateField('CMRScheduledDate', val)}
                           required
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold font-sans focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
                         />
                       </div>
                       <div>
@@ -1380,21 +1380,11 @@ export default function MRISchedulerView({
                     <label className="block text-slate-500 font-bold text-[10px] uppercase mb-2 flex items-center gap-1.5">
                       <CalendarDays className="w-4 h-4" /> Chọn ngày đầu tuần
                     </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={exportStartDate}
-                        onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
-                        onChange={(event) => setExportStartDate(event.target.value)}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <div className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 flex justify-between items-center pointer-events-none shadow-sm">
-                        <span className={exportStartDate ? 'text-slate-800' : 'text-slate-400'}>
-                          {exportStartDate ? exportStartDate.split('-').reverse().join(' / ') : 'dd / mm / yyyy'}
-                        </span>
-                        <CalendarDays className="w-4 h-4 text-emerald-600" />
-                      </div>
-                    </div>
+                    <VNDateInput
+                      value={exportStartDate}
+                      onChange={setExportStartDate}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 font-sans shadow-sm focus:outline-none"
+                    />
                     {exportEndDate && (
                       <p className="mt-2 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 p-2 rounded-lg">
                         Lọc từ ngày: <strong>{exportStartDate.split('-').reverse().join('/')}</strong><br />
@@ -1623,7 +1613,7 @@ export default function MRISchedulerView({
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày sinh</label>
-                          <input type="date" value={adHocNewPatDOB} onChange={(e) => setAdHocNewPatDOB(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-mono text-xs focus:outline-none" />
+                          <VNDateInput value={adHocNewPatDOB} onChange={setAdHocNewPatDOB} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold font-sans text-xs focus:outline-none" />
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Giới tính</label>
@@ -1729,7 +1719,7 @@ export default function MRISchedulerView({
                     </div>
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày chụp MRI dự kiến</label>
-                      <input type="date" value={String(adHocForm.CMRScheduledDate || '')} onChange={(e) => updateAdHocField('CMRScheduledDate', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
+                      <VNDateInput value={String(adHocForm.CMRScheduledDate || '')} onChange={(val) => updateAdHocField('CMRScheduledDate', val)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold font-sans focus:outline-none text-xs" />
                     </div>
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Trạng thái gọi MRI</label>
