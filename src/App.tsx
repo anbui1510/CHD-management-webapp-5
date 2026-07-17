@@ -1666,6 +1666,7 @@ export default function App() {
               HỆ THỐNG QUẢN LÝ TIM BẨM SINH<br />
               KHOA TIM MẠCH - BVNĐTP
             </p>
+            <p className="text-[9px] text-neutral-600 font-semibold mt-1 tracking-wide">Mobile UI · build 2026-07-17</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">

@@ -136,7 +136,7 @@ export function VNDateInput({ value, onChange, className, ...props }: Props) {
         type="text"
         inputMode="numeric"
         autoComplete="off"
-        placeholder={props.placeholder || 'dd/mm/yyyy'}
+        placeholder={props.placeholder || 'Nhập dd/mm/yyyy hoặc chọn lịch'}
         value={displayValue}
         onChange={handleChange}
         className={inputClass}
