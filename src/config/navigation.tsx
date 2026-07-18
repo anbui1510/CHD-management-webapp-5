@@ -48,7 +48,7 @@ export const SIDEBAR_MENU_ITEMS: NavMenuItem[] = [
 export const MOBILE_BOTTOM_TAB_ITEMS: NavMenuItem[] = [
   { id: 'home', label: 'Trang chủ', shortLabel: 'Home' },
   { id: 'results-staff', label: 'Staff', shortLabel: 'Staff' },
-  { id: 'schedule-tt', label: 'Xếp lịch', shortLabel: 'Lịch' },
+  { id: 'schedule-tt', label: 'Xếp lịch', shortLabel: 'Xếp lịch' },
   { id: 'patients', label: 'Hồ sơ', shortLabel: 'Hồ sơ' },
 ];
 
