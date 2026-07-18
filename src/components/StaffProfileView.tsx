@@ -178,7 +178,7 @@ function ActivityMetricRow({
                     initial={{ height: 0 }}
                     animate={{ height: `${percentage}%` }}
                     transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className="w-full bg-gradient-to-t from-pink-500 to-[#d2145a] rounded-t-md"
+                    className="w-full bg-[#d2145a] rounded-t-md"
                   />
                 </div>
                 <span className="text-[8px] font-black text-slate-400 font-mono mt-1 truncate max-w-full">

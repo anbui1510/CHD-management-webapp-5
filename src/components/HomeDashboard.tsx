@@ -831,7 +831,7 @@ export default function HomeDashboard({
                         initial={{ height: 0 }}
                         animate={{ height: `${percentage}%` }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
-                        className="w-full bg-gradient-to-t from-pink-500 to-[#d2145a] rounded-t-md group-hover:from-pink-600 group-hover:to-pink-700 transition-all cursor-pointer"
+                        className="w-full bg-[#d2145a] rounded-t-md group-hover:bg-pink-600 transition-colors cursor-pointer"
                       />
                     </div>
 
