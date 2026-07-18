@@ -6152,5 +6152,39 @@
     "IsRead": false,
     "CreatedTime": "2026-06-24T06:20:07.174Z",
     "ReadTime": ""
+  },
+  {
+    "NotificationKey": "notif_1784378415049_8c6dr6",
+    "StaffKey": "01442",
+    "StaffName": "Lưu Lâm Thắng Tài",
+    "Title": "Chưa điền kết quả thông tim",
+    "Message": "BN 0987654311 đã quá 1 tháng từ ngày dự kiến thông tim nhưng chưa có kết quả thông tim.",
+    "Severity": "critical",
+    "RelatedEntityType": "Consult",
+    "RelatedEntityKey": "d1ce6263",
+    "PatientKey": "260314124607",
+    "PatientID": "0987654311",
+    "PatientName": "LÊ HOÀNG PHƯƠNG ANH",
+    "DedupKey": "notif:missing-cath-result:d1ce6263:01442",
+    "IsRead": false,
+    "CreatedTime": "2026-07-18T12:40:15.049Z",
+    "ReadTime": ""
+  },
+  {
+    "NotificationKey": "notif_1784378415075_e7m15t",
+    "StaffKey": "01541",
+    "StaffName": "Nguyễn Văn Hiếu",
+    "Title": "Chưa điền kết quả thông tim",
+    "Message": "BN 2305020868 đã quá 1 tháng từ ngày dự kiến thông tim nhưng chưa có kết quả thông tim.",
+    "Severity": "critical",
+    "RelatedEntityType": "Consult",
+    "RelatedEntityKey": "00c15b71",
+    "PatientKey": "260115040921",
+    "PatientID": "2305020868",
+    "PatientName": "NGUYỄN ĐOÀN BẢO ANH",
+    "DedupKey": "notif:missing-cath-result:00c15b71:01541",
+    "IsRead": false,
+    "CreatedTime": "2026-07-18T12:40:15.075Z",
+    "ReadTime": ""
   }
 ]
