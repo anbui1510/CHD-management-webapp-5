@@ -2783,28 +2783,28 @@ Xin cảm ơn!`;
                 })}
               </div>
               <table className="hidden lg:table w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
-                <thead className="bg-slate-50/70 text-slate-500 sticky top-0 border-b border-slate-200 uppercase text-[9px] font-extrabold tracking-wider z-10 shadow-xs">
+                <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-200 uppercase text-[9px] font-extrabold tracking-wider z-20 shadow-xs">
                   <tr>
                     {activeTab === 'scheduled' && (
-                       <th className="py-3 px-2 border-b border-slate-200 text-center w-20 sticky left-0 bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200">Hành động</th>
+                       <th className="py-3 px-2 border-b border-slate-200 text-center w-20 sticky left-0 top-0 bg-slate-50 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200">Hành động</th>
                     )}
                     <th 
                       style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
-                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200"
+                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky top-0 bg-slate-50 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200"
                     >
                       Họ và tên
                     </th>
-                    {visibleColumns.icd && <th className="py-3 px-2 border-b border-slate-200">ICD</th>}
-                    {visibleColumns.priority && <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>}
-                    {visibleColumns.requestBy && <th className="py-3 px-2 border-b border-slate-200">BS Đăng ký</th>}
-                    {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>}
-                    {visibleColumns.consultDate && <th className="py-3 px-2 border-b border-slate-200">Ngày hội chẩn</th>}
-                    {visibleColumns.consultResultId && <th className="py-3 px-2 border-b border-slate-200">Kết luận chính</th>}
-                    {visibleColumns.plannedDate && <th className="py-3 px-2 border-b border-slate-200 text-center">Dự kiến ngày thông tim</th>}
-                    {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>}
-                    {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200">Trạng thái gọi</th>}
-                    {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center">Trễ xếp lịch</th>}
-                    <th className="py-3 px-2 border-b border-slate-200 text-center w-12 sticky right-0 bg-slate-50 z-20 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] border-l border-slate-200">
+                    {visibleColumns.icd && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">ICD</th>}
+                    {visibleColumns.priority && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Ưu tiên</th>}
+                    {visibleColumns.requestBy && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">BS Đăng ký</th>}
+                    {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">PTV Phụ 1</th>}
+                    {visibleColumns.consultDate && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">Ngày hội chẩn</th>}
+                    {visibleColumns.consultResultId && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">Kết luận chính</th>}
+                    {visibleColumns.plannedDate && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Dự kiến ngày thông tim</th>}
+                    {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Kiểm dụng cụ</th>}
+                    {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">Trạng thái gọi</th>}
+                    {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Trễ xếp lịch</th>}
+                    <th className="py-3 px-2 border-b border-slate-200 text-center w-12 sticky top-0 right-0 bg-slate-50 z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] border-l border-slate-200">
                       <div className="relative inline-block text-left" ref={columnDropdownRef}>
                         <button
                           onClick={(e) => {
