@@ -2636,7 +2636,7 @@ Xin cảm ơn!`;
           </div>
 
           {/* Subtabs for "Chưa xếp lịch" / "Đã xếp lịch" / "Tất cả" with Count badges */}
-          <div className="px-3 lg:px-4 py-2 bg-slate-50/75 border-b border-slate-150 flex gap-2 shrink-0 overflow-x-auto flex-nowrap lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="px-3 lg:px-4 py-2 bg-slate-50/75 border-b border-slate-200 flex gap-2 shrink-0 overflow-x-auto flex-nowrap lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <button
               onClick={() => setActiveTab('unscheduled')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
@@ -2685,7 +2685,7 @@ Xin cảm ơn!`;
           </div>
 
           {/* Search bar inside queue listing */}
-          <div className="p-3 border-b border-slate-150 flex items-center relative gap-2 shrink-0">
+          <div className="p-3 border-b border-slate-200 flex items-center relative gap-2 shrink-0">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
               <input
@@ -2725,7 +2725,7 @@ Xin cảm ơn!`;
               </div>
             ) : (
               <>
-              <div className="lg:hidden divide-y divide-slate-150">
+              <div className="lg:hidden divide-y divide-slate-200">
                 {mobileDisplayedWaitlist.map((c) => {
                   const pat = findPatientByKey(patients, c.PatientKey);
                   if (!pat) return null;
@@ -2918,7 +2918,7 @@ Xin cảm ơn!`;
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-150">
+                <tbody className="divide-y divide-slate-200">
                   {paginatedWaitlist.map((c) => {
                     const pat = findPatientByKey(patients, c.PatientKey);
                     if (!pat) return null;
@@ -2950,7 +2950,7 @@ Xin cảm ơn!`;
                       >
                         {activeTab === 'scheduled' && (
                           <td 
-                            className={`py-2 px-2 text-center sticky left-0 z-10 border-r border-slate-150 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${isSelected ? 'bg-indigo-50' : 'bg-white'}`}
+                            className={`py-2 px-2 text-center sticky left-0 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${isSelected ? 'bg-indigo-50' : 'bg-white'}`}
                             onClick={(e) => { e.stopPropagation(); }}
                           >
                             <div className="flex items-center justify-center gap-1.5">
@@ -2969,7 +2969,7 @@ Xin cảm ơn!`;
                         )}
                         <td 
                           style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
-                          className={`py-3.5 px-3 min-w-[160px] md:min-w-[200px] sticky z-10 border-r border-slate-150 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] transition-colors ${
+                          className={`py-3.5 px-3 min-w-[160px] md:min-w-[200px] sticky z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] transition-colors ${
                             isSelected ? 'bg-indigo-50' : 'bg-white'
                           }`}
                         >
@@ -3051,7 +3051,7 @@ Xin cảm ơn!`;
                             {missedDays > 0 ? `${missedDays} ngày` : '0 ngày'}
                           </td>
                         )}
-                        <td className={`py-3.5 px-2 text-center sticky right-0 z-10 border-l border-slate-150 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
+                        <td className={`py-3.5 px-2 text-center sticky right-0 z-10 border-l border-slate-200 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
                           isSelected ? 'bg-indigo-50' : 'bg-white'
                         }`} />
                       </tr>
@@ -3164,7 +3164,7 @@ Xin cảm ơn!`;
                 <div className="p-1.5 lg:p-3 bg-white/80 border-b border-slate-100 flex items-center justify-center gap-6 shrink-0">
                   <button 
                     onClick={handlePrevMonth}
-                    className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition border border-slate-150 cursor-pointer"
+                    className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition border border-slate-200 cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -3173,7 +3173,7 @@ Xin cảm ơn!`;
                   </span>
                   <button 
                     onClick={handleNextMonth}
-                    className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition border border-slate-150 cursor-pointer"
+                    className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition border border-slate-200 cursor-pointer"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -3356,7 +3356,7 @@ Xin cảm ơn!`;
                             <div 
                               key={c.ConsultKey}
                               onClick={() => { handleSelectConsult(c); if (pureCalendarMode) setShowSummaryModal(true); }}
-                              className="bg-white border border-slate-150 p-3 rounded-2xl flex justify-between items-center hover:bg-slate-100 cursor-pointer transition shadow-xs"
+                              className="bg-white border border-slate-200 p-3 rounded-2xl flex justify-between items-center hover:bg-slate-100 cursor-pointer transition shadow-xs"
                             >
                               <div>
                                 <span className="text-[10px] text-pink-700 font-extrabold uppercase bg-pink-50 border border-pink-100 px-2 py-0.5 rounded">
@@ -3451,7 +3451,7 @@ Xin cảm ơn!`;
                         <div className="space-y-2">
                       
                       {/* Part 1: Administrative Details */}
-                      <div className="bg-white border border-slate-150 p-3 rounded-2xl shadow-xs">
+                      <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-xs">
                         <span className="hidden lg:block font-extrabold text-slate-800 text-[10px] uppercase tracking-wider border-b border-slate-100 pb-1 mb-1.5">
                           THÔNG TIN HÀNH CHÍNH
                         </span>
@@ -3970,7 +3970,7 @@ Xin cảm ơn!`;
               </div>
 
               {/* Desktop Save Footer Bar */}
-              <div className="hidden lg:flex p-4 border-t border-slate-105 bg-slate-50 flex-row justify-between gap-3 shrink-0 flex-wrap">
+              <div className="hidden lg:flex p-4 border-t border-slate-200 bg-slate-50 flex-row justify-between gap-3 shrink-0 flex-wrap">
                 <div className="flex gap-2 items-center flex-wrap">
                   {/* Xem hồ sơ */}
                   {(() => {
@@ -4847,12 +4847,12 @@ Xin cảm ơn!`;
                               </span>
                             </div>
                             
-                            <div className="flex justify-between items-start gap-2 border-b border-slate-105 pb-1.5 pt-0.5 px-1">
+                            <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
                               <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0">Dụng cụ dự kiến:</span>
                               <span className="font-extrabold text-slate-800 text-[12.5px] text-right break-words max-w-[70%]">{plannedDevice || '—'}</span>
                             </div>
 
-                            <div className="flex justify-between items-center border-b border-slate-105 pb-1.5 pt-0.5 px-1">
+                            <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
                               <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Số tiền dự kiến:</span>
                               <span className="font-black text-rose-650 font-mono text-[12.5px]">{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
                             </div>
@@ -4886,12 +4886,12 @@ Xin cảm ơn!`;
                               </span>
                             </div>
 
-                            <div className="flex justify-between items-center border-b border-slate-105 pb-1.5 pt-0.5 px-1">
+                            <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
                               <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Trạng thái gọi:</span>
                               <span className="font-bold text-slate-800 text-[12.5px]">{callStatus || '—'}</span>
                             </div>
 
-                            <div className="flex justify-between items-start gap-2 border-b border-slate-105 pb-1.5 pt-0.5 px-1">
+                            <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
                               <span className="text-[#d2145a] font-black text-[9px] tracking-wider uppercase shrink-0">PTV:</span>
                               <span className="font-extrabold text-slate-850 uppercase text-[12.5px] text-right break-words max-w-[75%]">
                                 {[scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean).join(' - ') || 'Chưa gán'}
