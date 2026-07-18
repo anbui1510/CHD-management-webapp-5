@@ -2779,7 +2779,7 @@ Xin cảm ơn!`;
               </div>
             ) : (
               <>
-              <div className="lg:hidden divide-y divide-slate-150">
+              <div className="lg:hidden">
                 {mobileDisplayedWaitlist.map((c) => {
                   const pat = findPatientByKey(patients, c.PatientKey);
                   if (!pat) return null;
