@@ -63,9 +63,9 @@ export const SCHEDULE_DELAY_THRESHOLDS = {
   RED_FILLED_DAYS: 90,
   /** Tam giác đen đặc (6 tháng) */
   BLACK_FILLED_DAYS: 180,
-  /** Tab lọc "Trễ 2 tuần" */
+  /** Tab lọc "Trễ 2 tuần" (14–27 ngày, chưa có PlannedCathLabDate) */
   FILTER_LATE_2_WEEKS_DAYS: 14,
-  /** Tab lọc "Trễ 4 tuần" */
+  /** Tab lọc "Trễ 4 tuần" (>= 28 ngày, chưa có PlannedCathLabDate) */
   FILTER_LATE_4_WEEKS_DAYS: 28,
 } as const;
 
@@ -131,13 +131,23 @@ export function getScheduleDelayWarningInfo(
   return { missedDays, level, titleText };
 }
 
+export function isConsultUnscheduledForCathLab(
+  consult: Pick<Consult, 'PlannedCathLabDate'>
+): boolean {
+  return !hasPlannedCathLabDate(consult);
+}
+
 export function isConsultLateForScheduling(
   consult: Pick<Consult, 'ConsultDate' | 'PlannedCathLabDate'>,
   minDays: number,
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  maxDays?: number
 ): boolean {
   if (hasPlannedCathLabDate(consult)) return false;
-  return getMissScheduleDays(consult.ConsultDate, referenceDate) >= minDays;
+  const missedDays = getMissScheduleDays(consult.ConsultDate, referenceDate);
+  if (missedDays < minDays) return false;
+  if (maxDays !== undefined && missedDays >= maxDays) return false;
+  return true;
 }
 
 export function isConsultCathCompleted(consult: Consult, patientCathlabs: CathLab[] | undefined): boolean {

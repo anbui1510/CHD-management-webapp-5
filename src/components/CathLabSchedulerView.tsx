@@ -10,6 +10,7 @@ import {
   getScheduleDelayWarningInfo,
   isConsultCathCompleted,
   isConsultLateForScheduling,
+  isConsultUnscheduledForCathLab,
   isConsultWaitlistExcludedByStatus,
   SCHEDULE_DELAY_THRESHOLDS,
   type ScheduleDelayWarningInfo,
@@ -392,6 +393,7 @@ export default function CathLabSchedulerView({
   useEffect(() => {
     setWaitlistCurrentPage(1);
     setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
+    waitlistScrollRef.current?.scrollTo({ top: 0 });
   }, [activeTab, searchQuery, waitlistSortOrder, waitlistSortField]);
   
   // Selected consult for form editing
@@ -820,10 +822,15 @@ Xin cảm ơn!`;
   // Segment Waiting List into tabs: "Chưa xếp lịch" and "Đã xếp lịch"
   // Sắp xếp ngày gần nhất lên trên, ngày xa nhất dưới
   const segmentedWaitlist = useMemo(() => {
-    const unscheduledList = allEligibleWaitlist.filter(c => !c.PlannedCathLabDate);
-    const scheduledList = allEligibleWaitlist.filter(c => !!c.PlannedCathLabDate);
+    const unscheduledList = allEligibleWaitlist.filter(c => isConsultUnscheduledForCathLab(c));
+    const scheduledList = allEligibleWaitlist.filter(c => !isConsultUnscheduledForCathLab(c));
     const late2WeeksList = unscheduledList.filter(c =>
-      isConsultLateForScheduling(c, SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_2_WEEKS_DAYS)
+      isConsultLateForScheduling(
+        c,
+        SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_2_WEEKS_DAYS,
+        new Date(),
+        SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_4_WEEKS_DAYS
+      )
     );
     const late4WeeksList = unscheduledList.filter(c =>
       isConsultLateForScheduling(c, SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_4_WEEKS_DAYS)
@@ -1471,12 +1478,13 @@ Xin cảm ơn!`;
       });
     }
 
+    const shouldSortByMissedDays =
+      activeTab === 'late2weeks' || activeTab === 'late4weeks';
+
     return result.sort((a, b) => {
       let comparison = 0;
-      if (waitlistSortField === 'date') {
-        const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-        const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-        comparison = da - db;
+      if (shouldSortByMissedDays || waitlistSortField === 'date') {
+        comparison = getMissScheduleDays(a.ConsultDate) - getMissScheduleDays(b.ConsultDate);
       } else if (waitlistSortField === 'plannedDate') {
         const da = a.PlannedCathLabDate ? new Date(a.PlannedCathLabDate).getTime() : 0;
         const db = b.PlannedCathLabDate ? new Date(b.PlannedCathLabDate).getTime() : 0;
@@ -2709,6 +2717,7 @@ Xin cảm ơn!`;
           {/* Subtabs for "Chưa xếp lịch" / "Đã xếp lịch" / "Tất cả" with Count badges */}
           <div className="px-3 lg:px-4 py-2 bg-slate-50/75 border-b border-slate-150 flex gap-2 shrink-0 overflow-x-auto flex-nowrap lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <button
+              type="button"
               onClick={() => setActiveTab('unscheduled')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'unscheduled'
@@ -2724,6 +2733,7 @@ Xin cảm ơn!`;
               </span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('scheduled')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'scheduled'
@@ -2739,6 +2749,7 @@ Xin cảm ơn!`;
               </span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('all')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'all'
@@ -2754,6 +2765,7 @@ Xin cảm ơn!`;
               </span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('late2weeks')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'late2weeks'
@@ -2769,6 +2781,7 @@ Xin cảm ơn!`;
               </span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('late4weeks')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'late4weeks'
