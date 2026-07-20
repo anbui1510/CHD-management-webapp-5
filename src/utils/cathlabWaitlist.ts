@@ -63,13 +63,20 @@ export const SCHEDULE_DELAY_THRESHOLDS = {
   RED_FILLED_DAYS: 90,
   /** Tam giác đen đặc (6 tháng) */
   BLACK_FILLED_DAYS: 180,
-  /** Tab lọc "Trễ 2 tuần" (14–27 ngày, chưa có PlannedCathLabDate) */
-  FILTER_LATE_2_WEEKS_DAYS: 14,
-  /** Tab lọc "Trễ 4 tuần" (>= 28 ngày, chưa có PlannedCathLabDate) */
-  FILTER_LATE_4_WEEKS_DAYS: 28,
 } as const;
 
 export type ScheduleDelayWarningLevel = 'yellow' | 'red-outline' | 'red-filled' | 'black';
+
+export const SCHEDULE_DELAY_FILTER_TABS: ReadonlyArray<{
+  tabId: 'delayYellow' | 'delayRedOutline' | 'delayRedFilled' | 'delayBlack';
+  level: ScheduleDelayWarningLevel;
+  label: string;
+}> = [
+  { tabId: 'delayYellow', level: 'yellow', label: 'Trễ 2 tuần' },
+  { tabId: 'delayRedOutline', level: 'red-outline', label: 'Trễ 4 tuần' },
+  { tabId: 'delayRedFilled', level: 'red-filled', label: 'Trễ 3 tháng' },
+  { tabId: 'delayBlack', level: 'black', label: 'Trễ 6 tháng' },
+] as const;
 
 export interface ScheduleDelayWarningInfo {
   missedDays: number;
@@ -129,6 +136,14 @@ export function getScheduleDelayWarningInfo(
   }
 
   return { missedDays, level, titleText };
+}
+
+export function isConsultInScheduleDelayLevel(
+  consult: Pick<Consult, 'ConsultDate' | 'PlannedCathLabDate'>,
+  level: ScheduleDelayWarningLevel,
+  referenceDate: Date = new Date()
+): boolean {
+  return getScheduleDelayWarningInfo(consult, referenceDate)?.level === level;
 }
 
 export function isConsultUnscheduledForCathLab(

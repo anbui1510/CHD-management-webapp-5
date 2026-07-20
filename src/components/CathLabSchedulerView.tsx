@@ -9,10 +9,10 @@ import {
   getMissScheduleDays,
   getScheduleDelayWarningInfo,
   isConsultCathCompleted,
-  isConsultLateForScheduling,
+  isConsultInScheduleDelayLevel,
   isConsultUnscheduledForCathLab,
   isConsultWaitlistExcludedByStatus,
-  SCHEDULE_DELAY_THRESHOLDS,
+  SCHEDULE_DELAY_FILTER_TABS,
   type ScheduleDelayWarningInfo,
 } from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
@@ -146,7 +146,43 @@ const ScheduleDelayWarningIcon = ({ warning }: { warning: ScheduleDelayWarningIn
   return <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" title={warning.titleText} />;
 };
 
-type WaitlistTab = 'unscheduled' | 'scheduled' | 'all' | 'late2weeks' | 'late4weeks';
+type WaitlistTab =
+  | 'unscheduled'
+  | 'scheduled'
+  | 'all'
+  | 'delayYellow'
+  | 'delayRedOutline'
+  | 'delayRedFilled'
+  | 'delayBlack';
+
+const DELAY_WAITLIST_TABS = new Set<WaitlistTab>([
+  'delayYellow',
+  'delayRedOutline',
+  'delayRedFilled',
+  'delayBlack',
+]);
+
+const DELAY_TAB_STYLES: Record<
+  'delayYellow' | 'delayRedOutline' | 'delayRedFilled' | 'delayBlack',
+  { active: string; badgeActive: string }
+> = {
+  delayYellow: {
+    active: 'bg-amber-500 text-white shadow-xs',
+    badgeActive: 'bg-amber-100 text-amber-900',
+  },
+  delayRedOutline: {
+    active: 'bg-rose-600 text-white shadow-xs',
+    badgeActive: 'bg-rose-100 text-rose-800',
+  },
+  delayRedFilled: {
+    active: 'bg-[#d2145a] text-white shadow-xs',
+    badgeActive: 'bg-pink-100 text-[#d2145a]',
+  },
+  delayBlack: {
+    active: 'bg-slate-900 text-white shadow-xs',
+    badgeActive: 'bg-slate-200 text-slate-900',
+  },
+};
 
 const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
   if (!ptvPhu?.trim()) return patientName;
@@ -824,17 +860,6 @@ Xin cảm ơn!`;
   const segmentedWaitlist = useMemo(() => {
     const unscheduledList = allEligibleWaitlist.filter(c => isConsultUnscheduledForCathLab(c));
     const scheduledList = allEligibleWaitlist.filter(c => !isConsultUnscheduledForCathLab(c));
-    const late2WeeksList = unscheduledList.filter(c =>
-      isConsultLateForScheduling(
-        c,
-        SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_2_WEEKS_DAYS,
-        new Date(),
-        SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_4_WEEKS_DAYS
-      )
-    );
-    const late4WeeksList = unscheduledList.filter(c =>
-      isConsultLateForScheduling(c, SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_4_WEEKS_DAYS)
-    );
 
     const sortByConsultDateDesc = (items: Consult[]) =>
       [...items].sort((a, b) => (b.ConsultDate || '').localeCompare(a.ConsultDate || ''));
@@ -847,12 +872,21 @@ Xin cảm ơn!`;
       (b.PlannedCathLabDate || '').localeCompare(a.PlannedCathLabDate || '')
     );
 
+    const delaySegments = Object.fromEntries(
+      SCHEDULE_DELAY_FILTER_TABS.map(({ tabId, level }) => [
+        tabId,
+        sortByMissedDaysDesc(unscheduledList.filter(c => isConsultInScheduleDelayLevel(c, level))),
+      ])
+    ) as Record<
+      'delayYellow' | 'delayRedOutline' | 'delayRedFilled' | 'delayBlack',
+      Consult[]
+    >;
+
     return {
       unscheduled: sortedUnscheduled,
       scheduled: sortedScheduled,
       all: [...sortedUnscheduled, ...sortedScheduled],
-      late2weeks: sortByMissedDaysDesc(late2WeeksList),
-      late4weeks: sortByMissedDaysDesc(late4WeeksList),
+      ...delaySegments,
     };
   }, [allEligibleWaitlist]);
 
@@ -1454,15 +1488,14 @@ Xin cảm ơn!`;
 
   // Apply search and sort filtering on current active list tab
   const displayWaitlist = useMemo(() => {
-    const activeList = activeTab === 'unscheduled'
-      ? segmentedWaitlist.unscheduled
-      : activeTab === 'scheduled'
-        ? segmentedWaitlist.scheduled
-        : activeTab === 'late2weeks'
-          ? segmentedWaitlist.late2weeks
-          : activeTab === 'late4weeks'
-            ? segmentedWaitlist.late4weeks
-            : segmentedWaitlist.all;
+    const activeList =
+      activeTab === 'unscheduled'
+        ? segmentedWaitlist.unscheduled
+        : activeTab === 'scheduled'
+          ? segmentedWaitlist.scheduled
+          : activeTab === 'all'
+            ? segmentedWaitlist.all
+            : segmentedWaitlist[activeTab];
     let result = activeList;
     
     const q = removeDiacritics(searchQuery).toLowerCase().trim();
@@ -1478,8 +1511,7 @@ Xin cảm ơn!`;
       });
     }
 
-    const shouldSortByMissedDays =
-      activeTab === 'late2weeks' || activeTab === 'late4weeks';
+    const shouldSortByMissedDays = DELAY_WAITLIST_TABS.has(activeTab);
 
     return result.sort((a, b) => {
       let comparison = 0;
@@ -2764,38 +2796,29 @@ Xin cảm ơn!`;
                 {segmentedWaitlist.all.length}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('late2weeks')}
-              className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
-                activeTab === 'late2weeks'
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
-              }`}
-            >
-              Trễ 2 tuần
-              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
-                activeTab === 'late2weeks' ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {segmentedWaitlist.late2weeks.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('late4weeks')}
-              className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
-                activeTab === 'late4weeks'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
-              }`}
-            >
-              Trễ 4 tuần
-              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
-                activeTab === 'late4weeks' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {segmentedWaitlist.late4weeks.length}
-              </span>
-            </button>
+            {SCHEDULE_DELAY_FILTER_TABS.map(({ tabId, label }) => {
+              const styles = DELAY_TAB_STYLES[tabId];
+              const isActive = activeTab === tabId;
+              return (
+                <button
+                  key={tabId}
+                  type="button"
+                  onClick={() => setActiveTab(tabId)}
+                  className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? styles.active
+                      : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
+                  }`}
+                >
+                  {label}
+                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                    isActive ? styles.badgeActive : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {segmentedWaitlist[tabId].length}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Search bar inside queue listing */}
