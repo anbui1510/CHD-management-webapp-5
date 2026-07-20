@@ -1,5 +1,105 @@
-import type { CathLab, Consult } from '../types';
-import { normalizePatientKey } from '../types';
+import type { CathLab, Consult, Patient } from '../types';
+import { findPatientByKey, normalizePatientKey } from '../types';
+
+export const CATH_WAITLIST_ELIGIBLE_RESULTS = [
+  'Can thiệp thông tim',
+  'Chụp chẩn đoán +/- can thiệp',
+  'Chụp chẩn đoán-Đo kháng lực',
+  'Chụp chẩn đoán/Đo kháng lực',
+  'Tiền Glenn',
+  'Tiền Fontan',
+  'Điện sinh lý',
+] as const;
+
+const CATH_WAITLIST_ELIGIBLE_RESULTS_NORMALIZED = CATH_WAITLIST_ELIGIBLE_RESULTS.map(result =>
+  result.trim().toLowerCase()
+);
+
+export function buildLatestConsultsMap(consults: Consult[]): Map<string, string> {
+  const map = new Map<string, string>();
+  const sorted = [...consults].sort((a, b) => {
+    const aDate = a.ConsultDate || '';
+    const bDate = b.ConsultDate || '';
+    if (aDate !== bDate) return bDate.localeCompare(aDate);
+    return (b.ConsultCreateTime || '').localeCompare(a.ConsultCreateTime || '');
+  });
+
+  sorted.forEach(consult => {
+    if (!consult.PatientKey) return;
+    const patientKey = normalizePatientKey(consult.PatientKey);
+    if (!map.has(patientKey)) {
+      map.set(patientKey, consult.ConsultKey);
+    }
+  });
+
+  return map;
+}
+
+function isConsultRemoved(consult: Consult): boolean {
+  return (
+    consult.Removed === true ||
+    String(consult.Removed || '').trim().toLowerCase() === 'true' ||
+    String(consult.Removed || '').trim().toLowerCase() === 'có' ||
+    String(consult.Removed || '').trim().toLowerCase() === 'yes'
+  );
+}
+
+function isConsultTransferredToCathLab(consult: Consult): boolean {
+  const transferred = String(consult.TransferredToCathLab ?? '').trim().toLowerCase();
+  return (
+    consult.TransferredToCathLab === true ||
+    transferred === 'true' ||
+    transferred === 'yes' ||
+    transferred === 'có'
+  );
+}
+
+function isEligibleCathWaitlistResult(consultResultId?: string): boolean {
+  const resultId = (consultResultId || '').trim();
+  if (CATH_WAITLIST_ELIGIBLE_RESULTS.includes(resultId as (typeof CATH_WAITLIST_ELIGIBLE_RESULTS)[number])) {
+    return true;
+  }
+  return CATH_WAITLIST_ELIGIBLE_RESULTS_NORMALIZED.includes(resultId.toLowerCase());
+}
+
+function isExcludedCathWaitlistCallStatus(callStatus?: string): boolean {
+  const normalized = String(callStatus || '').trim().toLowerCase();
+  return (
+    normalized === 'đã can thiệp/mổ' ||
+    normalized === 'loại' ||
+    normalized === 'đã làm nơi khác' ||
+    normalized === 'muốn theo dõi nơi khác'
+  );
+}
+
+/** Ca hội chẩn còn trong hàng chờ xếp lịch thông tim (logic đồng bộ CathLabSchedulerView). */
+export function filterEligibleCathWaitlist(
+  consults: Consult[],
+  patients: Patient[],
+  cathlabsByPatientKey: Map<string, CathLab[]>,
+  latestConsultsMap: Map<string, string>
+): Consult[] {
+  return consults.filter(consult => {
+    if (!consult.ConsultDate) return false;
+
+    const patientKey = normalizePatientKey(consult.PatientKey);
+    if (latestConsultsMap.get(patientKey) !== consult.ConsultKey) return false;
+    if (isConsultCathCompleted(consult, cathlabsByPatientKey.get(patientKey))) return false;
+    if (isConsultWaitlistExcludedByStatus(consult.Status)) return false;
+    if (isConsultRemoved(consult)) return false;
+    if (!isEligibleCathWaitlistResult(consult.ConsultResultID)) return false;
+    if (isExcludedCathWaitlistCallStatus(consult.CallStatus)) return false;
+
+    const patient = findPatientByKey(patients, consult.PatientKey);
+    if (!patient) return false;
+
+    const outcome = String(patient.Outcome || '').toLowerCase().trim();
+    if (outcome === 'tử vong' || outcome === 'nặng xin về') return false;
+    if (isConsultTransferredToCathLab(consult)) return false;
+
+    return true;
+  });
+}
 
 const normalizeRefKey = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
