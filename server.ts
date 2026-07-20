@@ -270,11 +270,15 @@ app.get('/api/staff/public', async (_req, res) => {
   res.json(publicList);
 });
 
-const BUILD_TIMESTAMP = String(Date.now());
+const BUILD_ID =
+  process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) ||
+  process.env.GITHUB_SHA?.slice(0, 12) ||
+  process.env.BUILD_ID ||
+  String(Date.now());
 
 // Version endpoint — public, does not require authentication
 app.get('/api/version', (_req, res) => {
-  res.json({ version: '5.0.0', buildTime: BUILD_TIMESTAMP });
+  res.json({ version: '5.0.0', buildId: BUILD_ID, buildTime: BUILD_ID });
 });
 
 // ─────────────────────────────────────────────────────────────────

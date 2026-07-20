@@ -1,11 +1,39 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import path from 'path';
 import {defineConfig} from 'vite';
+import { APP_VERSION } from './src/appVersion';
 
 export default defineConfig(() => {
+  const appBuildId =
+    process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) ||
+    process.env.GITHUB_SHA?.slice(0, 12) ||
+    process.env.BUILD_ID ||
+    String(Date.now());
+
   return {
-    plugins: [react(), tailwindcss()],
+    define: {
+      __APP_BUILD_ID__: JSON.stringify(appBuildId),
+    },
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'chd-emit-version-json',
+        closeBundle() {
+          const payload = {
+            version: APP_VERSION,
+            buildId: appBuildId,
+            buildTime: appBuildId,
+          };
+          fs.writeFileSync(
+            path.resolve(__dirname, 'dist/version.json'),
+            `${JSON.stringify(payload)}\n`
+          );
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -1,4 +1,5 @@
 import { handleChdBriefRequest } from './chdBriefBridge';
+import { getAppVersionPayload } from '../appVersion';
 import type { Staff, Source } from '../types';
 
 type SheetData = {
@@ -703,6 +704,10 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
   const parts = parsed.pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean);
   const endpoint = parts[0] || '';
   const key = parts[1];
+
+  if (endpoint === 'version' && method === 'GET') {
+    return jsonResponse(getAppVersionPayload());
+  }
 
   if (endpoint === 'sync-config') {
     if (parts[1] === 'sync' && method === 'POST') {
