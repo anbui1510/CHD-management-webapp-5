@@ -58,6 +58,13 @@ import ResultStaffDrawer from './components/ResultStaffDrawer';
 import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
 import { clearLocalCache } from './api/appsScriptFetch';
 import {
+  APP_BUILD_ID,
+  CHD_APP_BUILD_ID_KEY,
+  CHD_DEPLOY_LOGOUT_MSG_KEY,
+  fetchRemoteAppBuildId,
+  isAppBuildIdMismatch,
+} from './appVersion';
+import {
   createLatestDiagnosisResolver,
 } from './utils/latestDiagnosis';
 import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
@@ -295,10 +302,6 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoadError, setLoginLoadError] = useState<string>('');
-
-  // States for Code Auto-Update & Background Polling
-  const [runningBuildTime, setRunningBuildTime] = useState<string | null>(null);
-  const [showUpdateBanner, setShowUpdateBanner] = useState<boolean>(false);
 
   // Search Filter State (Patient List & Globals)
   const [patientSearch, setPatientSearch] = useState<string>('');
@@ -592,11 +595,63 @@ export default function App() {
     });
   }, [refreshMedicalData]);
 
+  const handleLogoutRef = useRef<(() => void) | null>(null);
+
+  const loadPublicStaffForLogin = useCallback(() => {
+    void refreshMedicalData('staff', false).then(() => {
+      void refreshMedicalData('staff', true).catch(err => {
+        const msg = err instanceof Error ? err.message : String(err);
+        setLoginLoadError(
+          msg.includes('Failed to fetch')
+            ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
+            : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
+        );
+      });
+    }).catch(err => {
+      void refreshMedicalData('staff', true).catch(() => {});
+      const msg = err instanceof Error ? err.message : String(err);
+      setLoginLoadError(
+        msg.includes('Failed to fetch')
+          ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
+          : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
+      );
+    });
+  }, [refreshMedicalData]);
+
+  const forceLogoutForAppUpdate = useCallback(() => {
+    sessionStorage.setItem(
+      CHD_DEPLOY_LOGOUT_MSG_KEY,
+      'Hệ thống vừa được cập nhật trên Cloudflare. Vui lòng đăng nhập lại để sử dụng phiên bản mới.'
+    );
+    handleLogoutRef.current?.();
+    window.location.reload();
+  }, []);
+
   useEffect(() => {
-    // 1. Recover logged-in session via server token or cookie
+    const deployMsg = sessionStorage.getItem(CHD_DEPLOY_LOGOUT_MSG_KEY);
+    if (deployMsg) {
+      sessionStorage.removeItem(CHD_DEPLOY_LOGOUT_MSG_KEY);
+      setLoginLoadError(deployMsg);
+    }
+
+    const storedBuildId = localStorage.getItem(CHD_APP_BUILD_ID_KEY);
+    if (isAppBuildIdMismatch(storedBuildId)) {
+      localStorage.removeItem('CHD_AUTH_TOKEN');
+      localStorage.removeItem('CurrentStaffKey');
+      localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
+      setAuthToken('');
+      setCurrentStaff(null);
+      void clearLocalCache();
+      if (!deployMsg) {
+        setLoginLoadError('Hệ thống vừa cập nhật phiên bản mới. Vui lòng đăng nhập lại.');
+      }
+      loadPublicStaffForLogin();
+      return;
+    }
+
+    // Recover logged-in session via server token or cookie
     const storedToken = localStorage.getItem('CHD_AUTH_TOKEN') || (['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname) ? 'cookie-session' : '');
     if (storedToken) {
-      // Validate token with server and get current staff info
       fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${storedToken}` }
       })
@@ -605,9 +660,9 @@ export default function App() {
           return res.json();
         })
         .then((staffData: Staff) => {
+          localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
-          // Load full database (SWR)
           void refreshMedicalData('full', false).then(() => {
             void refreshMedicalData('full', true).catch(err => {
               console.warn('Background sync failed:', err);
@@ -620,69 +675,38 @@ export default function App() {
           });
         })
         .catch(() => {
-          // Token invalid/expired — clear and show login screen
           localStorage.removeItem('CHD_AUTH_TOKEN');
+          localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
           setAuthToken('');
           setCurrentStaff(null);
-          // Load public staff list for login dropdown
-          void refreshMedicalData('staff', false).then(() => {
-            void refreshMedicalData('staff', true).catch(() => {});
-          }).catch(() => {});
+          loadPublicStaffForLogin();
         });
     } else {
-      // Not logged in: load public staff list only
-      void refreshMedicalData('staff', false).then(() => {
-        void refreshMedicalData('staff', true).catch(err => {
-          const msg = err instanceof Error ? err.message : String(err);
-          setLoginLoadError(
-            msg.includes('Failed to fetch')
-              ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
-              : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
-          );
-        });
-      }).catch(err => {
-        void refreshMedicalData('staff', true).catch(err => {
-          const msg = err instanceof Error ? err.message : String(err);
-          setLoginLoadError(
-            msg.includes('Failed to fetch')
-              ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
-              : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
-          );
-        });
-      });
+      loadPublicStaffForLogin();
     }
-  }, []);
+  }, [loadPublicStaffForLogin, refreshMedicalData]);
 
-  // Background Code Version Polling (Check every 5 minutes)
+  // Detect new Cloudflare deploy while app is open → force logout + reload
   useEffect(() => {
-    const checkVersion = () => {
-      fetch('/api/version')
-        .then(res => {
-          if (res.ok) return res.json();
-          throw new Error('Version endpoint returned error');
-        })
-        .then(data => {
-          if (data && data.buildTime) {
-            setRunningBuildTime(prev => {
-              if (!prev) {
-                return data.buildTime;
-              }
-              if (prev !== data.buildTime) {
-                setShowUpdateBanner(true);
-              }
-              return prev;
-            });
-          }
-        })
-        .catch(err => {
-          console.warn('Failed to check app build version:', err);
-        });
+    let cancelled = false;
+
+    const checkVersion = async () => {
+      const remoteBuildId = await fetchRemoteAppBuildId();
+      if (cancelled || !remoteBuildId || remoteBuildId === APP_BUILD_ID) return;
+
+      const hasSession = !!localStorage.getItem('CHD_AUTH_TOKEN');
+      if (hasSession) {
+        forceLogoutForAppUpdate();
+      }
     };
 
-    checkVersion();
-    const interval = setInterval(checkVersion, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
+    void checkVersion();
+    const interval = setInterval(() => { void checkVersion(); }, 2 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [forceLogoutForAppUpdate]);
 
   // Background Clinical Data Polling (Refresh every 60 seconds when logged in)
   useEffect(() => {
@@ -804,6 +828,7 @@ export default function App() {
       const { token, staff: staffData } = data as { token: string; staff: Staff };
       // Store ONLY the token — no password, no sensitive data in localStorage
       localStorage.setItem('CHD_AUTH_TOKEN', token);
+      localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
       // Remove legacy storage key if present
       localStorage.removeItem('CurrentStaffKey');
       setAuthToken(token);
@@ -836,6 +861,7 @@ export default function App() {
       }).catch(() => {});
     }
     localStorage.removeItem('CHD_AUTH_TOKEN');
+    localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
     // Also clean up legacy keys
     localStorage.removeItem('CurrentStaffKey');
     if (currentStaff?.StaffKey) {
@@ -858,6 +884,8 @@ export default function App() {
     // Clear IndexedDB cache and bridge memory cache
     void clearLocalCache().catch(err => console.warn('Failed to clear local cache on logout:', err));
   }, [currentStaff]);
+
+  handleLogoutRef.current = handleLogout;
 
   // Auto logout / session timeout logic
   useEffect(() => {
@@ -4142,51 +4170,6 @@ export default function App() {
                   className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
                 >
                   Xác nhận
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Auto-Update Code Banner */}
-      <AnimatePresence>
-        {showUpdateBanner && (
-          <div className="fixed bottom-14 md:bottom-8 right-4 md:right-6 z-50 max-w-sm w-full p-0.5 shadow-2xl rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-[#d2145a] font-sans">
-            <motion.div 
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-slate-900/90 backdrop-blur-xl rounded-[14px] p-4 text-white space-y-3"
-            >
-              <div className="flex items-start gap-3">
-                <div className="bg-pink-500/20 text-[#d2145a] rounded-full p-2 flex items-center justify-center shrink-0">
-                  <RefreshCw className="w-5 h-5 animate-spin" style={{ animationDuration: '4s' }} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400">
-                    Hệ thống đã cập nhật
-                  </h4>
-                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed mt-1">
-                    Phiên bản mới đã được xuất bản trên Cloudflare. Vui lòng làm mới để áp dụng các cải tiến.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowUpdateBanner(false)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer text-[10px] font-black uppercase tracking-wider"
-                >
-                  Để sau
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-[#d2145a] hover:from-pink-600 hover:to-rose-600 text-white shadow-md hover:shadow-pink-500/20 transition cursor-pointer text-[10px] font-black uppercase tracking-wider"
-                >
-                  Tải lại ngay
                 </button>
               </div>
             </motion.div>
