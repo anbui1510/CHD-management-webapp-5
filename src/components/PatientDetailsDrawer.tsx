@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Patient, Consult, CathLab, CMR, Operation, formatVNTime } from '../types';
+import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
 import {
   parseMedicalDateTime,
   resolveLatestDiagnosis,
@@ -58,6 +59,9 @@ export default function PatientDetailsDrawer({
   onSelectPDF,
   onRegisterNewConsult
 }: PatientDetailsDrawerProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  useLockBodyScroll(true);
+  usePreventBackgroundTouchScroll(scrollContainerRef, true);
 
   const patientKey = normalizeRecordKey(patient.PatientKey);
   const patientId1 = normalizeRecordKey(patient.PatientID1);
@@ -122,21 +126,31 @@ export default function PatientDetailsDrawer({
   });
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0" onClick={onClose}></div>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 overflow-hidden overscroll-none animate-in fade-in duration-200">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true"></div>
 
-      <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-250 overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="patient-details-drawer-title"
+        className="relative bg-white w-full max-w-2xl max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[90vh] rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-250 overflow-hidden min-h-0"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
           <div className="flex items-center gap-2">
             <UserSquare2 className="w-5 h-5" />
-            <h3 className="font-extrabold text-sm tracking-wide uppercase">Hồ sơ chi tiết bệnh nhi</h3>
+            <h3 id="patient-details-drawer-title" className="font-extrabold text-sm tracking-wide uppercase">Hồ sơ chi tiết bệnh nhi</h3>
           </div>
           <button onClick={onClose} className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-6 space-y-6"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 border border-slate-150 rounded-2xl shadow-sm">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="hidden md:flex w-14 h-14 rounded-full bg-pink-100 border-2 border-pink-200 text-[#d2145a] items-center justify-center font-bold text-xl uppercase shadow-inner shrink-0">
