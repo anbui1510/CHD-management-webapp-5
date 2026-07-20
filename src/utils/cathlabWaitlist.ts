@@ -57,8 +57,8 @@ export function buildCathlabsByPatientKey(cathlabs: CathLab[]): Map<string, Cath
 export const SCHEDULE_DELAY_THRESHOLDS = {
   /** Bắt đầu hiện tam giác vàng */
   WARNING_MIN_DAYS: 14,
-  /** Tam giác đỏ viền (~1 tháng) */
-  RED_OUTLINE_DAYS: 30,
+  /** Tam giác đỏ viền (4 tuần) */
+  RED_OUTLINE_DAYS: 28,
   /** Tam giác đỏ đặc (3 tháng — đồng bộ notification server) */
   RED_FILLED_DAYS: 90,
   /** Tam giác đen đặc (6 tháng) */
