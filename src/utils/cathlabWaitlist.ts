@@ -53,6 +53,93 @@ export function buildCathlabsByPatientKey(cathlabs: CathLab[]): Map<string, Cath
  * - PlannedCathLabDate matches CathDate (historical imports missing ConsultKey)
  * - CathDate on/after ConsultDate for same patient (cath logged without ConsultKey link)
  */
+/** Ngưỡng cảnh báo trễ xếp lịch thông tim (tính từ ConsultDate, chỉ ca chưa có PlannedCathLabDate). */
+export const SCHEDULE_DELAY_THRESHOLDS = {
+  /** Bắt đầu hiện tam giác vàng */
+  WARNING_MIN_DAYS: 14,
+  /** Tam giác đỏ viền (~1 tháng) */
+  RED_OUTLINE_DAYS: 30,
+  /** Tam giác đỏ đặc (3 tháng — đồng bộ notification server) */
+  RED_FILLED_DAYS: 90,
+  /** Tam giác đen đặc (6 tháng) */
+  BLACK_FILLED_DAYS: 180,
+  /** Tab lọc "Trễ 2 tuần" */
+  FILTER_LATE_2_WEEKS_DAYS: 14,
+  /** Tab lọc "Trễ 4 tuần" */
+  FILTER_LATE_4_WEEKS_DAYS: 28,
+} as const;
+
+export type ScheduleDelayWarningLevel = 'yellow' | 'red-outline' | 'red-filled' | 'black';
+
+export interface ScheduleDelayWarningInfo {
+  missedDays: number;
+  level: ScheduleDelayWarningLevel;
+  titleText: string;
+}
+
+export function hasPlannedCathLabDate(consult: Pick<Consult, 'PlannedCathLabDate'>): boolean {
+  const value = String(consult.PlannedCathLabDate || '').trim().toLowerCase();
+  return !!value && !['', '—', '-', 'nodata', 'no data'].includes(value);
+}
+
+export function getMissScheduleDays(
+  consultDateStr: string | undefined,
+  referenceDate: Date = new Date()
+): number {
+  const formattedDateKey = getConsultDateKey(consultDateStr);
+  if (!formattedDateKey) return 0;
+
+  const parts = formattedDateKey.split('-');
+  if (parts.length !== 3) return 0;
+
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const consultDate = new Date(y, m, d);
+  if (isNaN(consultDate.getTime())) return 0;
+
+  const today = new Date(referenceDate);
+  today.setHours(0, 0, 0, 0);
+  consultDate.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.floor((today.getTime() - consultDate.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : 0;
+}
+
+export function getScheduleDelayWarningInfo(
+  consult: Pick<Consult, 'ConsultDate' | 'PlannedCathLabDate'>,
+  referenceDate: Date = new Date()
+): ScheduleDelayWarningInfo | null {
+  if (hasPlannedCathLabDate(consult)) return null;
+
+  const missedDays = getMissScheduleDays(consult.ConsultDate, referenceDate);
+  if (missedDays < SCHEDULE_DELAY_THRESHOLDS.WARNING_MIN_DAYS) return null;
+
+  let level: ScheduleDelayWarningLevel = 'yellow';
+  let titleText = `Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`;
+
+  if (missedDays >= SCHEDULE_DELAY_THRESHOLDS.BLACK_FILLED_DAYS) {
+    level = 'black';
+    titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 6 tháng chưa xếp lịch (${missedDays} ngày)`;
+  } else if (missedDays >= SCHEDULE_DELAY_THRESHOLDS.RED_FILLED_DAYS) {
+    level = 'red-filled';
+    titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 3 tháng chưa xếp lịch (${missedDays} ngày)`;
+  } else if (missedDays >= SCHEDULE_DELAY_THRESHOLDS.RED_OUTLINE_DAYS) {
+    level = 'red-outline';
+  }
+
+  return { missedDays, level, titleText };
+}
+
+export function isConsultLateForScheduling(
+  consult: Pick<Consult, 'ConsultDate' | 'PlannedCathLabDate'>,
+  minDays: number,
+  referenceDate: Date = new Date()
+): boolean {
+  if (hasPlannedCathLabDate(consult)) return false;
+  return getMissScheduleDays(consult.ConsultDate, referenceDate) >= minDays;
+}
+
 export function isConsultCathCompleted(consult: Consult, patientCathlabs: CathLab[] | undefined): boolean {
   if (!patientCathlabs?.length) return false;
 

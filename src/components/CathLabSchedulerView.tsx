@@ -4,7 +4,16 @@ import { toBlob as htmlToImageBlob } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder, restoreWeightFromDate } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
-import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
+import {
+  buildCathlabsByPatientKey,
+  getMissScheduleDays,
+  getScheduleDelayWarningInfo,
+  isConsultCathCompleted,
+  isConsultLateForScheduling,
+  isConsultWaitlistExcludedByStatus,
+  SCHEDULE_DELAY_THRESHOLDS,
+  type ScheduleDelayWarningInfo,
+} from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceConsultResultOptions } from '../data/source';
@@ -97,7 +106,7 @@ const getTodayIsoDate = (): string => {
   return `${y}-${m}-${d}`;
 };
 
-const FilledAlertTriangle = ({ className = '', fill = 'red' }: { className?: string; fill?: string }) => {
+const FilledAlertTriangle = ({ className = '', fill = 'red', title }: { className?: string; fill?: string; title?: string }) => {
   return (
     <svg 
       viewBox="0 0 24 24" 
@@ -107,7 +116,9 @@ const FilledAlertTriangle = ({ className = '', fill = 'red' }: { className?: str
       strokeWidth="2" 
       strokeLinecap="round" 
       strokeLinejoin="round"
+      aria-label={title}
     >
+      {title ? <title>{title}</title> : null}
       <path 
         d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" 
         fill={fill} 
@@ -118,6 +129,23 @@ const FilledAlertTriangle = ({ className = '', fill = 'red' }: { className?: str
     </svg>
   );
 };
+
+const ScheduleDelayWarningIcon = ({ warning }: { warning: ScheduleDelayWarningInfo | null }) => {
+  if (!warning) return null;
+
+  if (warning.level === 'black') {
+    return <FilledAlertTriangle className="w-4 h-4 shrink-0" fill="black" title={warning.titleText} />;
+  }
+  if (warning.level === 'red-filled') {
+    return <FilledAlertTriangle className="w-4 h-4 shrink-0" fill="#d2145a" title={warning.titleText} />;
+  }
+  if (warning.level === 'red-outline') {
+    return <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" title={warning.titleText} />;
+  }
+  return <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" title={warning.titleText} />;
+};
+
+type WaitlistTab = 'unscheduled' | 'scheduled' | 'all' | 'late2weeks' | 'late4weeks';
 
 const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
   if (!ptvPhu?.trim()) return patientName;
@@ -320,7 +348,7 @@ export default function CathLabSchedulerView({
   };
   
   // Tab states for waitlist
-  const [activeTab, setActiveTab] = useState<'unscheduled' | 'scheduled' | 'all'>('unscheduled');
+  const [activeTab, setActiveTab] = useState<WaitlistTab>('unscheduled');
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
   const [waitlistSortField, setWaitlistSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'date' | 'plannedDate'>('date');
@@ -581,30 +609,6 @@ export default function CathLabSchedulerView({
     return trimmed;
   };
 
-  const getMissScheduleDays = (consultDateStr: string | undefined): number => {
-    if (!consultDateStr) return 0;
-    const formattedDateKey = getFormattedDateKey(consultDateStr);
-    if (!formattedDateKey) return 0;
-    
-    const parts = formattedDateKey.split('-');
-    if (parts.length !== 3) return 0;
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10) - 1; // 0-indexed month
-    const d = parseInt(parts[2], 10);
-    
-    const consultDate = new Date(y, m, d);
-    if (isNaN(consultDate.getTime())) return 0;
-    
-    // Set time of both to midnight to count only full days
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    consultDate.setHours(0, 0, 0, 0);
-    
-    const diffTime = today.getTime() - consultDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  };
-
   const buildSnapshotFromConsult = (c: Consult): SchedulingFormSnapshot => {
     let methods: string[] = [];
     if (c.CathMethod) {
@@ -818,21 +822,30 @@ Xin cảm ơn!`;
   const segmentedWaitlist = useMemo(() => {
     const unscheduledList = allEligibleWaitlist.filter(c => !c.PlannedCathLabDate);
     const scheduledList = allEligibleWaitlist.filter(c => !!c.PlannedCathLabDate);
+    const late2WeeksList = unscheduledList.filter(c =>
+      isConsultLateForScheduling(c, SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_2_WEEKS_DAYS)
+    );
+    const late4WeeksList = unscheduledList.filter(c =>
+      isConsultLateForScheduling(c, SCHEDULE_DELAY_THRESHOLDS.FILTER_LATE_4_WEEKS_DAYS)
+    );
 
-    // Sort unscheduled by ConsultDate descending (most recently discussed on top)
-    const sortedUnscheduled = [...unscheduledList].sort((a, b) => {
-      return (b.ConsultDate || '').localeCompare(a.ConsultDate || '');
-    });
+    const sortByConsultDateDesc = (items: Consult[]) =>
+      [...items].sort((a, b) => (b.ConsultDate || '').localeCompare(a.ConsultDate || ''));
 
-    // Sort scheduled by PlannedCathLabDate descending (nearest dates up top)
-    const sortedScheduled = [...scheduledList].sort((a, b) => {
-      return (b.PlannedCathLabDate || '').localeCompare(a.PlannedCathLabDate || '');
-    });
+    const sortByMissedDaysDesc = (items: Consult[]) =>
+      [...items].sort((a, b) => getMissScheduleDays(b.ConsultDate) - getMissScheduleDays(a.ConsultDate));
+
+    const sortedUnscheduled = sortByConsultDateDesc(unscheduledList);
+    const sortedScheduled = [...scheduledList].sort((a, b) =>
+      (b.PlannedCathLabDate || '').localeCompare(a.PlannedCathLabDate || '')
+    );
 
     return {
       unscheduled: sortedUnscheduled,
       scheduled: sortedScheduled,
-      all: [...sortedUnscheduled, ...sortedScheduled]
+      all: [...sortedUnscheduled, ...sortedScheduled],
+      late2weeks: sortByMissedDaysDesc(late2WeeksList),
+      late4weeks: sortByMissedDaysDesc(late4WeeksList),
     };
   }, [allEligibleWaitlist]);
 
@@ -1438,7 +1451,11 @@ Xin cảm ơn!`;
       ? segmentedWaitlist.unscheduled
       : activeTab === 'scheduled'
         ? segmentedWaitlist.scheduled
-        : segmentedWaitlist.all;
+        : activeTab === 'late2weeks'
+          ? segmentedWaitlist.late2weeks
+          : activeTab === 'late4weeks'
+            ? segmentedWaitlist.late4weeks
+            : segmentedWaitlist.all;
     let result = activeList;
     
     const q = removeDiacritics(searchQuery).toLowerCase().trim();
@@ -2736,6 +2753,36 @@ Xin cảm ơn!`;
                 {segmentedWaitlist.all.length}
               </span>
             </button>
+            <button
+              onClick={() => setActiveTab('late2weeks')}
+              className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'late2weeks'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
+              }`}
+            >
+              Trễ 2 tuần
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                activeTab === 'late2weeks' ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {segmentedWaitlist.late2weeks.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('late4weeks')}
+              className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'late4weeks'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
+              }`}
+            >
+              Trễ 4 tuần
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                activeTab === 'late4weeks' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {segmentedWaitlist.late4weeks.length}
+              </span>
+            </button>
           </div>
 
           {/* Search bar inside queue listing */}
@@ -2785,44 +2832,7 @@ Xin cảm ơn!`;
                   if (!pat) return null;
                   const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
 
-                  const missedDays = getMissScheduleDays(c.ConsultDate);
-                  let warningIcon = null;
-                  if (missedDays >= 14) {
-                    let titleText = `Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`;
-                    if (missedDays >= 180) {
-                      titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 6 tháng chưa xếp lịch (${missedDays} ngày)`;
-                      warningIcon = (
-                        <FilledAlertTriangle 
-                          className="w-4 h-4 shrink-0" 
-                          fill="black"
-                          title={titleText}
-                        />
-                      );
-                    } else if (missedDays >= 90) {
-                      titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 3 tháng chưa xếp lịch (${missedDays} ngày)`;
-                      warningIcon = (
-                        <FilledAlertTriangle 
-                          className="w-4 h-4 shrink-0" 
-                          fill="#d2145a"
-                          title={titleText}
-                        />
-                      );
-                    } else if (missedDays >= 30) {
-                      warningIcon = (
-                        <AlertTriangle 
-                          className="w-4 h-4 shrink-0 text-rose-600" 
-                          title={titleText}
-                        />
-                      );
-                    } else {
-                      warningIcon = (
-                        <AlertTriangle 
-                          className="w-4 h-4 shrink-0 text-amber-500" 
-                          title={titleText}
-                        />
-                      );
-                    }
-                  }
+                  const scheduleDelayWarning = getScheduleDelayWarningInfo(c);
 
                   return (
                     <button
@@ -2834,7 +2844,7 @@ Xin cảm ơn!`;
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        {warningIcon}
+                        <ScheduleDelayWarningIcon warning={scheduleDelayWarning} />
                         <div className="min-w-0 flex-1">
                           <div className="font-extrabold uppercase text-slate-900 leading-snug break-words">
                             {pat.PatientName}
@@ -3096,44 +3106,8 @@ Xin cảm ơn!`;
                     // Display value for scheduled 2nd interventionist (auto-fills if empty in storage)
                     const dispScheduled2nd = getAutoScheduled2nd(c.RequestBy || '') || c.Scheduled2ndInterventionist || '';
 
-                    const missedDays = getMissScheduleDays(c.ConsultDate);
-                    let warningIcon = null;
-                    if (missedDays >= 14) {
-                      let titleText = `Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`;
-                      if (missedDays >= 180) {
-                        titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 6 tháng chưa xếp lịch (${missedDays} ngày)`;
-                        warningIcon = (
-                          <FilledAlertTriangle 
-                            className="w-4 h-4 shrink-0" 
-                            fill="black"
-                            title={titleText}
-                          />
-                        );
-                      } else if (missedDays >= 90) {
-                        titleText = `CẢNH BÁO: Bệnh nhân đã trễ quá 3 tháng chưa xếp lịch (${missedDays} ngày)`;
-                        warningIcon = (
-                          <FilledAlertTriangle 
-                            className="w-4 h-4 shrink-0" 
-                            fill="#d2145a"
-                            title={titleText}
-                          />
-                        );
-                      } else if (missedDays >= 30) {
-                        warningIcon = (
-                          <AlertTriangle 
-                            className="w-4 h-4 shrink-0 text-rose-600" 
-                            title={titleText}
-                          />
-                        );
-                      } else {
-                        warningIcon = (
-                          <AlertTriangle 
-                            className="w-4 h-4 shrink-0 text-amber-500" 
-                            title={titleText}
-                          />
-                        );
-                      }
-                    }
+                    const scheduleDelayWarning = getScheduleDelayWarningInfo(c);
+                    const missedDays = scheduleDelayWarning?.missedDays ?? 0;
 
                     return (
                       <tr 
@@ -3169,7 +3143,7 @@ Xin cảm ơn!`;
                           }`}
                         >
                           <div className="flex items-center gap-1.5">
-                            {warningIcon}
+                            <ScheduleDelayWarningIcon warning={scheduleDelayWarning} />
                             <div className="min-w-0 flex-1">
                               <span className="font-extrabold uppercase text-slate-900 block whitespace-normal break-words leading-snug">
                                 {pat.PatientName}
