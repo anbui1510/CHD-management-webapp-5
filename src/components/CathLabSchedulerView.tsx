@@ -4,10 +4,20 @@ import { toBlob as htmlToImageBlob } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder, restoreWeightFromDate } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
-import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
+import {
+  buildCathlabsByPatientKey,
+  getMissScheduleDays,
+  getScheduleDelayWarningInfo,
+  isConsultCathCompleted,
+  isConsultInScheduleDelayLevel,
+  isConsultUnscheduledForCathLab,
+  isConsultWaitlistExcludedByStatus,
+  SCHEDULE_DELAY_FILTER_TABS,
+  type ScheduleDelayWarningInfo,
+} from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { VNDateInput } from './VNDateInput';
-import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
+import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceConsultResultOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -95,6 +105,83 @@ const getTodayIsoDate = (): string => {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+};
+
+const FilledAlertTriangle = ({ className = '', fill = 'red', title }: { className?: string; fill?: string; title?: string }) => {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      className={className} 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      aria-label={title}
+    >
+      {title ? <title>{title}</title> : null}
+      <path 
+        d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" 
+        fill={fill} 
+        stroke={fill}
+      />
+      <line x1="12" y1="9" x2="12" y2="13" stroke="white" strokeWidth="2.5" />
+      <line x1="12" y1="17" x2="12.01" y2="17" stroke="white" strokeWidth="3" />
+    </svg>
+  );
+};
+
+const ScheduleDelayWarningIcon = ({ warning }: { warning: ScheduleDelayWarningInfo | null }) => {
+  if (!warning) return null;
+
+  if (warning.level === 'black') {
+    return <FilledAlertTriangle className="w-4 h-4 shrink-0" fill="black" title={warning.titleText} />;
+  }
+  if (warning.level === 'red-filled') {
+    return <FilledAlertTriangle className="w-4 h-4 shrink-0" fill="#d2145a" title={warning.titleText} />;
+  }
+  if (warning.level === 'red-outline') {
+    return <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" title={warning.titleText} />;
+  }
+  return <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" title={warning.titleText} />;
+};
+
+type WaitlistTab =
+  | 'unscheduled'
+  | 'scheduled'
+  | 'all'
+  | 'delayYellow'
+  | 'delayRedOutline'
+  | 'delayRedFilled'
+  | 'delayBlack';
+
+const DELAY_WAITLIST_TABS = new Set<WaitlistTab>([
+  'delayYellow',
+  'delayRedOutline',
+  'delayRedFilled',
+  'delayBlack',
+]);
+
+const DELAY_TAB_STYLES: Record<
+  'delayYellow' | 'delayRedOutline' | 'delayRedFilled' | 'delayBlack',
+  { active: string; badgeActive: string }
+> = {
+  delayYellow: {
+    active: 'bg-amber-500 text-white shadow-xs',
+    badgeActive: 'bg-amber-100 text-amber-900',
+  },
+  delayRedOutline: {
+    active: 'bg-rose-600 text-white shadow-xs',
+    badgeActive: 'bg-rose-100 text-rose-800',
+  },
+  delayRedFilled: {
+    active: 'bg-[#d2145a] text-white shadow-xs',
+    badgeActive: 'bg-pink-100 text-[#d2145a]',
+  },
+  delayBlack: {
+    active: 'bg-slate-900 text-white shadow-xs',
+    badgeActive: 'bg-slate-200 text-slate-900',
+  },
 };
 
 const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
@@ -259,6 +346,14 @@ export default function CathLabSchedulerView({
     () => getSourceDiagnosisOptions(sources),
     [sources]
   );
+  const provinceOptions = useMemo(
+    () => getSourceProvinceOptions(sources),
+    [sources]
+  );
+  const conclusionOptions = useMemo(
+    () => getSourceConsultResultOptions(sources),
+    [sources]
+  );
 
   const createDiagnosisSource = async (DiagnosisID: string) => {
     const trimmed = normalizeDiagnosisID(DiagnosisID);
@@ -290,9 +385,10 @@ export default function CathLabSchedulerView({
   };
   
   // Tab states for waitlist
-  const [activeTab, setActiveTab] = useState<'unscheduled' | 'scheduled' | 'all'>('unscheduled');
+  const [activeTab, setActiveTab] = useState<WaitlistTab>('unscheduled');
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
+  const [waitlistSortField, setWaitlistSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'date' | 'plannedDate'>('date');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Column visibility settings for the waitlist table
@@ -333,7 +429,8 @@ export default function CathLabSchedulerView({
   useEffect(() => {
     setWaitlistCurrentPage(1);
     setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
-  }, [activeTab, searchQuery, waitlistSortOrder]);
+    waitlistScrollRef.current?.scrollTo({ top: 0 });
+  }, [activeTab, searchQuery, waitlistSortOrder, waitlistSortField]);
   
   // Selected consult for form editing
   const [selectedConsult, setSelectedConsult] = useState<Consult | null>(null);
@@ -389,9 +486,9 @@ export default function CathLabSchedulerView({
 
   // Calendar view states
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
-  const [currentMonth, setCurrentMonth] = useState(5); // June (0-indexed, so 5 = June)
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [activeDate, setActiveDate] = useState<Date>(new Date(2026, 5, 6)); // Default focus: June 6th, 2026
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [activeDate, setActiveDate] = useState<Date>(() => new Date());
 
   // Editable Form states
   const [plannedDevice, setPlannedDevice] = useState('');
@@ -548,30 +645,6 @@ export default function CathLabSchedulerView({
       }
     }
     return trimmed;
-  };
-
-  const getMissScheduleDays = (consultDateStr: string | undefined): number => {
-    if (!consultDateStr) return 0;
-    const formattedDateKey = getFormattedDateKey(consultDateStr);
-    if (!formattedDateKey) return 0;
-    
-    const parts = formattedDateKey.split('-');
-    if (parts.length !== 3) return 0;
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10) - 1; // 0-indexed month
-    const d = parseInt(parts[2], 10);
-    
-    const consultDate = new Date(y, m, d);
-    if (isNaN(consultDate.getTime())) return 0;
-    
-    // Set time of both to midnight to count only full days
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    consultDate.setHours(0, 0, 0, 0);
-    
-    const diffTime = today.getTime() - consultDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
   };
 
   const buildSnapshotFromConsult = (c: Consult): SchedulingFormSnapshot => {
@@ -785,23 +858,35 @@ Xin cảm ơn!`;
   // Segment Waiting List into tabs: "Chưa xếp lịch" and "Đã xếp lịch"
   // Sắp xếp ngày gần nhất lên trên, ngày xa nhất dưới
   const segmentedWaitlist = useMemo(() => {
-    const unscheduledList = allEligibleWaitlist.filter(c => !c.PlannedCathLabDate);
-    const scheduledList = allEligibleWaitlist.filter(c => !!c.PlannedCathLabDate);
+    const unscheduledList = allEligibleWaitlist.filter(c => isConsultUnscheduledForCathLab(c));
+    const scheduledList = allEligibleWaitlist.filter(c => !isConsultUnscheduledForCathLab(c));
 
-    // Sort unscheduled by ConsultDate descending (most recently discussed on top)
-    const sortedUnscheduled = [...unscheduledList].sort((a, b) => {
-      return (b.ConsultDate || '').localeCompare(a.ConsultDate || '');
-    });
+    const sortByConsultDateDesc = (items: Consult[]) =>
+      [...items].sort((a, b) => (b.ConsultDate || '').localeCompare(a.ConsultDate || ''));
 
-    // Sort scheduled by PlannedCathLabDate descending (nearest dates up top)
-    const sortedScheduled = [...scheduledList].sort((a, b) => {
-      return (b.PlannedCathLabDate || '').localeCompare(a.PlannedCathLabDate || '');
-    });
+    const sortByMissedDaysDesc = (items: Consult[]) =>
+      [...items].sort((a, b) => getMissScheduleDays(b.ConsultDate) - getMissScheduleDays(a.ConsultDate));
+
+    const sortedUnscheduled = sortByConsultDateDesc(unscheduledList);
+    const sortedScheduled = [...scheduledList].sort((a, b) =>
+      (b.PlannedCathLabDate || '').localeCompare(a.PlannedCathLabDate || '')
+    );
+
+    const delaySegments = Object.fromEntries(
+      SCHEDULE_DELAY_FILTER_TABS.map(({ tabId, level }) => [
+        tabId,
+        sortByMissedDaysDesc(unscheduledList.filter(c => isConsultInScheduleDelayLevel(c, level))),
+      ])
+    ) as Record<
+      'delayYellow' | 'delayRedOutline' | 'delayRedFilled' | 'delayBlack',
+      Consult[]
+    >;
 
     return {
       unscheduled: sortedUnscheduled,
       scheduled: sortedScheduled,
-      all: [...sortedUnscheduled, ...sortedScheduled]
+      all: [...sortedUnscheduled, ...sortedScheduled],
+      ...delaySegments,
     };
   }, [allEligibleWaitlist]);
 
@@ -1403,11 +1488,14 @@ Xin cảm ơn!`;
 
   // Apply search and sort filtering on current active list tab
   const displayWaitlist = useMemo(() => {
-    const activeList = activeTab === 'unscheduled'
-      ? segmentedWaitlist.unscheduled
-      : activeTab === 'scheduled'
-        ? segmentedWaitlist.scheduled
-        : segmentedWaitlist.all;
+    const activeList =
+      activeTab === 'unscheduled'
+        ? segmentedWaitlist.unscheduled
+        : activeTab === 'scheduled'
+          ? segmentedWaitlist.scheduled
+          : activeTab === 'all'
+            ? segmentedWaitlist.all
+            : segmentedWaitlist[activeTab];
     let result = activeList;
     
     const q = removeDiacritics(searchQuery).toLowerCase().trim();
@@ -1423,12 +1511,46 @@ Xin cảm ơn!`;
       });
     }
 
+    const shouldSortByMissedDays = DELAY_WAITLIST_TABS.has(activeTab);
+
     return result.sort((a, b) => {
-      const da = a.PlannedCathLabDate ? new Date(a.PlannedCathLabDate).getTime() : 0;
-      const db = b.PlannedCathLabDate ? new Date(b.PlannedCathLabDate).getTime() : 0;
-      return waitlistSortOrder === 'asc' ? da - db : db - da;
+      let comparison = 0;
+      if (shouldSortByMissedDays || waitlistSortField === 'date') {
+        comparison = getMissScheduleDays(a.ConsultDate) - getMissScheduleDays(b.ConsultDate);
+      } else if (waitlistSortField === 'plannedDate') {
+        const da = a.PlannedCathLabDate ? new Date(a.PlannedCathLabDate).getTime() : 0;
+        const db = b.PlannedCathLabDate ? new Date(b.PlannedCathLabDate).getTime() : 0;
+        comparison = da - db;
+      } else if (waitlistSortField === 'name') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        const nameA = patA?.PatientName ? removeDiacritics(patA.PatientName).toLowerCase() : '';
+        const nameB = patB?.PatientName ? removeDiacritics(patB.PatientName).toLowerCase() : '';
+        comparison = nameA.localeCompare(nameB);
+      } else if (waitlistSortField === 'id') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        const idA = patA?.PatientID1 ? patA.PatientID1.toLowerCase() : '';
+        const idB = patB?.PatientID1 ? patB.PatientID1.toLowerCase() : '';
+        comparison = idA.localeCompare(idB);
+      } else if (waitlistSortField === 'dob') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        const dobA = patA?.PatientDOB ? new Date(patA.PatientDOB).getTime() : 0;
+        const dobB = patB?.PatientDOB ? new Date(patB.PatientDOB).getTime() : 0;
+        comparison = dobA - dobB;
+      } else if (waitlistSortField === 'diagnosis') {
+        const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
+        const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
+        comparison = diagA.localeCompare(diagB);
+      } else if (waitlistSortField === 'requestBy') {
+        const reqA = a.RequestBy ? removeDiacritics(a.RequestBy).toLowerCase() : '';
+        const reqB = b.RequestBy ? removeDiacritics(b.RequestBy).toLowerCase() : '';
+        comparison = reqA.localeCompare(reqB);
+      }
+      return waitlistSortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [segmentedWaitlist, activeTab, searchQuery, patients, waitlistSortOrder]);
+  }, [segmentedWaitlist, activeTab, searchQuery, patients, waitlistSortOrder, waitlistSortField]);
 
   const totalWaitlistPages = Math.ceil(displayWaitlist.length / rowsPerWaitlistPage) || 1;
   const paginatedWaitlist = useMemo(() => {
@@ -2337,18 +2459,11 @@ Xin cảm ơn!`;
     'w-full bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-200 text-[10.5px] text-slate-700 min-h-[32px]';
 
   const renderScheduleDatePicker = (value: string, onChange: (val: string) => void) => (
-    <div className="relative w-full">
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-      />
-      <div className={`${schedInputCls} font-mono font-bold flex items-center justify-between`}>
-        <span>{value ? formatVNTime(value) : 'dd/mm/yyyy'}</span>
-        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-      </div>
-    </div>
+    <VNDateInput
+      value={value}
+      onChange={onChange}
+      className={`${schedInputCls} font-sans font-bold`}
+    />
   );
 
   const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-[13px] text-slate-800 min-h-[34px]';
@@ -2376,18 +2491,11 @@ Xin cảm ơn!`;
   );
 
   const renderAdHocDatePicker = (value: string, onChange: (val: string) => void) => (
-    <div className="relative w-full">
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-      />
-      <div className={`${adHocInputCls} font-mono font-bold flex items-center justify-between`}>
-        <span>{value ? formatVNTime(value) : 'dd/mm/yyyy'}</span>
-        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-      </div>
-    </div>
+    <VNDateInput
+      value={value}
+      onChange={onChange}
+      className={`${adHocInputCls} font-sans font-bold`}
+    />
   );
 
   // Calendar rendering helper calculation list (Month View)
@@ -2427,8 +2535,9 @@ Xin cảm ơn!`;
       const dStr = String(d).padStart(2, '0');
       const dateStr = `${currentYear}-${mStr}-${dStr}`;
       
-      // Determine if cell points to June 6, 2026 (Local Time constraint)
-      const isToday = currentYear === 2026 && currentMonth === 5 && d === 6;
+      // Determine if cell points to today
+      const todayDate = new Date();
+      const isToday = todayDate.getFullYear() === currentYear && todayDate.getMonth() === currentMonth && d === todayDate.getDate();
 
       cells.push({
         day: d,
@@ -2442,7 +2551,8 @@ Xin cảm ơn!`;
     const nextMonthIndex = currentMonth === 11 ? 0 : currentMonth + 1;
     const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
     let nextDay = 1;
-    while (cells.length < 42) {
+    const targetLength = (startOffset + totalDays) <= 35 ? 35 : 42;
+    while (cells.length < targetLength) {
       const mStr = String(nextMonthIndex + 1).padStart(2, '0');
       const dStr = String(nextDay).padStart(2, '0');
       cells.push({
@@ -2474,7 +2584,7 @@ Xin cảm ơn!`;
       list.push({
         day: d.getDate(),
         dateStr: `${yStr}-${mStr}-${dStr}`,
-        isToday: d.getFullYear() === 2026 && d.getMonth() === 5 && d.getDate() === 6
+        isToday: d.getFullYear() === new Date().getFullYear() && d.getMonth() === new Date().getMonth() && d.getDate() === new Date().getDate()
       });
     }
     return list;
@@ -2500,9 +2610,10 @@ Xin cảm ơn!`;
   };
 
   const jumpToToday = () => {
-    setCurrentMonth(5); // June
-    setCurrentYear(2026);
-    setActiveDate(new Date(2026, 5, 6));
+    const today = new Date();
+    setCurrentMonth(today.getMonth());
+    setCurrentYear(today.getFullYear());
+    setActiveDate(today);
   };
 
   return (
@@ -2638,6 +2749,7 @@ Xin cảm ơn!`;
           {/* Subtabs for "Chưa xếp lịch" / "Đã xếp lịch" / "Tất cả" with Count badges */}
           <div className="px-3 lg:px-4 py-2 bg-slate-50/75 border-b border-slate-200 flex gap-2 shrink-0 overflow-x-auto flex-nowrap lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <button
+              type="button"
               onClick={() => setActiveTab('unscheduled')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'unscheduled'
@@ -2653,6 +2765,7 @@ Xin cảm ơn!`;
               </span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('scheduled')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'scheduled'
@@ -2668,6 +2781,7 @@ Xin cảm ơn!`;
               </span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('all')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'all'
@@ -2682,6 +2796,29 @@ Xin cảm ơn!`;
                 {segmentedWaitlist.all.length}
               </span>
             </button>
+            {SCHEDULE_DELAY_FILTER_TABS.map(({ tabId, label }) => {
+              const styles = DELAY_TAB_STYLES[tabId];
+              const isActive = activeTab === tabId;
+              return (
+                <button
+                  key={tabId}
+                  type="button"
+                  onClick={() => setActiveTab(tabId)}
+                  className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? styles.active
+                      : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
+                  }`}
+                >
+                  {label}
+                  <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                    isActive ? styles.badgeActive : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {segmentedWaitlist[tabId].length}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Search bar inside queue listing */}
@@ -2725,24 +2862,13 @@ Xin cảm ơn!`;
               </div>
             ) : (
               <>
-              <div className="lg:hidden divide-y divide-slate-200">
+              <div className="lg:hidden divide-y divide-slate-100">
                 {mobileDisplayedWaitlist.map((c) => {
                   const pat = findPatientByKey(patients, c.PatientKey);
                   if (!pat) return null;
                   const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
 
-                  const missedDays = getMissScheduleDays(c.ConsultDate);
-                  let warningIcon = null;
-                  if (missedDays >= 14) {
-                    const isRed = missedDays > 30;
-                    const iconColor = isRed ? 'text-rose-600' : 'text-amber-500';
-                    warningIcon = (
-                      <AlertTriangle 
-                        className={`w-4 h-4 shrink-0 ${iconColor}`} 
-                        title={`Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`}
-                      />
-                    );
-                  }
+                  const scheduleDelayWarning = getScheduleDelayWarningInfo(c);
 
                   return (
                     <button
@@ -2754,7 +2880,7 @@ Xin cảm ơn!`;
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        {warningIcon}
+                        <ScheduleDelayWarningIcon warning={scheduleDelayWarning} />
                         <div className="min-w-0 flex-1">
                           <div className="font-extrabold uppercase text-slate-900 leading-snug break-words">
                             {pat.PatientName}
@@ -2790,20 +2916,109 @@ Xin cảm ơn!`;
                     )}
                     <th 
                       style={{ left: activeTab === 'scheduled' ? '80px' : '0' }}
-                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky top-0 bg-slate-50 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200"
+                      onClick={() => {
+                        if (waitlistSortField === 'name') {
+                          setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setWaitlistSortField('name');
+                          setWaitlistSortOrder('asc');
+                        }
+                      }}
+                      className="py-3 px-3 border-b border-slate-200 min-w-[160px] md:min-w-[200px] sticky top-0 bg-slate-50 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
                     >
-                      Họ và tên
+                      <div className="flex items-center gap-1">
+                        <span>Họ và tên</span>
+                        <span className="text-[10px] text-slate-450 font-bold">
+                          {waitlistSortField === 'name' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                        </span>
+                      </div>
                     </th>
-                    {visibleColumns.icd && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">ICD</th>}
-                    {visibleColumns.priority && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Ưu tiên</th>}
-                    {visibleColumns.requestBy && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">BS Đăng ký</th>}
-                    {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">PTV Phụ 1</th>}
-                    {visibleColumns.consultDate && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">Ngày hội chẩn</th>}
-                    {visibleColumns.consultResultId && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">Kết luận chính</th>}
-                    {visibleColumns.plannedDate && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Dự kiến ngày thông tim</th>}
-                    {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Kiểm dụng cụ</th>}
-                    {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200 bg-slate-50">Trạng thái gọi</th>}
-                    {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center bg-slate-50">Trễ xếp lịch</th>}
+                    {visibleColumns.icd && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'diagnosis') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('diagnosis');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>ICD</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'diagnosis' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.priority && <th className="py-3 px-2 border-b border-slate-200 text-center">Ưu tiên</th>}
+                    {visibleColumns.requestBy && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'requestBy') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('requestBy');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>BS Đăng ký</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'requestBy' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>}
+                    {visibleColumns.consultDate && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'date') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('date');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Ngày hội chẩn</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'date' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.consultResultId && <th className="py-3 px-2 border-b border-slate-200">Kết luận chính</th>}
+                    {visibleColumns.plannedDate && (
+                      <th 
+                        onClick={() => {
+                          if (waitlistSortField === 'plannedDate') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('plannedDate');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 text-center cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1 justify-center">
+                          <span>Dự kiến ngày thông tim</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            {waitlistSortField === 'plannedDate' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                    )}
+                    {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>}
+                    {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200">Trạng thái gọi</th>}
+                    {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center">Trễ xếp lịch</th>}
                     <th className="py-3 px-2 border-b border-slate-200 text-center w-12 sticky top-0 right-0 bg-slate-50 z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] border-l border-slate-200">
                       <div className="relative inline-block text-left" ref={columnDropdownRef}>
                         <button
@@ -2927,18 +3142,8 @@ Xin cảm ơn!`;
                     // Display value for scheduled 2nd interventionist (auto-fills if empty in storage)
                     const dispScheduled2nd = getAutoScheduled2nd(c.RequestBy || '') || c.Scheduled2ndInterventionist || '';
 
-                    const missedDays = getMissScheduleDays(c.ConsultDate);
-                    let warningIcon = null;
-                    if (missedDays >= 14) {
-                      const isRed = missedDays > 30;
-                      const iconColor = isRed ? 'text-rose-600' : 'text-amber-500';
-                      warningIcon = (
-                        <AlertTriangle 
-                          className={`w-4 h-4 shrink-0 ${iconColor}`} 
-                          title={`Bệnh nhân đã bị trễ ${missedDays} ngày xếp lịch`}
-                        />
-                      );
-                    }
+                    const scheduleDelayWarning = getScheduleDelayWarningInfo(c);
+                    const missedDays = scheduleDelayWarning?.missedDays ?? 0;
 
                     return (
                       <tr 
@@ -2974,7 +3179,7 @@ Xin cảm ơn!`;
                           }`}
                         >
                           <div className="flex items-center gap-1.5">
-                            {warningIcon}
+                            <ScheduleDelayWarningIcon warning={scheduleDelayWarning} />
                             <div className="min-w-0 flex-1">
                               <span className="font-extrabold uppercase text-slate-900 block whitespace-normal break-words leading-snug">
                                 {pat.PatientName}
@@ -3122,9 +3327,6 @@ Xin cảm ơn!`;
                     <Calendar className="w-4 h-4 text-[#d2145a]" />
                     Lịch thông tim dự kiến
                   </h3>
-                  <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
-                    Hệ thống xếp lịch can thiệp phòng CathLab trực tuyến
-                  </p>
                 </div>
                 
                 {/* Views and Today navigation */}
@@ -3209,12 +3411,12 @@ Xin cảm ơn!`;
                         return (
                           <div
                             key={`${cell.dateStr}-${idx}`}
-                            className={`min-h-[52px] lg:min-h-[70px] xl:min-h-[85px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between transition ${
+                            className={`min-h-[60px] lg:min-h-[90px] xl:min-h-[100px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-start transition ${
                               cell.isCurrentMonth ? 'text-slate-800' : 'bg-slate-50/40 text-slate-300 pointer-events-none opacity-45'
                             } ${cell.isToday ? 'bg-[#d2145a]/5 border-[#d2145a]/30' : ''}`}
                           >
                             {/* Day Number inside the cell */}
-                            <div className="text-right">
+                            <div className="text-right shrink-0">
                               {cell.isToday ? (
                                 <span className="bg-[#d2145a] text-white font-black text-[10px] w-5 h-5 inline-flex items-center justify-center rounded-full shadow-xs">
                                   {cell.day}
@@ -3227,7 +3429,7 @@ Xin cảm ơn!`;
                             </div>
 
                             {/* Scheduled Patient badging inside day cell */}
-                            <div className="flex-1 overflow-y-auto mt-1 flex flex-col gap-1 pr-0.5 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto mt-0.5 flex flex-col gap-0.5 pr-0.5 custom-scrollbar">
                               {matchingConsults.map(c => {
                                 const pat = findPatientByKey(patients, c.PatientKey);
                                 const ptvPhu1Display = resolvePtvPhu1Display(
@@ -3242,7 +3444,7 @@ Xin cảm ơn!`;
                                       handleSelectConsult(c);
                                       if (pureCalendarMode) setShowSummaryModal(true);
                                     }}
-                                    className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight px-1.5 py-0.5 rounded-lg truncate cursor-pointer transition select-none tracking-wide text-center uppercase"
+                                    className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-bold leading-none py-0.5 px-1 rounded truncate cursor-pointer transition select-none tracking-wide text-center uppercase block w-full"
                                     title={formatCalendarPatientTooltip(pat?.PatientName || 'Unknown Patient', c.DiagnosisID || 'N/A', ptvPhu1Display)}
                                   >
                                     {pat?.PatientName ? pat.PatientName.split(' ').slice(-2).join(' ') : 'INFO'}
@@ -3377,20 +3579,7 @@ Xin cảm ơn!`;
                   </div>
                 )}
 
-                {/* Calendar Legend indicators bar */}
-                <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-[10px] text-slate-500 font-medium shrink-0 lg:mt-4">
-                  <div className="flex gap-4">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#b31448]"></span>
-                      Ca thông tim đã duyệt
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#d2145a]"></span>
-                      Đỉnh mốc "Hôm nay"
-                    </span>
-                  </div>
-                  <span className="text-[9px] text-[#d2145a] font-extrabold">AI Studio Scheduler v4.0</span>
-                </div>
+                {/* Calendar Legend indicators bar removed for cleaner layout */}
 
               </div>
 
@@ -3535,7 +3724,7 @@ Xin cảm ơn!`;
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Kết luận chính</label>
                             <SearchableEnumSelect
-                              options={CONCLUSION_OPTIONS}
+                              options={conclusionOptions}
                               value={schedConsultResultID}
                               onChange={setSchedConsultResultID}
                               placeholder="— Chọn kết luận —"
@@ -4222,21 +4411,11 @@ Xin cảm ơn!`;
                     <label className="block text-slate-500 font-bold text-[10px] uppercase mb-2 flex items-center gap-1.5">
                       <CalendarDays className="w-4 h-4" /> Chọn ngày đầu tuần
                     </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={exportStartDate}
-                        onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
-                        onChange={(e) => setExportStartDate(e.target.value)}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <div className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 flex justify-between items-center pointer-events-none shadow-sm">
-                        <span className={exportStartDate ? 'text-slate-800' : 'text-slate-400'}>
-                          {exportStartDate ? exportStartDate.split('-').reverse().join(' / ') : 'dd / mm / yyyy'}
-                        </span>
-                        <CalendarDays className="w-4 h-4 text-emerald-600" />
-                      </div>
-                    </div>
+                    <VNDateInput
+                      value={exportStartDate}
+                      onChange={setExportStartDate}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 font-sans shadow-sm focus:outline-none"
+                    />
                     {exportEndDateStr && (
                       <p className="mt-2 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 p-2 rounded-lg">
                         Lọc từ ngày: <strong>{exportStartDate.split('-').reverse().join('/')}</strong> <br/>
@@ -4323,32 +4502,20 @@ Xin cảm ơn!`;
                        <div className="flex gap-2">
                          <div className="flex-1">
                            <div className="relative w-full">
-                             <input 
-                               type="date" 
-                               value={deviceStartDate} 
-                               onClick={(e: any) => e.target.showPicker && e.target.showPicker()} 
-                               onChange={e => setDeviceStartDate(e.target.value)} 
-                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                             <VNDateInput
+                               value={deviceStartDate}
+                               onChange={setDeviceStartDate}
+                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold font-sans text-slate-700 focus:outline-none min-h-[24px]"
                              />
-                             <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold text-slate-700 flex items-center justify-between min-h-[24px]">
-                               <span>{deviceStartDate ? formatVNTime(deviceStartDate) : 'Từ ngày'}</span>
-                               <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                             </div>
                            </div>
                          </div>
                          <div className="flex-1">
                             <div className="relative w-full">
-                              <input 
-                                type="date" 
-                                value={deviceEndDate} 
-                                onClick={(e: any) => e.target.showPicker && e.target.showPicker()} 
-                                onChange={e => setDeviceEndDate(e.target.value)} 
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                              <VNDateInput
+                                value={deviceEndDate}
+                                onChange={setDeviceEndDate}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold font-sans text-slate-700 focus:outline-none min-h-[24px]"
                               />
-                              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold text-slate-700 flex items-center justify-between min-h-[24px]">
-                                <span>{deviceEndDate ? formatVNTime(deviceEndDate) : 'Đến ngày'}</span>
-                                <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                              </div>
                             </div>
                          </div>
                        </div>
@@ -5190,7 +5357,7 @@ Xin cảm ơn!`;
                                   <input type="text" required placeholder="Họ tên..." value={adHocPatientName} onChange={(e) => setAdHocPatientName(e.target.value)} className={`${adHocInputCls} font-black`} />
                                 ))}
                                 {renderAdHocRow(`Ngày sinh *${adHocErrors.includes('PatientDOB') ? ' !' : ''}`, (
-                                  <VNDateInput required value={adHocPatientDOB} onChange={(val) => setAdHocPatientDOB(val)} className={`${adHocInputCls} font-mono font-bold`} />
+                                  <VNDateInput required value={adHocPatientDOB} onChange={(val) => setAdHocPatientDOB(val)} className={`${adHocInputCls} font-sans font-bold`} />
                                 ))}
                                 {renderAdHocRow('Giới tính *', (
                                   <div className="flex gap-1">
@@ -5200,10 +5367,10 @@ Xin cảm ơn!`;
                                   </div>
                                 ))}
                                 {renderAdHocRow(`Địa chỉ *${adHocErrors.includes('PatientAddress') ? ' !' : ''}`, (
-                                  <SearchableEnumSelect required options={SOURCE_PROVINCE} value={adHocPatientAddress} onChange={setAdHocPatientAddress} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." />
+                                  <SearchableEnumSelect required options={provinceOptions} value={adHocPatientAddress} onChange={setAdHocPatientAddress} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." />
                                 ))}
                                 {renderAdHocRow('SĐT 1', (
-                                  <input type="text" placeholder="ĐT..." value={adHocPatientPhone1} onChange={(e) => setAdHocPatientPhone1(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />
+                                  <input type="text" placeholder="ĐT..." value={adHocPatientPhone1} onChange={(e) => setAdHocPatientPhone1(e.target.value)} className={`${adHocInputCls} font-sans font-bold`} />
                                 ))}
                                 {renderAdHocRow('SĐT 2', (
                                   <input type="text" placeholder="ĐT phụ..." value={adHocPatientPhone2} onChange={(e) => setAdHocPatientPhone2(e.target.value)} className={`${adHocInputCls} font-mono`} />
@@ -5305,7 +5472,7 @@ Xin cảm ơn!`;
                           />
                         ), { alignTop: true })}
                         {renderAdHocRow('Dự trù kinh phí', (
-                          <input type="text" placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-mono font-bold`} />
+                          <input type="text" placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-sans font-bold`} />
                         ))}
                         {renderAdHocRow('Kiểm tra dụng cụ', (
                           <select value={adHocCheckDevice} onChange={(e) => setAdHocCheckDevice(e.target.value as any)} className={adHocSelectCls}>
@@ -5329,7 +5496,7 @@ Xin cảm ơn!`;
                         {renderAdHocRow('Ghi chú gọi bệnh', (
                           <textarea rows={1} placeholder="Ghi chú gọi bệnh..." value={adHocCallNote} onChange={(e) => setAdHocCallNote(e.target.value)} className={`${adHocInputCls} resize-y`} />
                         ), { alignTop: true })}
-                        {renderAdHocRow('Ngày thông tim dự kiến', <VNDateInput value={adHocPlannedCathLabDate} onChange={setAdHocPlannedCathLabDate} className={`${adHocInputCls} font-mono font-bold`} />)}
+                        {renderAdHocRow('Ngày thông tim dự kiến', <VNDateInput value={adHocPlannedCathLabDate} onChange={setAdHocPlannedCathLabDate} className={`${adHocInputCls} font-sans font-bold`} />)}
                         {renderAdHocRow('Hỗ trợ tài chính', (
                           <select value={adHocFundingRequest} onChange={(e) => setAdHocFundingRequest(e.target.value)} className={adHocSelectCls}>
                             <option value="">— Chưa chọn —</option>

@@ -39,7 +39,7 @@ function getOrCreateSheet(sheetName, headers) {
     // Set number format of string columns to Plain Text to preserve leading zeros (only on creation)
     for (var col = 0; col < headers.length; col++) {
       var header = headers[col];
-      if (header === "PatientID1" || header === "PatientID2" || header === "PatientPhone1" || header === "PatientPhone2" || header === "StaffPhone") {
+      if (header === "PatientID1" || header === "PatientID2" || header === "PatientPhone1" || header === "PatientPhone2" || header === "StaffPhone" || header === "PatientCreateBy" || header === "ConsultCreateBy" || header === "ConsultResultCreateBy" || header === "ConsultResultUpdatedBy" || header === "CheckDeviceBy" || header === "CheckDeviceUpdatedBy" || header === "CathUpdatedBy" || header === "SurgUpdatedBy" || header === "StaffKey" || header === "CreatedBy") {
         var numRows = sheet.getMaxRows() - 1;
         if (numRows > 0) {
           sheet.getRange(2, col + 1, numRows, 1).setNumberFormat("@");
@@ -354,6 +354,40 @@ function writeRecordToSheet(type, action, key, record) {
   return { status: "success", action: "inserted", key: key, rowIndex: sheet.getLastRow() };
 }
 
+function deleteRecordFromSheet(type, key) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
+  if (!sheet) {
+    throw new Error("Sheet not found: " + type);
+  }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var keyColumnName = getKeyColumnNameForType(type);
+  var keyColIndex = headers.indexOf(keyColumnName) + 1;
+
+  if (keyColIndex === 0) {
+    keyColIndex = 1;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var foundRowIndex = -1;
+  
+  if (lastRow > 1) {
+    var keyValues = sheet.getRange(2, keyColIndex, lastRow - 1, 1).getValues();
+    for (var i = 0; i < keyValues.length; i++) {
+      if (keyValues[i][0] == key) {
+        foundRowIndex = i + 2;
+        break;
+      }
+    }
+  }
+
+  if (foundRowIndex !== -1) {
+    sheet.deleteRow(foundRowIndex);
+    return { status: "success", action: "deleted", key: key, rowIndex: foundRowIndex };
+  }
+  return { status: "error", message: "Record not found to delete" };
+}
+
 // POST Requests - Inserts or Updates records
 function doPost(e) {
   initializeDatabase();
@@ -446,8 +480,52 @@ function doPost(e) {
                            .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === "sync_sources") {
+      var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Source");
+      if (!sheet) {
+        throw new Error("Sheet not found: Source");
+      }
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      var records = Array.isArray(payload.data) ? payload.data : [];
+      var headers = ["DiagnosisID", "PatientAddress", "ResultConsultID", "CathMethod"];
+      var existingLastCol = Math.max(sheet.getLastColumn(), 1);
+      var existingHeaders = sheet.getRange(1, 1, 1, existingLastCol).getValues()[0];
+      var changed = false;
+      for (var h = 0; h < headers.length; h++) {
+        if (existingHeaders.indexOf(headers[h]) === -1) {
+          existingHeaders.push(headers[h]);
+          changed = true;
+        }
+      }
+      if (changed) {
+        sheet.getRange(1, 1, 1, existingHeaders.length).setValues([existingHeaders]);
+      }
+      var actualHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var rowsToAppend = [];
+      for (var rIndex = 0; rIndex < records.length; rIndex++) {
+        var rec = records[rIndex];
+        var rowVal = [];
+        for (var col = 0; col < actualHeaders.length; col++) {
+          var head = actualHeaders[col];
+          rowVal.push(rec[head] !== undefined ? rec[head] : "");
+        }
+        rowsToAppend.push(rowVal);
+      }
+      if (rowsToAppend.length > 0) {
+        sheet.getRange(2, 1, rowsToAppend.length, actualHeaders.length).setValues(rowsToAppend);
+      }
+      result = { status: "success", action: "sync_sources", count: rowsToAppend.length };
+      return ContentService.createTextOutput(JSON.stringify(result))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
+    } else if (action === "delete") {
+      result = deleteRecordFromSheet(type, key);
     }
   } catch (err) {
     result = { status: "error", message: err.toString() };

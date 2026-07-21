@@ -46,6 +46,7 @@ import MRISchedulerView from './components/MRISchedulerView';
 import MRIRegisterView from './components/MRIRegisterView';
 import MRIResultView from './components/MRIResultView';
 import MRICalendarView from './components/MRICalendarView';
+import MRIOverviewView from './components/MRIOverviewView';
 import SurgeryRoomView from './components/SurgeryRoomView';
 import DevelopingFeatureView from './components/DevelopingFeatureView';
 import ChdDailyBriefView from './components/ChdDailyBriefView';
@@ -57,12 +58,19 @@ import ResultStaffDrawer from './components/ResultStaffDrawer';
 import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
 import { clearLocalCache } from './api/appsScriptFetch';
 import {
+  APP_BUILD_ID,
+  CHD_APP_BUILD_ID_KEY,
+  CHD_DEPLOY_LOGOUT_MSG_KEY,
+  fetchRemoteAppBuildId,
+  isAppBuildIdMismatch,
+} from './appVersion';
+import {
   createLatestDiagnosisResolver,
 } from './utils/latestDiagnosis';
 import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
-import { SOURCE_PROVINCE, getSourceDiagnosisOptions } from './data/source';
+import { SOURCE_PROVINCE, getSourceDiagnosisOptions, getSourceProvinceOptions } from './data/source';
 import { AppModule, canAccessModule, canManageStaff, setRuntimeRolePresets } from './auth/permissions';
 import MobileBottomNav from './components/layout/MobileBottomNav';
 import MobileMoreMenu from './components/layout/MobileMoreMenu';
@@ -198,6 +206,7 @@ export default function App() {
   const [doctorPerformanceMarks, setDoctorPerformanceMarks] = useState<DoctorPerformanceMark[]>([]);
 
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
+  const provinceOptions = useMemo(() => getSourceProvinceOptions(sources), [sources]);
 
   const cathConsultKeySet = useMemo(
     () => new Set(cathlabs.map(cath => String(cath.ConsultKey || '').trim().toLowerCase()).filter(Boolean)),
@@ -272,11 +281,11 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'mri-overview' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
   const [profileReturnMenu, setProfileReturnMenu] = useState<typeof activeMenu>('home');
   const [isStaffAccountMenuOpen, setIsStaffAccountMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
-  const [staffManagementInitialTab, setStaffManagementInitialTab] = useState<'edit' | 'matrix' | 'marks'>('edit');
+  const [staffManagementInitialTab, setStaffManagementInitialTab] = useState<'edit' | 'matrix' | 'marks' | 'settings' | 'guide'>('edit');
   const [archiveInitialTab, setArchiveInitialTab] = useState<'transferred' | 'archive'>('archive');
 
   // Collapsible Sidebar State
@@ -293,10 +302,6 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoadError, setLoginLoadError] = useState<string>('');
-
-  // States for Code Auto-Update & Background Polling
-  const [runningBuildTime, setRunningBuildTime] = useState<string | null>(null);
-  const [showUpdateBanner, setShowUpdateBanner] = useState<boolean>(false);
 
   // Search Filter State (Patient List & Globals)
   const [patientSearch, setPatientSearch] = useState<string>('');
@@ -590,11 +595,63 @@ export default function App() {
     });
   }, [refreshMedicalData]);
 
+  const handleLogoutRef = useRef<(() => void) | null>(null);
+
+  const loadPublicStaffForLogin = useCallback(() => {
+    void refreshMedicalData('staff', false).then(() => {
+      void refreshMedicalData('staff', true).catch(err => {
+        const msg = err instanceof Error ? err.message : String(err);
+        setLoginLoadError(
+          msg.includes('Failed to fetch')
+            ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
+            : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
+        );
+      });
+    }).catch(err => {
+      void refreshMedicalData('staff', true).catch(() => {});
+      const msg = err instanceof Error ? err.message : String(err);
+      setLoginLoadError(
+        msg.includes('Failed to fetch')
+          ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
+          : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
+      );
+    });
+  }, [refreshMedicalData]);
+
+  const forceLogoutForAppUpdate = useCallback(() => {
+    sessionStorage.setItem(
+      CHD_DEPLOY_LOGOUT_MSG_KEY,
+      'Hệ thống vừa được cập nhật trên Cloudflare. Vui lòng đăng nhập lại để sử dụng phiên bản mới.'
+    );
+    handleLogoutRef.current?.();
+    window.location.reload();
+  }, []);
+
   useEffect(() => {
-    // 1. Recover logged-in session via server token or cookie
+    const deployMsg = sessionStorage.getItem(CHD_DEPLOY_LOGOUT_MSG_KEY);
+    if (deployMsg) {
+      sessionStorage.removeItem(CHD_DEPLOY_LOGOUT_MSG_KEY);
+      setLoginLoadError(deployMsg);
+    }
+
+    const storedBuildId = localStorage.getItem(CHD_APP_BUILD_ID_KEY);
+    if (isAppBuildIdMismatch(storedBuildId)) {
+      localStorage.removeItem('CHD_AUTH_TOKEN');
+      localStorage.removeItem('CurrentStaffKey');
+      localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
+      setAuthToken('');
+      setCurrentStaff(null);
+      void clearLocalCache();
+      if (!deployMsg) {
+        setLoginLoadError('Hệ thống vừa cập nhật phiên bản mới. Vui lòng đăng nhập lại.');
+      }
+      loadPublicStaffForLogin();
+      return;
+    }
+
+    // Recover logged-in session via server token or cookie
     const storedToken = localStorage.getItem('CHD_AUTH_TOKEN') || (['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname) ? 'cookie-session' : '');
     if (storedToken) {
-      // Validate token with server and get current staff info
       fetch('/api/auth/me', {
         headers: { 'Authorization': `Bearer ${storedToken}` }
       })
@@ -603,9 +660,9 @@ export default function App() {
           return res.json();
         })
         .then((staffData: Staff) => {
+          localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
-          // Load full database (SWR)
           void refreshMedicalData('full', false).then(() => {
             void refreshMedicalData('full', true).catch(err => {
               console.warn('Background sync failed:', err);
@@ -618,69 +675,38 @@ export default function App() {
           });
         })
         .catch(() => {
-          // Token invalid/expired — clear and show login screen
           localStorage.removeItem('CHD_AUTH_TOKEN');
+          localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
           setAuthToken('');
           setCurrentStaff(null);
-          // Load public staff list for login dropdown
-          void refreshMedicalData('staff', false).then(() => {
-            void refreshMedicalData('staff', true).catch(() => {});
-          }).catch(() => {});
+          loadPublicStaffForLogin();
         });
     } else {
-      // Not logged in: load public staff list only
-      void refreshMedicalData('staff', false).then(() => {
-        void refreshMedicalData('staff', true).catch(err => {
-          const msg = err instanceof Error ? err.message : String(err);
-          setLoginLoadError(
-            msg.includes('Failed to fetch')
-              ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
-              : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
-          );
-        });
-      }).catch(err => {
-        void refreshMedicalData('staff', true).catch(err => {
-          const msg = err instanceof Error ? err.message : String(err);
-          setLoginLoadError(
-            msg.includes('Failed to fetch')
-              ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
-              : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
-          );
-        });
-      });
+      loadPublicStaffForLogin();
     }
-  }, []);
+  }, [loadPublicStaffForLogin, refreshMedicalData]);
 
-  // Background Code Version Polling (Check every 5 minutes)
+  // Detect new Cloudflare deploy while app is open → force logout + reload
   useEffect(() => {
-    const checkVersion = () => {
-      fetch('/api/version')
-        .then(res => {
-          if (res.ok) return res.json();
-          throw new Error('Version endpoint returned error');
-        })
-        .then(data => {
-          if (data && data.buildTime) {
-            setRunningBuildTime(prev => {
-              if (!prev) {
-                return data.buildTime;
-              }
-              if (prev !== data.buildTime) {
-                setShowUpdateBanner(true);
-              }
-              return prev;
-            });
-          }
-        })
-        .catch(err => {
-          console.warn('Failed to check app build version:', err);
-        });
+    let cancelled = false;
+
+    const checkVersion = async () => {
+      const remoteBuildId = await fetchRemoteAppBuildId();
+      if (cancelled || !remoteBuildId || remoteBuildId === APP_BUILD_ID) return;
+
+      const hasSession = !!localStorage.getItem('CHD_AUTH_TOKEN');
+      if (hasSession) {
+        forceLogoutForAppUpdate();
+      }
     };
 
-    checkVersion();
-    const interval = setInterval(checkVersion, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
+    void checkVersion();
+    const interval = setInterval(() => { void checkVersion(); }, 2 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [forceLogoutForAppUpdate]);
 
   // Background Clinical Data Polling (Refresh every 60 seconds when logged in)
   useEffect(() => {
@@ -701,7 +727,7 @@ export default function App() {
     const updated = staffList.find(staff => staff.StaffKey === currentStaff.StaffKey);
     if (updated && JSON.stringify(updated) !== JSON.stringify(currentStaff)) {
       setCurrentStaff(updated);
-      localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+      localStorage.setItem('CurrentStaffKey', updated.StaffKey);
     }
   }, [staffList, currentStaff?.StaffKey]);
 
@@ -802,6 +828,7 @@ export default function App() {
       const { token, staff: staffData } = data as { token: string; staff: Staff };
       // Store ONLY the token — no password, no sensitive data in localStorage
       localStorage.setItem('CHD_AUTH_TOKEN', token);
+      localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
       // Remove legacy storage key if present
       localStorage.removeItem('CurrentStaffKey');
       setAuthToken(token);
@@ -834,6 +861,7 @@ export default function App() {
       }).catch(() => {});
     }
     localStorage.removeItem('CHD_AUTH_TOKEN');
+    localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
     // Also clean up legacy keys
     localStorage.removeItem('CurrentStaffKey');
     if (currentStaff?.StaffKey) {
@@ -856,6 +884,8 @@ export default function App() {
     // Clear IndexedDB cache and bridge memory cache
     void clearLocalCache().catch(err => console.warn('Failed to clear local cache on logout:', err));
   }, [currentStaff]);
+
+  handleLogoutRef.current = handleLogout;
 
   // Auto logout / session timeout logic
   useEffect(() => {
@@ -925,9 +955,16 @@ export default function App() {
   }, [currentStaff, handleLogout]);
 
   const navigateMenu = (menuTarget: typeof activeMenu | string) => {
-    const menu = menuTarget === 'staff-mgmt:marks' ? 'staff-mgmt' : menuTarget as typeof activeMenu;
-    if (menuTarget === 'staff-mgmt:marks') {
+    const isMarks = menuTarget === 'staff-mgmt:marks';
+    const isSettings = menuTarget === 'staff-mgmt:settings';
+    const isGuide = menuTarget === 'staff-mgmt:guide';
+    const menu = (isMarks || isSettings || isGuide) ? 'staff-mgmt' : menuTarget as typeof activeMenu;
+    if (isMarks) {
       setStaffManagementInitialTab('marks');
+    } else if (isSettings) {
+      setStaffManagementInitialTab('settings');
+    } else if (isGuide) {
+      setStaffManagementInitialTab('guide');
     } else if (menu === 'staff-mgmt') {
       setStaffManagementInitialTab('edit');
     }
@@ -1642,7 +1679,7 @@ export default function App() {
   // Return Login screen if not authenticated
   if (!currentStaff) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
+      <div className={`min-h-screen bg-neutral-950 flex flex-col items-center p-4 relative overflow-hidden font-sans ${isMobile ? 'justify-start pt-[max(1.5rem,env(safe-area-inset-top))]' : 'justify-center'}`}>
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#d2145a]/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -1657,9 +1694,10 @@ export default function App() {
               HỆ THỐNG QUẢN LÝ TIM BẨM SINH<br />
               KHOA TIM MẠCH - BVNĐTP
             </p>
+            <p className="text-[9px] text-neutral-600 font-semibold mt-1 tracking-wide">Mobile UI · build 2026-07-17</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
             {((loginLoadError && staffList.length === 0) || loginError) && (
               <div className="space-y-2">
                 <div className="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-3 text-xs leading-relaxed flex gap-1.5 animate-in fade-in duration-200">
@@ -1698,7 +1736,10 @@ export default function App() {
               </label>
               <select
                 value={loginStaffKey}
-                onChange={(e) => setLoginStaffKey(e.target.value)}
+                onChange={(e) => {
+                  setLoginStaffKey(e.target.value);
+                  setLoginPassword('');
+                }}
                 className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] transition-all font-semibold"
               >
                 <option value="" disabled>-- Chọn nhân viên --</option>
@@ -1717,10 +1758,12 @@ export default function App() {
               <input
                 type="password"
                 required
+                disabled={!loginStaffKey}
+                autoComplete="new-password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] placeholder:text-neutral-700 transition"
-                placeholder="Nhập Password nhân viên"
+                className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] placeholder:text-neutral-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder={loginStaffKey ? "Nhập Password nhân viên" : "Vui lòng chọn nhân viên trước"}
               />
             </div>
 
@@ -1981,7 +2024,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className={`${activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-room' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'results-staff' || activeMenu === 'cathlab-report' ? 'max-w-none px-4 md:px-6' : 'max-w-7xl px-4 sm:px-6 lg:px-8'} mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4`}>
+      <div className="max-w-none px-4 md:px-6 mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4">
         
         {/* Collapsible Left navigation Aside drawer */}
         <aside className={`hidden md:block ${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
@@ -2044,7 +2087,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -2076,7 +2119,7 @@ export default function App() {
                 onClose={() => setActiveMenu(profileReturnMenu)}
                 onStaffUpdated={(updated) => {
                   setCurrentStaff(updated);
-                  localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+                  localStorage.setItem('CurrentStaffKey', updated.StaffKey);
                   refreshStaffData();
                 }}
                 triggerAlert={triggerAlert}
@@ -2527,7 +2570,7 @@ export default function App() {
                           required
                           value={newConsultData.ConsultDate}
                           onChange={(val) => setNewConsultData(prev => ({ ...prev, ConsultDate: val }))}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                         />
                       </div>
                     </div>
@@ -3039,14 +3082,13 @@ export default function App() {
                     <div className="space-y-4 text-xs font-semibold text-slate-700">
                       <div>
                         <label className="block text-slate-400 font-bold uppercase text-[9px] mb-1">Chọn Ngày staff</label>
-                        <input
-                          type="date"
+                        <VNDateInput
                           value={filterDate}
-                          onChange={(e) => {
-                            setFilterDate(e.target.value);
+                          onChange={(val) => {
+                            setFilterDate(val);
                             setConsultCurrentPage(1);
                           }}
-                          className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                         />
                       </div>
                       <div>
@@ -3121,14 +3163,13 @@ export default function App() {
                     <div className="space-y-3 font-medium">
                     <div>
                       <label className="block text-slate-400 font-bold uppercase text-[9px] mb-1">Chọn Ngày staff</label>
-                      <input
-                        type="date"
+                      <VNDateInput
                         value={filterDate}
-                        onChange={(e) => {
-                          setFilterDate(e.target.value);
+                        onChange={(val) => {
+                          setFilterDate(val);
                           setConsultCurrentPage(1);
                         }}
-                        className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                        className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                       />
                     </div>
 
@@ -3307,6 +3348,19 @@ export default function App() {
             />
           )}
 
+          {/* TỔNG QUAN MRI PANEL */}
+          {activeMenu === 'mri-overview' && (
+            <MRIOverviewView
+              patients={patients}
+              consults={consults}
+              cmrs={cmrs}
+              sources={sources}
+              staffList={staffList}
+              currentStaffName={currentStaff?.StaffName}
+              onNavigate={setActiveMenu}
+            />
+          )}
+
           {/* XẾP LỊCH MRI PANEL */}
           {activeMenu === 'mri-scheduler' && (
             <MRISchedulerView
@@ -3418,6 +3472,7 @@ export default function App() {
               currentStaff={currentStaff}
               rolePresetRecords={rolePresetRecords}
               doctorPerformanceMarks={doctorPerformanceMarks}
+              sources={sources}
               initialTab={staffManagementInitialTab}
               onRefreshData={refreshStaffData}
               onRefreshRolePresets={refreshFullData}
@@ -3657,7 +3712,7 @@ export default function App() {
                                 required
                                 value={editConsultData.ConsultDate}
                                 onChange={(val) => setEditConsultData(prev => ({ ...prev, ConsultDate: val }))}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:ring-1 focus:ring-pink-500 focus:outline-none"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans focus:ring-1 focus:ring-pink-500 focus:outline-none"
                               />
                             </div>
                           </div>
@@ -3820,7 +3875,7 @@ export default function App() {
       <AnimatePresence>
         {showAddPatient && (
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-4 sm:p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed">
+            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-4 sm:p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed font-sans">
               
               <div className="flex items-center justify-between border-b border-slate-150 pb-2.5 text-[#d2145a]">
                 <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
@@ -3896,7 +3951,7 @@ export default function App() {
                       required
                       value={newPatientData.PatientDOB}
                       onChange={(val) => setNewPatientData(prev => ({ ...prev, PatientDOB: val }))}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-mono focus:outline-none"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans focus:outline-none"
                     />
                   </div>
                   <div>
@@ -3939,7 +3994,7 @@ export default function App() {
                   <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Địa chỉ *</label>
                   <SearchableEnumSelect
                     required
-                    options={SOURCE_PROVINCE}
+                    options={provinceOptions}
                     value={newPatientData.PatientAddress}
                     onChange={(value) => setNewPatientData(prev => ({ ...prev, PatientAddress: value }))}
                     placeholder="-- Chọn tỉnh/thành --"
@@ -4115,51 +4170,6 @@ export default function App() {
                   className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
                 >
                   Xác nhận
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Auto-Update Code Banner */}
-      <AnimatePresence>
-        {showUpdateBanner && (
-          <div className="fixed bottom-14 md:bottom-8 right-4 md:right-6 z-50 max-w-sm w-full p-0.5 shadow-2xl rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-[#d2145a] font-sans">
-            <motion.div 
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-slate-900/90 backdrop-blur-xl rounded-[14px] p-4 text-white space-y-3"
-            >
-              <div className="flex items-start gap-3">
-                <div className="bg-pink-500/20 text-[#d2145a] rounded-full p-2 flex items-center justify-center shrink-0">
-                  <RefreshCw className="w-5 h-5 animate-spin" style={{ animationDuration: '4s' }} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400">
-                    Hệ thống đã cập nhật
-                  </h4>
-                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed mt-1">
-                    Phiên bản mới đã được xuất bản trên Cloudflare. Vui lòng làm mới để áp dụng các cải tiến.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowUpdateBanner(false)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer text-[10px] font-black uppercase tracking-wider"
-                >
-                  Để sau
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-[#d2145a] hover:from-pink-600 hover:to-rose-600 text-white shadow-md hover:shadow-pink-500/20 transition cursor-pointer text-[10px] font-black uppercase tracking-wider"
-                >
-                  Tải lại ngay
                 </button>
               </div>
             </motion.div>

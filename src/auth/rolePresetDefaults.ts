@@ -8,7 +8,7 @@ export interface RolePresetRecord {
 }
 
 const ALL_MODULES_CSV =
-  'home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt,chd-daily-brief,cathlab-report';
+  'home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-overview,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt,chd-daily-brief,cathlab-report';
 
 export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
   {
@@ -51,7 +51,7 @@ export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
     RolePresetID: 'mri-team',
     RolePresetLabel: 'Nhóm MRI tim',
     RolePresetDescription: 'Đăng ký, xếp lịch và nhập KQ MRI',
-    Permissions: 'home,workspace,mri-register,mri-scheduler,mri-result,mri-calendar,patients',
+    Permissions: 'home,workspace,mri-overview,mri-register,mri-scheduler,mri-result,mri-calendar,patients',
     SortOrder: 6,
   },
   {

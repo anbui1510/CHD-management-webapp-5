@@ -99,3 +99,40 @@ export const SOURCE_CATH_METHOD = [
   'Phá vách liên nhĩ',
   'Đặt máy tạo nhịp'
 ];
+
+export function getSourceProvinceOptions(sources: any[] = []): string[] {
+  const values = sources
+    .map(s => String(s.PatientAddress || '').trim())
+    .filter(Boolean);
+  return values.length > 0 ? Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, 'vi')) : SOURCE_PROVINCE;
+}
+
+export function getSourceCathMethodOptions(sources: any[] = []): string[] {
+  const values = sources
+    .map(s => String(s.CathMethod || '').trim())
+    .filter(Boolean);
+  return values.length > 0 ? Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, 'vi')) : SOURCE_CATH_METHOD;
+}
+
+export function getSourceConsultResultOptions(sources: any[] = []): string[] {
+  const values = sources
+    .map(s => String(s.ResultConsultID || s.ConsultResultID || '').trim())
+    .filter(Boolean);
+  return values.length > 0 ? Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, 'vi')) : [
+    'Can thiệp thông tim',
+    'Chụp chẩn đoán-Đo kháng lực',
+    'Chụp chẩn đoán +/- can thiệp',
+    'Tiền Glenn',
+    'Tiền Fontan',
+    'Điện sinh lý',
+    'Mổ tim',
+    'Thêm CĐHA; vđ khác - Staff lại',
+    'Chụp MRI',
+    'Chụp chẩn đoán +/- Can thiệp',
+    'Chưa có chỉ định - Theo dõi tiếp',
+    'Điều trị nội khoa - Hẹn staff lại',
+    'Quá chỉ định',
+    'Không có thông tin'
+  ];
+}
+

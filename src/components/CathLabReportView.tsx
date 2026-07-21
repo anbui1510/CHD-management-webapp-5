@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CathLab, Patient, Staff, Source, formatVNTime, findPatientByKey, removeDiacritics } from '../types';
+import { VNDateInput } from './VNDateInput';
 import { 
   FileText, 
   Filter, 
@@ -443,20 +444,18 @@ function CathLabReportViewInner({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[10px] text-slate-400 mb-1">Từ ngày</label>
-                  <input
-                    type="date"
+                  <VNDateInput
                     value={fromDate}
-                    onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 font-bold font-mono focus:outline-none focus:ring-1 focus:ring-pink-400"
+                    onChange={(val) => { setFromDate(val); setCurrentPage(1); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 font-bold font-sans focus:outline-none focus:ring-1 focus:ring-pink-400"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] text-slate-400 mb-1">Đến ngày</label>
-                  <input
-                    type="date"
+                  <VNDateInput
                     value={toDate}
-                    onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 font-bold font-mono focus:outline-none focus:ring-1 focus:ring-pink-400"
+                    onChange={(val) => { setToDate(val); setCurrentPage(1); }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 font-bold font-sans focus:outline-none focus:ring-1 focus:ring-pink-400"
                   />
                 </div>
               </div>

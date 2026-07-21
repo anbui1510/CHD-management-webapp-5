@@ -580,14 +580,7 @@ export default function HomeDashboard({
   }, [pieMetric, pieCathlabs, pieCompletedConsults, cathPatientDiagnosisDistribution, secondOperatorDistribution, cathMethodDistribution, requestByDistribution]);
 
   // Date and Week scheduling for Weekly Calendar
-  const [referenceDate, setReferenceDate] = useState(() => {
-    const today = new Date();
-    // System context year is 2026
-    if (today.getFullYear() !== 2026) {
-      return new Date(2026, 5, 10); // June 10th, 2026
-    }
-    return today;
-  });
+  const [referenceDate, setReferenceDate] = useState(() => new Date());
 
   const getMonday = (d: Date) => {
     const day = d.getDay();
@@ -622,12 +615,7 @@ export default function HomeDashboard({
   };
 
   const handleResetToToday = () => {
-    const today = new Date();
-    if (today.getFullYear() !== 2026) {
-      setReferenceDate(new Date(2026, 5, 10));
-    } else {
-      setReferenceDate(today);
-    }
+    setReferenceDate(new Date());
   };
 
   const formatDateToKey = (date: Date) => {

@@ -1,5 +1,6 @@
 import { handleChdBriefRequest } from './chdBriefBridge';
-import type { Staff } from '../types';
+import { getAppVersionPayload } from '../appVersion';
+import type { Staff, Source } from '../types';
 
 type SheetData = {
   patients: any[];
@@ -704,6 +705,10 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
   const endpoint = parts[0] || '';
   const key = parts[1];
 
+  if (endpoint === 'version' && method === 'GET') {
+    return jsonResponse(getAppVersionPayload());
+  }
+
   if (endpoint === 'sync-config') {
     if (parts[1] === 'sync' && method === 'POST') {
       cache = null;
@@ -964,6 +969,147 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     }
     const staffData = await loadStaffOnly();
     return jsonResponse(staffData);
+  }
+
+  if (endpoint === 'sources' && parts[1] === 'update-all' && method === 'POST') {
+    if (!isLocalHost()) {
+      const authErr = requireAuthBridge(init);
+      if (authErr) return authErr;
+    }
+    if (!scriptUrl) {
+      if (isLocalHost()) return null;
+      return jsonResponse({ error: 'Chưa kết nối Google Apps Script URL trong mục Google Sheets.' }, { status: 400 });
+    }
+
+    const body = await parseBody(init);
+    const { PatientAddress, DiagnosisID, ResultConsultID, CathMethod, diagnosisRenames } = body || {};
+
+    if (!Array.isArray(PatientAddress) || !Array.isArray(DiagnosisID) || !Array.isArray(ResultConsultID) || !Array.isArray(CathMethod)) {
+      return jsonResponse({ error: 'Invalid payload: expected arrays for PatientAddress, DiagnosisID, ResultConsultID, and CathMethod.' }, { status: 400 });
+    }
+
+    if (!cache) {
+      await loadAllData();
+    }
+
+    // 1. Cascade DiagnosisID changes client-side in the cache
+    if (Array.isArray(diagnosisRenames) && diagnosisRenames.length > 0 && cache) {
+      const consults = [...cache.consults];
+      let consultsChanged = false;
+      const cathlabs = [...cache.cathlabs];
+      let cathlabsChanged = false;
+      const cmrs = [...cache.cmrs];
+      let cmrsChanged = false;
+      const templates = [...cache.deviceTemplates];
+      let templatesChanged = false;
+
+      const scriptOperations: Array<{ type: SheetType; action: 'insert' | 'update'; key: string; data: any }> = [];
+
+      for (const rename of diagnosisRenames) {
+        const oldId = String(rename.oldVal || '').trim();
+        const newId = String(rename.newVal || '').trim();
+        if (oldId && newId && oldId !== newId) {
+          // Consults
+          consults.forEach((c, idx) => {
+            if (c.DiagnosisID === oldId) {
+              const updated = { ...c, DiagnosisID: newId };
+              consults[idx] = updated;
+              consultsChanged = true;
+              scriptOperations.push({ type: 'Consult', action: 'update', key: c.ConsultKey, data: updated });
+            }
+          });
+          
+          // Cathlabs
+          cathlabs.forEach((cl, idx) => {
+            let clChanged = false;
+            const updated = { ...cl };
+            if (cl.DiagnosisID === oldId) {
+              updated.DiagnosisID = newId;
+              clChanged = true;
+            }
+            if (cl.PostDiagnosisID === oldId) {
+              updated.PostDiagnosisID = newId;
+              clChanged = true;
+            }
+            if (clChanged) {
+              cathlabs[idx] = updated;
+              cathlabsChanged = true;
+              scriptOperations.push({ type: 'CathLab', action: 'update', key: cl.CathKey, data: updated });
+            }
+          });
+
+          // CMRs
+          cmrs.forEach((cmr, idx) => {
+            if (cmr.CMRDiagnosisID === oldId) {
+              const updated = { ...cmr, CMRDiagnosisID: newId };
+              cmrs[idx] = updated;
+              cmrsChanged = true;
+              scriptOperations.push({ type: 'CMR', action: 'update', key: cmr.CMRKey, data: updated });
+            }
+          });
+
+          // DeviceTemplates
+          templates.forEach((t, idx) => {
+            if (t.DiagnosisID === oldId) {
+              const updated = { ...t, DiagnosisID: newId };
+              templates[idx] = updated;
+              templatesChanged = true;
+              scriptOperations.push({ type: 'DeviceTemplate', action: 'update', key: t.DeviceName, data: updated });
+            }
+          });
+        }
+      }
+
+      if (consultsChanged) cache.consults = consults;
+      if (cathlabsChanged) cache.cathlabs = cathlabs;
+      if (cmrsChanged) cache.cmrs = cmrs;
+      if (templatesChanged) cache.deviceTemplates = templates;
+
+      if (scriptOperations.length > 0) {
+        await postBatchToScript(scriptOperations);
+      }
+    }
+
+    // 2. Reconstruct sources in the client cache
+    const existingSources = cache ? cache.sources : [];
+    const maxLen = Math.max(
+      PatientAddress.length,
+      DiagnosisID.length,
+      ResultConsultID.length,
+      CathMethod.length
+    );
+
+    const nextSources: Source[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      const existing = existingSources[i] || {};
+      nextSources.push({
+        ...existing,
+        PatientAddress: PatientAddress[i] || '',
+        DiagnosisID: DiagnosisID[i] || '',
+        ResultConsultID: ResultConsultID[i] || '',
+        CathMethod: CathMethod[i] || ''
+      });
+    }
+
+    if (cache) {
+      cache.sources = nextSources;
+      void setPersistedData('all_data', sanitizeDataBundle(cache));
+    }
+
+    // 3. Sync to Google Sheets
+    await fetchWithTimeout(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'sync_sources',
+        type: 'Source',
+        key: '',
+        data: nextSources,
+        apiKey: getScriptSecret()
+      })
+    });
+
+    return jsonResponse({ success: true, count: nextSources.length });
   }
 
   const config = endpointMap[endpoint];

@@ -270,11 +270,15 @@ app.get('/api/staff/public', async (_req, res) => {
   res.json(publicList);
 });
 
-const BUILD_TIMESTAMP = String(Date.now());
+const BUILD_ID =
+  process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) ||
+  process.env.GITHUB_SHA?.slice(0, 12) ||
+  process.env.BUILD_ID ||
+  String(Date.now());
 
 // Version endpoint — public, does not require authentication
 app.get('/api/version', (_req, res) => {
-  res.json({ version: '5.0.0', buildTime: BUILD_TIMESTAMP });
+  res.json({ version: '5.0.0', buildId: BUILD_ID, buildTime: BUILD_ID });
 });
 
 // ─────────────────────────────────────────────────────────────────
@@ -648,6 +652,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         writeDB(DOCTOR_MARKS_FILE, Array.from(mMap.values()));
       }
       lastSyncTime = Date.now();
+      checkSchedulingDelays();
       console.log('Successfully pulling synced and updated local database cache!');
       return true;
     }
@@ -657,25 +662,120 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
   return false;
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update', key: string, record: any): Promise<boolean> {
+function checkSchedulingDelays(): void {
+  try {
+    const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
+    const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
+    const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
+
+    // Build map
+    const cathlabsMap = new Map<string, CathLab[]>();
+    for (const cath of cathlabs) {
+      const pKey = String(cath.PatientKey || '').trim().replace(/_dup_\d+$/i, '').toLowerCase();
+      if (!pKey) continue;
+      const bucket = cathlabsMap.get(pKey);
+      if (bucket) bucket.push(cath);
+      else cathlabsMap.set(pKey, [cath]);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const c of consults) {
+      if (c.ConsultType !== 'Staff thông') continue;
+
+      // Check if planned date is set
+      const hasPlannedDate = c.PlannedCathLabDate && !['', '—', '-', 'nodata'].includes(String(c.PlannedCathLabDate).trim().toLowerCase());
+      if (hasPlannedDate) continue;
+
+      // Check if status is excluded
+      const status = String(c.Status || '').trim().toLowerCase();
+      if (status === 'no data' || status.includes('đã thông tim') || status.includes('đã mổ')) continue;
+
+      // Check if cath is already completed
+      const pKey = String(c.PatientKey || '').trim().replace(/_dup_\d+$/i, '').toLowerCase();
+      const patientCaths = cathlabsMap.get(pKey) || [];
+      const isCompleted = patientCaths.some(cath => {
+        const consultKey = String(c.ConsultKey || '').trim().toLowerCase();
+        const cathConsultKey = String(cath.ConsultKey || '').trim().toLowerCase();
+        if (consultKey && cathConsultKey === consultKey) return true;
+
+        const cathDate = String(cath.CathDate || '').trim().split('T')[0];
+        const consultDate = String(c.ConsultDate || '').trim().split('T')[0];
+        if (cathDate && consultDate && cathDate >= consultDate) return true;
+        return false;
+      });
+      if (isCompleted) continue;
+
+      // Calculate missed days
+      if (!c.ConsultDate) continue;
+      const dateStr = String(c.ConsultDate).trim().split('T')[0];
+      const parts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
+      let consultDate: Date;
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          consultDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        } else {
+          consultDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        }
+      } else {
+        consultDate = new Date(dateStr);
+      }
+
+      if (isNaN(consultDate.getTime())) continue;
+      consultDate.setHours(0, 0, 0, 0);
+
+      const diffTime = today.getTime() - consultDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= 90) {
+        const patientContext = getPatientContext(c.PatientKey, patients);
+        const months = Math.floor(diffDays / 30);
+        
+        appendNotificationIfMissing({
+          StaffKey: '01541', // BS Hiếu
+          StaffName: 'Nguyễn Văn Hiếu',
+          Title: 'Cảnh báo trễ xếp lịch',
+          Message: `Bệnh nhi ${patientContext.PatientName || 'không rõ tên'} (${patientContext.PatientID || 'không rõ mã'}) đã trễ ${months} tháng chưa được xếp lịch thông tim dự kiến.`,
+          Severity: 'warning',
+          RelatedEntityType: 'Consult',
+          RelatedEntityKey: c.ConsultKey,
+          PatientKey: patientContext.PatientKey,
+          PatientID: patientContext.PatientID,
+          PatientName: patientContext.PatientName,
+          DedupKey: `missed_3m_delay_${c.ConsultKey}`
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error checking scheduling delays:', err);
+  }
+}
+
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update' | 'delete', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
   // Clone record to format fields safely without polluting the database cache
-  const dataToPush = { ...record };
-  const numericTextCols = ['PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight'];
-  
-  numericTextCols.forEach(col => {
-    if (dataToPush[col] !== undefined && dataToPush[col] !== null) {
-      let val = String(dataToPush[col]).trim();
-      if (val !== "") {
-        if (!val.startsWith("'")) {
-          val = "'" + val;
+  const dataToPush = record ? { ...record } : null;
+  if (dataToPush) {
+    const numericTextCols = [
+      'PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight',
+      'PatientCreateBy', 'ConsultCreateBy', 'ConsultResultCreateBy', 'ConsultResultUpdatedBy', 'CheckDeviceBy', 'CheckDeviceUpdatedBy', 'CathUpdatedBy', 'SurgUpdatedBy', 'StaffKey', 'CreatedBy'
+    ];
+    
+    numericTextCols.forEach(col => {
+      if (dataToPush[col] !== undefined && dataToPush[col] !== null) {
+        let val = String(dataToPush[col]).trim();
+        if (val !== "") {
+          if (!val.startsWith("'")) {
+            val = "'" + val;
+          }
+          dataToPush[col] = val;
         }
-        dataToPush[col] = val;
       }
-    }
-  });
+    });
+  }
 
   try {
     console.log(`Pushing mutation to Google Sheets: type=${type}, action=${action}, key=${key}`);
@@ -2091,6 +2191,121 @@ app.post('/api/sources', requireAuth, async (req, res) => {
   res.status(existingIndex >= 0 ? 200 : 201).json(sourceRecord);
 });
 
+app.post('/api/sources/update-all', requireAuth, async (req, res) => {
+  try {
+    const { PatientAddress, DiagnosisID, ResultConsultID, CathMethod, diagnosisRenames } = req.body || {};
+
+    if (!Array.isArray(PatientAddress) || !Array.isArray(DiagnosisID) || !Array.isArray(ResultConsultID) || !Array.isArray(CathMethod)) {
+      res.status(400).json({ error: 'Invalid payload: expected arrays for PatientAddress, DiagnosisID, ResultConsultID, and CathMethod.' });
+      return;
+    }
+
+    // 1. Cascade DiagnosisID changes
+    if (Array.isArray(diagnosisRenames) && diagnosisRenames.length > 0) {
+      const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
+      let consultsChanged = false;
+      
+      const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
+      let cathlabsChanged = false;
+      
+      const cmrs = readDB<CMR>(CMRS_FILE, []);
+      let cmrsChanged = false;
+      
+      const templates = readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []);
+      let templatesChanged = false;
+
+      for (const rename of diagnosisRenames) {
+        const oldId = String(rename.oldVal || '').trim();
+        const newId = String(rename.newVal || '').trim();
+        if (oldId && newId && oldId !== newId) {
+          // Consults
+          consults.forEach(c => {
+            if (c.DiagnosisID === oldId) {
+              c.DiagnosisID = newId;
+              consultsChanged = true;
+              syncToGoogleSheets('Consult', 'update', c.ConsultKey, c).catch(() => {});
+            }
+          });
+          
+          // Cathlabs
+          cathlabs.forEach(cl => {
+            let clChanged = false;
+            if (cl.DiagnosisID === oldId) {
+              cl.DiagnosisID = newId;
+              clChanged = true;
+            }
+            if (cl.PostDiagnosisID === oldId) {
+              cl.PostDiagnosisID = newId;
+              clChanged = true;
+            }
+            if (clChanged) {
+              cathlabsChanged = true;
+              syncToGoogleSheets('CathLab', 'update', cl.CathKey, cl).catch(() => {});
+            }
+          });
+
+          // CMRs
+          cmrs.forEach(cmr => {
+            if (cmr.CMRDiagnosisID === oldId) {
+              cmr.CMRDiagnosisID = newId;
+              cmrsChanged = true;
+              syncToGoogleSheets('CMR', 'update', cmr.CMRKey, cmr).catch(() => {});
+            }
+          });
+
+          // DeviceTemplates
+          templates.forEach(t => {
+            if (t.DiagnosisID === oldId) {
+              t.DiagnosisID = newId;
+              templatesChanged = true;
+              syncToGoogleSheets('DeviceTemplate', 'update', t.DeviceName, t).catch(() => {});
+            }
+          });
+        }
+      }
+
+      if (consultsChanged) writeDB(CONSULTS_FILE, consults);
+      if (cathlabsChanged) writeDB(CATHLABS_FILE, cathlabs);
+      if (cmrsChanged) writeDB(CMRS_FILE, cmrs);
+      if (templatesChanged) writeDB(DEVICE_TEMPLATES_FILE, templates);
+    }
+
+    // 2. Reconstruct sources sheet
+    const existingSources = readDB<Source>(SOURCES_FILE, []);
+    const maxLen = Math.max(
+      PatientAddress.length,
+      DiagnosisID.length,
+      ResultConsultID.length,
+      CathMethod.length
+    );
+
+    const nextSources: Source[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      const existing = existingSources[i] || {};
+      nextSources.push({
+        ...existing,
+        PatientAddress: PatientAddress[i] || '',
+        DiagnosisID: DiagnosisID[i] || '',
+        ResultConsultID: ResultConsultID[i] || '',
+        CathMethod: CathMethod[i] || ''
+      });
+    }
+
+    writeDB<Source>(SOURCES_FILE, nextSources);
+    markLocalMutation();
+
+    // 3. Sync to Google Sheets
+    syncToGoogleSheets('Source', 'sync_sources' as any, '', nextSources).catch(err => {
+      console.error('Error syncing sources update-all to google sheets background:', err);
+    });
+
+    res.json({ success: true, count: nextSources.length });
+  } catch (err) {
+    console.error('Error in POST /api/sources/update-all:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/api/consults', requireAuth, async (req, res) => {
   const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
   const newConsult: Consult = applyDiagnosisNormalization(req.body, ['DiagnosisID']);
@@ -2151,6 +2366,37 @@ app.put('/api/consults/:key', requireAuth, async (req, res) => {
     res.json(consults[index]);
   } else {
     res.status(404).json({ error: 'Consult not found' });
+  }
+});
+
+// Delete an existing consult result
+app.delete('/api/consults/:key', requireAuth, async (req, res) => {
+  try {
+    const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
+    const key = req.params.key;
+    
+    const index = consults.findIndex(c => c.ConsultKey === key);
+    if (index === -1) {
+      res.status(404).json({ error: 'Consult not found' });
+      return;
+    }
+    
+    consults.splice(index, 1);
+    writeDB<Consult>(CONSULTS_FILE, consults);
+    markLocalMutation();
+    
+    // Track local deletion
+    recentLocalEdits.set(`Consult_${key}`, { timestamp: Date.now(), data: null });
+    
+    // Sync to Google Sheet asynchronously
+    syncToGoogleSheets('Consult', 'delete', key, null).catch(err => {
+      console.error('Error syncing consult deletion to google sheets background:', err);
+    });
+    
+    res.json({ success: true, ConsultKey: key });
+  } catch (err) {
+    console.error('Error in DELETE /api/consults/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

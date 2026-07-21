@@ -18,7 +18,7 @@ import {
 } from '../types';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
-import { getSourceDiagnosisOptions } from '../data/source';
+import { getSourceDiagnosisOptions, getSourceConsultResultOptions } from '../data/source';
 import { getShortStaffName } from '../utils/staffNameMatch';
 import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
@@ -52,14 +52,14 @@ type ResultFormState = {
   RequestBy: string;
   DiagnosisID: string;
   DetailDiagnosis: string;
-  ConsultMember: string[];
+  ConsultMember: string;
   PriorityOrder: string;
 };
 
-const normalizeConsultMembers = (value: Consult['ConsultMember']): string[] => {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  return String(value).split(',').map(s => s.trim()).filter(Boolean);
+const normalizeConsultMembers = (value: Consult['ConsultMember']): string => {
+  if (!value) return '';
+  if (Array.isArray(value)) return value.join(', ');
+  return String(value).trim();
 };
 
 const buildFormState = (consult: Consult): ResultFormState => ({
@@ -115,6 +115,7 @@ export default function ResultStaffDrawer({
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ResultFormState | null>(null);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
+  const conclusionOptions = useMemo(() => getSourceConsultResultOptions(sources), [sources]);
 
   const consult = consultKey ? consults.find(c => c.ConsultKey === consultKey) : undefined;
   const patient = consult ? findPatientByKey(patients, consult.PatientKey) : undefined;
@@ -146,8 +147,8 @@ export default function ResultStaffDrawer({
       triggerAlert('Vui lòng chọn Kết luận chính (ConsultResultID)!', 'Thiếu thông tin');
       return;
     }
-    if (!formData.ConsultMember || formData.ConsultMember.length === 0) {
-      triggerAlert('Vui lòng chọn ít nhất một Thành viên duyệt hội chẩn!', 'Thiếu thông tin');
+    if (!formData.ConsultMember || !formData.ConsultMember.trim()) {
+      triggerAlert('Vui lòng nhập Thành viên duyệt hội chẩn!', 'Thiếu thông tin');
       return;
     }
 
@@ -328,14 +329,11 @@ export default function ResultStaffDrawer({
                                 <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(formData.ConsultDate)}</span></p>
                                 <p><span className="text-slate-400">Kiểu staff:</span> <span className="font-bold text-[#d2145a]">{formData.ConsultType || ''}</span></p>
                                 <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{formData.RequestBy || ''}</span></p>
-                                {formData.ConsultMember && (Array.isArray(formData.ConsultMember) ? formData.ConsultMember : [String(formData.ConsultMember)]).length > 0 && (
+                                {formData.ConsultMember && String(formData.ConsultMember).trim() && (
                                   <p>
                                     <span className="text-slate-400">Thành viên duyệt HC:</span>{' '}
                                     <span className="font-bold text-slate-800">
-                                      {(Array.isArray(formData.ConsultMember) 
-                                        ? formData.ConsultMember 
-                                        : String(formData.ConsultMember).split(',').map(s => s.trim()).filter(Boolean)
-                                      ).join(', ')}
+                                      {String(formData.ConsultMember)}
                                     </span>
                                   </p>
                                 )}
@@ -396,17 +394,13 @@ export default function ResultStaffDrawer({
 
                                 <div className="pb-2">
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                                  <SearchableEnumSelect
-                                    multiple
+                                  <input
+                                    type="text"
                                     required
-                                    options={[
-                                      ...staffList.map(s => getShortStaffName(s.StaffName, staffList)),
-                                      ...Array.from(new Set(consults.flatMap(c => Array.isArray(c.ConsultMember) ? c.ConsultMember : String(c.ConsultMember || '').split(',').map(s => s.trim()).filter(Boolean))))
-                                    ]}
-                                    values={formData.ConsultMember || []}
-                                    onMultiChange={(members) => setFormData(prev => ({ ...prev, ConsultMember: members }))}
-                                    placeholder="-- Bấm hoặc tìm để chọn bác sĩ --"
-                                    searchPlaceholder="Gõ tìm bác sĩ..."
+                                    value={formData.ConsultMember || ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, ConsultMember: e.target.value }))}
+                                    placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
                                   />
                                 </div>
 
@@ -488,7 +482,7 @@ export default function ResultStaffDrawer({
                                     </label>
                                     <SearchableEnumSelect
                                       required
-                                      options={CONCLUSION_OPTIONS}
+                                      options={conclusionOptions}
                                       value={formData.ConsultResultID}
                                       onChange={(value) => setFormData(prev => ({ ...prev, ConsultResultID: value as any }))}
                                       placeholder="-- Chọn Kết luận chính --"
