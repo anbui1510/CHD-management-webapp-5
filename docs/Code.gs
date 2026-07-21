@@ -116,7 +116,7 @@ function initializeDatabase() {
   var transplantHeaders = [
     "TransKey", "PatientKey", "TransWeight", "TransHeight", "BloodType", "Gens", "GensFile",
     "MRI", "MRIFile", "TTE", "TTEFile", "Holter", "HolterFile", "TransDiagID",
-    "DetailTransDiagkháct", "Treatment", "TransNote", "TransStatus", "TransDate",
+    "DetailTransDiag", "Treatment", "TransNote", "TransStatus", "TransDate",
     "TransCreatedTime", "TransUpdateBy", "TransUpdateTime"
   ];
 
@@ -572,7 +572,7 @@ function readSheetAsJson(ss, sheetName) {
     // CMR
     "CMRKey", "CMRkey", "MBN", "Họ và tên", "Tình trạng", "CMRDiagnosisID", "CMRDiagnosis", "CMRRequest", "DepartRequest", "CMRMethod", "CMRDevice", "PostDepart", "Anesthesia", "CMRScheduledDate", "DayOfWeek", "CMRCallStatus", "CMRCallStatusNote", "CMRDate", "CMRResult", "CMRNote", "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime",
     // Transplant
-    "TransKey", "TransWeight", "TransHeight", "BloodType", "Gens", "GensFile", "MRI", "MRIFile", "TTE", "TTEFile", "Holter", "HolterFile", "TransDiagID", "DetailTransDiagkháct", "Treatment", "TransNote", "TransStatus", "TransDate", "TransCreatedTime", "TransUpdateBy", "TransUpdateTime",
+    "TransKey", "TransWeight", "TransHeight", "BloodType", "Gens", "GensFile", "MRI", "MRIFile", "TTE", "TTEFile", "Holter", "HolterFile", "TransDiagID", "DetailTransDiag", "Treatment", "TransNote", "TransStatus", "TransDate", "TransCreatedTime", "TransUpdateBy", "TransUpdateTime",
     // DeviceTemplate
     "PHƯƠNG PHÁP PHẪU THUẬT", "DeviceName", "FullDeviceName", "Size", "Price", "bhyt",
     // RolePreset

@@ -55,7 +55,7 @@ function emptyForm(): Partial<Transplant> {
     Holter: 'Không',
     TransStatus: TRANS_STATUS_NOT_READY,
     TTE: '',
-    DetailTransDiagkháct: '',
+    DetailTransDiag: '',
     Treatment: '',
     TransNote: '',
     TransWeight: '',
@@ -157,7 +157,7 @@ export default function TransplantRegisterModal({
     if (!String(form.TransWeight || '').trim()) return 'Vui lòng nhập cân nặng.';
     if (!String(form.TTE || '').trim()) return 'Vui lòng nhập siêu âm tim.';
     if (!String(form.TransDiagID || '').trim()) return 'Vui lòng chọn mã chẩn đoán.';
-    if (!String(form.DetailTransDiagkháct || '').trim()) return 'Vui lòng nhập chẩn đoán chi tiết.';
+    if (!String(form.DetailTransDiag || '').trim()) return 'Vui lòng nhập chẩn đoán chi tiết.';
     if (!String(form.Treatment || '').trim()) return 'Vui lòng nhập điều trị hiện tại.';
     return null;
   };
@@ -284,7 +284,7 @@ export default function TransplantRegisterModal({
                 <div key={field}><label className="text-[9px] font-bold uppercase text-slate-500">{field === 'Gens' ? 'XN gen' : field} *</label><select value={form[field] || 'Không'} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1">{TRANSPLANT_YES_NO_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
               ))}
               <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Mã chẩn đoán *</label><SearchableEnumSelect value={form.TransDiagID || ''} onChange={v => setForm(f => ({ ...f, TransDiagID: v }))} options={diagnosisOptions} placeholder="Chọn mã ICD..." /></div>
-              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Chẩn đoán chi tiết *</label><textarea value={form.DetailTransDiagkháct || ''} onChange={e => setForm(f => ({ ...f, DetailTransDiagkháct: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
+              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Chẩn đoán chi tiết *</label><textarea value={form.DetailTransDiag || ''} onChange={e => setForm(f => ({ ...f, DetailTransDiag: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
               <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Siêu âm tim *</label><textarea value={form.TTE || ''} onChange={e => setForm(f => ({ ...f, TTE: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
               <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Điều trị hiện tại *</label><textarea value={form.Treatment || ''} onChange={e => setForm(f => ({ ...f, Treatment: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
               <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Ghi chú</label><textarea value={form.TransNote || ''} onChange={e => setForm(f => ({ ...f, TransNote: e.target.value }))} rows={2} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>

@@ -104,7 +104,7 @@ export async function exportTransplantExcel(items: EnrichedTransplant[], staffNa
       pat?.PatientID1 || '',
       String(pat?.PatientName || '').toUpperCase(),
       infoLines,
-      [item.TransDiagID, item.DetailTransDiagkháct].filter(Boolean).join(' — '),
+      [item.TransDiagID, item.DetailTransDiag].filter(Boolean).join(' — '),
       item.BloodType || '',
       item.Gens || '',
       item.MRI || '',

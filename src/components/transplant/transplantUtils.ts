@@ -132,8 +132,8 @@ export function sortTransplants(
         valB = String(patB?.PatientAddress || '');
         break;
       case 'detailDiag':
-        valA = String(a.DetailTransDiagkháct || '');
-        valB = String(b.DetailTransDiagkháct || '');
+        valA = String(a.DetailTransDiag || '');
+        valB = String(b.DetailTransDiag || '');
         break;
       default:
         valA = String((a as Record<string, unknown>)[field] || '');

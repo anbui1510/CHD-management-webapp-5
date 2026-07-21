@@ -237,7 +237,7 @@ export default function TransplantManagementView({
       case 'sex': return pat?.PatientSex || '—';
       case 'dob': return formatVNTime(pat?.PatientDOB);
       case 'address': return pat?.PatientAddress || '—';
-      case 'detailDiag': return <span className="line-clamp-2">{item.DetailTransDiagkháct || '—'}</span>;
+      case 'detailDiag': return <span className="line-clamp-2">{item.DetailTransDiag || '—'}</span>;
       case 'TransWeight': return item.TransWeight ? `${item.TransWeight} kg` : '—';
       case 'TransDate': return formatVNTime(item.TransDate);
       default: return String(item[col as keyof Transplant] || '—');
@@ -358,7 +358,7 @@ export default function TransplantManagementView({
                   <div key={field}><label className="text-[9px] font-bold uppercase text-slate-500">{field === 'Gens' ? 'XN gen' : field}</label><select value={detailForm[field] || 'Không'} onChange={e => setDetailForm(f => ({ ...f, [field]: e.target.value }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1">{TRANSPLANT_YES_NO_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
                 ))}
                 <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Mã chẩn đoán</label><SearchableEnumSelect value={detailForm.TransDiagID || ''} onChange={v => setDetailForm(f => ({ ...f, TransDiagID: v }))} options={diagnosisOptions} placeholder="Chọn mã ICD..." /></div>
-                <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Chẩn đoán chi tiết</label><textarea value={detailForm.DetailTransDiagkháct || ''} onChange={e => setDetailForm(f => ({ ...f, DetailTransDiagkháct: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
+                <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Chẩn đoán chi tiết</label><textarea value={detailForm.DetailTransDiag || ''} onChange={e => setDetailForm(f => ({ ...f, DetailTransDiag: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
                 <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Siêu âm tim</label><textarea value={detailForm.TTE || ''} onChange={e => setDetailForm(f => ({ ...f, TTE: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
                 <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Điều trị hiện tại</label><textarea value={detailForm.Treatment || ''} onChange={e => setDetailForm(f => ({ ...f, Treatment: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
                 <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Ghi chú</label><textarea value={detailForm.TransNote || ''} onChange={e => setDetailForm(f => ({ ...f, TransNote: e.target.value }))} rows={2} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>

@@ -185,7 +185,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `Holter` | Holter ECG | Enum | Có / Không | Bắt buộc | |
 | `HolterFile` | File Holter | Text | | | Chỉ upload khi Holter = Có. |
 | `TransDiagID` | Mã chẩn đoán | Enum | Ref tới `Source.DiagnosisID` | Bắt buộc | |
-| `DetailTransDiagkháct` | Chẩn đoán chi tiết | LongText | | Bắt buộc | Giữ đúng tên cột trên Google Sheets. |
+| `DetailTransDiag` | Chẩn đoán chi tiết | LongText | | Bắt buộc | Giữ đúng tên cột trên Google Sheets. |
 | `Treatment` | Điều trị hiện tại | LongText | | Bắt buộc | |
 | `TransNote` | Ghi chú | LongText | | | |
 | `TransStatus` | Trạng thái | Enum | Chưa đủ tiêu chuẩn / Đủ tiêu chuẩn ghép tim | | |

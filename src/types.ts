@@ -251,7 +251,7 @@ export interface Transplant {
   Holter?: TransplantYesNo | string;
   HolterFile?: string;
   TransDiagID?: string;
-  DetailTransDiagkháct?: string;
+  DetailTransDiag?: string;
   Treatment?: string;
   TransNote?: string;
   TransStatus?: TransplantStatus | string;
