@@ -19,6 +19,7 @@ import {
   CathLab,
   Operation,
   CMR,
+  Transplant,
   Source,
   DeviceTemplate,
   RolePreset,
@@ -47,6 +48,7 @@ import MRIRegisterView from './components/MRIRegisterView';
 import MRIResultView from './components/MRIResultView';
 import MRICalendarView from './components/MRICalendarView';
 import MRIOverviewView from './components/MRIOverviewView';
+import TransplantManagementView from './components/TransplantManagementView';
 import SurgeryRoomView from './components/SurgeryRoomView';
 import DevelopingFeatureView from './components/DevelopingFeatureView';
 import ChdDailyBriefView from './components/ChdDailyBriefView';
@@ -199,6 +201,7 @@ export default function App() {
   const [cathlabs, setCathlabs] = useState<CathLab[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [cmrs, setCmrs] = useState<CMR[]>([]);
+  const [transplants, setTransplants] = useState<Transplant[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [deviceTemplates, setDeviceTemplates] = useState<DeviceTemplate[]>([]);
   const [rolePresetRecords, setRolePresetRecords] = useState<RolePreset[]>([]);
@@ -281,7 +284,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'mri-overview' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'heart-transplant' | 'mri-overview' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
   const [profileReturnMenu, setProfileReturnMenu] = useState<typeof activeMenu>('home');
   const [isStaffAccountMenuOpen, setIsStaffAccountMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -403,6 +406,7 @@ export default function App() {
       setCathlabs,
       setOperations,
       setCmrs,
+      setTransplants,
       setSources,
       setDeviceTemplates,
       setRolePresetRecords,
@@ -447,6 +451,25 @@ export default function App() {
 
   const addCmr = useCallback((cmr: CMR) => {
     setCmrs(prev => [...prev, cmr]);
+  }, []);
+
+  const patchTransplant = useCallback((transKey: string, patch: Partial<Transplant>) => {
+    const normalized = transKey.trim().toLowerCase();
+    setTransplants(prev =>
+      prev.map(t => {
+        const key = String(t.TransKey || '').trim().toLowerCase();
+        return key === normalized ? { ...t, ...patch } : t;
+      })
+    );
+  }, []);
+
+  const addTransplant = useCallback((record: Transplant) => {
+    setTransplants(prev => [...prev, record]);
+  }, []);
+
+  const deleteTransplant = useCallback((transKey: string) => {
+    const normalized = transKey.trim().toLowerCase();
+    setTransplants(prev => prev.filter(t => String(t.TransKey || '').trim().toLowerCase() !== normalized));
   }, []);
 
   const patchCathlab = useCallback((cathKey: string, patch: Partial<CathLab>) => {
@@ -878,6 +901,7 @@ export default function App() {
     setCathlabs([]);
     setOperations([]);
     setCmrs([]);
+    setTransplants([]);
     setNotifications([]);
     setDoctorPerformanceMarks([]);
 
@@ -1827,6 +1851,12 @@ export default function App() {
           subtitle: "",
           icon: <CalendarDays className="w-5 h-5 text-pink-200 animate-pulse" />
         };
+      case 'heart-transplant':
+        return {
+          title: "QUẢN LÝ GHÉP TIM",
+          subtitle: "Danh sách chờ ghép tim",
+          icon: <Heart className="w-5 h-5 text-pink-200 animate-pulse" />
+        };
       case 'schedule-view':
         return {
           title: "LỊCH THÔNG TIM DỰ KIẾN",
@@ -2087,7 +2117,7 @@ export default function App() {
         </aside>
 
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'heart-transplant' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -3414,6 +3444,23 @@ export default function App() {
               patients={patients}
               consults={consults}
               cmrs={cmrs}
+            />
+          )}
+
+          {activeMenu === 'heart-transplant' && (
+            <TransplantManagementView
+              patients={patients}
+              transplants={transplants}
+              sources={sources}
+              staffList={staffList}
+              currentStaff={currentStaff}
+              onRefreshData={() => refreshMedicalData('transplant')}
+              onAddTransplant={addTransplant}
+              onPatchTransplant={patchTransplant}
+              onDeleteTransplant={deleteTransplant}
+              onAddPatient={addPatient}
+              onEditPatientAdmin={patient => setSelectedPatientForDetail(patient)}
+              triggerAlert={triggerAlert}
             />
           )}
 

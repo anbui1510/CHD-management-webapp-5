@@ -155,7 +155,19 @@ export default function WorkspaceDashboard({
         ],
       },
       {
-        title: '5. QUẢN LÝ MRI TIM',
+        title: '5. QUẢN LÝ GHÉP TIM',
+        tiles: [
+          {
+            module: 'heart-transplant',
+            label: 'Quản lý ghép tim',
+            description: 'Danh sách chờ ghép tim & hồ sơ tiêu chuẩn',
+            icon: <Heart className="w-6 h-6 text-pink-600" />,
+            iconBg: 'bg-pink-50',
+          },
+        ],
+      },
+      {
+        title: '6. QUẢN LÝ MRI TIM',
         tiles: [
           {
             module: 'mri-overview',

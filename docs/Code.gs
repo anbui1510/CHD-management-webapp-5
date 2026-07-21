@@ -113,6 +113,13 @@ function initializeDatabase() {
     "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime"
   ];
 
+  var transplantHeaders = [
+    "TransKey", "PatientKey", "TransWeight", "TransHeight", "BloodType", "Gens", "GensFile",
+    "MRI", "MRIFile", "TTE", "TTEFile", "Holter", "HolterFile", "TransDiagID",
+    "DetailTransDiagkháct", "Treatment", "TransNote", "TransStatus", "TransDate",
+    "TransCreatedTime", "TransUpdateBy", "TransUpdateTime"
+  ];
+
   var sourceHeaders = ["DiagnosisID"];
 
   var deviceTemplateHeaders = [
@@ -141,6 +148,7 @@ function initializeDatabase() {
   getOrCreateSheet("CathLab", cathLabHeaders);
   getOrCreateSheet("Operation", operationHeaders);
   getOrCreateSheet("CMR", cmrHeaders);
+  getOrCreateSheet("Transplant", transplantHeaders);
   
   if (sourceHeaders.length > 0) {
     getOrCreateSheet("Source", sourceHeaders);
@@ -239,6 +247,7 @@ function doGet(e) {
   var cathlabs = readSheetAsJson(ss, "CathLab");
   var operations = readSheetAsJson(ss, "Operation");
   var cmrs = readSheetAsJson(ss, "CMR");
+  var transplants = readSheetAsJson(ss, "Transplant");
   var sources = readSheetAsJson(ss, "Source");
   var deviceTemplates = readSheetAsJson(ss, "DeviceTemplate");
   var rolePresets = readSheetAsJson(ss, "RolePreset");
@@ -265,6 +274,7 @@ function doGet(e) {
     cathlabs: cathlabs,
     operations: operations,
     cmrs: cmrs,
+    transplants: transplants,
     sources: sources,
     deviceTemplates: deviceTemplates,
     rolePresets: rolePresets,
@@ -288,6 +298,8 @@ function getKeyColumnNameForType(type) {
     keyColumnName = "NotificationKey";
   } else if (type === "DoctorPerformanceMark") {
     keyColumnName = "MarkKey";
+  } else if (type === "Transplant") {
+    keyColumnName = "TransKey";
   }
   return keyColumnName;
 }
@@ -330,7 +342,12 @@ function writeRecordToSheet(type, action, key, record) {
         header === "PatientID2" || 
         header === "PatientPhone1" || 
         header === "PatientPhone2" || 
-        header === "StaffPhone"
+        header === "StaffPhone" ||
+        header === "PatientWeight" ||
+        header === "PatientHeight" ||
+        header === "TransWeight" ||
+        header === "TransHeight" ||
+        header === "StaffKey"
       );
       if (isNumericTextCol && strVal !== "") {
         if (!strVal.startsWith("'")) {
@@ -349,6 +366,40 @@ function writeRecordToSheet(type, action, key, record) {
 
   sheet.appendRow(rowValues);
   return { status: "success", action: "inserted", key: key, rowIndex: sheet.getLastRow() };
+}
+
+function deleteRecordFromSheet(type, key) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
+  if (!sheet) {
+    throw new Error("Sheet not found: " + type);
+  }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var keyColumnName = getKeyColumnNameForType(type);
+  var keyColIndex = headers.indexOf(keyColumnName) + 1;
+
+  if (keyColIndex === 0) {
+    keyColIndex = 1;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var foundRowIndex = -1;
+  
+  if (lastRow > 1) {
+    var keyValues = sheet.getRange(2, keyColIndex, lastRow - 1, 1).getValues();
+    for (var i = 0; i < keyValues.length; i++) {
+      if (keyValues[i][0] == key) {
+        foundRowIndex = i + 2;
+        break;
+      }
+    }
+  }
+
+  if (foundRowIndex !== -1) {
+    sheet.deleteRow(foundRowIndex);
+    return { status: "success", action: "deleted", key: key, rowIndex: foundRowIndex };
+  }
+  return { status: "error", message: "Record not found to delete" };
 }
 
 // POST Requests - Inserts or Updates records
@@ -487,6 +538,8 @@ function doPost(e) {
 
     if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
+    } else if (action === "delete") {
+      result = deleteRecordFromSheet(type, key);
     }
   } catch (err) {
     result = { status: "error", message: err.toString() };
@@ -518,6 +571,8 @@ function readSheetAsJson(ss, sheetName) {
     "SurgKey", "SurgDate", "DetailDiagnosisManual", "SurgResultID", "SurgNote", "SurgMethod", "1stSurgeon", "2ndSurgeon", "3rdSurgeon", "4thSurgeon", "SurgCreateTime", "SurgUpdatedBy",
     // CMR
     "CMRKey", "CMRkey", "MBN", "Họ và tên", "Tình trạng", "CMRDiagnosisID", "CMRDiagnosis", "CMRRequest", "DepartRequest", "CMRMethod", "CMRDevice", "PostDepart", "Anesthesia", "CMRScheduledDate", "DayOfWeek", "CMRCallStatus", "CMRCallStatusNote", "CMRDate", "CMRResult", "CMRNote", "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime",
+    // Transplant
+    "TransKey", "TransWeight", "TransHeight", "BloodType", "Gens", "GensFile", "MRI", "MRIFile", "TTE", "TTEFile", "Holter", "HolterFile", "TransDiagID", "DetailTransDiagkháct", "Treatment", "TransNote", "TransStatus", "TransDate", "TransCreatedTime", "TransUpdateBy", "TransUpdateTime",
     // DeviceTemplate
     "PHƯƠNG PHÁP PHẪU THUẬT", "DeviceName", "FullDeviceName", "Size", "Price", "bhyt",
     // RolePreset
@@ -575,7 +630,7 @@ function readSheetAsJson(ss, sheetName) {
         }
       } else {
         if (cellVal !== undefined && cellVal !== null) {
-          if (headerName === "PatientID1" || headerName === "PatientID2" || headerName === "PatientPhone1" || headerName === "PatientPhone2" || headerName === "StaffPhone") {
+          if (headerName === "PatientID1" || headerName === "PatientID2" || headerName === "PatientPhone1" || headerName === "PatientPhone2" || headerName === "StaffPhone" || headerName === "PatientWeight" || headerName === "PatientHeight") {
             var strVal = String(cellVal).trim();
             if (strVal.startsWith("'")) {
               strVal = strVal.substring(1);

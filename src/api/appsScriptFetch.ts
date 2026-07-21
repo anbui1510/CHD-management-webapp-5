@@ -9,6 +9,7 @@ type SheetData = {
   cathlabs: any[];
   operations: any[];
   cmrs: any[];
+  transplants: any[];
   sources: any[];
   deviceTemplates: any[];
   rolePresets: any[];
@@ -16,7 +17,7 @@ type SheetData = {
   doctorPerformanceMarks: any[];
 };
 
-type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark';
+type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Transplant' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark';
 
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
 const SCRIPT_SECRET_STORAGE_KEY = 'chd_apps_script_secret';
@@ -101,6 +102,7 @@ const EMPTY_DATA: SheetData = {
   cathlabs: [],
   operations: [],
   cmrs: [],
+  transplants: [],
   sources: [],
   deviceTemplates: [],
   rolePresets: [],
@@ -115,6 +117,7 @@ const endpointMap: Record<string, { type: SheetType; collection: keyof SheetData
   cathlabs: { type: 'CathLab', collection: 'cathlabs', keyField: 'CathKey', prefix: 'cath' },
   operations: { type: 'Operation', collection: 'operations', keyField: 'SurgKey', prefix: 'surg' },
   cmrs: { type: 'CMR', collection: 'cmrs', keyField: 'CMRKey', prefix: 'cmr' },
+  transplants: { type: 'Transplant', collection: 'transplants', keyField: 'TransKey', prefix: 'trans' },
   sources: { type: 'Source', collection: 'sources', keyField: 'DiagnosisID', prefix: 'source' },
   'device-templates': { type: 'DeviceTemplate', collection: 'deviceTemplates', keyField: 'DeviceName', prefix: 'device' },
   'role-presets': { type: 'RolePreset', collection: 'rolePresets', keyField: 'RolePresetID', prefix: 'preset' },
@@ -352,6 +355,7 @@ const normalizeData = (data: Partial<SheetData>): SheetData => ({
   cathlabs: Array.isArray(data.cathlabs) ? data.cathlabs : [],
   operations: Array.isArray(data.operations) ? data.operations : [],
   cmrs: Array.isArray(data.cmrs) ? data.cmrs : [],
+  transplants: Array.isArray(data.transplants) ? data.transplants : [],
   sources: Array.isArray(data.sources) ? data.sources : [],
   deviceTemplates: Array.isArray(data.deviceTemplates) ? data.deviceTemplates : [],
   rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : [],
@@ -564,6 +568,7 @@ const createKey = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().t
 
 const getRecordKey = (record: any, config: (typeof endpointMap)[string]) => {
   if (config.collection === 'cmrs') return record.CMRKey || record.CMRkey;
+  if (config.collection === 'transplants') return record.TransKey;
   return record[config.keyField];
 };
 
@@ -581,6 +586,11 @@ const prepareRecordForInsert = async (endpoint: string, record: any, config: (ty
   if (endpoint === 'cmrs') {
     next.CMRKey = next.CMRKey || next.CMRkey || createKey(config.prefix);
     next.UpdateTime = next.UpdateTime || new Date().toISOString();
+  }
+  if (endpoint === 'transplants') {
+    next.TransKey = next.TransKey || createKey(config.prefix);
+    next.TransCreatedTime = next.TransCreatedTime || new Date().toISOString();
+    next.TransUpdateTime = next.TransUpdateTime || new Date().toISOString();
   }
   if (endpoint === 'notifications') {
     next.NotificationKey = next.NotificationKey || createKey(config.prefix);
@@ -617,6 +627,10 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   if (endpoint === 'cmrs') {
     record.CMRKey = record.CMRKey || record.CMRkey || key || createKey(config.prefix);
     record.UpdateTime = new Date().toISOString();
+  }
+  if (endpoint === 'transplants') {
+    record.TransKey = record.TransKey || key || createKey(config.prefix);
+    record.TransUpdateTime = new Date().toISOString();
   }
 
   const finalKey = getRecordKey(record, config) || key || createKey(config.prefix);

@@ -167,11 +167,38 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `NextPlan` | Kế hoạch tiếp theo | Text | | | Hướng xử trí sau MRI. |
 | `UpdateTime` | Thời gian cập nhật | DateTime | | | Thời điểm cập nhật record CMR. |
 
-### 7. Bảng Source (Cấu hình nguồn và danh mục)
-*   Chứa các danh mục thiết lập, các cột phụ thuộc vào cấu hình người dùng. Hệ thống sẽ tự động quét hết các cột vào mảng.
-*   `DiagnosisID`: Danh mục mã chẩn đoán dùng chung cho `Consult.DiagnosisID`, `CathLab.PostDiagnosisID` và `CMR.CMRDiagnosisID`. Không hard-code danh sách DiagnosisID mới trong component; nếu user thêm mã mới thì lưu vào cột này.
+### 7. Bảng Transplant (Quản lý ghép tim)
 
-### 8. Bảng DeviceTemplate (Gợi ý dụng cụ can thiệp)
+| Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `TransKey` | Key | Text | UniqueID() | Bắt buộc | Khóa chính mỗi hồ sơ ghép tim. |
+| `PatientKey` | Liên kết Patient | Ref | | Bắt buộc | Liên kết bảng Patient. |
+| `TransWeight` | Cân nặng (kg) | Text | | Bắt buộc | Cân nặng tại thời điểm đăng ký. |
+| `TransHeight` | Chiều cao (cm) | Text | | | Chiều cao bệnh nhi. |
+| `BloodType` | Nhóm máu | Enum | Chưa xác định / Nhóm A (+) / Nhóm A (-) / Nhóm B (+) / Nhóm B (-) / Nhóm O (+) / Nhóm O (-) / Nhóm AB (+) / Nhóm AB (-) | Bắt buộc | |
+| `Gens` | Xét nghiệm gen | Enum | Có / Không | Bắt buộc | |
+| `GensFile` | File XN gen | Text | | | Chỉ upload khi Gens = Có; URL hoặc data URL. |
+| `MRI` | Chụp MRI tim | Enum | Có / Không | Bắt buộc | |
+| `MRIFile` | File MRI | Text | | | Chỉ upload khi MRI = Có. |
+| `TTE` | Siêu âm tim | LongText | | Bắt buộc | Mô tả các ý chính siêu âm tim. |
+| `TTEFile` | File siêu âm tim | Text | | | URL hoặc data URL. |
+| `Holter` | Holter ECG | Enum | Có / Không | Bắt buộc | |
+| `HolterFile` | File Holter | Text | | | Chỉ upload khi Holter = Có. |
+| `TransDiagID` | Mã chẩn đoán | Enum | Ref tới `Source.DiagnosisID` | Bắt buộc | |
+| `DetailTransDiagkháct` | Chẩn đoán chi tiết | LongText | | Bắt buộc | Giữ đúng tên cột trên Google Sheets. |
+| `Treatment` | Điều trị hiện tại | LongText | | Bắt buộc | |
+| `TransNote` | Ghi chú | LongText | | | |
+| `TransStatus` | Trạng thái | Enum | Chưa đủ tiêu chuẩn / Đủ tiêu chuẩn ghép tim | | |
+| `TransDate` | Ngày ghép tim | Date | | | Định dạng dd/mm/yyyy. |
+| `TransCreatedTime` | Thời gian tạo | DateTime | | | |
+| `TransUpdateBy` | Người tạo/cập nhật | Ref | StaffKey | | |
+| `TransUpdateTime` | Thời gian cập nhật | DateTime | | | |
+
+### 8. Bảng Source (Cấu hình nguồn và danh mục)
+*   Chứa các danh mục thiết lập, các cột phụ thuộc vào cấu hình người dùng. Hệ thống sẽ tự động quét hết các cột vào mảng.
+*   `DiagnosisID`: Danh mục mã chẩn đoán dùng chung cho `Consult.DiagnosisID`, `CathLab.PostDiagnosisID`, `CMR.CMRDiagnosisID` và `Transplant.TransDiagID`. Không hard-code danh sách DiagnosisID mới trong component; nếu user thêm mã mới thì lưu vào cột này.
+
+### 9. Bảng DeviceTemplate (Gợi ý dụng cụ can thiệp)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -186,7 +213,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 * Gợi ý `PlannedDevice` trong các popup staff/xếp lịch lấy từ bảng này theo `DiagnosisID`, đồng thời có thể trộn thêm lịch sử `Consult.PlannedDevice` cùng mã bệnh.
 * Khi bấm nhiều gợi ý, nội dung điền vào `PlannedDevice` được nối bằng dấu chấm.
 
-### 9. Bảng RolePreset (Vai trò mẫu phân quyền)
+### 10. Bảng RolePreset (Vai trò mẫu phân quyền)
 
 | Tên Cột | Tên hiển thị | Type | Giá trị | Yêu cầu | Giải thích |
 | :--- | :--- | :--- | :--- | :--- | :--- |

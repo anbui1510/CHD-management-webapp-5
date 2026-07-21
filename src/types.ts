@@ -219,6 +219,49 @@ export interface CMR {
   [key: string]: any;
 }
 
+export type BloodTypeValue =
+  | 'Chưa xác định'
+  | 'Nhóm A (+)'
+  | 'Nhóm A (-)'
+  | 'Nhóm B (+)'
+  | 'Nhóm B (-)'
+  | 'Nhóm O (+)'
+  | 'Nhóm O (-)'
+  | 'Nhóm AB (+)'
+  | 'Nhóm AB (-)';
+
+export type TransplantYesNo = 'Có' | 'Không';
+
+export type TransplantStatus =
+  | 'Chưa đủ tiêu chuẩn'
+  | 'Đủ tiêu chuẩn ghép tim';
+
+export interface Transplant {
+  TransKey?: string;
+  PatientKey?: string;
+  TransWeight?: string;
+  TransHeight?: string;
+  BloodType?: BloodTypeValue | string;
+  Gens?: TransplantYesNo | string;
+  GensFile?: string;
+  MRI?: TransplantYesNo | string;
+  MRIFile?: string;
+  TTE?: string;
+  TTEFile?: string;
+  Holter?: TransplantYesNo | string;
+  HolterFile?: string;
+  TransDiagID?: string;
+  DetailTransDiagkháct?: string;
+  Treatment?: string;
+  TransNote?: string;
+  TransStatus?: TransplantStatus | string;
+  TransDate?: string;
+  TransCreatedTime?: string;
+  TransUpdateBy?: string;
+  TransUpdateTime?: string;
+  [key: string]: any;
+}
+
 export interface Source {
   [key: string]: any;
 }

@@ -9,7 +9,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
-import { Patient, Consult, Staff, CathLab, CMR, Source, DeviceTemplate, RolePreset, Operation, Notification, DoctorPerformanceMark } from './src/types';
+import { Patient, Consult, Staff, CathLab, CMR, Transplant, Source, DeviceTemplate, RolePreset, Operation, Notification, DoctorPerformanceMark } from './src/types';
 import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
@@ -310,6 +310,7 @@ const CONSULTS_FILE = path.join(DB_DIR, 'consults.json');
 const CATHLABS_FILE = path.join(DB_DIR, 'cathlabs.json');
 const OPERATIONS_FILE = path.join(DB_DIR, 'operations.json');
 const CMRS_FILE = path.join(DB_DIR, 'cmrs.json');
+const TRANSPLANTS_FILE = path.join(DB_DIR, 'transplants.json');
 const SOURCES_FILE = path.join(DB_DIR, 'sources.json');
 const DEVICE_TEMPLATES_FILE = path.join(DB_DIR, 'device-templates.json');
 const ROLE_PRESETS_FILE = path.join(DB_DIR, 'role-presets.json');
@@ -475,7 +476,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
 
     const data = await response.json() as any;
 
-    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.sources) || Array.isArray(data.deviceTemplates) || Array.isArray(data.rolePresets) || Array.isArray(data.notifications) || Array.isArray(data.doctorPerformanceMarks))) {
+    if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.transplants) || Array.isArray(data.sources) || Array.isArray(data.deviceTemplates) || Array.isArray(data.rolePresets) || Array.isArray(data.notifications) || Array.isArray(data.doctorPerformanceMarks))) {
       if (Array.isArray(data.patients)) {
         const currentPatients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
         const pMap = new Map();
@@ -595,6 +596,29 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         preserveLocalOnlyRecords(cmrmap, currentCmrs, record => record.CMRKey || record.CMRkey);
         preserveRecentLocalRecords(cmrmap, 'CMR', record => record.CMRKey || record.CMRkey);
         writeDB(CMRS_FILE, Array.from(cmrmap.values()));
+      }
+
+      if (Array.isArray(data.transplants) && data.transplants.length > 0) {
+        const currentTransplants = readDB<Transplant>(TRANSPLANTS_FILE, defaultTransplants);
+        const transplantMap = new Map<string, Transplant>();
+        data.transplants.forEach((t: any, i: number) => {
+          const k = t.TransKey || `trans_no_key_${i}`;
+          t.TransKey = k;
+          if (t.TransWeight != null) {
+            t.TransWeight = restoreWeightFromDate(cleanSheetText(t.TransWeight));
+          }
+          if (t.TransHeight != null) {
+            t.TransHeight = restoreWeightFromDate(cleanSheetText(t.TransHeight));
+          }
+          const recent = recentLocalEdits.get(`Transplant_${k}`);
+          if (recent && Date.now() - recent.timestamp < 45000) {
+            t = { ...t, ...recent.data };
+          }
+          transplantMap.set(k, t);
+        });
+        preserveLocalOnlyRecords(transplantMap, currentTransplants, record => record.TransKey);
+        preserveRecentLocalRecords(transplantMap, 'Transplant', record => record.TransKey);
+        writeDB(TRANSPLANTS_FILE, Array.from(transplantMap.values()));
       }
       if (Array.isArray(data.staff) && data.staff.length > 0) {
         const stMap = new Map();
@@ -752,7 +776,7 @@ function checkSchedulingDelays(): void {
   }
 }
 
-async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update' | 'delete', key: string, record: any): Promise<boolean> {
+async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Transplant' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark', action: 'insert' | 'update' | 'delete', key: string, record: any): Promise<boolean> {
   const config = getSyncConfig();
   if (!config.scriptUrl) return false;
 
@@ -760,7 +784,7 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
   const dataToPush = record ? { ...record } : null;
   if (dataToPush) {
     const numericTextCols = [
-      'PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight',
+      'PatientID1', 'PatientID2', 'PatientPhone1', 'PatientPhone2', 'StaffPhone', 'PatientWeight', 'PatientHeight', 'TransWeight', 'TransHeight',
       'PatientCreateBy', 'ConsultCreateBy', 'ConsultResultCreateBy', 'ConsultResultUpdatedBy', 'CheckDeviceBy', 'CheckDeviceUpdatedBy', 'CathUpdatedBy', 'SurgUpdatedBy', 'StaffKey', 'CreatedBy'
     ];
     
@@ -1012,6 +1036,7 @@ const defaultConsults: Consult[] = [
 // Initial CathLab Data
 const defaultCathlabs: CathLab[] = [];
 const defaultCmrs: CMR[] = [];
+const defaultTransplants: Transplant[] = [];
 
 // Helper functions for reading/writing Database
 function readDB<T>(filePath: string, defaultData: T[]): T[] {
@@ -1543,6 +1568,7 @@ app.get('/api/all', requireAuth, async (_req, res) => {
     cathlabs: readDB<CathLab>(CATHLABS_FILE, defaultCathlabs),
     operations: readDB<Operation>(OPERATIONS_FILE, []),
     cmrs: readDB<CMR>(CMRS_FILE, defaultCmrs),
+    transplants: readDB<Transplant>(TRANSPLANTS_FILE, defaultTransplants),
     sources: readDB<Source>(SOURCES_FILE, []),
     deviceTemplates: readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []),
     rolePresets: ensureRolePresetsDB(),
@@ -2142,6 +2168,82 @@ app.put('/api/cmrs/:key', requireAuth, async (req, res) => {
     }
   } catch (err) {
     console.error('Error in PUT /api/cmrs/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/transplants', requireAuth, async (req, res) => {
+  await syncFromGoogleSheets();
+  const transplants = readDB<Transplant>(TRANSPLANTS_FILE, defaultTransplants);
+  res.json(transplants);
+});
+
+app.post('/api/transplants', requireAuth, async (req, res) => {
+  const transplants = readDB<Transplant>(TRANSPLANTS_FILE, defaultTransplants);
+  const newRec: Transplant = applyDiagnosisNormalization(req.body, ['TransDiagID']);
+  const requestedKey = newRec.TransKey;
+  const keyExists = requestedKey && transplants.some(t => String(t.TransKey || '') === String(requestedKey));
+  newRec.TransKey = requestedKey && !keyExists ? requestedKey : createUniqueKey('trans', transplants.map(t => t.TransKey));
+  newRec.TransCreatedTime = newRec.TransCreatedTime || newTimestamp();
+  newRec.TransUpdateTime = newRec.TransUpdateTime || newTimestamp();
+  transplants.push(newRec);
+  writeDB<Transplant>(TRANSPLANTS_FILE, transplants);
+  markLocalMutation();
+  recentLocalEdits.set(`Transplant_${newRec.TransKey}`, { timestamp: Date.now(), data: newRec });
+  syncToGoogleSheets('Transplant', 'insert', newRec.TransKey, newRec).catch(err => {
+    console.error('Error syncing Transplant to google sheets background:', err);
+  });
+  res.status(201).json(newRec);
+});
+
+app.put('/api/transplants/:key', requireAuth, async (req, res) => {
+  try {
+    const transplants = readDB<Transplant>(TRANSPLANTS_FILE, defaultTransplants);
+    const key = req.params.key;
+    const index = transplants.findIndex(t =>
+      String(t.TransKey || '').trim().toLowerCase() === String(key || '').trim().toLowerCase()
+    );
+    if (index !== -1) {
+      transplants[index] = applyDiagnosisNormalization(
+        { ...transplants[index], ...req.body, TransUpdateTime: newTimestamp() },
+        ['TransDiagID']
+      );
+      transplants[index].TransKey = transplants[index].TransKey || key;
+      writeDB<Transplant>(TRANSPLANTS_FILE, transplants);
+      markLocalMutation();
+      recentLocalEdits.set(`Transplant_${transplants[index].TransKey}`, { timestamp: Date.now(), data: transplants[index] });
+      syncToGoogleSheets('Transplant', 'update', transplants[index].TransKey!, transplants[index]).catch(err => {
+        console.error('Error syncing Transplant update to google sheets background:', err);
+      });
+      res.json(transplants[index]);
+    } else {
+      res.status(404).json({ error: 'Transplant record not found' });
+    }
+  } catch (err) {
+    console.error('Error in PUT /api/transplants/:key:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/transplants/:key', requireAuth, async (req, res) => {
+  try {
+    const transplants = readDB<Transplant>(TRANSPLANTS_FILE, defaultTransplants);
+    const key = req.params.key;
+    const index = transplants.findIndex(t => String(t.TransKey || '') === String(key || ''));
+    if (index === -1) {
+      res.status(404).json({ error: 'Transplant record not found' });
+      return;
+    }
+    transplants.splice(index, 1);
+    writeDB<Transplant>(TRANSPLANTS_FILE, transplants);
+    markLocalMutation();
+    recentLocalEdits.set(`Transplant_${key}`, { timestamp: Date.now(), data: null });
+    syncToGoogleSheets('Transplant', 'delete', key, null).catch(err => {
+      console.error('Error syncing Transplant deletion to google sheets background:', err);
+    });
+    res.json({ success: true, TransKey: key });
+  } catch (err) {
+    console.error('Error in DELETE /api/transplants/:key:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

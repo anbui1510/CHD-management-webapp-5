@@ -33,6 +33,7 @@ export const SIDEBAR_MENU_ITEMS: NavMenuItem[] = [
   { id: 'consult-list', label: 'Hội chẩn' },
   { id: 'results-staff', label: 'Nhập kết quả staff' },
   { id: 'schedule-tt', label: 'Xếp lịch & Dụng cụ' },
+  { id: 'heart-transplant', label: 'Quản lý ghép tim' },
   { id: 'cathlab-report', label: 'Báo cáo thông tim' },
   { id: 'mri-overview', label: 'Tổng quan MRI' },
   { id: 'mri-register', label: 'Đăng ký MRI' },
@@ -59,6 +60,7 @@ const MOBILE_SHORT_LABELS: Partial<Record<ActiveMenuId, string>> = {
   'schedule-view': 'Lịch TT',
   'cathlab-room': 'P.TT',
   'cathlab-report': 'BC TT',
+  'heart-transplant': 'Ghép tim',
   archive: 'Lưu trữ',
   'mri-overview': 'TQ MRI',
   'mri-register': 'ĐK MRI',
@@ -81,6 +83,7 @@ export const MOBILE_MORE_MENU_IDS: ActiveMenuId[] = [
   'schedule-view',
   'cathlab-room',
   'cathlab-report',
+  'heart-transplant',
   'archive',
   'mri-overview',
   'mri-register',
@@ -103,6 +106,7 @@ const MOBILE_MORE_LABELS: Partial<Record<ActiveMenuId, string>> = {
   'schedule-view': 'Xem lịch thông tim',
   'cathlab-room': 'Phòng thông tim',
   'cathlab-report': 'Báo cáo thông tim',
+  'heart-transplant': 'Quản lý ghép tim',
   archive: 'Lưu trữ',
   'mri-overview': 'Tổng quan MRI',
   'mri-register': 'Đăng ký MRI',
@@ -140,6 +144,8 @@ export function getNavIcon(id: ActiveMenuId, className = 'w-4 h-4'): ReactNode {
     case 'results-staff':
     case 'cathlab-report':
       return <FileText className={className} />;
+    case 'heart-transplant':
+      return <Heart className={className} />;
     case 'schedule-tt':
     case 'schedule-view':
     case 'mri-calendar':

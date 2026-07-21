@@ -1,4 +1,4 @@
-import type { CathLab, CMR, Consult, DeviceTemplate, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff } from '../types';
+import type { CathLab, CMR, Consult, DeviceTemplate, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff, Transplant } from '../types';
 
 export type MedicalDataBundle = {
   patients: Patient[];
@@ -7,6 +7,7 @@ export type MedicalDataBundle = {
   cathlabs: CathLab[];
   operations: Operation[];
   cmrs: CMR[];
+  transplants: Transplant[];
   sources: Source[];
   deviceTemplates: DeviceTemplate[];
   rolePresets: RolePreset[];
@@ -14,7 +15,7 @@ export type MedicalDataBundle = {
   doctorPerformanceMarks: DoctorPerformanceMark[];
 };
 
-export type RefreshScope = 'full' | 'clinical' | 'consult' | 'staff' | 'mri';
+export type RefreshScope = 'full' | 'clinical' | 'consult' | 'staff' | 'mri' | 'transplant';
 
 const EMPTY_BUNDLE: MedicalDataBundle = {
   patients: [],
@@ -23,6 +24,7 @@ const EMPTY_BUNDLE: MedicalDataBundle = {
   cathlabs: [],
   operations: [],
   cmrs: [],
+  transplants: [],
   sources: [],
   deviceTemplates: [],
   rolePresets: [],
@@ -80,6 +82,7 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
     cathlabs: Array.isArray(data.cathlabs) ? data.cathlabs : EMPTY_BUNDLE.cathlabs,
     operations: Array.isArray(data.operations) ? data.operations : EMPTY_BUNDLE.operations,
     cmrs: Array.isArray(data.cmrs) ? data.cmrs : EMPTY_BUNDLE.cmrs,
+    transplants: Array.isArray(data.transplants) ? data.transplants : EMPTY_BUNDLE.transplants,
     sources: Array.isArray(data.sources) ? data.sources : EMPTY_BUNDLE.sources,
     deviceTemplates: Array.isArray(data.deviceTemplates) ? data.deviceTemplates : EMPTY_BUNDLE.deviceTemplates,
     rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : EMPTY_BUNDLE.rolePresets,
@@ -96,6 +99,7 @@ export type MedicalDataSetters = {
   setCathlabs: (value: CathLab[]) => void;
   setOperations: (value: Operation[]) => void;
   setCmrs: (value: CMR[]) => void;
+  setTransplants: (value: Transplant[]) => void;
   setSources: (value: Source[]) => void;
   setDeviceTemplates: (value: DeviceTemplate[]) => void;
   setRolePresetRecords: (value: RolePreset[]) => void;
@@ -127,6 +131,12 @@ export function applyMedicalDataBundle(bundle: MedicalDataBundle, scope: Refresh
     return;
   }
 
+  if (scope === 'transplant') {
+    setters.setTransplants(bundle.transplants);
+    setters.setSources(bundle.sources);
+    return;
+  }
+
   setters.setCathlabs(bundle.cathlabs);
   setters.setSources(bundle.sources);
   setters.setDeviceTemplates(bundle.deviceTemplates);
@@ -134,6 +144,7 @@ export function applyMedicalDataBundle(bundle: MedicalDataBundle, scope: Refresh
   if (scope === 'full') {
     setters.setOperations(bundle.operations);
     setters.setCmrs(bundle.cmrs);
+    setters.setTransplants(bundle.transplants);
     setters.setStaffList(bundle.staff);
     setters.setRolePresetRecords(bundle.rolePresets);
     setters.setRuntimeRolePresets(bundle.rolePresets);

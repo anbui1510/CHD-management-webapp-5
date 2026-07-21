@@ -113,6 +113,13 @@ function initializeDatabase() {
     "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime"
   ];
 
+  var transplantHeaders = [
+    "TransKey", "PatientKey", "TransWeight", "TransHeight", "BloodType", "Gens", "GensFile",
+    "MRI", "MRIFile", "TTE", "TTEFile", "Holter", "HolterFile", "TransDiagID",
+    "DetailTransDiagkháct", "Treatment", "TransNote", "TransStatus", "TransDate",
+    "TransCreatedTime", "TransUpdateBy", "TransUpdateTime"
+  ];
+
   var sourceHeaders = ["DiagnosisID"];
 
   var deviceTemplateHeaders = [
@@ -141,6 +148,7 @@ function initializeDatabase() {
   getOrCreateSheet("CathLab", cathLabHeaders);
   getOrCreateSheet("Operation", operationHeaders);
   getOrCreateSheet("CMR", cmrHeaders);
+  getOrCreateSheet("Transplant", transplantHeaders);
   
   if (sourceHeaders.length > 0) {
     getOrCreateSheet("Source", sourceHeaders);
@@ -239,6 +247,7 @@ function doGet(e) {
   var cathlabs = readSheetAsJson(ss, "CathLab");
   var operations = readSheetAsJson(ss, "Operation");
   var cmrs = readSheetAsJson(ss, "CMR");
+  var transplants = readSheetAsJson(ss, "Transplant");
   var sources = readSheetAsJson(ss, "Source");
   var deviceTemplates = readSheetAsJson(ss, "DeviceTemplate");
   var rolePresets = readSheetAsJson(ss, "RolePreset");
@@ -265,6 +274,7 @@ function doGet(e) {
     cathlabs: cathlabs,
     operations: operations,
     cmrs: cmrs,
+    transplants: transplants,
     sources: sources,
     deviceTemplates: deviceTemplates,
     rolePresets: rolePresets,
@@ -288,6 +298,8 @@ function getKeyColumnNameForType(type) {
     keyColumnName = "NotificationKey";
   } else if (type === "DoctorPerformanceMark") {
     keyColumnName = "MarkKey";
+  } else if (type === "Transplant") {
+    keyColumnName = "TransKey";
   }
   return keyColumnName;
 }
@@ -333,6 +345,8 @@ function writeRecordToSheet(type, action, key, record) {
         header === "StaffPhone" ||
         header === "PatientWeight" ||
         header === "PatientHeight" ||
+        header === "TransWeight" ||
+        header === "TransHeight" ||
         header === "StaffKey"
       );
       if (isNumericTextCol && strVal !== "") {
@@ -557,6 +571,8 @@ function readSheetAsJson(ss, sheetName) {
     "SurgKey", "SurgDate", "DetailDiagnosisManual", "SurgResultID", "SurgNote", "SurgMethod", "1stSurgeon", "2ndSurgeon", "3rdSurgeon", "4thSurgeon", "SurgCreateTime", "SurgUpdatedBy",
     // CMR
     "CMRKey", "CMRkey", "MBN", "Họ và tên", "Tình trạng", "CMRDiagnosisID", "CMRDiagnosis", "CMRRequest", "DepartRequest", "CMRMethod", "CMRDevice", "PostDepart", "Anesthesia", "CMRScheduledDate", "DayOfWeek", "CMRCallStatus", "CMRCallStatusNote", "CMRDate", "CMRResult", "CMRNote", "ConcludedResult", "PDFResult", "NextPlan", "UpdateTime",
+    // Transplant
+    "TransKey", "TransWeight", "TransHeight", "BloodType", "Gens", "GensFile", "MRI", "MRIFile", "TTE", "TTEFile", "Holter", "HolterFile", "TransDiagID", "DetailTransDiagkháct", "Treatment", "TransNote", "TransStatus", "TransDate", "TransCreatedTime", "TransUpdateBy", "TransUpdateTime",
     // DeviceTemplate
     "PHƯƠNG PHÁP PHẪU THUẬT", "DeviceName", "FullDeviceName", "Size", "Price", "bhyt",
     // RolePreset
