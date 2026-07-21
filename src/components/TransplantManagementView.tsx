@@ -135,6 +135,10 @@ export default function TransplantManagementView({
   }, [selectedItem?.TransKey]);
 
   useEffect(() => {
+    void onRefreshData();
+  }, [onRefreshData]);
+
+  useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (columnDropdownRef.current && !columnDropdownRef.current.contains(e.target as Node)) {
         setShowColumnDropdown(false);

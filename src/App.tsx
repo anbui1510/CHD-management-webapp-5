@@ -3454,7 +3454,7 @@ export default function App() {
               sources={sources}
               staffList={staffList}
               currentStaff={currentStaff}
-              onRefreshData={() => refreshMedicalData('transplant')}
+              onRefreshData={() => refreshMedicalData('transplant', true)}
               onAddTransplant={addTransplant}
               onPatchTransplant={patchTransplant}
               onDeleteTransplant={deleteTransplant}

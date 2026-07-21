@@ -91,8 +91,7 @@ export function matchesTransplantSearch(item: EnrichedTransplant, query: string)
 }
 
 export function isNotReadyStatus(status?: string): boolean {
-  const s = String(status || '').trim();
-  return !s || s === TRANS_STATUS_NOT_READY;
+  return !isReadyStatus(status);
 }
 
 export function isReadyStatus(status?: string): boolean {

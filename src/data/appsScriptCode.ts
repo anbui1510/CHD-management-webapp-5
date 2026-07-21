@@ -241,18 +241,18 @@ function doGet(e) {
   }
 
   // Fetch all sheets using the cached Spreadsheet object
-  var patients = readSheetAsJson(ss, "Patient");
-  var consults = readSheetAsJson(ss, "Consult");
-  var staff = readSheetAsJson(ss, "Staff");
-  var cathlabs = readSheetAsJson(ss, "CathLab");
-  var operations = readSheetAsJson(ss, "Operation");
-  var cmrs = readSheetAsJson(ss, "CMR");
-  var transplants = readSheetAsJson(ss, "Transplant");
-  var sources = readSheetAsJson(ss, "Source");
-  var deviceTemplates = readSheetAsJson(ss, "DeviceTemplate");
-  var rolePresets = readSheetAsJson(ss, "RolePreset");
-  var notifications = readSheetAsJson(ss, "Notification");
-  var doctorPerformanceMarks = readSheetAsJson(ss, "DoctorPerformanceMark");
+  var patients = safeReadSheetAsJson(ss, "Patient");
+  var consults = safeReadSheetAsJson(ss, "Consult");
+  var staff = safeReadSheetAsJson(ss, "Staff");
+  var cathlabs = safeReadSheetAsJson(ss, "CathLab");
+  var operations = safeReadSheetAsJson(ss, "Operation");
+  var cmrs = safeReadSheetAsJson(ss, "CMR");
+  var transplants = safeReadSheetAsJson(ss, "Transplant");
+  var sources = safeReadSheetAsJson(ss, "Source");
+  var deviceTemplates = safeReadSheetAsJson(ss, "DeviceTemplate");
+  var rolePresets = safeReadSheetAsJson(ss, "RolePreset");
+  var notifications = safeReadSheetAsJson(ss, "Notification");
+  var doctorPerformanceMarks = safeReadSheetAsJson(ss, "DoctorPerformanceMark");
 
   // If Staff is completely empty, populate with some default users so admin can login
   if (staff.length === 0) {
@@ -282,7 +282,7 @@ function doGet(e) {
     doctorPerformanceMarks: doctorPerformanceMarks
   };
 
-  return ContentService.createTextOutput(JSON.stringify(responseData))
+  return ContentService.createTextOutput(safeStringify(responseData))
                        .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -550,6 +550,45 @@ function doPost(e) {
 }
 
 // Convert Sheet into Array of JSON Objects
+function safeReadSheetAsJson(ss, sheetName) {
+  try {
+    return readSheetAsJson(ss, sheetName);
+  } catch (err) {
+    console.error("Failed to read sheet " + sheetName + ": " + err);
+    return [];
+  }
+}
+
+function safeStringify(value) {
+  return JSON.stringify(value, function(key, val) {
+    if (val instanceof Date) {
+      if (isNaN(val.getTime())) return "";
+      try {
+        return val.toISOString();
+      } catch (dateErr) {
+        return "";
+      }
+    }
+    return val;
+  });
+}
+
+function formatCellDateValue(cellVal) {
+  if (!(cellVal instanceof Date)) return null;
+  if (isNaN(cellVal.getTime())) return "";
+  try {
+    if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {
+      var year = cellVal.getFullYear();
+      var month = ("0" + (cellVal.getMonth() + 1)).slice(-2);
+      var day = ("0" + cellVal.getDate()).slice(-2);
+      return year + "-" + month + "-" + day;
+    }
+    return cellVal.toISOString();
+  } catch (dateErr) {
+    return "";
+  }
+}
+
 function readSheetAsJson(ss, sheetName) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
@@ -610,24 +649,7 @@ function readSheetAsJson(ss, sheetName) {
       
       // Convert Date objects to ISO string
       if (cellVal instanceof Date) {
-        // Skip invalid dates (empty/broken cells) - toISOString() throws RangeError otherwise
-        if (isNaN(cellVal.getTime())) {
-          obj[headerName] = "";
-        } else {
-          try {
-            if (cellVal.getHours() === 0 && cellVal.getMinutes() === 0 && cellVal.getSeconds() === 0) {
-              // Format as YYYY-MM-DD
-              var year = cellVal.getFullYear();
-              var month = ("0" + (cellVal.getMonth() + 1)).slice(-2);
-              var day = ("0" + cellVal.getDate()).slice(-2);
-              obj[headerName] = year + "-" + month + "-" + day;
-            } else {
-              obj[headerName] = cellVal.toISOString();
-            }
-          } catch (dateErr) {
-            obj[headerName] = "";
-          }
-        }
+        obj[headerName] = formatCellDateValue(cellVal);
       } else {
         if (cellVal !== undefined && cellVal !== null) {
           if (headerName === "PatientID1" || headerName === "PatientID2" || headerName === "PatientPhone1" || headerName === "PatientPhone2" || headerName === "StaffPhone" || headerName === "PatientWeight" || headerName === "PatientHeight") {

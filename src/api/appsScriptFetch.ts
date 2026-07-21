@@ -418,7 +418,14 @@ const loadAllData = async (force = false): Promise<SheetData> => {
 
   if (!force) {
     const cachedAll = await getPersistedData('all_data');
-    if (cachedAll && cachedAll.staff && Array.isArray(cachedAll.staff) && cachedAll.staff.length > 0 && cachedAll.staff[0].Role !== undefined) {
+    if (
+      cachedAll &&
+      cachedAll.staff &&
+      Array.isArray(cachedAll.staff) &&
+      cachedAll.staff.length > 0 &&
+      cachedAll.staff[0].Role !== undefined &&
+      Array.isArray(cachedAll.transplants)
+    ) {
       cache = normalizeData(cachedAll);
       return cache;
     }
