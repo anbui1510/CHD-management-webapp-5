@@ -12,7 +12,8 @@
     "extract:apps-script": "node scripts/extract-apps-script.mjs",
     "sync:github:init": "bash scripts/github-init.sh",
     "sync:github": "bash scripts/github-sync.sh",
-    "sync:github:watch": "bash scripts/github-auto-sync.sh"
+    "sync:github:watch": "bash scripts/github-auto-sync.sh",
+    "deploy:cloudflare": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -39,6 +40,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "wrangler": "^4.113.0"
   }
 }
