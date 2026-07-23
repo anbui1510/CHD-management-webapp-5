@@ -795,7 +795,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       <button
                         type="button"
                         onClick={() => handleOpenConsult(c)}
-                        className="px-2 py-1 text-[10px] font-bold text-indigo-650 hover:text-indigo-850 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 rounded-lg shadow-xs transition cursor-pointer"
+                        className="lg:hidden px-2 py-1 text-[10px] font-bold text-indigo-650 hover:text-indigo-850 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 rounded-lg shadow-xs transition cursor-pointer"
                       >
                         Chi tiết
                       </button>
