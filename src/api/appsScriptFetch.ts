@@ -692,26 +692,37 @@ const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) =
   }
 
   const finalKey = String(getRecordKey(existing, config) || key);
+
+  // Xoá cache ngay để UI phản hồi tức thì; đồng bộ Google Sheets ở background.
+  deleteCachedRecord(config, finalKey);
+
   const scriptUrl = getScriptUrl();
   if (scriptUrl) {
     const apiKey = getScriptSecret();
-    const response = await fetchWithTimeout(scriptUrl, {
+    const syncPayload = { action: 'delete', type: config.type, key: finalKey, apiKey };
+    void fetchWithTimeout(scriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'delete', type: config.type, key: finalKey, apiKey })
+      body: JSON.stringify(syncPayload)
+    }).then(async (response) => {
+      const text = await response.text();
+      if (!response.ok) {
+        console.error(`Background delete sync HTTP ${response.status}:`, text);
+        return;
+      }
+      try {
+        const result = JSON.parse(text);
+        if (result.status === 'error') {
+          console.error('Background delete sync error:', result.message);
+        }
+      } catch {
+        console.error('Background delete sync returned invalid JSON:', text);
+      }
+    }).catch((err) => {
+      console.error('Background delete sync failed:', err);
     });
-
-    const text = await response.text();
-    if (!response.ok) {
-      return jsonResponse({ error: `Apps Script trả về HTTP ${response.status}` }, { status: 502 });
-    }
-    const result = JSON.parse(text);
-    if (result.status === 'error') {
-      return jsonResponse({ error: result.message || 'Apps Script không thể xoá dữ liệu' }, { status: 500 });
-    }
   }
 
-  deleteCachedRecord(config, finalKey);
   return jsonResponse({ success: true, [config.keyField]: finalKey });
 };
 

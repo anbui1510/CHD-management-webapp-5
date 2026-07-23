@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, restoreWeightFromDate } from '../types';
-import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown, Trash2 } from 'lucide-react';
+import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, ArrowUpDown, Trash2, CheckSquare, Square } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceConsultResultOptions } from '../data/source';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
@@ -87,9 +87,11 @@ interface StaffResultsViewProps {
   onAddPatient?: (patient: Patient) => void;
   onPatchPatient?: (patientKey: string, patch: Partial<Patient>) => void;
   onAddConsult?: (consult: Consult) => void;
+  onRemoveConsult?: (consultKey: string) => void;
+  onRemoveConsults?: (consultKeys: string[]) => void;
 }
 
-export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults }: StaffResultsViewProps) {
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -444,7 +446,61 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortField, setSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'date'>('date');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
+  const [confirmDeleteKeys, setConfirmDeleteKeys] = useState<string[] | null>(null);
+  const [selectedDeleteKeys, setSelectedDeleteKeys] = useState<Set<string>>(() => new Set());
+  const [deletingKeys, setDeletingKeys] = useState<Set<string>>(() => new Set());
+
+  const toggleSelectDeleteKey = useCallback((consultKey: string) => {
+    setSelectedDeleteKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(consultKey)) next.delete(consultKey);
+      else next.add(consultKey);
+      return next;
+    });
+  }, []);
+
+  const executeDeleteConsults = useCallback(async (keys: string[]) => {
+    const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
+    if (uniqueKeys.length === 0) return;
+
+    onRemoveConsults?.(uniqueKeys);
+    if (!onRemoveConsults) {
+      uniqueKeys.forEach(key => onRemoveConsult?.(key));
+    }
+    setSelectedDeleteKeys(prev => {
+      const next = new Set(prev);
+      uniqueKeys.forEach(key => next.delete(key));
+      return next;
+    });
+    setConfirmDeleteKeys(null);
+    setDeletingKeys(prev => new Set([...prev, ...uniqueKeys]));
+
+    const results = await Promise.allSettled(
+      uniqueKeys.map(async (key) => {
+        const res = await fetch(`/api/consults/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || `HTTP ${res.status}`);
+        }
+      })
+    );
+
+    setDeletingKeys(prev => {
+      const next = new Set(prev);
+      uniqueKeys.forEach(key => next.delete(key));
+      return next;
+    });
+
+    const failedCount = results.filter(r => r.status === 'rejected').length;
+    if (failedCount > 0) {
+      onRefreshData?.();
+      alert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.`);
+    }
+  }, [onRemoveConsult, onRemoveConsults, onRefreshData]);
+
+  useEffect(() => {
+    setSelectedDeleteKeys(new Set());
+  }, [staffType, statusTab, currentPage]);
 
   // Deduplicate consults client-side to ensure each ConsultKey has only 1 row on the UI
   // and prevent React rendering key collision issues.
@@ -564,6 +620,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       );
     }
 
+    const pageKeys = filtered.map(c => c.ConsultKey).filter(Boolean);
+    const allPageSelected = pageKeys.length > 0 && pageKeys.every(key => selectedDeleteKeys.has(key));
+    const somePageSelected = pageKeys.some(key => selectedDeleteKeys.has(key));
+
     const renderSortableHeader = (field: 'name' | 'id' | 'dob' | 'diagnosis' | 'date', label: string) => {
       const isSorted = sortField === field;
       return (
@@ -590,10 +650,55 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     };
 
     return (
+      <div className="space-y-2">
+        {selectedDeleteKeys.size > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+            <span className="text-xs font-bold text-rose-800">
+              Đã chọn {selectedDeleteKeys.size} ca
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDeleteKeys(new Set())}
+                className="text-[10px] font-bold uppercase text-slate-600 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-white cursor-pointer"
+              >
+                Bỏ chọn
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteKeys(Array.from(selectedDeleteKeys))}
+                className="text-[10px] font-extrabold uppercase bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Xoá đã chọn
+              </button>
+            </div>
+          </div>
+        )}
       <div className="overflow-x-auto w-full rounded-2xl shadow-xs bg-white custom-scrollbar">
         <table className="min-w-full divide-y divide-slate-200 table-auto text-left font-sans text-xs">
           <thead className="bg-slate-55 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-10">
             <tr>
+              <th scope="col" className="px-2 py-3 bg-slate-50 border-b border-slate-200 text-center w-10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDeleteKeys(prev => {
+                      const next = new Set(prev);
+                      if (allPageSelected) {
+                        pageKeys.forEach(key => next.delete(key));
+                      } else {
+                        pageKeys.forEach(key => next.add(key));
+                      }
+                      return next;
+                    });
+                  }}
+                  className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-[#d2145a] cursor-pointer"
+                  title={allPageSelected ? 'Bỏ chọn trang này' : 'Chọn tất cả trang này'}
+                >
+                  {allPageSelected ? <CheckSquare className="w-4 h-4" /> : somePageSelected ? <CheckSquare className="w-4 h-4 opacity-50" /> : <Square className="w-4 h-4" />}
+                </button>
+              </th>
               {renderSortableHeader('name', 'Họ và tên')}
               {renderSortableHeader('id', 'Mã bệnh nhi')}
               {renderSortableHeader('dob', 'Ngày sinh / GT')}
@@ -610,8 +715,23 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               return (
                 <tr 
                   key={c.ConsultKey}
-                  className="hover:bg-slate-50/80 transition duration-150 group"
+                  className={`hover:bg-slate-50/80 transition duration-150 group ${selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : ''} ${deletingKeys.has(c.ConsultKey) ? 'opacity-50' : ''}`}
                 >
+                  <td className="px-2 py-3 text-center whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectDeleteKey(c.ConsultKey);
+                      }}
+                      className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-[#d2145a] cursor-pointer"
+                      title={selectedDeleteKeys.has(c.ConsultKey) ? 'Bỏ chọn' : 'Chọn để xoá'}
+                    >
+                      {selectedDeleteKeys.has(c.ConsultKey)
+                        ? <CheckSquare className="w-4 h-4 text-[#d2145a]" />
+                        : <Square className="w-4 h-4" />}
+                    </button>
+                  </td>
                   <td 
                     onClick={() => onSelectConsult(c)}
                     className="px-4 py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer min-w-[160px]"
@@ -661,7 +781,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setConfirmDeleteKey(c.ConsultKey);
+                          setConfirmDeleteKeys([c.ConsultKey]);
                         }}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-lg transition cursor-pointer"
                         title="Xoá ca hội chẩn"
@@ -675,6 +795,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
             })}
           </tbody>
         </table>
+      </div>
       </div>
     );
   };
@@ -1561,8 +1682,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         </div>
       )}
       {/* CONFIRM DELETE MODAL */}
-      {confirmDeleteKey && (() => {
-        const consultToDelete = consults.find(c => c.ConsultKey === confirmDeleteKey);
+      {confirmDeleteKeys && confirmDeleteKeys.length > 0 && (() => {
+        const keysToDelete = confirmDeleteKeys;
+        const isBulk = keysToDelete.length > 1;
+        const consultToDelete = !isBulk ? consults.find(c => c.ConsultKey === keysToDelete[0]) : null;
         const pat = consultToDelete ? getPatientByKey(consultToDelete.PatientKey) : null;
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -1573,68 +1696,68 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                 </div>
                 <div>
                   <h4 className="font-extrabold text-sm uppercase font-sans tracking-wide text-red-600">
-                    Xác nhận xoá
+                    Xác nhận xoá{isBulk ? ` (${keysToDelete.length} ca)` : ''}
                   </h4>
                   <p className="text-[10px] text-slate-500 font-semibold normal-case">Hành động này không thể hoàn tác</p>
                 </div>
               </div>
               
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 mb-4 space-y-1.5">
-                {pat && (
-                  <p className="font-bold text-slate-800">
-                    Bệnh nhi: <span className="font-extrabold text-[#d2145a] uppercase">{pat.PatientName}</span>
-                  </p>
-                )}
-                {consultToDelete && (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 mb-4 space-y-1.5 max-h-40 overflow-y-auto">
+                {isBulk ? (
+                  keysToDelete.map(key => {
+                    const c = consults.find(item => item.ConsultKey === key);
+                    const p = c ? getPatientByKey(c.PatientKey) : null;
+                    return (
+                      <p key={key} className="font-semibold text-slate-700 border-b border-slate-100 pb-1 last:border-0">
+                        <span className="font-extrabold text-[#d2145a] uppercase">{p?.PatientName || '—'}</span>
+                        <span className="text-slate-400 font-mono ml-2">{p?.PatientID1 || key}</span>
+                      </p>
+                    );
+                  })
+                ) : (
                   <>
-                    <p className="font-semibold text-slate-650">
-                      Mã bệnh nhân: <span className="font-bold font-mono text-slate-800">{pat?.PatientID1 || '—'}</span>
-                    </p>
-                    <p className="font-semibold text-slate-650">
-                      Loại hội chẩn: <span className="font-bold text-slate-800">{consultToDelete.ConsultType}</span>
-                    </p>
-                    <p className="font-semibold text-slate-650">
-                      Ngày hội chẩn: <span className="font-bold font-mono text-slate-800">{formatVNTime(consultToDelete.ConsultDate)}</span>
-                    </p>
+                    {pat && (
+                      <p className="font-bold text-slate-800">
+                        Bệnh nhi: <span className="font-extrabold text-[#d2145a] uppercase">{pat.PatientName}</span>
+                      </p>
+                    )}
+                    {consultToDelete && (
+                      <>
+                        <p className="font-semibold text-slate-650">
+                          Mã bệnh nhân: <span className="font-bold font-mono text-slate-800">{pat?.PatientID1 || '—'}</span>
+                        </p>
+                        <p className="font-semibold text-slate-650">
+                          Loại hội chẩn: <span className="font-bold text-slate-800">{consultToDelete.ConsultType}</span>
+                        </p>
+                        <p className="font-semibold text-slate-650">
+                          Ngày hội chẩn: <span className="font-bold font-mono text-slate-800">{formatVNTime(consultToDelete.ConsultDate)}</span>
+                        </p>
+                      </>
+                    )}
                   </>
                 )}
               </div>
               
               <p className="text-slate-600 leading-relaxed mb-5 font-medium">
-                Bạn có chắc chắn muốn xoá lượt hội chẩn này khỏi hệ thống không?
+                {isBulk
+                  ? `Bạn có chắc chắn muốn xoá ${keysToDelete.length} lượt hội chẩn đã chọn khỏi hệ thống không?`
+                  : 'Bạn có chắc chắn muốn xoá lượt hội chẩn này khỏi hệ thống không?'}
               </p>
               
               <div className="flex justify-end gap-3 font-extrabold uppercase">
                 <button
                   type="button"
-                  onClick={() => setConfirmDeleteKey(null)}
+                  onClick={() => setConfirmDeleteKeys(null)}
                   className="bg-white hover:bg-slate-100 border border-slate-250 text-slate-700 px-4 py-2 rounded-xl transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (!confirmDeleteKey) return;
-                    try {
-                      const res = await fetch(`/api/consults/${confirmDeleteKey}`, {
-                        method: 'DELETE',
-                      });
-                      if (res.ok) {
-                        onRefreshData?.();
-                      } else {
-                        const errText = await res.text();
-                        alert(`Lỗi khi xoá: ${errText}`);
-                      }
-                    } catch (err: any) {
-                      alert(`Đã xảy ra lỗi: ${err.message || err}`);
-                    } finally {
-                      setConfirmDeleteKey(null);
-                    }
-                  }}
+                  onClick={() => void executeDeleteConsults(keysToDelete)}
                   className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl transition shadow-md hover:shadow-lg cursor-pointer"
                 >
-                  Xoá ca
+                  {isBulk ? `Xoá ${keysToDelete.length} ca` : 'Xoá ca'}
                 </button>
               </div>
             </div>

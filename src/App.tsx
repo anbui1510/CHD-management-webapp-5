@@ -439,6 +439,17 @@ export default function App() {
     setConsults(prev => [...prev, consult]);
   }, []);
 
+  const removeConsult = useCallback((consultKey: string) => {
+    const normalized = consultKey.trim().toLowerCase();
+    setConsults(prev => prev.filter(c => String(c.ConsultKey || '').trim().toLowerCase() !== normalized));
+  }, []);
+
+  const removeConsults = useCallback((consultKeys: string[]) => {
+    const normalized = new Set(consultKeys.map(k => k.trim().toLowerCase()).filter(Boolean));
+    if (normalized.size === 0) return;
+    setConsults(prev => prev.filter(c => !normalized.has(String(c.ConsultKey || '').trim().toLowerCase())));
+  }, []);
+
   const patchCmr = useCallback((cmrKey: string, patch: Partial<CMR>) => {
     const normalized = cmrKey.trim().toLowerCase();
     setCmrs(prev =>
@@ -3261,6 +3272,8 @@ export default function App() {
               onAddPatient={addPatient}
               onPatchPatient={patchPatient}
               onAddConsult={addConsult}
+              onRemoveConsult={removeConsult}
+              onRemoveConsults={removeConsults}
             />
           )}
 
