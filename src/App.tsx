@@ -56,7 +56,6 @@ import StaffManagementView from './components/StaffManagementView';
 import StaffAccountMenu from './components/StaffAccountMenu';
 import BellNotificationMenu from './components/BellNotificationMenu';
 import StaffProfileView from './components/StaffProfileView';
-import ResultStaffDrawer from './components/ResultStaffDrawer';
 import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
 import { clearLocalCache } from './api/appsScriptFetch';
 import {
@@ -395,8 +394,8 @@ export default function App() {
   const [showAddConsult, setShowAddConsult] = useState<boolean>(false);
   const [formSuccessMessage, setFormSuccessMessage] = useState<string>('');
 
-  // Consult Outcome Results Form State (TRẦN MINH PHÚC style drawer, screenshot 9)
-  const [editingConsultKey, setEditingConsultKey] = useState<string | null>(null);
+
+  // Consult Outcome Results Form State — handled inside StaffResultsView (split panel)
 
   const medicalDataSetters = useMemo(
     () => ({
@@ -591,6 +590,19 @@ export default function App() {
 
     refreshConsultData();
   };
+
+  const registrationDoctorOptions = useMemo(() => {
+    const fromStaff = staffList.map(s => getShortStaffName(s.StaffName, staffList));
+    const extra = Array.from(new Set(consults.map(c => String(c.RequestBy || ''))))
+      .filter(d => d && !fromStaff.some(x => x.toLowerCase() === d.toLowerCase()));
+    return [...fromStaff, ...extra];
+  }, [staffList, consults]);
+
+  const registrationDepartmentOptions = useMemo(() => {
+    const extra = Array.from(new Set(consults.map(c => String(c.Department || ''))))
+      .filter(d => d && !DEFAULT_DEPARTMENTS.includes(d));
+    return [...DEFAULT_DEPARTMENTS, ...extra];
+  }, [consults]);
 
   const refreshClinicalData = useCallback((force = false) => {
     void refreshMedicalData('clinical', force);
@@ -1322,10 +1334,6 @@ export default function App() {
         triggerAlert(err instanceof Error ? err.message : 'Không thể cập nhật đăng ký staff', 'Lỗi lưu');
         refreshConsultData();
       });
-  };
-
-  const makeResultEdit = (c: Consult) => {
-    setEditingConsultKey(c.ConsultKey);
   };
 
   // Emulate AppSheet Google Cloud Bot A4 PDF Generation Task
@@ -2642,118 +2650,30 @@ export default function App() {
 
                       <div>
                         <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Người đăng ký *</label>
-                        <select
-                          required={!showAddDocInput}
-                          value={showAddDocInput ? 'ADD_NEW' : (newConsultData.RequestBy || '')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'ADD_NEW') {
-                              setShowAddDocInput(true);
-                              setNewConsultData(prev => ({ ...prev, RequestBy: '' }));
-                            } else {
-                              setShowAddDocInput(false);
-                              setNewConsultData(prev => ({ ...prev, RequestBy: val }));
-                            }
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold focus:outline-none text-slate-700 font-bold"
-                        >
-                          <option value="">-- Chọn BS --</option>
-                          {staffList.map(s => {
-                            const displayName = getShortStaffName(s.StaffName, staffList);
-                            return (
-                              <option key={s.StaffKey} value={displayName}>
-                                {displayName}
-                              </option>
-                            );
-                          })}
-                          {Array.from(new Set(consults.map(c => String(c.RequestBy || '')))).filter((d: string) => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d)).map((d: string) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                          <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm bác sĩ mới...</option>
-                        </select>
-
-                        {showAddDocInput && (
-                          <div className="mt-1.5 flex gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <input
-                              type="text"
-                              required
-                              placeholder="Nhập tên bác sĩ..."
-                              value={customDocVal}
-                              onChange={(e) => {
-                                setCustomDocVal(e.target.value);
-                                setNewConsultData(prev => ({ ...prev, RequestBy: e.target.value }));
-                              }}
-                              className="flex-1 bg-white border border-rose-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddDocInput(false);
-                                setCustomDocVal('');
-                                setNewConsultData(prev => ({ ...prev, RequestBy: '' }));
-                              }}
-                              className="text-slate-400 hover:text-[#d2145a] px-2 text-xs font-bold"
-                              title="Quay lại"
-                            >
-                              Quay lại
-                            </button>
-                          </div>
-                        )}
+                        <SearchableEnumSelect
+                          required
+                          options={registrationDoctorOptions}
+                          value={newConsultData.RequestBy || ''}
+                          onChange={(val) => setNewConsultData(prev => ({ ...prev, RequestBy: val }))}
+                          allowCreate
+                          createLabel={(val) => `Thêm BS "${val}"`}
+                          placeholder="-- Chọn BS --"
+                          searchPlaceholder="Gõ tên BS..."
+                        />
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Khoa nội trú</label>
-                      <select
-                        value={showAddDeptInput ? 'ADD_NEW' : (newConsultData.Department || '')}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === 'ADD_NEW') {
-                            setShowAddDeptInput(true);
-                            setNewConsultData(prev => ({ ...prev, Department: '' }));
-                          } else {
-                            setShowAddDeptInput(false);
-                            setNewConsultData(prev => ({ ...prev, Department: val as any }));
-                          }
-                        }}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none text-slate-600 font-semibold"
-                      >
-                        <option value="">-- Không bắt buộc --</option>
-                        {DEFAULT_DEPARTMENTS.map(d => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                        {Array.from(new Set(consults.map(c => String(c.Department || '')))).filter((d: string) => d && !DEFAULT_DEPARTMENTS.includes(d)).map((d: string) => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                        <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm khoa mới...</option>
-                      </select>
-
-                      {showAddDeptInput && (
-                        <div className="mt-1.5 flex gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <input
-                            type="text"
-                            placeholder="Nhập tên khoa mới..."
-                            value={customDeptVal}
-                            onChange={(e) => {
-                              setCustomDeptVal(e.target.value);
-                              setNewConsultData(prev => ({ ...prev, Department: e.target.value }));
-                            }}
-                            className="flex-1 bg-white border border-rose-300 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowAddDeptInput(false);
-                              setCustomDeptVal('');
-                              setNewConsultData(prev => ({ ...prev, Department: '' }));
-                            }}
-                            className="text-slate-400 hover:text-slate-600 px-2 text-xs font-bold"
-                            title="Quay lại"
-                          >
-                            Quay lại
-                          </button>
-                        </div>
-                      )}
+                      <SearchableEnumSelect
+                        options={registrationDepartmentOptions}
+                        value={newConsultData.Department || ''}
+                        onChange={(val) => setNewConsultData(prev => ({ ...prev, Department: val as any }))}
+                        allowCreate
+                        createLabel={(val) => `Thêm khoa "${val}"`}
+                        placeholder="-- Không bắt buộc --"
+                        searchPlaceholder="Gõ tên khoa..."
+                      />
                     </div>
 
                     <div>
@@ -3267,13 +3187,16 @@ export default function App() {
               deviceTemplates={deviceTemplates}
               staffList={staffList}
               currentStaff={currentStaff}
-              onSelectConsult={(c) => makeResultEdit(c)}
               onRefreshData={refreshConsultData}
               onAddPatient={addPatient}
               onPatchPatient={patchPatient}
               onAddConsult={addConsult}
               onRemoveConsult={removeConsult}
               onRemoveConsults={removeConsults}
+              onPatchConsult={patchConsult}
+              onEditPatientAdmin={handleEditPatientAdmin}
+              createDiagnosisSource={createDiagnosisSource}
+              triggerAlert={triggerAlert}
             />
           )}
 
@@ -3592,23 +3515,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-
-      <ResultStaffDrawer
-        consultKey={editingConsultKey}
-        consults={consults}
-        patients={patients}
-        staffList={staffList}
-        sources={sources}
-        deviceTemplates={deviceTemplates}
-        currentStaff={currentStaff}
-        onClose={() => setEditingConsultKey(null)}
-        onPatchConsult={patchConsult}
-        onPatchPatient={patchPatient}
-        onRefreshData={refreshConsultData}
-        onEditPatientAdmin={handleEditPatientAdmin}
-        createDiagnosisSource={createDiagnosisSource}
-        triggerAlert={triggerAlert}
-      />
 
       {/* Centered Registration Edit Modal Dialog (Sửa Đăng ký staff) */}
       <AnimatePresence>
