@@ -155,12 +155,7 @@ type WaitlistTab =
   | 'delayRedFilled'
   | 'delayBlack';
 
-const DELAY_WAITLIST_TABS = new Set<WaitlistTab>([
-  'delayYellow',
-  'delayRedOutline',
-  'delayRedFilled',
-  'delayBlack',
-]);
+type WaitlistSortField = 'default' | 'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'date' | 'plannedDate';
 
 const DELAY_TAB_STYLES: Record<
   'delayYellow' | 'delayRedOutline' | 'delayRedFilled' | 'delayBlack',
@@ -388,7 +383,7 @@ export default function CathLabSchedulerView({
   const [activeTab, setActiveTab] = useState<WaitlistTab>('unscheduled');
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
-  const [waitlistSortField, setWaitlistSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'date' | 'plannedDate'>('date');
+  const [waitlistSortField, setWaitlistSortField] = useState<WaitlistSortField>('default');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Column visibility settings for the waitlist table
@@ -429,8 +424,15 @@ export default function CathLabSchedulerView({
   useEffect(() => {
     setWaitlistCurrentPage(1);
     setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
+    setWaitlistSortField('default');
     waitlistScrollRef.current?.scrollTo({ top: 0 });
-  }, [activeTab, searchQuery, waitlistSortOrder, waitlistSortField]);
+  }, [activeTab, searchQuery]);
+
+  useEffect(() => {
+    setWaitlistCurrentPage(1);
+    setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
+    waitlistScrollRef.current?.scrollTo({ top: 0 });
+  }, [waitlistSortOrder, waitlistSortField]);
   
   // Selected consult for form editing
   const [selectedConsult, setSelectedConsult] = useState<Consult | null>(null);
@@ -1511,12 +1513,14 @@ Xin cảm ơn!`;
       });
     }
 
-    const shouldSortByMissedDays = DELAY_WAITLIST_TABS.has(activeTab);
+    if (waitlistSortField === 'default') {
+      return [...result];
+    }
 
-    return result.sort((a, b) => {
+    return [...result].sort((a, b) => {
       let comparison = 0;
-      if (shouldSortByMissedDays || waitlistSortField === 'date') {
-        comparison = getMissScheduleDays(a.ConsultDate) - getMissScheduleDays(b.ConsultDate);
+      if (waitlistSortField === 'date') {
+        comparison = (a.ConsultDate || '').localeCompare(b.ConsultDate || '');
       } else if (waitlistSortField === 'plannedDate') {
         const da = a.PlannedCathLabDate ? new Date(a.PlannedCathLabDate).getTime() : 0;
         const db = b.PlannedCathLabDate ? new Date(b.PlannedCathLabDate).getTime() : 0;
@@ -1526,13 +1530,13 @@ Xin cảm ơn!`;
         const patB = findPatientByKey(patients, b.PatientKey);
         const nameA = patA?.PatientName ? removeDiacritics(patA.PatientName).toLowerCase() : '';
         const nameB = patB?.PatientName ? removeDiacritics(patB.PatientName).toLowerCase() : '';
-        comparison = nameA.localeCompare(nameB);
+        comparison = nameA.localeCompare(nameB, 'vi');
       } else if (waitlistSortField === 'id') {
         const patA = findPatientByKey(patients, a.PatientKey);
         const patB = findPatientByKey(patients, b.PatientKey);
         const idA = patA?.PatientID1 ? patA.PatientID1.toLowerCase() : '';
         const idB = patB?.PatientID1 ? patB.PatientID1.toLowerCase() : '';
-        comparison = idA.localeCompare(idB);
+        comparison = idA.localeCompare(idB, 'vi');
       } else if (waitlistSortField === 'dob') {
         const patA = findPatientByKey(patients, a.PatientKey);
         const patB = findPatientByKey(patients, b.PatientKey);
@@ -1542,11 +1546,11 @@ Xin cảm ơn!`;
       } else if (waitlistSortField === 'diagnosis') {
         const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
         const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
-        comparison = diagA.localeCompare(diagB);
+        comparison = diagA.localeCompare(diagB, 'vi');
       } else if (waitlistSortField === 'requestBy') {
         const reqA = a.RequestBy ? removeDiacritics(a.RequestBy).toLowerCase() : '';
         const reqB = b.RequestBy ? removeDiacritics(b.RequestBy).toLowerCase() : '';
-        comparison = reqA.localeCompare(reqB);
+        comparison = reqA.localeCompare(reqB, 'vi');
       }
       return waitlistSortOrder === 'asc' ? comparison : -comparison;
     });
@@ -2842,9 +2846,16 @@ Xin cảm ơn!`;
               )}
             </div>
             <button
-              onClick={() => setWaitlistSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+              onClick={() => {
+                if (waitlistSortField === 'default') {
+                  setWaitlistSortField('date');
+                  setWaitlistSortOrder('desc');
+                  return;
+                }
+                setWaitlistSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+              }}
               className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0 cursor-pointer"
-              title="Sắp xếp theo thời gian dự kiến (Tăng/Giảm)"
+              title="Sắp xếp theo ngày hội chẩn (Tăng/Giảm)"
             >
               <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 object-center ${waitlistSortOrder === 'asc' ? 'rotate-180' : ''}`} />
             </button>

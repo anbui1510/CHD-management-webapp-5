@@ -272,6 +272,26 @@ export default function TransplantRegisterModal({
                   <input placeholder="Họ tên *" value={newPatient.PatientName} onChange={e => setNewPatient(p => ({ ...p, PatientName: e.target.value }))} className="border rounded-xl px-3 py-2 text-sm" />
                   <VNDateInput value={newPatient.PatientDOB} onChange={v => setNewPatient(p => ({ ...p, PatientDOB: v }))} className="border rounded-xl px-3 py-2 text-sm w-full" />
                   <select value={newPatient.PatientSex} onChange={e => setNewPatient(p => ({ ...p, PatientSex: e.target.value }))} className="border rounded-xl px-3 py-2 text-sm"><option>Nam</option><option>Nữ</option></select>
+                  <div>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">SĐT gia đình</label>
+                    <input
+                      type="text"
+                      placeholder="Số ĐT..."
+                      value={newPatient.PatientPhone1}
+                      onChange={e => setNewPatient(p => ({ ...p, PatientPhone1: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Địa chỉ *</label>
+                    <select
+                      value={newPatient.PatientAddress}
+                      onChange={e => setNewPatient(p => ({ ...p, PatientAddress: e.target.value }))}
+                      className="w-full border rounded-xl px-3 py-2 text-sm font-bold text-slate-800"
+                    >
+                      {ADDRESS_OPTIONS.map(addr => <option key={addr} value={addr}>{addr}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
             </div>

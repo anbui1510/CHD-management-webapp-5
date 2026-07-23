@@ -350,7 +350,9 @@ export default function TransplantManagementView({
                 <div><span className="text-slate-400 font-bold uppercase text-[9px]">Ngày sinh</span><div>{formatVNTime(selectedItem.__patient?.PatientDOB)}</div></div>
                 <div><span className="text-slate-400 font-bold uppercase text-[9px]">Địa chỉ</span><div>{selectedItem.__patient?.PatientAddress}</div></div>
                 {selectedItem.__patient && onEditPatientAdmin && (
-                  <div className="col-span-2"><PatientAdminEditButton patient={selectedItem.__patient} onEdit={onEditPatientAdmin} /></div>
+                  <div className="col-span-2">
+                    <PatientAdminEditButton onClick={() => onEditPatientAdmin(selectedItem.__patient!)} />
+                  </div>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">

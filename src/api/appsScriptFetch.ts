@@ -524,6 +524,23 @@ const upsertCachedRecord = (config: (typeof endpointMap)[string], record: any, i
   };
 };
 
+const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): boolean => {
+  if (!cache) return false;
+  const normalizedKey = String(key).trim().toLowerCase();
+  const collection = [...(cache[config.collection] as any[])];
+  const index = collection.findIndex(item =>
+    String(getRecordKey(item, config) || '').trim().toLowerCase() === normalizedKey
+  );
+  if (index < 0) return false;
+  collection.splice(index, 1);
+  cache = {
+    ...cache,
+    [config.collection]: collection
+  };
+  void setPersistedData('all_data', sanitizeDataBundle(cache));
+  return true;
+};
+
 const postToScript = async (
   payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any },
   config: (typeof endpointMap)[string],
@@ -657,6 +674,45 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   );
 
   return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
+};
+
+const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) => {
+  const config = endpointMap[endpoint];
+  if (!config) return jsonResponse({ error: `Unsupported endpoint: ${endpoint}` }, { status: 404 });
+  if (!keyFromPath) return jsonResponse({ error: 'Missing record key' }, { status: 400 });
+
+  const key = decodeURIComponent(keyFromPath);
+  if (!cache) {
+    await loadAllData();
+  }
+
+  const existing = findCachedRecord(endpoint, key, config);
+  if (!existing) {
+    return jsonResponse({ error: 'Record not found' }, { status: 404 });
+  }
+
+  const finalKey = String(getRecordKey(existing, config) || key);
+  const scriptUrl = getScriptUrl();
+  if (scriptUrl) {
+    const apiKey = getScriptSecret();
+    const response = await fetchWithTimeout(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete', type: config.type, key: finalKey, apiKey })
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      return jsonResponse({ error: `Apps Script trả về HTTP ${response.status}` }, { status: 502 });
+    }
+    const result = JSON.parse(text);
+    if (result.status === 'error') {
+      return jsonResponse({ error: result.message || 'Apps Script không thể xoá dữ liệu' }, { status: 500 });
+    }
+  }
+
+  deleteCachedRecord(config, finalKey);
+  return jsonResponse({ success: true, [config.keyField]: finalKey });
 };
 
 const batchWriteRecords = async (init?: RequestInit) => {
@@ -1161,6 +1217,10 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
 
   if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
     return upsertRecord(endpoint, key, method, init);
+  }
+
+  if (method === 'DELETE') {
+    return deleteRecord(endpoint, key);
   }
 
   return jsonResponse({ error: `Unsupported method: ${method}` }, { status: 405 });

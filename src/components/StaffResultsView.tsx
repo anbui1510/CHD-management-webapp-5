@@ -1632,7 +1632,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       setConfirmDeleteKey(null);
                     }
                   }}
-                  className="bg-red-650 hover:bg-red-750 text-white px-5 py-2 rounded-xl transition shadow-md hover:shadow-lg cursor-pointer"
+                  className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl transition shadow-md hover:shadow-lg cursor-pointer"
                 >
                   Xoá ca
                 </button>
