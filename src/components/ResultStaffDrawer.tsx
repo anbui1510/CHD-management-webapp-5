@@ -94,6 +94,8 @@ export interface ResultStaffDrawerProps {
   onEditPatientAdmin: (patient: Patient) => void;
   createDiagnosisSource: (DiagnosisID: string) => Promise<void>;
   triggerAlert: (message: string, title?: string) => void;
+  layout?: 'modal' | 'panel';
+  autoEdit?: boolean;
 }
 
 export default function ResultStaffDrawer({
@@ -110,7 +112,9 @@ export default function ResultStaffDrawer({
   onRefreshData,
   onEditPatientAdmin,
   createDiagnosisSource,
-  triggerAlert
+  triggerAlert,
+  layout = 'modal',
+  autoEdit = false
 }: ResultStaffDrawerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ResultFormState | null>(null);
@@ -120,6 +124,13 @@ export default function ResultStaffDrawer({
   const consult = consultKey ? consults.find(c => c.ConsultKey === consultKey) : undefined;
   const patient = consult ? findPatientByKey(patients, consult.PatientKey) : undefined;
 
+  const doctorOptions = useMemo(() => {
+    const fromStaff = staffList.map(s => getShortStaffName(s.StaffName, staffList));
+    const extra = Array.from(new Set(consults.map(c => String(c.RequestBy || ''))))
+      .filter(d => d && !fromStaff.some(x => x.toLowerCase() === d.toLowerCase()));
+    return [...fromStaff, ...extra];
+  }, [staffList, consults]);
+
   useEffect(() => {
     if (!consultKey || !consult) {
       setFormData(null);
@@ -127,8 +138,10 @@ export default function ResultStaffDrawer({
       return;
     }
     setFormData(buildFormState(consult));
-    setIsEditing(false);
-  }, [consultKey, consult?.ConsultKey]);
+    setIsEditing(autoEdit);
+  }, [consultKey, consult?.ConsultKey, autoEdit]);
+
+  const isFormEditing = autoEdit || isEditing;
 
   const handleClose = () => {
     setIsEditing(false);
@@ -159,8 +172,8 @@ export default function ResultStaffDrawer({
     };
 
     onPatchConsult(consultKey, finalData);
-    setIsEditing(false);
-    handleClose();
+    if (!autoEdit) setIsEditing(false);
+    if (layout === 'modal') handleClose();
     triggerAlert('Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi thành công!', 'Cập nhật thành công');
 
     let automaticOutcome: OutcomeType = '';
@@ -199,35 +212,26 @@ export default function ResultStaffDrawer({
 
   if (!consultKey || !consult || !patient || !formData) return null;
 
-  return (
-    <AnimatePresence>
-      {consultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in duration-200">
-            <div 
-              className="absolute inset-0" 
-              onClick={() => {
-                handleClose();
-                setIsEditing(false);
-              }}
-            ></div>
-            <div className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[96vh]">
-              
-              <div className="bg-[#d2145a] text-white px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between shadow-sm shrink-0">
-                <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                  <Stethoscope className="w-5 h-5 text-white" /> Điền kết quả staff
-                </h3>
-                <button 
-                  onClick={() => {
-                    handleClose();
-                    setIsEditing(false);
-                  }}
-                  className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors font-bold text-lg leading-none"
-                >
-                  ✕
-                </button>
-              </div>
+  const drawerHeader = (
+    <div className="bg-[#d2145a] text-white px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between shadow-sm shrink-0">
+      <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
+        <Stethoscope className="w-5 h-5 text-white shrink-0" />
+        <span className="truncate">Điền kết quả staff — {patient.PatientName}</span>
+      </h3>
+      <button
+        type="button"
+        onClick={() => {
+          handleClose();
+          setIsEditing(false);
+        }}
+        className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors font-bold text-lg leading-none shrink-0"
+      >
+        ✕
+      </button>
+    </div>
+  );
 
-              {/* Output Form Frame */}
+  const drawerForm = (
               <form 
                 onSubmit={submitResultUpdate} 
                 className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-sans"
@@ -277,7 +281,7 @@ export default function ResultStaffDrawer({
 
                             <div className="space-y-2 md:space-y-4">
                                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 md:mt-4 md:pt-4 border-t border-slate-100">
-                                  {!isEditing ? (
+                                  {!isFormEditing ? (
                                     <>
                                       {formData.PatientHeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Chiều cao:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientHeight} cm</span></p>}
                                       {formData.PatientWeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Cân nặng:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientWeight} kg</span></p>}
@@ -324,7 +328,7 @@ export default function ResultStaffDrawer({
                           <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4.5 space-y-3 shadow-sm h-full flex flex-col justify-start">
                             <span className="hidden md:block text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
                             
-                            {!isEditing ? (
+                            {!isFormEditing ? (
                               <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium pt-1">
                                 <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(formData.ConsultDate)}</span></p>
                                 <p><span className="text-slate-400">Kiểu staff:</span> <span className="font-bold text-[#d2145a]">{formData.ConsultType || ''}</span></p>
@@ -371,25 +375,16 @@ export default function ResultStaffDrawer({
                                 
                                 <div>
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">BS đăng ký</label>
-                                  <select
+                                  <SearchableEnumSelect
                                     required
+                                    options={doctorOptions}
                                     value={formData.RequestBy || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, RequestBy: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
-                                  >
-                                    <option value="">-- Chọn BS --</option>
-                                    {staffList.map(s => {
-                                      const displayName = getShortStaffName(s.StaffName, staffList);
-                                      return (
-                                        <option key={s.StaffKey} value={displayName}>
-                                          {displayName}
-                                        </option>
-                                      );
-                                    })}
-                                    {Array.from(new Set(consults.map(c => String(c.RequestBy || '')))).filter((d: string) => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d)).map((d: string) => (
-                                      <option key={d} value={d}>{d}</option>
-                                    ))}
-                                  </select>
+                                    onChange={(val) => setFormData(prev => ({ ...prev, RequestBy: val }))}
+                                    allowCreate
+                                    createLabel={(val) => `Thêm BS "${val}"`}
+                                    placeholder="-- Chọn BS --"
+                                    searchPlaceholder="Gõ tên BS..."
+                                  />
                                 </div>
 
                                 <div className="pb-2">
@@ -414,7 +409,7 @@ export default function ResultStaffDrawer({
                           <div className="bg-indigo-50/20 border border-slate-200 rounded-3xl p-4.5 space-y-3 shadow-sm h-full">
                             <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2">Kết quả hội chẩn</span>
                             
-                            {!isEditing ? (
+                            {!isFormEditing ? (
                               <div className="space-y-3 text-[11px] text-slate-600 font-medium pt-1">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3.5">
                                   <p className="flex items-baseline gap-2 flex-wrap">
@@ -592,7 +587,7 @@ export default function ResultStaffDrawer({
 
                       {/* Action buttons area — sticky footer */}
                       <div className="pt-2 border-t border-slate-100 flex justify-end gap-3 shrink-0 px-4 md:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white">
-                        {!isEditing ? (
+                        {!autoEdit && !isFormEditing ? (
                           <div className="w-full flex justify-end">
                             <button
                               type="button"
@@ -610,10 +605,11 @@ export default function ResultStaffDrawer({
                               onClick={() => {
                                 setFormData(buildFormState(consult));
                                 setIsEditing(false);
+                                if (autoEdit) handleClose();
                               }}
                               className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl transition cursor-pointer text-xs font-sans text-center lg:w-48"
                             >
-                              Hủy
+                              {autoEdit ? 'Đóng' : 'Hủy'}
                             </button>
                             <button
                               type="submit"
@@ -626,6 +622,31 @@ export default function ResultStaffDrawer({
                       </div>
 
               </form>
+  );
+
+  if (layout === 'panel') {
+    return (
+      <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+        {drawerHeader}
+        {drawerForm}
+      </div>
+    );
+  }
+
+  return (
+    <AnimatePresence>
+      {consultKey && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in duration-200">
+            <div 
+              className="absolute inset-0" 
+              onClick={() => {
+                handleClose();
+                setIsEditing(false);
+              }}
+            ></div>
+            <div className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[96vh]">
+              {drawerHeader}
+              {drawerForm}
             </div>
           </div>
         )}

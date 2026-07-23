@@ -6,6 +6,7 @@ import { getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceConsultResult
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { VNDateInput } from './VNDateInput';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import ResultStaffDrawer from './ResultStaffDrawer';
 
 const DEFAULT_CONCLUSION_OPTIONS = [
   "Can thiệp thông tim",
@@ -82,16 +83,19 @@ interface StaffResultsViewProps {
   deviceTemplates?: DeviceTemplate[];
   staffList?: Staff[];
   currentStaff?: Staff | null;
-  onSelectConsult: (consult: Consult) => void;
   onRefreshData?: () => void;
   onAddPatient?: (patient: Patient) => void;
   onPatchPatient?: (patientKey: string, patch: Partial<Patient>) => void;
   onAddConsult?: (consult: Consult) => void;
   onRemoveConsult?: (consultKey: string) => void;
   onRemoveConsults?: (consultKeys: string[]) => void;
+  onPatchConsult: (consultKey: string, patch: Partial<Consult>) => void;
+  onEditPatientAdmin: (patient: Patient) => void;
+  createDiagnosisSource: (DiagnosisID: string) => Promise<void>;
+  triggerAlert: (message: string, title?: string) => void;
 }
 
-export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onSelectConsult, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert }: StaffResultsViewProps) {
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -105,6 +109,38 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   };
 
   const ITEMS_PER_PAGE = 100;
+  const isMobile = useIsMobile();
+  const [selectedConsultKey, setSelectedConsultKey] = useState<string | null>(null);
+  const [mobileDrawerKey, setMobileDrawerKey] = useState<string | null>(null);
+
+  const doctorOptions = useMemo(() => {
+    const fromStaff = staffList.map(s => getShortStaffName(s.StaffName, staffList));
+    const extra = Array.from(new Set(consults.map(c => String(c.RequestBy || ''))))
+      .filter(d => d && !fromStaff.some(x => x.toLowerCase() === d.toLowerCase()));
+    return [...fromStaff, ...extra];
+  }, [staffList, consults]);
+
+  const departmentOptions = useMemo(() => {
+    const extra = Array.from(new Set(consults.map(c => String(c.Department || ''))))
+      .filter(d => d && !DEFAULT_DEPARTMENTS.includes(d));
+    return [...DEFAULT_DEPARTMENTS, ...extra];
+  }, [consults]);
+
+  const handleOpenConsult = useCallback((c: Consult) => {
+    if (isMobile) {
+      setMobileDrawerKey(c.ConsultKey);
+    } else {
+      setSelectedConsultKey(c.ConsultKey);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (isMobile) {
+      setSelectedConsultKey(null);
+    } else {
+      setMobileDrawerKey(null);
+    }
+  }, [isMobile]);
 
   const patientMap = useMemo(() => {
     const map = new Map<string, Patient>();
@@ -142,23 +178,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     () => getSourceConsultResultOptions(sources),
     [sources]
   );
-
-  const createDiagnosisSource = async (DiagnosisID: string) => {
-    const trimmed = normalizeDiagnosisID(DiagnosisID);
-    if (!trimmed) return;
-
-    const response = await fetch('/api/sources', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ DiagnosisID: trimmed })
-    });
-
-    if (!response.ok) {
-      throw new Error('Không thể thêm DiagnosisID vào Source');
-    }
-
-    onRefreshData?.();
-  };
 
   // 1. Patient Mode (select existing vs create new)
   const [patientMode, setPatientMode] = useState<'select' | 'create'>('select');
@@ -340,8 +359,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       }
 
       // 2. Add the consult
-      const chosenDept = showAddDeptInput ? customDeptVal : department;
-      const chosenDoc = showAddDocInput ? customDocVal : requestBy;
+      const chosenDept = department;
+      const chosenDoc = requestBy;
 
       // For "Staff thông": auto-fill Scheduled1stInterventionist & Scheduled2ndInterventionist
       const isCathStaff = consultType === 'Staff thông';
@@ -500,6 +519,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
   useEffect(() => {
     setSelectedDeleteKeys(new Set());
+    setSelectedConsultKey(null);
   }, [staffType, statusTab, currentPage]);
 
   // Deduplicate consults client-side to ensure each ConsultKey has only 1 row on the UI
@@ -715,7 +735,9 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               return (
                 <tr 
                   key={c.ConsultKey}
-                  className={`hover:bg-slate-50/80 transition duration-150 group ${selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : ''} ${deletingKeys.has(c.ConsultKey) ? 'opacity-50' : ''}`}
+                  className={`hover:bg-slate-50/80 transition duration-150 group ${
+                    selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : ''
+                  } ${selectedConsultKey === c.ConsultKey ? 'bg-indigo-50/80 ring-1 ring-inset ring-indigo-200' : ''} ${deletingKeys.has(c.ConsultKey) ? 'opacity-50' : ''}`}
                 >
                   <td className="px-2 py-3 text-center whitespace-nowrap">
                     <button
@@ -733,20 +755,20 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     </button>
                   </td>
                   <td 
-                    onClick={() => onSelectConsult(c)}
+                    onClick={() => handleOpenConsult(c)}
                     className="px-4 py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer min-w-[160px]"
                   >
                     {pat.PatientName}
                   </td>
                   <td 
-                    onClick={() => onSelectConsult(c)}
+                    onClick={() => handleOpenConsult(c)}
                     className="px-4 py-3 text-slate-700 font-mono font-bold cursor-pointer whitespace-nowrap"
                   >
                     {pat.PatientID1}
                     {pat.PatientID2 && <span className="text-[9px] text-slate-450 font-semibold block font-sans">Mã phụ: {pat.PatientID2}</span>}
                   </td>
                   <td 
-                    onClick={() => onSelectConsult(c)}
+                    onClick={() => handleOpenConsult(c)}
                     className="px-4 py-3 text-slate-600 font-medium cursor-pointer whitespace-nowrap"
                   >
                     <span className="font-mono">{formatVNTime(pat.PatientDOB)}</span>
@@ -755,7 +777,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     </span>
                   </td>
                   <td 
-                    onClick={() => onSelectConsult(c)}
+                    onClick={() => handleOpenConsult(c)}
                     className="px-4 py-3 cursor-pointer"
                   >
                     <span className="font-bold text-red-650 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[10px] font-mono">
@@ -763,7 +785,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     </span>
                   </td>
                   <td 
-                    onClick={() => onSelectConsult(c)}
+                    onClick={() => handleOpenConsult(c)}
                     className="px-4 py-3 text-slate-600 font-semibold font-mono cursor-pointer"
                   >
                     {formatVNTime(c.ConsultDate)}
@@ -772,7 +794,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     <div className="flex items-center justify-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onSelectConsult(c)}
+                        onClick={() => handleOpenConsult(c)}
                         className="px-2 py-1 text-[10px] font-bold text-indigo-650 hover:text-indigo-850 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 rounded-lg shadow-xs transition cursor-pointer"
                       >
                         Chi tiết
@@ -865,8 +887,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         </div>
       </div>
 
-      {/* Main List Box */}
-      <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-3xl p-4 lg:p-6 shadow-sm gap-4 overflow-hidden">
+      {/* Main workspace: split list + detail panel on desktop */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 overflow-hidden">
+        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl p-4 lg:p-6 shadow-sm gap-4 overflow-hidden transition-all duration-300 ${
+          selectedConsultKey && !isMobile ? 'lg:w-[46%] lg:shrink-0' : 'flex-1'
+        }`}>
         
         {/* Tab "Staff thông" và "Staff mổ" cùng line */}
         <div className="shrink-0 flex border-b border-slate-200 gap-6">
@@ -992,7 +1017,51 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
             </div>
           </div>
         )}
+        </div>
+
+        {selectedConsultKey && !isMobile && (
+          <div className="hidden lg:flex lg:flex-1 lg:min-w-0 flex-col min-h-0">
+            <ResultStaffDrawer
+              layout="panel"
+              autoEdit
+              consultKey={selectedConsultKey}
+              consults={consults}
+              patients={patients}
+              staffList={staffList}
+              sources={sources}
+              deviceTemplates={deviceTemplates}
+              currentStaff={currentStaff ?? null}
+              onClose={() => setSelectedConsultKey(null)}
+              onPatchConsult={onPatchConsult}
+              onPatchPatient={onPatchPatient ?? (() => {})}
+              onRefreshData={onRefreshData ?? (() => {})}
+              onEditPatientAdmin={onEditPatientAdmin}
+              createDiagnosisSource={createDiagnosisSource}
+              triggerAlert={triggerAlert}
+            />
+          </div>
+        )}
       </div>
+
+      {mobileDrawerKey && isMobile && (
+        <ResultStaffDrawer
+          layout="modal"
+          consultKey={mobileDrawerKey}
+          consults={consults}
+          patients={patients}
+          staffList={staffList}
+          sources={sources}
+          deviceTemplates={deviceTemplates}
+          currentStaff={currentStaff ?? null}
+          onClose={() => setMobileDrawerKey(null)}
+          onPatchConsult={onPatchConsult}
+          onPatchPatient={onPatchPatient ?? (() => {})}
+          onRefreshData={onRefreshData ?? (() => {})}
+          onEditPatientAdmin={onEditPatientAdmin}
+          createDiagnosisSource={createDiagnosisSource}
+          triggerAlert={triggerAlert}
+        />
+      )}
 
       {/* COMBINED STAFF BỔ SUNG MODAL */}
       {showCombinedForm && (
@@ -1371,113 +1440,30 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký *</label>
-                        <select
-                          required={!showAddDocInput}
-                          value={showAddDocInput ? 'ADD_NEW' : requestBy}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'ADD_NEW') {
-                              setShowAddDocInput(true);
-                              setRequestBy('');
-                            } else {
-                              setShowAddDocInput(false);
-                              setRequestBy(val);
-                            }
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold focus:outline-none text-xs text-slate-800"
-                        >
-                          <option value="">-- Chọn BS --</option>
-                          {staffList.map(s => {
-                            const displayName = getShortStaffName(s.StaffName, staffList);
-                            return (
-                              <option key={s.StaffKey} value={displayName}>
-                                {displayName}
-                              </option>
-                            );
-                          })}
-                          {Array.from(new Set(consults.map(c => String(c.RequestBy || '')))).filter(d => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d)).map(d => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                          <option value="ADD_NEW" className="text-rose-600 font-bold">+ Thêm bác sĩ mới...</option>
-                        </select>
-
-                        {showAddDocInput && (
-                          <div className="mt-1 flex gap-1 animate-in slide-in-from-top-1 duration-150">
-                            <input
-                              type="text"
-                              required
-                              placeholder="Họ tên bác sĩ mới..."
-                              value={customDocVal}
-                              onChange={(e) => {
-                                setCustomDocVal(e.target.value);
-                              }}
-                              className="flex-1 bg-white border border-indigo-200 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddDocInput(false);
-                                setCustomDocVal('');
-                              }}
-                              className="text-slate-400 hover:text-red-500 text-[10px] font-bold"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        )}
+                        <SearchableEnumSelect
+                          required
+                          options={doctorOptions}
+                          value={requestBy}
+                          onChange={setRequestBy}
+                          allowCreate
+                          createLabel={(val) => `Thêm BS "${val}"`}
+                          placeholder="-- Chọn BS --"
+                          searchPlaceholder="Gõ tên BS..."
+                        />
                       </div>
 
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nội trú *</label>
-                        <select
-                          required={!showAddDeptInput}
-                          value={showAddDeptInput ? 'ADD_NEW' : department}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'ADD_NEW') {
-                              setShowAddDeptInput(true);
-                              setDepartment('');
-                            } else {
-                              setShowAddDeptInput(false);
-                              setDepartment(val);
-                            }
-                          }}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold focus:outline-none text-xs text-slate-800"
-                        >
-                          <option value="">-- Chọn khoa --</option>
-                          {DEFAULT_DEPARTMENTS.map(d => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                          {Array.from(new Set(consults.map(c => String(c.Department || '')))).filter(d => d && !DEFAULT_DEPARTMENTS.includes(d)).map(d => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                          <option value="ADD_NEW" className="text-rose-600 font-bold">+ Thêm khoa mới...</option>
-                        </select>
-
-                        {showAddDeptInput && (
-                          <div className="mt-1 flex gap-1 animate-in slide-in-from-top-1 duration-150">
-                            <input
-                              type="text"
-                              required
-                              placeholder="Tên khoa mới..."
-                              value={customDeptVal}
-                              onChange={(e) => {
-                                setCustomDeptVal(e.target.value);
-                              }}
-                              className="flex-1 bg-white border border-indigo-200 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddDeptInput(false);
-                                setCustomDeptVal('');
-                              }}
-                              className="text-slate-400 hover:text-red-500 text-[10px] font-bold"
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        )}
+                        <SearchableEnumSelect
+                          required
+                          options={departmentOptions}
+                          value={department}
+                          onChange={setDepartment}
+                          allowCreate
+                          createLabel={(val) => `Thêm khoa "${val}"`}
+                          placeholder="-- Chọn khoa --"
+                          searchPlaceholder="Gõ tên khoa..."
+                        />
                       </div>
                     </div>
 
