@@ -168,8 +168,13 @@ app.post('/api/auth/login', async (req, res) => {
       }
     }
 
-    // 2. Fallback to Google Sheets (Apps Script) delegation if local match didn't succeed
-    if (!staffMember && config.scriptUrl) {
+    if (localStaff && !staffMember) {
+      res.status(401).json({ error: 'Mật khẩu không đúng.' });
+      return;
+    }
+
+    // 2. Fallback to Google Sheets only when staff is not in local roster
+    if (!staffMember && !localStaff && config.scriptUrl) {
       try {
         console.log(`Verifying credentials with Google Sheets for StaffKey: ${StaffKey}`);
         const response = await fetchWithTimeout(config.scriptUrl, {
@@ -256,7 +261,6 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 // Public staff list — only StaffKey + StaffName + Name + Role + Avatar for login dropdown
 // No auth required, no sensitive fields exposed
 app.get('/api/staff/public', async (_req, res) => {
-  await syncFromGoogleSheets();
   const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
   const publicList = staffList
     .filter(s => !s.FireDate || !String(s.FireDate).trim())
@@ -268,6 +272,9 @@ app.get('/api/staff/public', async (_req, res) => {
       Avatar: (s as any).Avatar || ''
     }));
   res.json(publicList);
+  void syncFromGoogleSheets().catch(err => {
+    console.warn('Background staff sync failed:', err);
+  });
 });
 
 const BUILD_ID =
@@ -621,7 +628,8 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         writeDB(TRANSPLANTS_FILE, Array.from(transplantMap.values()));
       }
       if (Array.isArray(data.staff) && data.staff.length > 0) {
-        const stMap = new Map();
+        const currentStaff = readDB<Staff>(STAFF_FILE, defaultStaff);
+        const stMap = new Map<string, Staff>();
         data.staff.forEach((s: any, i: number) => {
           const k = s.StaffKey || `st_no_key_${i}`;
           s.StaffKey = k;
@@ -630,6 +638,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           }
           stMap.set(k, s);
         });
+        preserveLocalOnlyRecords(stMap, currentStaff, record => record.StaffKey);
         writeDB(STAFF_FILE, Array.from(stMap.values()));
       }
       if (Array.isArray(data.sources) && data.sources.length > 0) {
@@ -1558,8 +1567,15 @@ function runWorkflowMonitor() {
   };
 }
 
-app.get('/api/all', requireAuth, async (_req, res) => {
-  await syncFromGoogleSheets();
+app.get('/api/all', requireAuth, async (req, res) => {
+  const force = String(req.query.force || '') === 'true';
+  if (force) {
+    await syncFromGoogleSheets(true);
+  } else {
+    void syncFromGoogleSheets().catch(err => {
+      console.warn('Background sync failed:', err);
+    });
+  }
   const rawStaff = readDB<Staff>(STAFF_FILE, defaultStaff);
   res.json({
     patients: readDB<Patient>(PATIENTS_FILE, defaultPatients),

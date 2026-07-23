@@ -1,5 +1,6 @@
 import { handleChdBriefRequest } from './chdBriefBridge';
 import { getAppVersionPayload } from '../appVersion';
+import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
 import type { Staff, Source } from '../types';
 
 type SheetData = {
@@ -58,47 +59,10 @@ const setScriptSecret = (secret: string) => {
 };
 const viteEnv = (import.meta as any).env || {};
 
-const DEFAULT_STAFF: any[] = [
-  {
-    StaffKey: "11111",
-    StaffName: "Admin",
-    Name: "Admin",
-    Password: "1111",
-    Role: "Admin",
-    Email: "admin@hospital.vn",
-    FireDate: ""
-  },
-  {
-    StaffKey: "01378",
-    StaffName: "Bùi Tuấn Ân",
-    Name: "BS. Ân",
-    Password: "1111",
-    Role: "User",
-    StaffSex: "Nam",
-    Email: "anbui150@gmail.com",
-    StaffPhone: "0348940432",
-    FireDate: ""
-  },
-  {
-    StaffKey: "01651",
-    StaffName: "Lê Trần Bảo Nghi",
-    Name: "BS. Nghi",
-    Password: "1111",
-    Role: "User",
-    StaffSex: "Nữ",
-    StaffDOB: "13/05/1995",
-    Department: "Nội Tim Mạch",
-    Career: "Bác sĩ",
-    Email: "baonghile.95@gmail.com",
-    StaffPhone: "0932051995",
-    FireDate: ""
-  }
-];
-
 const EMPTY_DATA: SheetData = {
   patients: [],
   consults: [],
-  staff: DEFAULT_STAFF,
+  staff: BUNDLED_STAFF,
   cathlabs: [],
   operations: [],
   cmrs: [],
@@ -351,7 +315,7 @@ const normalizeData = (data: Partial<SheetData>): SheetData => ({
   ...data,
   patients: Array.isArray(data.patients) ? data.patients : [],
   consults: Array.isArray(data.consults) ? data.consults : [],
-  staff: Array.isArray(data.staff) ? data.staff : [],
+  staff: Array.isArray(data.staff) && data.staff.length > 0 ? data.staff : BUNDLED_STAFF,
   cathlabs: Array.isArray(data.cathlabs) ? data.cathlabs : [],
   operations: Array.isArray(data.operations) ? data.operations : [],
   cmrs: Array.isArray(data.cmrs) ? data.cmrs : [],
@@ -363,20 +327,50 @@ const normalizeData = (data: Partial<SheetData>): SheetData => ({
   doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks) ? data.doctorPerformanceMarks : []
 });
 
-const loadStaffOnly = async (force = false): Promise<any[]> => {
+const resolveOfflineStaffList = (): Staff[] => {
+  staffCache = BUNDLED_STAFF;
+  return staffCache;
+};
+
+const refreshStaffInBackground = (): void => {
+  if (!getScriptUrl() || pendingStaffLoad) return;
+  void loadStaffOnly(true).catch(err => {
+    console.warn('Background staff sync failed:', err);
+  });
+};
+
+const loadStaffOnly = async (force = false): Promise<Staff[]> => {
   const scriptUrl = getScriptUrl();
-  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
-  if (cache && !force) return cache.staff;
-  if (staffCache && !force) return staffCache;
-  if (pendingStaffLoad && !force) return pendingStaffLoad;
 
   if (!force) {
-    const cachedStaff = await getPersistedData('staff_data');
-    if (cachedStaff && Array.isArray(cachedStaff) && cachedStaff.length > 0 && cachedStaff[0].Role !== undefined) {
-      staffCache = cachedStaff;
+    if (staffCache?.length) {
+      refreshStaffInBackground();
       return staffCache;
     }
+    if (cache?.staff?.length) {
+      staffCache = mergeStaffWithBundledPasswords(cache.staff);
+      refreshStaffInBackground();
+      return staffCache;
+    }
+    if (pendingStaffLoad) return pendingStaffLoad;
+
+    const cachedStaff = await getPersistedData('staff_data');
+    if (cachedStaff && Array.isArray(cachedStaff) && cachedStaff.length > 0 && cachedStaff[0].Role !== undefined) {
+      staffCache = mergeStaffWithBundledPasswords(cachedStaff);
+      refreshStaffInBackground();
+      return staffCache;
+    }
+
+    if (!scriptUrl) {
+      return resolveOfflineStaffList();
+    }
   }
+
+  if (!scriptUrl) {
+    return resolveOfflineStaffList();
+  }
+
+  if (pendingStaffLoad && !force) return pendingStaffLoad;
 
   const apiKey = getScriptSecret();
   let fetchUrl = `${scriptUrl}?action=getStaff`;
@@ -384,7 +378,7 @@ const loadStaffOnly = async (force = false): Promise<any[]> => {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
 
-  pendingStaffLoad = fetchWithTimeout(fetchUrl)
+  pendingStaffLoad = fetchWithTimeout(fetchUrl, undefined, force ? 60000 : 15000)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
@@ -393,12 +387,20 @@ const loadStaffOnly = async (force = false): Promise<any[]> => {
         throw new Error('Apps Script đang trả về HTML.');
       }
       const parsed = JSON.parse(text);
-      const staffList = Array.isArray(parsed.staff) ? parsed.staff : [];
-      // Keep raw (with Password) in-memory only — needed for login verification
-      staffCache = staffList;
-      // Persist password-stripped version to IndexedDB only
-      void setPersistedData('staff_data', staffList.map(stripBridgePassword));
+      const staffList = Array.isArray(parsed.staff) && parsed.staff.length > 0
+        ? parsed.staff
+        : BUNDLED_STAFF;
+      staffCache = mergeStaffWithBundledPasswords(staffList);
+      void setPersistedData('staff_data', staffCache.map(stripBridgePassword));
+      if (cache) {
+        cache.staff = staffCache;
+      }
       return staffCache!;
+    })
+    .catch(err => {
+      if (staffCache?.length) return staffCache;
+      console.warn('Staff sync failed, using bundled roster:', err);
+      return resolveOfflineStaffList();
     })
     .finally(() => {
       pendingStaffLoad = null;
@@ -410,13 +412,23 @@ const loadStaffOnly = async (force = false): Promise<any[]> => {
 
 
 
+const refreshAllDataInBackground = (): void => {
+  if (!getScriptUrl() || pendingLoad) return;
+  void loadAllData(true).catch(err => {
+    console.warn('Background data sync failed:', err);
+  });
+};
+
 const loadAllData = async (force = false): Promise<SheetData> => {
   const scriptUrl = getScriptUrl();
-  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
-  if (cache && !force) return cache;
-  if (pendingLoad && !force) return pendingLoad;
 
   if (!force) {
+    if (cache) {
+      refreshAllDataInBackground();
+      return cache;
+    }
+    if (pendingLoad) return pendingLoad;
+
     const cachedAll = await getPersistedData('all_data');
     if (
       cachedAll &&
@@ -427,9 +439,26 @@ const loadAllData = async (force = false): Promise<SheetData> => {
       Array.isArray(cachedAll.transplants)
     ) {
       cache = normalizeData(cachedAll);
+      staffCache = mergeStaffWithBundledPasswords(cache.staff);
+      cache.staff = staffCache;
+      refreshAllDataInBackground();
+      return cache;
+    }
+
+    if (!scriptUrl) {
+      cache = normalizeData({ staff: BUNDLED_STAFF });
+      staffCache = cache.staff;
       return cache;
     }
   }
+
+  if (!scriptUrl) {
+    cache = normalizeData({ staff: BUNDLED_STAFF });
+    staffCache = cache.staff;
+    return cache;
+  }
+
+  if (pendingLoad && !force) return pendingLoad;
 
   const apiKey = getScriptSecret();
   let fetchUrl = `${scriptUrl}?action=getAll`;
@@ -437,7 +466,7 @@ const loadAllData = async (force = false): Promise<SheetData> => {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
 
-  pendingLoad = fetchWithTimeout(fetchUrl)
+  pendingLoad = fetchWithTimeout(fetchUrl, undefined, force ? 60000 : 20000)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
@@ -452,19 +481,35 @@ const loadAllData = async (force = false): Promise<SheetData> => {
       }
       const parsed = JSON.parse(text);
       cache = normalizeData(parsed);
-      // Persist stripped version to IndexedDB (no passwords in browser storage)
+      if (Array.isArray(cache.staff)) {
+        staffCache = mergeStaffWithBundledPasswords(cache.staff);
+        cache.staff = staffCache;
+      }
       void setPersistedData('all_data', {
         ...parsed,
-        staff: Array.isArray(parsed.staff) ? parsed.staff.map(stripBridgePassword) : []
+        staff: Array.isArray(cache.staff) ? cache.staff.map(stripBridgePassword) : []
       });
       if (Array.isArray(cache.staff)) {
-        // Keep raw staff (with Password) in-memory only for login verification
-        staffCache = cache.staff;
         void setPersistedData('staff_data', cache.staff.map(stripBridgePassword));
       }
       return cache;
     })
     .catch(async err => {
+      if (cache) return cache;
+
+      const cachedAll = await getPersistedData('all_data');
+      if (
+        cachedAll &&
+        cachedAll.staff &&
+        Array.isArray(cachedAll.staff) &&
+        cachedAll.staff.length > 0
+      ) {
+        cache = normalizeData(cachedAll);
+        staffCache = mergeStaffWithBundledPasswords(cache.staff);
+        cache.staff = staffCache;
+        return cache;
+      }
+
       if (isLocalHost()) {
         console.warn('Google Apps Script connection failed. Falling back to local offline Express database...', err);
         const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ || window.fetch;
@@ -473,12 +518,17 @@ const loadAllData = async (force = false): Promise<SheetData> => {
           if (localRes.ok) {
             const localData = await localRes.json();
             cache = normalizeData(localData);
+            staffCache = mergeStaffWithBundledPasswords(cache.staff);
+            cache.staff = staffCache;
             return cache;
           }
         } catch (fallbackErr) {
           console.error('Local Express database fallback also failed:', fallbackErr);
         }
       }
+
+      cache = normalizeData({ staff: BUNDLED_STAFF });
+      staffCache = cache.staff;
       throw err;
     })
     .finally(() => {
@@ -905,17 +955,15 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       }
 
       const verifyLocally = async () => {
-        let staffList: any[] = [];
+        let staffList: Staff[] = [];
         try {
-          staffList = staffCache ?? (scriptUrl ? await loadStaffOnly(false) : DEFAULT_STAFF);
+          staffList = staffCache ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
         } catch (e) {
-          console.warn('Failed to load staff list for local fallback, using DEFAULT_STAFF:', e);
-          staffList = DEFAULT_STAFF;
+          console.warn('Failed to load staff list for local fallback, using bundled roster:', e);
+          staffList = BUNDLED_STAFF;
         }
-        let localStaff = staffList.find((s: any) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
-        if (!localStaff && staffList !== DEFAULT_STAFF) {
-          localStaff = DEFAULT_STAFF.find((s: any) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
-        }
+        const localStaff = staffList.find((s: Staff) => String(s.StaffKey || '').trim() === String(StaffKey).trim())
+          ?? BUNDLED_STAFF.find((s: Staff) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
         if (!localStaff) {
           return jsonResponse({ error: 'Mã nhân viên không tồn tại!' }, { status: 401 });
         }
@@ -930,54 +978,8 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
         return jsonResponse({ token, staff: stripBridgePassword(localStaff) });
       };
 
-      // Try local verification first for instant login
-      try {
-        const localRes = await verifyLocally();
-        if (localRes.status === 200) {
-          console.log('Instant local login verification succeeded!');
-          return localRes;
-        }
-      } catch (err) {
-        console.warn('Local verification failed, falling back to Apps Script delegation:', err);
-      }
-
-      if (!scriptUrl) {
-        return verifyLocally();
-      }
-
-      try {
-        const apiKey = getScriptSecret();
-        const response = await fetchWithTimeout(scriptUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'login',
-            staffKey: StaffKey,
-            password: Password,
-            apiKey
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Apps Script trả về HTTP ${response.status}`);
-        }
-        
-        const text = await response.text();
-        const result = JSON.parse(text);
-        if (result.status === 'error') {
-          if (result.message === 'Unknown action') {
-            throw new Error('Unknown action');
-          }
-          return jsonResponse({ error: result.message || 'Mã nhân viên hoặc mật khẩu không đúng.' }, { status: 401 });
-        }
-        
-        const staff = result.staff;
-        const token = bridgeCreateSession(String(staff.StaffKey));
-        return jsonResponse({ token, staff });
-      } catch (err) {
-        console.error('Login verification via Apps Script failed, trying fallback:', err);
-        return verifyLocally();
-      }
+      // Local verification only — instant login without waiting for Apps Script
+      return verifyLocally();
     }
 
     // POST /api/auth/logout
@@ -1001,11 +1003,11 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       if (!token) return jsonResponse({ error: 'Yêu cầu đăng nhập.' }, { status: 401 });
       const staffKey = bridgeResolveSession(token);
       if (!staffKey) return jsonResponse({ error: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 });
-      let staffList: any[];
+      let staffList: Staff[];
       try {
-        staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : DEFAULT_STAFF);
+        staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
       } catch {
-        staffList = DEFAULT_STAFF;
+        staffList = BUNDLED_STAFF;
       }
       const staff = staffList.find((s: any) => String(s.StaffKey) === staffKey);
       if (!staff) return jsonResponse({ error: 'Tài khoản không còn tồn tại.' }, { status: 401 });
@@ -1017,15 +1019,16 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
 
   // GET /api/staff/public — only StaffKey + StaffName + Avatar + Name + Role, no auth required
   if (endpoint === 'staff' && key === 'public' && method === 'GET') {
-    let staffList: any[];
+    let staffList: Staff[];
     try {
-      staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : DEFAULT_STAFF);
+      staffList = staffCache ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
     } catch {
-      staffList = DEFAULT_STAFF;
+      staffList = BUNDLED_STAFF;
     }
-    const publicList = staffList
-      .filter((s: any) => !s.FireDate || !String(s.FireDate).trim())
-      .map((s: any) => ({
+    const resolvedStaff = mergeStaffWithBundledPasswords(staffList);
+    const publicList = resolvedStaff
+      .filter((s: Staff) => !s.FireDate || !String(s.FireDate).trim())
+      .map((s: Staff) => ({
         StaffKey: s.StaffKey,
         StaffName: s.StaffName,
         Name: s.Name || '',

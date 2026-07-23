@@ -53,7 +53,6 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
       const res = await fetch('/api/staff/public');
       if (!res.ok) return EMPTY_BUNDLE;
       const publicStaff = await res.json();
-      // Map public staff (StaffKey, StaffName only) to Staff type
       return {
         ...EMPTY_BUNDLE,
         staff: Array.isArray(publicStaff) ? publicStaff : []

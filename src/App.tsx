@@ -649,17 +649,8 @@ export default function App() {
   const handleLogoutRef = useRef<(() => void) | null>(null);
 
   const loadPublicStaffForLogin = useCallback(() => {
-    void refreshMedicalData('staff', false).then(() => {
-      void refreshMedicalData('staff', true).catch(err => {
-        const msg = err instanceof Error ? err.message : String(err);
-        setLoginLoadError(
-          msg.includes('Failed to fetch')
-            ? 'Không kết nối được Google Sheets. Kiểm tra Apps Script URL và mạng.'
-            : msg || 'Không tải được danh sách nhân viên từ Google Sheets.'
-        );
-      });
-    }).catch(err => {
-      void refreshMedicalData('staff', true).catch(() => {});
+    setLoginLoadError('');
+    void refreshMedicalData('staff', false).catch(err => {
       const msg = err instanceof Error ? err.message : String(err);
       setLoginLoadError(
         msg.includes('Failed to fetch')
@@ -692,7 +683,6 @@ export default function App() {
       localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
       setAuthToken('');
       setCurrentStaff(null);
-      void clearLocalCache();
       if (!deployMsg) {
         setLoginLoadError('Hệ thống vừa cập nhật phiên bản mới. Vui lòng đăng nhập lại.');
       }
@@ -714,15 +704,15 @@ export default function App() {
           localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
-          void refreshMedicalData('full', false).then(() => {
-            void refreshMedicalData('full', true).catch(err => {
-              console.warn('Background sync failed:', err);
-            });
-          }).catch(err => {
-            void refreshMedicalData('full', true).catch(err => {
-              const msg = err instanceof Error ? err.message : String(err);
+          void refreshMedicalData('full', false).catch(err => {
+            console.warn('Initial cached data load failed:', err);
+            void refreshMedicalData('full', true).catch(syncErr => {
+              const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
               setLoginLoadError(msg || 'Không tải được dữ liệu từ Google Sheets.');
             });
+          });
+          void refreshMedicalData('full', true).catch(err => {
+            console.warn('Background sync failed:', err);
           });
         })
         .catch(() => {
@@ -886,14 +876,15 @@ export default function App() {
       setCurrentStaff(staffData);
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
 
-      // Load full database (SWR)
-      void refreshMedicalData('full', false).then(() => {
-        void refreshMedicalData('full', true).catch(() => {});
-      }).catch(() => {
-        void refreshMedicalData('full', true).catch(err => {
-          const msg = err instanceof Error ? err.message : String(err);
+      void refreshMedicalData('full', false).catch(err => {
+        console.warn('Initial cached data load failed:', err);
+        void refreshMedicalData('full', true).catch(syncErr => {
+          const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
           setLoginError(msg || 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c d\u1eef li\u1ec7u t\u1eeb Google Sheets.');
         });
+      });
+      void refreshMedicalData('full', true).catch(err => {
+        console.warn('Background sync after login failed:', err);
       });
     } catch (err) {
       setLoginError('L\u1ed7i k\u1ebft n\u1ed1i. Vui l\u00f2ng ki\u1ec3m tra m\u1ea1ng v\u00e0 th\u1eed l\u1ea1i.');
