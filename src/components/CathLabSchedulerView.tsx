@@ -157,6 +157,18 @@ type WaitlistTab =
 
 type WaitlistSortField = 'default' | 'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'date' | 'plannedDate';
 
+type FilterListSortField =
+  | 'default'
+  | 'plannedDate'
+  | 'name'
+  | 'dob'
+  | 'diagnosis'
+  | 'plannedDevice'
+  | 'operationFeedback'
+  | 'supplyDepFeedback'
+  | 'ptv'
+  | 'consultResult';
+
 const DELAY_TAB_STYLES: Record<
   'delayYellow' | 'delayRedOutline' | 'delayRedFilled' | 'delayBlack',
   { active: string; badgeActive: string }
@@ -385,6 +397,8 @@ export default function CathLabSchedulerView({
   const [searchQuery, setSearchQuery] = useState('');
   const [waitlistSortField, setWaitlistSortField] = useState<WaitlistSortField>('default');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [filterListSortField, setFilterListSortField] = useState<FilterListSortField>('default');
+  const [filterListSortOrder, setFilterListSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Column visibility settings for the waitlist table
   const [visibleColumns, setVisibleColumns] = useState({
@@ -483,6 +497,11 @@ export default function CathLabSchedulerView({
   const [deviceGroupValue, setDeviceGroupValue] = useState<string>('1');
 
   const isAnyFilterExpanded = isFilterExpanded || isDeviceFilterExpanded;
+
+  useEffect(() => {
+    setFilterListSortField('default');
+    setFilterListSortOrder('asc');
+  }, [deviceCheckFilter, deviceDateType, deviceStartDate, deviceEndDate, deviceGroupType, deviceGroupValue, exportStartDate, isDeviceFilterExpanded, isFilterExpanded]);
 
   // ... rest of the code is unchanged ...
 
@@ -935,6 +954,76 @@ Xin cảm ơn!`;
       return true;
     }).sort((a, b) => (a.ConsultDate || '').localeCompare(b.ConsultDate || ''));
   }, [allEligibleWaitlist, deviceCheckFilter, deviceDateType, deviceStartDate, deviceEndDate, deviceGroupType, deviceGroupValue, currentYear]);
+
+  const sortFilterList = useCallback((list: Consult[]) => {
+    if (filterListSortField === 'default') return list;
+    return [...list].sort((a, b) => {
+      let comparison = 0;
+      if (filterListSortField === 'plannedDate') {
+        comparison = (a.PlannedCathLabDate || '').localeCompare(b.PlannedCathLabDate || '');
+      } else if (filterListSortField === 'name') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        const nameA = patA?.PatientName ? removeDiacritics(patA.PatientName).toLowerCase() : '';
+        const nameB = patB?.PatientName ? removeDiacritics(patB.PatientName).toLowerCase() : '';
+        comparison = nameA.localeCompare(nameB, 'vi');
+      } else if (filterListSortField === 'dob') {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        comparison = (patA?.PatientDOB || '').localeCompare(patB?.PatientDOB || '');
+      } else if (filterListSortField === 'diagnosis') {
+        const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
+        const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
+        comparison = diagA.localeCompare(diagB, 'vi');
+      } else if (filterListSortField === 'plannedDevice') {
+        const devA = a.PlannedDevice ? removeDiacritics(a.PlannedDevice).toLowerCase() : '';
+        const devB = b.PlannedDevice ? removeDiacritics(b.PlannedDevice).toLowerCase() : '';
+        comparison = devA.localeCompare(devB, 'vi');
+      } else if (filterListSortField === 'operationFeedback') {
+        const fbA = a.OperationFeedback ? removeDiacritics(a.OperationFeedback).toLowerCase() : '';
+        const fbB = b.OperationFeedback ? removeDiacritics(b.OperationFeedback).toLowerCase() : '';
+        comparison = fbA.localeCompare(fbB, 'vi');
+      } else if (filterListSortField === 'supplyDepFeedback') {
+        const fbA = a.SupplyDepFeedback ? removeDiacritics(a.SupplyDepFeedback).toLowerCase() : '';
+        const fbB = b.SupplyDepFeedback ? removeDiacritics(b.SupplyDepFeedback).toLowerCase() : '';
+        comparison = fbA.localeCompare(fbB, 'vi');
+      } else if (filterListSortField === 'ptv') {
+        const ptvA = [a.Scheduled1stInterventionist, a.Scheduled2ndInterventionist, a.Scheduled3rdInterventionist].filter(Boolean).join(' ');
+        const ptvB = [b.Scheduled1stInterventionist, b.Scheduled2ndInterventionist, b.Scheduled3rdInterventionist].filter(Boolean).join(' ');
+        comparison = removeDiacritics(ptvA).toLowerCase().localeCompare(removeDiacritics(ptvB).toLowerCase(), 'vi');
+      } else if (filterListSortField === 'consultResult') {
+        const resA = a.ConsultResultID ? removeDiacritics(a.ConsultResultID).toLowerCase() : '';
+        const resB = b.ConsultResultID ? removeDiacritics(b.ConsultResultID).toLowerCase() : '';
+        comparison = resA.localeCompare(resB, 'vi');
+      }
+      return filterListSortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [filterListSortField, filterListSortOrder, patients]);
+
+  const sortedDeviceFilteredConsults = useMemo(
+    () => sortFilterList(deviceFilteredConsults),
+    [deviceFilteredConsults, sortFilterList]
+  );
+
+  const sortedExportFilteredConsults = useMemo(
+    () => sortFilterList(exportFilteredConsults),
+    [exportFilteredConsults, sortFilterList]
+  );
+
+  const handleFilterListSort = (field: FilterListSortField) => {
+    if (filterListSortField === field) {
+      setFilterListSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setFilterListSortField(field);
+      setFilterListSortOrder('asc');
+    }
+  };
+
+  const renderFilterListSortIcon = (field: FilterListSortField) => (
+    <span className="text-[10px] font-bold opacity-80">
+      {filterListSortField === field ? (filterListSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+    </span>
+  );
 
   const handleExportDeviceExcel = async () => {
     let start = '';
@@ -2688,6 +2777,7 @@ Xin cảm ơn!`;
               onClick={() => {
                 setIsDeviceFilterExpanded(true);
                 setIsFilterExpanded(false);
+                setMobileTab('calendar');
               }}
               className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-[10.5px] font-black uppercase tracking-wider text-slate-700 active:bg-slate-100 transition shadow-xs cursor-pointer"
             >
@@ -2705,7 +2795,7 @@ Xin cảm ơn!`;
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex-1 lg:flex-initial flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-0 ${pureCalendarMode ? 'hidden' : 'lg:col-span-6'} ${mobileTab === 'waitlist' ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex-1 lg:flex-initial flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-0 ${pureCalendarMode ? 'hidden' : isDeviceFilterExpanded ? 'hidden' : 'lg:col-span-6'} ${mobileTab === 'waitlist' && !isDeviceFilterExpanded ? 'flex' : 'hidden lg:flex'}`}>
           
           <div className="hidden lg:flex p-4 border-b border-slate-100 bg-slate-50 shrink-0 items-center justify-between gap-2">
             <div>
@@ -3309,7 +3399,7 @@ Xin cảm ơn!`;
         </div>
 
         {/* RIGHT COLUMN: Selection Detailed Form Editor OR Preview List */}
-        <div className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm overflow-y-auto lg:overflow-hidden min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor') ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm overflow-y-auto lg:overflow-hidden min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : isDeviceFilterExpanded ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor' || isDeviceFilterExpanded) ? 'flex' : 'hidden lg:flex'}`}>
           {!isAnyFilterExpanded ? (
             <>
               {(!selectedConsult || pureCalendarMode || mobileTab !== 'editor') ? (
@@ -4256,21 +4346,77 @@ Xin cảm ơn!`;
                   <thead className={`${isDeviceFilterExpanded ? 'bg-[#0d9488]' : 'bg-[#b31448]'} text-white text-[10px] uppercase font-black tracking-wider sticky top-0 z-10`}>
                     <tr>
                       <th className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-12 text-center`}>STT</th>
-                      <th className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-32`}>Ngày thông tim</th>
-                      <th className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-48`}>Mã NB / Họ tên / Ngày sinh</th>
-                      <th className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-64`}>Chẩn đoán / ICD</th>
-                      <th className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} min-w-[150px]`}>{isDeviceFilterExpanded ? 'Dụng cụ dự kiến' : 'Kết quả Staff'}</th>
+                      <th
+                        onClick={() => handleFilterListSort('plannedDate')}
+                        className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-32 cursor-pointer select-none hover:brightness-110 transition`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Ngày thông tim</span>
+                          {renderFilterListSortIcon('plannedDate')}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleFilterListSort('name')}
+                        className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-48 cursor-pointer select-none hover:brightness-110 transition`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Mã NB / Họ tên / Ngày sinh</span>
+                          {renderFilterListSortIcon('name')}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleFilterListSort('diagnosis')}
+                        className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-64 cursor-pointer select-none hover:brightness-110 transition`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Chẩn đoán / ICD</span>
+                          {renderFilterListSortIcon('diagnosis')}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleFilterListSort(isDeviceFilterExpanded ? 'plannedDevice' : 'consultResult')}
+                        className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} min-w-[150px] cursor-pointer select-none hover:brightness-110 transition`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>{isDeviceFilterExpanded ? 'Dụng cụ dự kiến' : 'Kết quả Staff'}</span>
+                          {renderFilterListSortIcon(isDeviceFilterExpanded ? 'plannedDevice' : 'consultResult')}
+                        </div>
+                      </th>
                       {isDeviceFilterExpanded && (
                         <>
-                          <th className="p-3 border-b border-teal-700 w-48">Phòng mổ phản hồi</th>
-                          <th className="p-3 border-b border-teal-700 w-48">Phòng vật tư phản hồi</th>
+                          <th
+                            onClick={() => handleFilterListSort('operationFeedback')}
+                            className="p-3 border-b border-teal-700 w-48 cursor-pointer select-none hover:brightness-110 transition"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Phòng mổ phản hồi</span>
+                              {renderFilterListSortIcon('operationFeedback')}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleFilterListSort('supplyDepFeedback')}
+                            className="p-3 border-b border-teal-700 w-48 cursor-pointer select-none hover:brightness-110 transition"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Phòng vật tư phản hồi</span>
+                              {renderFilterListSortIcon('supplyDepFeedback')}
+                            </div>
+                          </th>
                         </>
                       )}
-                      <th className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-48`}>PTV (Chính - Phụ 1 - Phụ 2)</th>
+                      <th
+                        onClick={() => handleFilterListSort('ptv')}
+                        className={`p-3 border-b ${isDeviceFilterExpanded ? 'border-teal-700' : 'border-rose-800'} w-48 cursor-pointer select-none hover:brightness-110 transition`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>PTV (Chính - Phụ 1 - Phụ 2)</span>
+                          {renderFilterListSortIcon('ptv')}
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="text-[11px] font-bold text-slate-700 divide-y divide-slate-100">
-                    {(isDeviceFilterExpanded ? deviceFilteredConsults : exportFilteredConsults).map((c, idx) => {
+                    {(isDeviceFilterExpanded ? sortedDeviceFilteredConsults : sortedExportFilteredConsults).map((c, idx) => {
                       const p = findPatientByKey(patients, c.PatientKey);
                       const ptvList = [c.Scheduled1stInterventionist, c.Scheduled2ndInterventionist, c.Scheduled3rdInterventionist].filter(Boolean).join(' - ');
                       
@@ -4328,7 +4474,7 @@ Xin cảm ơn!`;
                         </tr>
                       );
                     })}
-                    {(isDeviceFilterExpanded ? deviceFilteredConsults : exportFilteredConsults).length === 0 && (
+                    {(isDeviceFilterExpanded ? sortedDeviceFilteredConsults : sortedExportFilteredConsults).length === 0 && (
                       <tr>
                         <td colSpan={isDeviceFilterExpanded ? 8 : 6} className="p-8 text-center text-slate-400 italic font-semibold">
                           Không có ca bệnh nào trong khoảng thời gian được chọn. Hãy chọn một khoảng thời gian khác ở bộ lọc bên phải.
@@ -4447,7 +4593,7 @@ Xin cảm ơn!`;
           {/* Device Export Panel */}
           <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isDeviceFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isDeviceFilterExpanded ? (
-               <div className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl" onClick={() => { setIsDeviceFilterExpanded(true); setIsFilterExpanded(false); }}>
+               <div className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl" onClick={() => { setIsDeviceFilterExpanded(true); setIsFilterExpanded(false); setMobileTab('calendar'); }}>
                  <div className="bg-slate-100 p-2.5 rounded-2xl text-slate-500 mb-6 hover:bg-[#0d9488] hover:text-white transition">
                    <Filter className="w-5 h-5" />
                  </div>
