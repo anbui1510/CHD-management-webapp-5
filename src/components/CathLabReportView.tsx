@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CathLab, Patient, Staff, Source, formatVNTime, findPatientByKey, removeDiacritics } from '../types';
 import { VNDateInput } from './VNDateInput';
+import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { 
   FileText, 
   Filter, 
@@ -72,12 +73,12 @@ function CathLabReportViewInner({
   const [toDate, setToDate] = useState<string>('');
   
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [diagnosisFilter, setDiagnosisFilter] = useState<string>('all');
-  const [methodFilter, setMethodFilter] = useState<string>('all');
-  const [primaryInterv, setPrimaryInterv] = useState<string>('all');
-  const [assistant1, setAssistant1] = useState<string>('all');
-  const [assistant2, setAssistant2] = useState<string>('all');
-  const [assistant3, setAssistant3] = useState<string>('all');
+  const [diagnosisFilters, setDiagnosisFilters] = useState<string[]>([]);
+  const [methodFilters, setMethodFilters] = useState<string[]>([]);
+  const [primaryIntervFilters, setPrimaryIntervFilters] = useState<string[]>([]);
+  const [assistant1Filters, setAssistant1Filters] = useState<string[]>([]);
+  const [assistant2Filters, setAssistant2Filters] = useState<string[]>([]);
+  const [assistant3Filters, setAssistant3Filters] = useState<string[]>([]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -163,24 +164,24 @@ function CathLabReportViewInner({
       }
 
       // 2. Diagnosis ID Filtering
-      if (diagnosisFilter !== 'all') {
+      if (diagnosisFilters.length > 0) {
         const d1 = c.DiagnosisID ? safeString(c.DiagnosisID).trim().toLowerCase() : '';
         const d2 = c.PostDiagnosisID ? safeString(c.PostDiagnosisID).trim().toLowerCase() : '';
-        const target = diagnosisFilter.trim().toLowerCase();
-        if (d1 !== target && d2 !== target) return false;
+        const targets = diagnosisFilters.map(item => item.trim().toLowerCase());
+        if (!targets.some(target => d1 === target || d2 === target)) return false;
       }
 
       // 3. Cath Method Filtering
-      if (methodFilter !== 'all') {
+      if (methodFilters.length > 0) {
         const parsed = parseCathMethods(c.CathMethod);
-        if (!parsed.includes(methodFilter)) return false;
+        if (!methodFilters.some(method => parsed.includes(method))) return false;
       }
 
       // 4. Interventionists Filtering
-      if (primaryInterv !== 'all' && safeString(c._1stInterventionist) !== primaryInterv) return false;
-      if (assistant1 !== 'all' && safeString(c._2ndInterventionist) !== assistant1) return false;
-      if (assistant2 !== 'all' && safeString(c._3rdInterventionist) !== assistant2) return false;
-      if (assistant3 !== 'all' && safeString(c._4thInterventionist) !== assistant3) return false;
+      if (primaryIntervFilters.length > 0 && !primaryIntervFilters.includes(safeString(c._1stInterventionist))) return false;
+      if (assistant1Filters.length > 0 && !assistant1Filters.includes(safeString(c._2ndInterventionist))) return false;
+      if (assistant2Filters.length > 0 && !assistant2Filters.includes(safeString(c._3rdInterventionist))) return false;
+      if (assistant3Filters.length > 0 && !assistant3Filters.includes(safeString(c._4thInterventionist))) return false;
 
       // 5. Search Query (Patient Name / ID)
       if (searchQuery.trim() !== '') {
@@ -197,8 +198,8 @@ function CathLabReportViewInner({
     });
   }, [
     safeCathlabs, safePatients, timeMode, yearFilter, monthFilter, quarterFilter, 
-    fromDate, toDate, diagnosisFilter, methodFilter, primaryInterv, 
-    assistant1, assistant2, assistant3, searchQuery
+    fromDate, toDate, diagnosisFilters, methodFilters, primaryIntervFilters, 
+    assistant1Filters, assistant2Filters, assistant3Filters, searchQuery
   ]);
 
   // Stats Calculation
@@ -280,12 +281,12 @@ function CathLabReportViewInner({
     setQuarterFilter('all');
     setFromDate('');
     setToDate('');
-    setDiagnosisFilter('all');
-    setMethodFilter('all');
-    setPrimaryInterv('all');
-    setAssistant1('all');
-    setAssistant2('all');
-    setAssistant3('all');
+    setDiagnosisFilters([]);
+    setMethodFilters([]);
+    setPrimaryIntervFilters([]);
+    setAssistant1Filters([]);
+    setAssistant2Filters([]);
+    setAssistant3Filters([]);
     setSearchQuery('');
     setCurrentPage(1);
   };
@@ -493,30 +494,28 @@ function CathLabReportViewInner({
 
             <div>
               <label className="block text-[10px] text-slate-400 mb-1">Bệnh chính (DiagnosisID)</label>
-              <select
-                value={diagnosisFilter}
-                onChange={(e) => { setDiagnosisFilter(e.target.value); setCurrentPage(1); }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
-              >
-                <option value="all">Tất cả bệnh chính</option>
-                {filterOptions.diagnoses.map(diag => (
-                  <option key={diag} value={diag}>{diag}</option>
-                ))}
-              </select>
+              <SearchableEnumSelect
+                options={filterOptions.diagnoses}
+                values={diagnosisFilters}
+                onMultiChange={(values) => { setDiagnosisFilters(values); setCurrentPage(1); }}
+                multiple
+                placeholder="Tất cả bệnh chính"
+                searchPlaceholder="Tìm mã ICD..."
+                className="text-xs"
+              />
             </div>
 
             <div>
               <label className="block text-[10px] text-slate-400 mb-1">Phương pháp can thiệp</label>
-              <select
-                value={methodFilter}
-                onChange={(e) => { setMethodFilter(e.target.value); setCurrentPage(1); }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
-              >
-                <option value="all">Tất cả phương pháp</option>
-                {filterOptions.methods.map(met => (
-                  <option key={met} value={met}>{met}</option>
-                ))}
-              </select>
+              <SearchableEnumSelect
+                options={filterOptions.methods}
+                values={methodFilters}
+                onMultiChange={(values) => { setMethodFilters(values); setCurrentPage(1); }}
+                multiple
+                placeholder="Tất cả phương pháp"
+                searchPlaceholder="Tìm phương pháp..."
+                className="text-xs"
+              />
             </div>
           </div>
 
@@ -529,58 +528,54 @@ function CathLabReportViewInner({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[10px] text-slate-400 mb-1">PTV Chính</label>
-                <select
-                  value={primaryInterv}
-                  onChange={(e) => { setPrimaryInterv(e.target.value); setCurrentPage(1); }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
-                >
-                  <option value="all">Tất cả</option>
-                  {filterOptions.primaryIntervs.map(ptv => (
-                    <option key={ptv} value={ptv}>{ptv}</option>
-                  ))}
-                </select>
+                <SearchableEnumSelect
+                  options={filterOptions.primaryIntervs}
+                  values={primaryIntervFilters}
+                  onMultiChange={(values) => { setPrimaryIntervFilters(values); setCurrentPage(1); }}
+                  multiple
+                  placeholder="Tất cả"
+                  searchPlaceholder="Tìm PTV..."
+                  className="text-xs"
+                />
               </div>
 
               <div>
                 <label className="block text-[10px] text-slate-400 mb-1">PTV Phụ 1</label>
-                <select
-                  value={assistant1}
-                  onChange={(e) => { setAssistant1(e.target.value); setCurrentPage(1); }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
-                >
-                  <option value="all">Tất cả</option>
-                  {filterOptions.assist1s.map(ptv => (
-                    <option key={ptv} value={ptv}>{ptv}</option>
-                  ))}
-                </select>
+                <SearchableEnumSelect
+                  options={filterOptions.assist1s}
+                  values={assistant1Filters}
+                  onMultiChange={(values) => { setAssistant1Filters(values); setCurrentPage(1); }}
+                  multiple
+                  placeholder="Tất cả"
+                  searchPlaceholder="Tìm PTV..."
+                  className="text-xs"
+                />
               </div>
 
               <div>
                 <label className="block text-[10px] text-slate-400 mb-1">PTV Phụ 2</label>
-                <select
-                  value={assistant2}
-                  onChange={(e) => { setAssistant2(e.target.value); setCurrentPage(1); }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
-                >
-                  <option value="all">Tất cả</option>
-                  {filterOptions.assist2s.map(ptv => (
-                    <option key={ptv} value={ptv}>{ptv}</option>
-                  ))}
-                </select>
+                <SearchableEnumSelect
+                  options={filterOptions.assist2s}
+                  values={assistant2Filters}
+                  onMultiChange={(values) => { setAssistant2Filters(values); setCurrentPage(1); }}
+                  multiple
+                  placeholder="Tất cả"
+                  searchPlaceholder="Tìm PTV..."
+                  className="text-xs"
+                />
               </div>
 
               <div>
                 <label className="block text-[10px] text-slate-400 mb-1">PTV Phụ 3</label>
-                <select
-                  value={assistant3}
-                  onChange={(e) => { setAssistant3(e.target.value); setCurrentPage(1); }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400 font-bold"
-                >
-                  <option value="all">Tất cả</option>
-                  {filterOptions.assist3s.map(ptv => (
-                    <option key={ptv} value={ptv}>{ptv}</option>
-                  ))}
-                </select>
+                <SearchableEnumSelect
+                  options={filterOptions.assist3s}
+                  values={assistant3Filters}
+                  onMultiChange={(values) => { setAssistant3Filters(values); setCurrentPage(1); }}
+                  multiple
+                  placeholder="Tất cả"
+                  searchPlaceholder="Tìm PTV..."
+                  className="text-xs"
+                />
               </div>
             </div>
           </div>
