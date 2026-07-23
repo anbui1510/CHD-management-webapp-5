@@ -241,13 +241,15 @@ export default function ResultStaffDrawer({
                 <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-4 md:p-6">
                 <div className="space-y-6">
                       
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch animate-in fade-in duration-300">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch animate-in fade-in duration-300 min-h-0">
                         
-                        {/* Khung 1: Bệnh nhi đang hội chẩn (Hành chính) */}
-                        <div className="lg:col-span-3 flex flex-col">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4.5 space-y-1 md:space-y-3 relative shadow-sm h-full flex flex-col justify-between">
+                        {/* Cột trái: Bệnh nhi (trên) + Thông tin hội chẩn (dưới) */}
+                        <div className="lg:col-span-5 flex flex-col gap-4 min-h-0">
+                        {/* Khung 1: Bệnh nhi đang hội chẩn (Hành chính) — phía trên */}
+                        <div className="flex flex-col shrink-0">
+                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-1 md:space-y-3 relative shadow-sm flex flex-col">
                             <div>
-                              <div className="hidden md:flex items-center border-b border-slate-100 pb-2">
+                              <div className="flex items-center border-b border-slate-100 pb-2">
                                 <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-slate-400">Bệnh nhi đang hội chẩn</span>
                               </div>
                               
@@ -315,7 +317,7 @@ export default function ResultStaffDrawer({
                                </div>
 
                               <PatientAdminEditButton
-                                className="hidden md:flex mx-auto"
+                                className="shrink-0"
                                 onClick={() => {
                                   onEditPatientAdmin(patient);
                                   handleClose();
@@ -325,10 +327,10 @@ export default function ResultStaffDrawer({
                           </div>
                         </div>
 
-                        {/* Khung 2: Thông tin hội chẩn */}
-                        <div className="lg:col-span-3 flex flex-col">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4.5 space-y-3 shadow-sm h-full flex flex-col justify-start">
-                            <span className="hidden md:block text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
+                        {/* Khung 2: Thông tin hội chẩn — phía dưới */}
+                        <div className="flex flex-col flex-1 min-h-0">
+                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-y-auto custom-scrollbar">
+                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
                             
                             {!isFormEditing ? (
                               <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium pt-1">
@@ -405,11 +407,12 @@ export default function ResultStaffDrawer({
                             )}
                           </div>
                         </div>
+                        </div>
 
-                        {/* Khung 3: Kết quả hội chẩn */}
-                        <div className="lg:col-span-6 flex flex-col">
-                          <div className="bg-indigo-50/20 border border-slate-200 rounded-3xl p-4.5 space-y-3 shadow-sm h-full">
-                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2">Kết quả hội chẩn</span>
+                        {/* Cột phải: Kết quả hội chẩn */}
+                        <div className="lg:col-span-7 flex flex-col min-h-0">
+                          <div className="bg-indigo-50/20 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col min-h-0 overflow-y-auto custom-scrollbar">
+                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2 shrink-0">Kết quả hội chẩn</span>
                             
                             {!isFormEditing ? (
                               <div className="space-y-3 text-[11px] text-slate-600 font-medium pt-1">
