@@ -1194,15 +1194,19 @@ Xin cảm ơn!`;
       }
 
       if (updates.length > 0) {
-        const promises = updates.map(u => 
-          fetch(`/api/consults/${u.consultKey}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(u.payload)
-          })
-        );
-        await Promise.all(promises);
-        onRefreshData();
+        updates.forEach(u => onPatchConsult?.(u.consultKey, u.payload));
+        void Promise.allSettled(
+          updates.map(u =>
+            fetch(`/api/consults/${u.consultKey}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(u.payload)
+            })
+          )
+        ).then(results => {
+          const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)).length;
+          if (failed > 0) onRefreshData();
+        });
         setErrorMsg(`Đã cập nhật dụng cụ xong ${updates.length} ca!`);
         setTimeout(() => setErrorMsg(''), 4000);
       } else {
@@ -1646,7 +1650,7 @@ Xin cảm ơn!`;
     setAdHocValidationMsg('');
   };
 
-  const activatePendingConsultForScheduling = async (pendingConsult: Consult) => {
+  const activatePendingConsultForScheduling = (pendingConsult: Consult) => {
     const overrideNote = `[Kích hoạt xếp lịch bổ sung - ${currentStaff?.StaffName || currentStaff?.StaffKey || 'user'} ${new Date().toISOString()}]`;
     const payload = {
       ConsultResultID: 'Can thiệp thông tim',
@@ -1658,103 +1662,103 @@ Xin cảm ơn!`;
         : overrideNote,
     };
 
-    const response = await fetch(`/api/consults/${pendingConsult.ConsultKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-      throw new Error('Không thể kích hoạt lượt hội chẩn');
-    }
-
-    // Phạt sẹo BS thư ký (BS. Tài) khi BS xếp lịch phải vượt quyền kích hoạt
-    try {
-      const bsTai = staffList?.find(s => {
-        const name = removeVietnameseTones(s.Name || '').toLowerCase();
-        const staffName = removeVietnameseTones(s.StaffName || '').toLowerCase();
-        return name.includes('tai') || staffName.includes('tai');
-      });
-      const keyTai = bsTai?.StaffKey || '01442';
-      const nameTai = bsTai?.StaffName || 'BS. Tài';
-
-      const pat = patients.find(p => p.PatientKey === pendingConsult.PatientKey);
-      const patName = pat?.PatientName || 'Bệnh nhi';
-      const patId = pat?.PatientID1 || '';
-
-      const markPayload = {
-        MarkKey: `mark_override_sched_${Date.now()}_tai`,
-        StaffKey: keyTai,
-        StaffName: nameTai,
-        MarkType: 'missing_staff_result' as const,
-        Score: 1,
-        Label: 'Trễ điền kết quả hội chẩn',
-        Reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do BS thư ký Tài chưa điền kết quả hội chẩn đúng hạn.`,
-        RelatedEntityType: 'Consult' as const,
-        RelatedEntityKey: pendingConsult.ConsultKey,
-        PatientKey: pendingConsult.PatientKey,
-        PatientID: patId,
-        PatientName: patName,
-        DedupKey: `override_sched_tai:${pendingConsult.ConsultKey}`,
-        CreatedBy: currentStaff?.StaffKey || 'SYSTEM',
-        CreatedTime: new Date().toISOString()
-      };
-
-      const markRes = await fetch('/api/doctor-performance-marks', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
-        },
-        body: JSON.stringify(markPayload)
-      });
-      if (!markRes.ok) {
-        console.error('Không thể ghi sẹo phạt BS Tài:', markPayload);
-      }
-
-      // Gửi Notification tương ứng cho BS Tài
-      const notifPayload = {
-        NotificationKey: `notif_override_sched_${Date.now()}_tai`,
-        StaffKey: keyTai,
-        StaffName: nameTai,
-        Title: 'Phạt sẹo workflow',
-        Message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do bạn chưa điền kết quả hội chẩn đúng hạn. Bạn bị phạt 1 sẹo.`,
-        Severity: 'warning',
-        RelatedEntityType: 'Consult' as const,
-        RelatedEntityKey: pendingConsult.ConsultKey,
-        PatientKey: pendingConsult.PatientKey,
-        PatientID: patId,
-        PatientName: patName,
-        DedupKey: `override_sched_tai_notif:${pendingConsult.ConsultKey}`,
-        IsRead: false,
-        CreatedTime: new Date().toISOString(),
-        ReadTime: ''
-      };
-
-      const notifRes = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
-        },
-        body: JSON.stringify(notifPayload)
-      });
-      if (!notifRes.ok) {
-        console.error('Không thể ghi thông báo phạt BS Tài:', notifPayload);
-      }
-    } catch (markErr) {
-      console.error('Lỗi khi lưu sẹo phạt BS Tài:', markErr);
-    }
-
     const mergedConsult = { ...pendingConsult, ...payload } as Consult;
+    onPatchConsult?.(pendingConsult.ConsultKey, payload as Partial<Consult>);
     setShowAdHocModal(false);
     handleClearSelectedPatient();
     resetAdHocFormFields();
     setAdHocPatientMode('existing');
     setActiveTab('unscheduled');
-    onRefreshData(true);
     applySelectConsult(mergedConsult);
     setSuccessMsg('Đã kích hoạt lượt hội chẩn và mở form Xếp lịch.');
     setTimeout(() => setSuccessMsg(''), 4000);
+
+    void fetch(`/api/consults/${pendingConsult.ConsultKey}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(err => {
+      console.error('Error activating consult in background:', err);
+      onRefreshData(true);
+    });
+
+    void (async () => {
+      try {
+        const bsTai = staffList?.find(s => {
+          const name = removeVietnameseTones(s.Name || '').toLowerCase();
+          const staffName = removeVietnameseTones(s.StaffName || '').toLowerCase();
+          return name.includes('tai') || staffName.includes('tai');
+        });
+        const keyTai = bsTai?.StaffKey || '01442';
+        const nameTai = bsTai?.StaffName || 'BS. Tài';
+
+        const pat = patients.find(p => p.PatientKey === pendingConsult.PatientKey);
+        const patName = pat?.PatientName || 'Bệnh nhi';
+        const patId = pat?.PatientID1 || '';
+
+        const markPayload = {
+          MarkKey: `mark_override_sched_${Date.now()}_tai`,
+          StaffKey: keyTai,
+          StaffName: nameTai,
+          MarkType: 'missing_staff_result' as const,
+          Score: 1,
+          Label: 'Trễ điền kết quả hội chẩn',
+          Reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do BS thư ký Tài chưa điền kết quả hội chẩn đúng hạn.`,
+          RelatedEntityType: 'Consult' as const,
+          RelatedEntityKey: pendingConsult.ConsultKey,
+          PatientKey: pendingConsult.PatientKey,
+          PatientID: patId,
+          PatientName: patName,
+          DedupKey: `override_sched_tai:${pendingConsult.ConsultKey}`,
+          CreatedBy: currentStaff?.StaffKey || 'SYSTEM',
+          CreatedTime: new Date().toISOString()
+        };
+
+        const markRes = await fetch('/api/doctor-performance-marks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+          },
+          body: JSON.stringify(markPayload)
+        });
+        if (!markRes.ok) {
+          console.error('Không thể ghi sẹo phạt BS Tài:', markPayload);
+        }
+
+        const notifPayload = {
+          NotificationKey: `notif_override_sched_${Date.now()}_tai`,
+          StaffKey: keyTai,
+          StaffName: nameTai,
+          Title: 'Phạt sẹo workflow',
+          Message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do bạn chưa điền kết quả hội chẩn đúng hạn. Bạn bị phạt 1 sẹo.`,
+          Severity: 'warning',
+          RelatedEntityType: 'Consult' as const,
+          RelatedEntityKey: pendingConsult.ConsultKey,
+          PatientKey: pendingConsult.PatientKey,
+          PatientID: patId,
+          PatientName: patName,
+          DedupKey: `override_sched_tai_notif:${pendingConsult.ConsultKey}`,
+          IsRead: false,
+          CreatedTime: new Date().toISOString(),
+          ReadTime: ''
+        };
+
+        const notifRes = await fetch('/api/notifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+          },
+          body: JSON.stringify(notifPayload)
+        });
+        if (!notifRes.ok) {
+          console.error('Không thể ghi thông báo phạt BS Tài:', notifPayload);
+        }
+      } catch (markErr) {
+        console.error('Lỗi khi lưu sẹo phạt BS Tài:', markErr);
+      }
+    })();
   };
 
   // Setup form fields on consult selection
@@ -1895,29 +1899,28 @@ Xin cảm ơn!`;
     setShowConfirmRemoveDialog(false);
   };
 
-  const handleConfirmRemove = async () => {
+  const handleConfirmRemove = () => {
     if (!selectedConsult) return;
-    setSaving(true);
+    const consultKey = selectedConsult.ConsultKey;
     setErrorMsg('');
     setSuccessMsg('');
-    try {
-      const response = await fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ CallStatus: callStatus })
-      });
-      if (!response.ok) {
-        throw new Error('Không thể cập nhật trạng thái loại bệnh nhân.');
-      }
-      setSuccessMsg(`Đã chuyển bệnh nhân sang trạng thái: ${callStatus}!`);
+    const patch = { CallStatus: callStatus };
+    onPatchConsult?.(consultKey, patch);
+    setSuccessMsg(`Đã chuyển bệnh nhân sang trạng thái: ${callStatus}!`);
+    setSelectedConsult(null);
+    setFormSnapshot(null);
+    setShowConfirmRemoveDialog(false);
+    setSaving(false);
+
+    fetch(`/api/consults/${consultKey}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).catch((err) => {
+      console.error('Error updating call status in background:', err);
+      setErrorMsg(err instanceof Error ? err.message : 'Lỗi khi loại bệnh nhân');
       onRefreshData();
-      setSelectedConsult(null);
-      setShowConfirmRemoveDialog(false);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi khi loại bệnh nhân');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const handleSaveAdHoc = async (e: React.FormEvent) => {
@@ -2078,7 +2081,6 @@ Xin cảm ơn!`;
         body: JSON.stringify(consultData)
       });
       if (!conRes.ok) throw new Error(await conRes.text() || 'Không thể thêm xếp lịch hội chẩn bổ sung');
-      onRefreshData();
     };
 
     persist()
@@ -2236,7 +2238,6 @@ Xin cảm ơn!`;
           const d = await response.json();
           throw new Error(d.error || 'Failed to update consult');
         }
-        onRefreshData();
       })
       .catch((err) => {
         console.error('Error saving consult in background:', err);
@@ -2320,57 +2321,42 @@ Xin cảm ơn!`;
 
     setSaving(true);
     if (currentAction.type === 'undo_scheduled' && currentAction.consultToUpdate) {
-      try {
-        const patch = { PlannedCathLabDate: '', TransferredToCathLab: false };
-        onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
-        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch)
-        });
-        if (response.ok) {
-           onRefreshData();
-           if (selectedConsult && selectedConsult.ConsultKey === currentAction.consultToUpdate.ConsultKey) {
-              setPlannedCathLabDate('');
-           }
-           setSuccessMsg('Đã rút ca về danh sách Chưa xếp lịch.');
-        } else {
-          throw new Error('Không thể rút ca về danh sách Chưa xếp lịch');
-        }
-      } catch (e) {
+      const patch = { PlannedCathLabDate: '', TransferredToCathLab: false };
+      onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
+      if (selectedConsult && selectedConsult.ConsultKey === currentAction.consultToUpdate.ConsultKey) {
+        setPlannedCathLabDate('');
+      }
+      setSuccessMsg('Đã rút ca về danh sách Chưa xếp lịch.');
+      setSaving(false);
+      fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }).catch(e => {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể rút ca về danh sách Chưa xếp lịch');
         onRefreshData();
-      }
+      });
     } else if (currentAction.type === 'transfer_row' && currentAction.consultToUpdate) {
-      try {
-        const patch = { TransferredToCathLab: true };
-        onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
-        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch)
-        });
-        if (response.ok) {
-           onRefreshData();
-           setSuccessMsg('Đã chuyển phòng thông tim. Ca vẫn được giữ trong Lịch thông tim dự kiến.');
-        } else {
-          throw new Error('Không thể chuyển phòng thông tim');
-        }
-      } catch (e) {
+      const patch = { TransferredToCathLab: true };
+      onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
+      setSuccessMsg('Đã chuyển phòng thông tim. Ca vẫn được giữ trong Lịch thông tim dự kiến.');
+      setSaving(false);
+      fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }).catch(e => {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể chuyển phòng thông tim');
         onRefreshData();
-      }
+      });
     } else if (currentAction.type === 'ad_hoc_override' && currentAction.consultToUpdate) {
-      try {
-        await activatePendingConsultForScheduling(currentAction.consultToUpdate);
-      } catch (err: any) {
-        console.error(err);
-        setErrorMsg(err.message || 'Không thể kích hoạt lượt hội chẩn');
-      }
+      activatePendingConsultForScheduling(currentAction.consultToUpdate);
+      setSaving(false);
+    } else {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const hasAdminField = (v?: string) => Boolean(v && String(v).trim() !== '' && v !== '-');

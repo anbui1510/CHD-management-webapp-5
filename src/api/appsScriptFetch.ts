@@ -541,6 +541,34 @@ const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): 
   return true;
 };
 
+const syncRecordToScript = (payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any }) => {
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) return;
+
+  const apiKey = getScriptSecret();
+  void fetchWithTimeout(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ ...payload, apiKey })
+  }).then(async (response) => {
+    const text = await response.text();
+    if (!response.ok) {
+      console.error(`Background upsert sync HTTP ${response.status}:`, text);
+      return;
+    }
+    try {
+      const result = JSON.parse(text);
+      if (result.status === 'error') {
+        console.error('Background upsert sync error:', result.message);
+      }
+    } catch {
+      console.error('Background upsert sync returned invalid JSON:', text);
+    }
+  }).catch((err) => {
+    console.error('Background upsert sync failed:', err);
+  });
+};
+
 const postToScript = async (
   payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any },
   config: (typeof endpointMap)[string],
@@ -661,17 +689,13 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   record[config.keyField] = finalKey;
 
   const isInsert = !(existing || isUpdate);
-  await postToScript(
-    {
-      type: config.type,
-      action: existing || isUpdate ? 'update' : 'insert',
-      key: String(finalKey),
-      data: record
-    },
-    config,
-    record,
-    isInsert
-  );
+  upsertCachedRecord(config, record, isInsert);
+  syncRecordToScript({
+    type: config.type,
+    action: existing || isUpdate ? 'update' : 'insert',
+    key: String(finalKey),
+    data: record
+  });
 
   return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
 };
