@@ -94,6 +94,7 @@ export interface ResultStaffDrawerProps {
   onEditPatientAdmin: (patient: Patient) => void;
   createDiagnosisSource: (DiagnosisID: string) => Promise<void>;
   triggerAlert: (message: string, title?: string) => void;
+  onSaveSuccess?: (message: string) => void;
   layout?: 'modal' | 'panel';
   autoEdit?: boolean;
 }
@@ -113,6 +114,7 @@ export default function ResultStaffDrawer({
   onEditPatientAdmin,
   createDiagnosisSource,
   triggerAlert,
+  onSaveSuccess,
   layout = 'modal',
   autoEdit = false
 }: ResultStaffDrawerProps) {
@@ -173,8 +175,8 @@ export default function ResultStaffDrawer({
 
     onPatchConsult(consultKey, finalData);
     if (!autoEdit) setIsEditing(false);
-    if (layout === 'modal') handleClose();
-    triggerAlert('Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi thành công!', 'Cập nhật thành công');
+    handleClose();
+    onSaveSuccess?.('Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi thành công!');
 
     let automaticOutcome: OutcomeType = '';
     if (formData.ConsultResultID === 'Can thiệp thông tim') {

@@ -93,9 +93,10 @@ interface StaffResultsViewProps {
   onEditPatientAdmin: (patient: Patient) => void;
   createDiagnosisSource: (DiagnosisID: string) => Promise<void>;
   triggerAlert: (message: string, title?: string) => void;
+  onSaveSuccess?: (message: string) => void;
 }
 
-export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert, onSaveSuccess }: StaffResultsViewProps) {
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -1038,6 +1039,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               onEditPatientAdmin={onEditPatientAdmin}
               createDiagnosisSource={createDiagnosisSource}
               triggerAlert={triggerAlert}
+              onSaveSuccess={onSaveSuccess}
             />
           </div>
         )}
@@ -1060,6 +1062,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           onEditPatientAdmin={onEditPatientAdmin}
           createDiagnosisSource={createDiagnosisSource}
           triggerAlert={triggerAlert}
+          onSaveSuccess={onSaveSuccess}
         />
       )}
 

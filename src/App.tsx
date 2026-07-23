@@ -546,6 +546,11 @@ export default function App() {
     setCustomAlert({ message, title });
   };
 
+  const showSuccessBanner = (message: string, durationMs = 4000) => {
+    setFormSuccessMessage(message);
+    setTimeout(() => setFormSuccessMessage(''), durationMs);
+  };
+
   const triggerConfirm = (message: string, onConfirm: () => void, title = 'Xác nhận', onCancel?: () => void) => {
     setCustomConfirm({ message, title, onConfirm, onCancel });
   };
@@ -3197,6 +3202,7 @@ export default function App() {
               onEditPatientAdmin={handleEditPatientAdmin}
               createDiagnosisSource={createDiagnosisSource}
               triggerAlert={triggerAlert}
+              onSaveSuccess={showSuccessBanner}
             />
           )}
 
