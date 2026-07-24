@@ -4,6 +4,7 @@ import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Pl
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceConsultResultOptions } from '../data/source';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { VNDateInput } from './VNDateInput';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ResultStaffDrawer from './ResultStaffDrawer';
@@ -1527,8 +1528,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán chi tiết *</label>
-                      <textarea
-                        rows={2}
+                      <MobileAutoExpandTextarea
+                        minRows={2}
                         required
                         placeholder="Nhập thông tin chẩn đoán chính, tình trạng bệnh lý mạch, van tim, shunt..."
                         value={detailDiagnosis}
@@ -1574,13 +1575,13 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kết quả chi tiết *</label>
-                      <textarea
-                        rows={2}
+                      <MobileAutoExpandTextarea
+                        minRows={2}
                         required
                         placeholder="Nhập phác đồ, chi tiết kết quả hoặc phương án xử trí chi tiết của hội đồng..."
                         value={detailConsultResult}
                         onChange={(e) => setDetailConsultResult(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold text-xs focus:outline-none text-slate-800 min-h-[50px]"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold text-xs focus:outline-none text-slate-800"
                       />
                     </div>
 
@@ -1592,7 +1593,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       consults={consults}
                       rows={2}
                       placeholder="vd: Amplatzer ADOII..."
-                      textareaClassName="w-full h-[46px] bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold focus:outline-none text-xs text-slate-800 font-mono resize-y"
+                      textareaClassName="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold focus:outline-none text-xs text-slate-800 font-mono"
                     />
 
                     <div>

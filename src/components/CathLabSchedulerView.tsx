@@ -20,6 +20,7 @@ import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceConsultResultOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { 
   ClipboardList, 
@@ -1951,8 +1952,8 @@ Xin cảm ơn!`;
     }
     setSelectedMethods(methods);
     
-    setPostCathDepart(c.PostCathDepart || '');
-    setScheduled1st(c.Scheduled1stInterventionist || '');
+    setPostCathDepart(c.PostCathDepart || (isMobile ? DEFAULT_AD_HOC_POST_CATH_DEPART : ''));
+    setScheduled1st(c.Scheduled1stInterventionist || (isMobile ? DEFAULT_AD_HOC_SCHEDULED_1ST : ''));
     
     const autoPtv2 = getAutoScheduled2nd(c.RequestBy || '');
     setScheduled2nd(autoPtv2 || c.Scheduled2ndInterventionist || '');
@@ -3763,25 +3764,27 @@ Xin cảm ơn!`;
                               ))}
                             </select>
                           </div>
-                          <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Cân nặng (kg)</label>
-                            <input
-                              type="text"
-                              placeholder="12.5"
-                              value={schedPatientWeight}
-                              onChange={(e) => setSchedPatientWeight(e.target.value)}
-                              className={`${schedInputCls} font-mono font-bold`}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chiều cao (cm)</label>
-                            <input
-                              type="text"
-                              placeholder="95"
-                              value={schedPatientHeight}
-                              onChange={(e) => setSchedPatientHeight(e.target.value)}
-                              className={`${schedInputCls} font-mono`}
-                            />
+                          <div className="grid grid-cols-2 gap-1.5 sm:col-span-2">
+                            <div>
+                              <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Cân nặng (kg)</label>
+                              <input
+                                type="text"
+                                placeholder="12.5"
+                                value={schedPatientWeight}
+                                onChange={(e) => setSchedPatientWeight(e.target.value)}
+                                className={`${schedInputCls} font-mono font-bold`}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chiều cao (cm)</label>
+                              <input
+                                type="text"
+                                placeholder="95"
+                                value={schedPatientHeight}
+                                onChange={(e) => setSchedPatientHeight(e.target.value)}
+                                className={`${schedInputCls} font-mono`}
+                              />
+                            </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-1 gap-1.5 pt-0.5">
@@ -3800,12 +3803,12 @@ Xin cảm ơn!`;
                           </div>
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chẩn đoán chi tiết</label>
-                            <textarea
-                              rows={2.5}
+                            <MobileAutoExpandTextarea
+                              minRows={2}
                               value={schedDetailDiagnosis}
                               onChange={(e) => setSchedDetailDiagnosis(e.target.value)}
                               placeholder="Nhập chẩn đoán chi tiết..."
-                              className={`${schedInputCls} leading-relaxed resize-y`}
+                              className={`${schedInputCls} leading-relaxed`}
                             />
                           </div>
                           <div>
@@ -3842,12 +3845,12 @@ Xin cảm ơn!`;
                           </div>
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Kết quả Hội chẩn chi tiết</label>
-                            <textarea
-                              rows={2.5}
+                            <MobileAutoExpandTextarea
+                              minRows={2}
                               value={schedDetailConsultResult}
                               onChange={(e) => setSchedDetailConsultResult(e.target.value)}
                               placeholder="Nhập kết quả hội chẩn chi tiết..."
-                              className={`${schedInputCls} leading-relaxed resize-y`}
+                              className={`${schedInputCls} leading-relaxed`}
                             />
                           </div>
                         </div>
@@ -3915,24 +3918,24 @@ Xin cảm ơn!`;
                     {/* Supply Dept feedback */}
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phòng vật tư phản hồi</label>
-                      <textarea
-                        rows={2}
+                      <MobileAutoExpandTextarea
+                        minRows={2}
                         placeholder="Ghi chú dụng cụ đặc thù, vật tư phản hồi..."
                         value={supplyDepFeedback}
                         onChange={(e) => setSupplyDepFeedback(e.target.value)}
-                        className="w-full bg-white border border-slate-250 rounded-xl px-2.5 py-1 focus:outline-none text-xs text-slate-800 font-semibold resize-y"
+                        className="w-full bg-white border border-slate-250 rounded-xl px-2.5 py-1 focus:outline-none text-xs text-slate-800 font-semibold"
                       />
                     </div>
 
                     {/* Operation Room feedback */}
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phòng mổ phản hồi</label>
-                      <textarea
-                        rows={2}
+                      <MobileAutoExpandTextarea
+                        minRows={2}
                         placeholder="Nếu có phản hồi từ phòng mổ, ghi nhận chi tiết tại đây..."
                         value={operationFeedback}
                         onChange={(e) => setOperationFeedback(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none text-xs text-slate-800 font-semibold resize-y"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none text-xs text-slate-800 font-semibold"
                       />
                     </div>
 
@@ -3975,8 +3978,8 @@ Xin cảm ơn!`;
                       {/* Call Note */}
                       <div className="md:col-span-2">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Lưu ý gọi bệnh</label>
-                        <textarea
-                          rows={2}
+                        <MobileAutoExpandTextarea
+                          minRows={2}
                           placeholder="Thông tin liên lạc hoặc lý do chưa can thiệp..."
                           value={callNote}
                           onChange={(e) => setCallNote(e.target.value)}
@@ -4012,7 +4015,7 @@ Xin cảm ơn!`;
                       )}
 
                       {/* Show scheduling controls ONLY if callStatus === 'Đồng ý' */}
-                      {callStatus === 'Đồng ý' && (
+                      {(isMobile || callStatus === 'Đồng ý') && (
                         <>
                           {/* Planned Cath Date (type="date") */}
                           <div>
@@ -4156,16 +4159,22 @@ Xin cảm ơn!`;
 
               {/* Mobile Save Footer Bar (Single scrollable row) */}
               <div className="flex lg:hidden items-center gap-1.5 p-2 bg-slate-50 border-t border-slate-200 overflow-x-auto whitespace-nowrap shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                {/* 1. Back button (moved from top) */}
                 <button
                   type="button"
                   onClick={handleCloseSchedulingView}
-                  className="bg-white hover:bg-slate-100 border border-slate-350 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center justify-center shrink-0 shadow-xs cursor-pointer"
+                  className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
                 >
-                  ←
+                  Đóng
                 </button>
 
-                {/* 2. Hồ sơ */}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10.5px] px-4 py-1.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? 'Đang lưu...' : 'Lưu'}
+                </button>
+
                 {(() => {
                   const pat = findPatientByKey(patients, selectedConsult.PatientKey);
                   if (!pat) return null;
@@ -4224,24 +4233,6 @@ Xin cảm ơn!`;
                   className="bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs hover:bg-sky-100 cursor-pointer"
                 >
                   Chuyển phòng TT
-                </button>
-
-                {/* 7. Đóng */}
-                <button
-                  type="button"
-                  onClick={handleCloseSchedulingView}
-                  className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
-                >
-                  Đóng
-                </button>
-
-                {/* 8. Lưu */}
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10.5px] px-4 py-1.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
-                >
-                  {saving ? 'Đang lưu...' : 'Lưu'}
                 </button>
               </div>
 
@@ -5580,13 +5571,13 @@ Xin cảm ơn!`;
                           </select>
                         ))}
                         {renderAdHocRow(`Chẩn đoán chi tiết *${adHocErrors.includes('DetailDiagnosis') ? ' !' : ''}`, (
-                          <textarea rows={2} required placeholder="Chẩn đoán chi tiết..." value={adHocDetailDiagnosis} onChange={(e) => setAdHocDetailDiagnosis(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                          <MobileAutoExpandTextarea minRows={2} required placeholder="Chẩn đoán chi tiết..." value={adHocDetailDiagnosis} onChange={(e) => setAdHocDetailDiagnosis(e.target.value)} className={adHocInputCls} />
                         ), { alignTop: true })}
                         {renderAdHocRow('Kết luận chính *', (
                           <SearchableEnumSelect required options={['Can thiệp thông tim', 'Chụp chẩn đoán +/- can thiệp', 'Chụp chẩn đoán/Đo kháng lực', 'Tiền Glenn', 'Tiền Fontan', 'Điện sinh lý', 'Mổ tim', 'Thêm CĐHA; vđ khác - Staff lại', 'Chưa có chỉ định - Theo dõi tiếp', 'Điều trị nội khoa - Hẹn staff lại', 'Quá chỉ định', 'Không có thông tin']} value={adHocConsultResultID} onChange={setAdHocConsultResultID} direction="up" placeholder="— Chọn kết luận —" searchPlaceholder="Gõ tìm..." />
                         ))}
                         {renderAdHocRow(`Kết quả chi tiết *${adHocErrors.includes('DetailConsultResult') ? ' !' : ''}`, (
-                          <textarea rows={2} placeholder="Kết quả chi tiết..." value={adHocDetailConsultResult} onChange={(e) => setAdHocDetailConsultResult(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                          <MobileAutoExpandTextarea minRows={2} placeholder="Kết quả chi tiết..." value={adHocDetailConsultResult} onChange={(e) => setAdHocDetailConsultResult(e.target.value)} className={adHocInputCls} />
                         ), { alignTop: true })}
 
                       </div>
@@ -5611,7 +5602,7 @@ Xin cảm ơn!`;
                             label=""
                             rows={2}
                             placeholder="Amplatzer ADOII..."
-                            textareaClassName={`${adHocInputCls} font-bold resize-y`}
+                            textareaClassName={`${adHocInputCls} font-bold`}
                           />
                         ), { alignTop: true })}
                         {renderAdHocRow('Dự trù kinh phí', (
@@ -5625,10 +5616,10 @@ Xin cảm ơn!`;
                           </select>
                         ))}
                         {renderAdHocRow('Phòng mổ phản hồi', (
-                          <textarea rows={1} placeholder="Phòng mổ phản hồi..." value={adHocOperationFeedback} onChange={(e) => setAdHocOperationFeedback(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                          <MobileAutoExpandTextarea minRows={2} placeholder="Phòng mổ phản hồi..." value={adHocOperationFeedback} onChange={(e) => setAdHocOperationFeedback(e.target.value)} className={adHocInputCls} />
                         ), { alignTop: true })}
                         {renderAdHocRow('Phòng vật tư phản hồi', (
-                          <textarea rows={1} placeholder="Phòng vật tư phản hồi..." value={adHocSupplyDepFeedback} onChange={(e) => setAdHocSupplyDepFeedback(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                          <MobileAutoExpandTextarea minRows={2} placeholder="Phòng vật tư phản hồi..." value={adHocSupplyDepFeedback} onChange={(e) => setAdHocSupplyDepFeedback(e.target.value)} className={adHocInputCls} />
                         ), { alignTop: true })}
                         {renderAdHocRow('Trạng thái gọi bệnh', (
                           <select value={adHocCallStatus} onChange={(e) => setAdHocCallStatus(e.target.value)} className={`${adHocSelectCls} text-[#d2145a]`}>
@@ -5637,7 +5628,7 @@ Xin cảm ơn!`;
                           </select>
                         ))}
                         {renderAdHocRow('Ghi chú gọi bệnh', (
-                          <textarea rows={1} placeholder="Ghi chú gọi bệnh..." value={adHocCallNote} onChange={(e) => setAdHocCallNote(e.target.value)} className={`${adHocInputCls} resize-y`} />
+                          <MobileAutoExpandTextarea minRows={2} placeholder="Ghi chú gọi bệnh..." value={adHocCallNote} onChange={(e) => setAdHocCallNote(e.target.value)} className={adHocInputCls} />
                         ), { alignTop: true })}
                         {renderAdHocRow('Ngày thông tim dự kiến', <VNDateInput value={adHocPlannedCathLabDate} onChange={setAdHocPlannedCathLabDate} className={`${adHocInputCls} font-sans font-bold`} />)}
                         {renderAdHocRow('Hỗ trợ tài chính', (

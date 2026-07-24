@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Wrench, X } from 'lucide-react';
 import type { Consult, DeviceTemplate } from '../types';
 import { normalizeDiagnosisID } from '../data/source';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 
 type PlannedDeviceSuggestion = {
   key: string;
@@ -22,6 +23,7 @@ type PlannedDeviceSuggestBoxProps = {
   rows?: number;
   required?: boolean;
   textareaClassName?: string;
+  autoExpandOnMobile?: boolean;
 };
 
 const normalizeText = (value?: unknown) =>
@@ -76,7 +78,8 @@ export function PlannedDeviceSuggestBox({
   placeholder = 'Nhập chi tiết dụng cụ dự kiến đầy đủ...',
   rows = 2,
   required = false,
-  textareaClassName = 'w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800 leading-normal resize-y'
+  textareaClassName = 'w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800 leading-normal resize-y',
+  autoExpandOnMobile = true
 }: PlannedDeviceSuggestBoxProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const normalizedDiagnosisID = normalizeDiagnosisID(diagnosisID);
@@ -171,14 +174,25 @@ export function PlannedDeviceSuggestBox({
       </div>
 
       <div className="relative">
-        <textarea
-          rows={rows}
-          required={required}
-          placeholder={placeholder}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={textareaClassName}
-        />
+        {autoExpandOnMobile ? (
+          <MobileAutoExpandTextarea
+            minRows={rows}
+            required={required}
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className={textareaClassName}
+          />
+        ) : (
+          <textarea
+            rows={rows}
+            required={required}
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className={textareaClassName}
+          />
+        )}
         <button
           type="button"
           onClick={() => setShowSuggestions(prev => !prev)}

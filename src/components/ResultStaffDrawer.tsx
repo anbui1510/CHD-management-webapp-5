@@ -22,6 +22,7 @@ import { getSourceDiagnosisOptions, getSourceConsultResultOptions } from '../dat
 import { getShortStaffName } from '../utils/staffNameMatch';
 import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -516,8 +517,8 @@ export default function ResultStaffDrawer({
 
                                 <div>
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Chẩn đoán chi tiết</label>
-                                  <textarea
-                                    rows={2}
+                                  <MobileAutoExpandTextarea
+                                    minRows={2}
                                     value={formData.DetailDiagnosis}
                                     onChange={(e) => setFormData(prev => ({ ...prev, DetailDiagnosis: e.target.value }))}
                                     className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs italic font-semibold leading-relaxed"
@@ -526,8 +527,8 @@ export default function ResultStaffDrawer({
 
                                 <div>
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Kết luận hội chẩn chi tiết</label>
-                                  <textarea
-                                    rows={2}
+                                  <MobileAutoExpandTextarea
+                                    minRows={2}
                                     required
                                     placeholder="vd: Thống nhất chỉ định mổ tim hở..."
                                     value={formData.DetailConsultResult}
