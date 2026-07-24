@@ -738,7 +738,14 @@ export default function App() {
       const hasSession = !!localStorage.getItem('CHD_AUTH_TOKEN');
       if (hasSession) {
         forceLogoutForAppUpdate();
+        return;
       }
+
+      sessionStorage.setItem(
+        CHD_DEPLOY_LOGOUT_MSG_KEY,
+        'Hệ thống vừa được cập nhật. Trang sẽ tải lại phiên bản mới.'
+      );
+      window.location.reload();
     };
 
     void checkVersion();
