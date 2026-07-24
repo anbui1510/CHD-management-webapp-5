@@ -76,6 +76,7 @@ interface CathLabSchedulerViewProps {
   onViewPatientRecord?: (patient: Patient) => void;
   pureCalendarMode?: boolean;
   onTogglePureMode?: () => void;
+  mobileLeaveGuardRef?: React.MutableRefObject<((next: () => void) => void) | null>;
 }
 
 const CATH_INTERVENTIONIST_DOCTORS = [
@@ -348,7 +349,8 @@ export default function CathLabSchedulerView({
   onAddConsult,
   onViewPatientRecord,
   pureCalendarMode = false,
-  onTogglePureMode
+  onTogglePureMode,
+  mobileLeaveGuardRef
 }: CathLabSchedulerViewProps) {
   const diagnosisOptions = useMemo(
     () => getSourceDiagnosisOptions(sources),
@@ -1897,6 +1899,35 @@ Xin cảm ơn!`;
     setExitConfirmOpen(true);
   };
 
+  const requestMobileTabChange = (
+    tab: 'waitlist' | 'calendar' | 'editor',
+    after?: () => void
+  ) => {
+    const action = () => {
+      setMobileTab(tab);
+      after?.();
+    };
+    if (isMobile && mobileTab === 'editor' && tab !== 'editor' && selectedConsult) {
+      requestCloseScheduling(action);
+      return;
+    }
+    action();
+  };
+
+  useEffect(() => {
+    if (!mobileLeaveGuardRef) return;
+    mobileLeaveGuardRef.current = (next) => {
+      if (isMobile && selectedConsult && mobileTab === 'editor') {
+        requestCloseScheduling(next);
+        return;
+      }
+      next();
+    };
+    return () => {
+      mobileLeaveGuardRef.current = null;
+    };
+  }, [isMobile, selectedConsult, mobileTab, mobileLeaveGuardRef, formSnapshot]);
+
   const handleCloseSchedulingView = () => {
     requestCloseScheduling(() => {
       setSelectedConsult(null);
@@ -2724,7 +2755,7 @@ Xin cảm ơn!`;
         )}
         <button
           type="button"
-          onClick={() => setMobileTab('waitlist')}
+          onClick={() => requestMobileTabChange('waitlist')}
           className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
             mobileTab === 'waitlist'
               ? 'bg-indigo-600 text-white shadow-xs'
@@ -2735,7 +2766,7 @@ Xin cảm ơn!`;
         </button>
         <button
           type="button"
-          onClick={() => setMobileTab('calendar')}
+          onClick={() => requestMobileTabChange('calendar')}
           className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
             mobileTab === 'calendar'
               ? 'bg-[#d2145a] text-white shadow-xs'
@@ -2747,7 +2778,7 @@ Xin cảm ơn!`;
         {selectedConsult && (
           <button
             type="button"
-            onClick={() => setMobileTab('editor')}
+            onClick={() => requestMobileTabChange('editor')}
             className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center gap-1 ${
               mobileTab === 'editor'
                 ? 'bg-emerald-600 text-white shadow-xs'
@@ -2778,7 +2809,7 @@ Xin cảm ơn!`;
               onClick={() => {
                 setIsDeviceFilterExpanded(true);
                 setIsFilterExpanded(false);
-                setMobileTab('calendar');
+                requestMobileTabChange('calendar');
               }}
               className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-[10.5px] font-black uppercase tracking-wider text-slate-700 active:bg-slate-100 transition shadow-xs cursor-pointer"
             >
@@ -4584,7 +4615,7 @@ Xin cảm ơn!`;
           {/* Device Export Panel */}
           <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isDeviceFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isDeviceFilterExpanded ? (
-               <div className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl" onClick={() => { setIsDeviceFilterExpanded(true); setIsFilterExpanded(false); setMobileTab('calendar'); }}>
+               <div className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl" onClick={() => { setIsDeviceFilterExpanded(true); setIsFilterExpanded(false); requestMobileTabChange('calendar'); }}>
                  <div className="bg-slate-100 p-2.5 rounded-2xl text-slate-500 mb-6 hover:bg-[#0d9488] hover:text-white transition">
                    <Filter className="w-5 h-5" />
                  </div>

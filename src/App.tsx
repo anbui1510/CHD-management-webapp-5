@@ -647,6 +647,7 @@ export default function App() {
   }, [refreshMedicalData]);
 
   const handleLogoutRef = useRef<(() => void) | null>(null);
+  const scheduleTtMobileLeaveGuardRef = useRef<((next: () => void) => void) | null>(null);
 
   const loadPublicStaffForLogin = useCallback(() => {
     setLoginLoadError('');
@@ -1009,29 +1010,44 @@ export default function App() {
     const isSettings = menuTarget === 'staff-mgmt:settings';
     const isGuide = menuTarget === 'staff-mgmt:guide';
     const menu = (isMarks || isSettings || isGuide) ? 'staff-mgmt' : menuTarget as typeof activeMenu;
-    if (isMarks) {
-      setStaffManagementInitialTab('marks');
-    } else if (isSettings) {
-      setStaffManagementInitialTab('settings');
-    } else if (isGuide) {
-      setStaffManagementInitialTab('guide');
-    } else if (menu === 'staff-mgmt') {
-      setStaffManagementInitialTab('edit');
-    }
-    if (menu === 'profile') {
-      setProfileReturnMenu(activeMenu === 'profile' ? 'home' : activeMenu);
-      setActiveMenu('profile');
-      setIsStaffAccountMenuOpen(false);
+
+    const performNavigation = () => {
+      if (isMarks) {
+        setStaffManagementInitialTab('marks');
+      } else if (isSettings) {
+        setStaffManagementInitialTab('settings');
+      } else if (isGuide) {
+        setStaffManagementInitialTab('guide');
+      } else if (menu === 'staff-mgmt') {
+        setStaffManagementInitialTab('edit');
+      }
+      if (menu === 'profile') {
+        setProfileReturnMenu(activeMenu === 'profile' ? 'home' : activeMenu);
+        setActiveMenu('profile');
+        setIsStaffAccountMenuOpen(false);
+        setIsMobileMoreMenuOpen(false);
+        return;
+      }
+      if (!canAccessModule(currentStaff, menu as AppModule)) {
+        triggerAlert('Bạn không có quyền truy cập module này.', 'Từ chối truy cập');
+        setActiveMenu('workspace');
+        return;
+      }
+      setActiveMenu(menu);
       setIsMobileMoreMenuOpen(false);
+    };
+
+    if (
+      isMobile &&
+      activeMenu === 'schedule-tt' &&
+      menu !== 'schedule-tt' &&
+      scheduleTtMobileLeaveGuardRef.current
+    ) {
+      scheduleTtMobileLeaveGuardRef.current(performNavigation);
       return;
     }
-    if (!canAccessModule(currentStaff, menu as AppModule)) {
-      triggerAlert('Bạn không có quyền truy cập module này.', 'Từ chối truy cập');
-      setActiveMenu('workspace');
-      return;
-    }
-    setActiveMenu(menu);
-    setIsMobileMoreMenuOpen(false);
+
+    performNavigation();
   };
 
   const normalizeMobileQuickTabs = (staff: Staff, loaded: ActiveMenuId[]): ActiveMenuId[] => {
@@ -3283,14 +3299,22 @@ export default function App() {
               staffList={staffList}
               currentStaff={currentStaff}
               pureCalendarMode={false}
+              mobileLeaveGuardRef={scheduleTtMobileLeaveGuardRef}
               onRefreshData={refreshClinicalData}
               onPatchConsult={patchConsult}
               onPatchPatient={patchPatient}
               onAddPatient={addPatient}
               onAddConsult={addConsult}
               onViewPatientRecord={(pat) => {
-                setActiveMenu('patients');
-                setSelectedPatientForDetail(pat);
+                const openPatientRecord = () => {
+                  setActiveMenu('patients');
+                  setSelectedPatientForDetail(pat);
+                };
+                if (isMobile && scheduleTtMobileLeaveGuardRef.current) {
+                  scheduleTtMobileLeaveGuardRef.current(openPatientRecord);
+                  return;
+                }
+                openPatientRecord();
               }}
             />
           )}
