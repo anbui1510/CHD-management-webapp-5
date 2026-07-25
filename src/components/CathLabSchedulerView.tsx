@@ -4983,13 +4983,21 @@ Xin cảm ơn!`;
               setTimeout(() => setCopied(false), 2000);
             };
 
+            const buildSummaryImageFileName = (pObj: Patient) => {
+              const patientId = String(pObj.PatientID1 || 'Unknown').trim();
+              const nameSlug = removeDiacritics(String(pObj.PatientName || '')).replace(/\s+/g, '');
+              return `${patientId}_${nameSlug}.png`;
+            };
+
             const handleCopyImage = async () => {
               const el = document.getElementById('screenshot-summary-card');
               if (!el) return;
               setIsCopyingImage(true);
 
               const handleBlobResult = async (blob: Blob, sourceCanvas?: HTMLCanvasElement) => {
-                const fileName = `TomTatXepLich_${pat.PatientID1 || pat.PatientName}.png`;
+                const fileName = isMobile
+                  ? buildSummaryImageFileName(pat)
+                  : `TomTatXepLich_${pat.PatientID1 || pat.PatientName}.png`;
 
                 if (isMobile && typeof navigator.share === 'function') {
                   try {
@@ -5126,7 +5134,7 @@ Xin cảm ơn!`;
                     
                     {/* Header of summary */}
                     <div className={`border-b-2 border-slate-800 ${isMobile ? 'pb-2' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}`}>
-                      <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[11px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
+                      <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[12px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
                         {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
                       </div>
                     </div>
@@ -5214,7 +5222,7 @@ Xin cảm ơn!`;
                             </div>
 
                             {(supplyDepFeedback || operationFeedback) && (
-                              <div className="bg-amber-50/20 border border-amber-200 p-1.5 rounded-lg text-[10px] text-amber-900 font-semibold leading-normal mt-1 truncate">
+                              <div className={`bg-amber-50/20 border border-amber-200 p-1.5 rounded-lg text-[10px] text-amber-900 font-semibold leading-normal mt-1 ${isMobile ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
                                 <span className="block font-black text-[8px] uppercase tracking-wider text-amber-800">Liên khoa phản hồi:</span>
                                 {[supplyDepFeedback, operationFeedback].filter(Boolean).join(' | ')}
                               </div>
