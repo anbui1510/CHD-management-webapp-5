@@ -57,6 +57,8 @@ import StaffAccountMenu from './components/StaffAccountMenu';
 import BellNotificationMenu from './components/BellNotificationMenu';
 import StaffProfileView from './components/StaffProfileView';
 import { useRefreshMedicalData, type MedicalDataLoadState } from './hooks/useRefreshMedicalData';
+import { useSheetsSyncStatus } from './hooks/useSheetsSyncStatus';
+import { appendSheetsSyncToSaveMessage, formatSheetsSyncStatusLabel } from './utils/sheetsSyncFeedback';
 import { AuthRequiredError } from './api/medicalDataRefresh';
 import { clearLocalCache } from './api/appsScriptFetch';
 import {
@@ -400,6 +402,7 @@ export default function App() {
   const [pendingConsultsCount, setPendingConsultsCount] = useState<number>(0);
   const [showAddConsult, setShowAddConsult] = useState<boolean>(false);
   const [formSuccessMessage, setFormSuccessMessage] = useState<string>('');
+  const [formSuccessWarning, setFormSuccessWarning] = useState(false);
 
 
   // Consult Outcome Results Form State — handled inside StaffResultsView (split panel)
@@ -427,6 +430,8 @@ export default function App() {
     medicalDataSetters,
     setMedicalDataLoadState
   );
+  const { status: sheetsSyncStatus, refreshStatus: refreshSheetsSyncStatus } = useSheetsSyncStatus(!!currentStaff?.StaffKey);
+  const sheetsSyncBadge = formatSheetsSyncStatusLabel(sheetsSyncStatus);
 
   const patchConsult = useCallback((consultKey: string, patch: Partial<Consult>) => {
     setConsults(prev => prev.map(c => (c.ConsultKey === consultKey ? { ...c, ...patch } : c)));
@@ -557,8 +562,23 @@ export default function App() {
   };
 
   const showSuccessBanner = (message: string, durationMs = 4000) => {
+    setFormSuccessWarning(false);
     setFormSuccessMessage(message);
     setTimeout(() => setFormSuccessMessage(''), durationMs);
+  };
+
+  const showSaveFeedback = (baseMessage: string, responseData: unknown, durationMs = 6000) => {
+    const { message, isWarning } = appendSheetsSyncToSaveMessage(baseMessage, responseData);
+    setFormSuccessWarning(isWarning);
+    setFormSuccessMessage(message);
+    void refreshSheetsSyncStatus();
+    setTimeout(() => {
+      setFormSuccessMessage('');
+      setFormSuccessWarning(false);
+    }, durationMs);
+    if (isWarning) {
+      triggerAlert(message, 'Lưu app OK — Google Sheets chưa xác nhận');
+    }
   };
 
   const triggerConfirm = (message: string, onConfirm: () => void, title = 'Xác nhận', onCancel?: () => void) => {
@@ -637,11 +657,13 @@ export default function App() {
 
   const refreshFullData = useCallback((force = false) => {
     if (force) {
-      void syncMedicalDataInBackground('full');
+      void syncMedicalDataInBackground('full')?.finally(() => {
+        void refreshSheetsSyncStatus();
+      });
       return;
     }
     void refreshMedicalData('full', false, { silent: true });
-  }, [refreshMedicalData, syncMedicalDataInBackground]);
+  }, [refreshMedicalData, syncMedicalDataInBackground, refreshSheetsSyncStatus]);
 
   const markNotificationRead = useCallback((notificationKey: string) => {
     setNotifications(prev =>
@@ -1192,9 +1214,8 @@ export default function App() {
         PatientPhone2: '',
         Outcome: ''
       });
-      setFormSuccessMessage(isEdit ? 'Cập nhật hồ sơ hành chính thành công!' : 'Thêm bệnh nhi CHD mới thành công!');
-      setTimeout(() => setFormSuccessMessage(''), 3000);
-
+      setFormSuccessMessage('');
+      setFormSuccessWarning(false);
       const url = isEdit ? `/api/patients/${patientKey}` : '/api/patients';
       const method = isEdit ? 'PUT' : 'POST';
 
@@ -1207,7 +1228,13 @@ export default function App() {
           if (!res.ok) throw new Error('Không thể lưu hồ sơ bệnh nhi');
           return res.json();
         })
-        .then(() => refreshConsultData())
+        .then(data => {
+          showSaveFeedback(
+            isEdit ? 'Cập nhật hồ sơ hành chính thành công' : 'Thêm bệnh nhi CHD mới thành công',
+            data
+          );
+          return refreshConsultData();
+        })
         .catch(err => {
           console.error(err);
           triggerAlert(err instanceof Error ? err.message : 'Không thể lưu hồ sơ bệnh nhi', 'Lỗi lưu');
@@ -1309,10 +1336,8 @@ export default function App() {
       setShowAddDocInput(false);
       setCustomDocVal('');
       setPendingConsultsCount(0);
-      setFormSuccessMessage('Đã gửi thông tin đăng ký Hội chẩn thành công lên hệ thống!');
       setShowAddConsult(false);
       setActiveMenu('consult-list');
-      setTimeout(() => setFormSuccessMessage(''), 4000);
 
       fetch('/api/consults', {
         method: 'POST',
@@ -1323,7 +1348,10 @@ export default function App() {
           if (!res.ok) throw new Error('Không thể đăng ký hội chẩn');
           return res.json();
         })
-        .then(() => refreshConsultData())
+        .then(data => {
+          showSaveFeedback('Đã gửi thông tin đăng ký hội chẩn thành công', data);
+          return refreshConsultData();
+        })
         .catch(err => {
           console.error(err);
           triggerAlert(err instanceof Error ? err.message : 'Không thể đăng ký hội chẩn', 'Lỗi lưu');
@@ -1361,7 +1389,6 @@ export default function App() {
     const consultKey = editingRegConsultKey;
     patchConsult(consultKey, editConsultData);
     setEditingRegConsultKey(null);
-    triggerAlert('Đã cập nhật thông tin đăng ký staff thành công!', 'Cập nhật thành công');
 
     fetch(`/api/consults/${consultKey}`, {
       method: 'PUT',
@@ -1372,7 +1399,10 @@ export default function App() {
         if (!res.ok) throw new Error('Không thể cập nhật đăng ký staff');
         return res.json();
       })
-      .then(() => refreshConsultData())
+      .then(data => {
+        showSaveFeedback('Đã cập nhật thông tin đăng ký staff', data);
+        return refreshConsultData();
+      })
       .catch(err => {
         console.error(err);
         triggerAlert(err instanceof Error ? err.message : 'Không thể cập nhật đăng ký staff', 'Lỗi lưu');
@@ -2051,14 +2081,30 @@ export default function App() {
           {/* Right Panel: CHD MANAGEMENT V5.0, circular Admin avatar, Log out */}
           <div className="flex items-center gap-2 shrink-0">
             
-            {/* Sync trigger icon */}
+            {/* Sync trigger — bấm để kéo dữ liệu mới từ Google Sheets */}
             <button 
               onClick={() => refreshFullData(true)}
-              className="hover:bg-white/10 p-1.5 rounded-xl transition flex items-center gap-1 text-xs shrink-0"
-              title="Đồng bộ lại"
+              className="hover:bg-white/10 px-2 py-1.5 rounded-xl transition flex items-center gap-1 text-[10px] font-bold shrink-0 border border-white/20"
+              title="Đồng bộ lại dữ liệu từ Google Sheets"
             >
               <RefreshCw className="w-3.5 h-3.5 text-white/90" />
+              <span className="hidden sm:inline">Đồng bộ</span>
             </button>
+
+            <span
+              className={`hidden sm:inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide border ${
+                sheetsSyncBadge.tone === 'ok'
+                  ? 'bg-emerald-500/20 border-emerald-200/40 text-emerald-50'
+                  : sheetsSyncBadge.tone === 'error'
+                    ? 'bg-rose-500/25 border-rose-200/40 text-rose-50'
+                    : sheetsSyncBadge.tone === 'warn'
+                      ? 'bg-amber-500/25 border-amber-200/40 text-amber-50'
+                      : 'bg-white/10 border-white/20 text-white/80'
+              }`}
+              title={sheetsSyncBadge.title}
+            >
+              {sheetsSyncBadge.label}
+            </span>
 
             {/* Title: CHD MANAGEMENT V5.0 */}
             <div className="hidden md:flex items-center gap-1 text-xs font-black tracking-tight text-white/90">
@@ -2111,8 +2157,8 @@ export default function App() {
 
       {/* Hero success/error notifications */}
       {formSuccessMessage && (
-        <div className="bg-green-600 text-white text-center py-2 text-xs font-bold shadow-inner">
-          ✓ {formSuccessMessage}
+        <div className={`text-white text-center py-2 text-xs font-bold shadow-inner ${formSuccessWarning ? 'bg-amber-600' : 'bg-green-600'}`}>
+          {formSuccessWarning ? '⚠ ' : '✓ '}{formSuccessMessage}
         </div>
       )}
 

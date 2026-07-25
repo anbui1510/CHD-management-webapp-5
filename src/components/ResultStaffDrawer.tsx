@@ -22,7 +22,7 @@ import { getSourceDiagnosisOptions, getSourceConsultResultOptions } from '../dat
 import { getShortStaffName } from '../utils/staffNameMatch';
 import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
-import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
+import { appendSheetsSyncToSaveMessage } from '../utils/sheetsSyncFeedback';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -240,6 +240,7 @@ export default function ResultStaffDrawer({
         const d = await response.json().catch(() => ({}));
         throw new Error(d.error || 'Không thể lưu kết quả hội chẩn');
       }
+      const savedData = await response.json();
 
       if (consult.PatientKey && automaticOutcome) {
         onPatchPatient(consult.PatientKey, { Outcome: automaticOutcome });
@@ -250,10 +251,17 @@ export default function ResultStaffDrawer({
         });
       }
       onRefreshData();
-      onSaveSuccess?.('Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi thành công!');
+      const { message, isWarning } = appendSheetsSyncToSaveMessage(
+        'Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi',
+        savedData
+      );
       if (options?.closeOnSuccess !== false) {
         forceClose();
       }
+      if (isWarning) {
+        triggerAlert(message, 'Lưu app OK — Google Sheets chưa xác nhận');
+      }
+      onSaveSuccess?.(message);
       return true;
     } catch (err) {
       console.error(err);
