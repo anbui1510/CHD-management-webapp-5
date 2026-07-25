@@ -67,10 +67,15 @@ import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToS
 import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
+  CHD_BUILD_MISMATCH_RELOAD_KEY,
   CHD_DEPLOY_LOGOUT_MSG_KEY,
+  activateWaitingServiceWorker,
   fetchRemoteAppBuildId,
   isAppBuildIdMismatch,
+  markDeployReload,
+  shouldBlockDeployReload,
 } from './appVersion';
+import { useForegroundPushAlerts } from './hooks/useForegroundPushAlerts';
 import {
   createLatestDiagnosisResolver,
 } from './utils/latestDiagnosis';
@@ -309,6 +314,7 @@ export default function App() {
   const [mobileQuickTabIds, setMobileQuickTabIds] = useState<ActiveMenuId[]>(DEFAULT_MOBILE_QUICK_SLOTS);
   const isMobile = useIsMobile();
   const webPush = useWebPush(currentStaff?.StaffKey);
+  useForegroundPushAlerts(notifications, currentStaff?.StaffKey, webPush.subscribed);
 
   // Collapsible Filter Panel State
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
@@ -744,12 +750,14 @@ export default function App() {
     });
   }, [refreshMedicalData]);
 
-  const forceLogoutForAppUpdate = useCallback(() => {
+  const applyAppUpdate = useCallback(async () => {
+    if (shouldBlockDeployReload()) return;
+    markDeployReload();
     sessionStorage.setItem(
       CHD_DEPLOY_LOGOUT_MSG_KEY,
-      'Hệ thống vừa được cập nhật trên Cloudflare. Vui lòng đăng nhập lại để sử dụng phiên bản mới.'
+      'Hệ thống vừa cập nhật phiên bản mới. Trang sẽ tải lại — bạn vẫn giữ phiên đăng nhập.'
     );
-    handleLogoutRef.current?.();
+    await activateWaitingServiceWorker();
     window.location.reload();
   }, []);
 
@@ -762,17 +770,16 @@ export default function App() {
 
     const storedBuildId = localStorage.getItem(CHD_APP_BUILD_ID_KEY);
     if (isAppBuildIdMismatch(storedBuildId)) {
-      localStorage.removeItem('CHD_AUTH_TOKEN');
-      localStorage.removeItem('CHD_AUTH_STAFF_KEY');
-      localStorage.removeItem('CurrentStaffKey');
-      localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
-      setAuthToken('');
-      setCurrentStaff(null);
-      if (!deployMsg) {
-        setLoginLoadError('Hệ thống vừa cập nhật phiên bản mới. Vui lòng đăng nhập lại.');
+      if (!sessionStorage.getItem(CHD_BUILD_MISMATCH_RELOAD_KEY)) {
+        sessionStorage.setItem(CHD_BUILD_MISMATCH_RELOAD_KEY, '1');
+        markDeployReload();
+        void activateWaitingServiceWorker().finally(() => {
+          window.location.reload();
+        });
+        return;
       }
-      loadPublicStaffForLogin();
-      return;
+      sessionStorage.removeItem(CHD_BUILD_MISMATCH_RELOAD_KEY);
+      localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
     }
 
     // Recover logged-in session via server token or cookie
@@ -806,34 +813,35 @@ export default function App() {
     }
   }, [handleAuthDataFailure, loadMedicalDataAfterAuth, loadPublicStaffForLogin]);
 
-  // Detect new Cloudflare deploy while app is open → force logout + reload
+  // Detect new Cloudflare deploy while app is open → reload once for new bundle
   useEffect(() => {
     let cancelled = false;
 
     const checkVersion = async () => {
       const remoteBuildId = await fetchRemoteAppBuildId();
       if (cancelled || !remoteBuildId || remoteBuildId === APP_BUILD_ID) return;
-
-      const hasSession = !!localStorage.getItem('CHD_AUTH_TOKEN');
-      if (hasSession) {
-        forceLogoutForAppUpdate();
-        return;
-      }
-
-      sessionStorage.setItem(
-        CHD_DEPLOY_LOGOUT_MSG_KEY,
-        'Hệ thống vừa được cập nhật. Trang sẽ tải lại phiên bản mới.'
-      );
-      window.location.reload();
+      if (shouldBlockDeployReload()) return;
+      void applyAppUpdate();
     };
 
     void checkVersion();
-    const interval = setInterval(() => { void checkVersion(); }, 2 * 60 * 1000);
+    const interval = setInterval(() => { void checkVersion(); }, 5 * 60 * 1000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [forceLogoutForAppUpdate]);
+  }, [applyAppUpdate]);
+
+  // Refresh data when user returns to the app (helps after deploy / background)
+  useEffect(() => {
+    if (!currentStaff?.StaffKey) return;
+    const onVisible = () => {
+      if (document.hidden) return;
+      void refreshMedicalData('full', false, { silent: true }).catch(() => undefined);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [currentStaff?.StaffKey, refreshMedicalData]);
 
   // Background Clinical Data Polling (Refresh every 60 seconds when logged in)
   useEffect(() => {

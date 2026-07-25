@@ -3,6 +3,10 @@ import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 
 declare const self: ServiceWorkerGlobalScope;
 
+self.addEventListener('install', () => {
+  void self.skipWaiting();
+});
+
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
