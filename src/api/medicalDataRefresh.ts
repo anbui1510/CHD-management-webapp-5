@@ -70,10 +70,22 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
   }
 
   const url = force ? '/api/all?force=true' : '/api/all';
-  const res = await fetch(url, {
-    headers: authHeaders(token),
-    signal: AbortSignal.timeout(20000)
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: authHeaders(token),
+      signal: controller.signal
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Không tải được dữ liệu sau 20 giây — kiểm tra mạng hoặc bấm Đồng bộ lại.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (res.status === 401) {
     localStorage.removeItem('CHD_AUTH_TOKEN');
     throw new AuthRequiredError();

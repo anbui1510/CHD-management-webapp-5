@@ -510,7 +510,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
     const data = await response.json() as any;
 
     if (data && (Array.isArray(data.patients) || Array.isArray(data.consults) || Array.isArray(data.staff) || Array.isArray(data.cathlabs) || Array.isArray(data.operations) || Array.isArray(data.cmrs) || Array.isArray(data.transplants) || Array.isArray(data.sources) || Array.isArray(data.deviceTemplates) || Array.isArray(data.rolePresets) || Array.isArray(data.notifications) || Array.isArray(data.doctorPerformanceMarks))) {
-      if (Array.isArray(data.patients)) {
+      if (Array.isArray(data.patients) && data.patients.length > 0) {
         const currentPatients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
         const pMap = new Map();
         data.patients.forEach((p: any, i: number) => {
@@ -542,7 +542,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         preserveRecentLocalRecords(pMap, 'Patient', record => record.PatientKey);
         writeDB(PATIENTS_FILE, Array.from(pMap.values()));
       }
-      if (Array.isArray(data.consults)) {
+      if (Array.isArray(data.consults) && data.consults.length > 0) {
         const currentConsults = readDB(CONSULTS_FILE, []);
         const currentMap = new Map();
         currentConsults.forEach(c => currentMap.set((c as any).ConsultKey, c));
@@ -1870,9 +1870,17 @@ function runWorkflowMonitor() {
 
 app.get('/api/all', requireAuth, async (req, res) => {
   const force = String(req.query.force || '') === 'true';
-  void syncFromGoogleSheets(force).catch(err => {
-    console.warn('Background sync failed:', err);
-  });
+  if (force) {
+    try {
+      await syncFromGoogleSheets(true);
+    } catch (err) {
+      console.warn('Force sync failed:', err);
+    }
+  } else {
+    void syncFromGoogleSheets(false).catch(err => {
+      console.warn('Background sync failed:', err);
+    });
+  }
   const config = getSyncConfig();
   const rawStaff = readDB<Staff>(STAFF_FILE, defaultStaff);
   res.json({

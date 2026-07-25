@@ -711,7 +711,20 @@ export default function App() {
     const tick = () => setMedicalLoadElapsedSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
+    const safetyTimer = setTimeout(() => {
+      setMedicalDataLoadState(prev => {
+        if (prev.phase !== 'loading' && prev.phase !== 'syncing') return prev;
+        return {
+          phase: 'error',
+          startedAt: null,
+          message: 'Đồng bộ quá lâu — dữ liệu có thể chưa cập nhật. Bấm nút Đồng bộ trên header để thử lại.'
+        };
+      });
+    }, 25000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(safetyTimer);
+    };
   }, [medicalDataLoadState.phase, medicalDataLoadState.startedAt]);
 
   const loadPublicStaffForLogin = useCallback(() => {
