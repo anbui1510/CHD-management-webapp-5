@@ -9,6 +9,8 @@ import { VNDateInput } from './VNDateInput';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ResultStaffDrawer from './ResultStaffDrawer';
 import { SortColumnIcon } from './SortColumnIcon';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
 
 const DEFAULT_CONCLUSION_OPTIONS = [
   "Can thiệp thông tim",
@@ -99,6 +101,7 @@ interface StaffResultsViewProps {
 }
 
 export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert, onSaveSuccess }: StaffResultsViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
@@ -411,11 +414,15 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       setSubmitLoading(false);
 
       const persist = async () => {
+        const syncContext = buildSyncContext('results-staff', {
+          patientName: newPatName || patients.find(p => p.PatientKey === finalPatientKey)?.PatientName,
+          patientKey: finalPatientKey
+        });
         if (patientMode === 'create') {
           const patRes = await fetch('/api/patients', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+            body: JSON.stringify(withSyncContext({
               PatientKey: finalPatientKey,
               PatientID1: String(newPatID1 || '').trim(),
               PatientID2: String(newPatID2 || '').trim(),
@@ -429,23 +436,26 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               PatientCreateBy: currentStaff?.StaffKey || '01378',
               PatientCreateTime: new Date().toISOString(),
               Outcome: automaticOutcome
-            })
+            }, syncContext))
           });
           if (!patRes.ok) throw new Error('Không thể đăng ký bệnh nhi mới');
+          reportMutationResponse(await patRes.json(), { baseMessage: 'Đã đăng ký bệnh nhi mới' });
         } else if (automaticOutcome) {
           const patRes = await fetch(`/api/patients/${finalPatientKey}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ Outcome: automaticOutcome })
+            body: JSON.stringify(withSyncContext({ Outcome: automaticOutcome }, syncContext))
           });
           if (!patRes.ok) throw new Error('Không thể cập nhật trạng thái bệnh nhi');
+          reportMutationResponse(await patRes.json(), { baseMessage: 'Đã cập nhật trạng thái bệnh nhi' });
         }
         const conRes = await fetch('/api/consults', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(consultPayload)
+          body: JSON.stringify(withSyncContext(consultPayload, syncContext))
         });
         if (!conRes.ok) throw new Error('Không thể đăng ký kết quả hội chẩn');
+        reportMutationResponse(await conRes.json(), { baseMessage: 'Đã đăng ký kết quả staff bổ sung' });
         onRefreshData?.();
       };
 
@@ -499,11 +509,21 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
     const results = await Promise.allSettled(
       uniqueKeys.map(async (key) => {
-        const res = await fetch(`/api/consults/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        const consult = consults.find(c => c.ConsultKey === key);
+        const patient = consult ? findPatientByKey(patients, consult.PatientKey) : undefined;
+        const res = await fetch(`/api/consults/${encodeURIComponent(key)}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(withSyncContext({}, buildSyncContext('results-staff', {
+            patientName: patient?.PatientName,
+            patientKey: consult?.PatientKey
+          })))
+        });
         if (!res.ok) {
           const errText = await res.text();
           throw new Error(errText || `HTTP ${res.status}`);
         }
+        reportMutationResponse(await res.json(), { baseMessage: 'Đã xóa đăng ký staff' });
       })
     );
 
@@ -518,7 +538,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       onRefreshData?.();
       alert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.`);
     }
-  }, [onRemoveConsult, onRemoveConsults, onRefreshData]);
+  }, [consults, onRemoveConsult, onRemoveConsults, onRefreshData, patients, reportMutationResponse]);
 
   useEffect(() => {
     setSelectedDeleteKeys(new Set());

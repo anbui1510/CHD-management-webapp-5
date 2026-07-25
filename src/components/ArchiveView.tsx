@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Search, ArrowUpDown, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { findPatientByKey, formatVNTime, removeDiacritics } from '../types';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 type ArchiveTab = 'transferred' | 'archive';
 
@@ -23,6 +25,7 @@ export default function ArchiveView({
   triggerConfirm,
   initialTab = 'archive'
 }: ArchiveViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<ArchiveTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOldest, setSortOldest] = useState(false);
@@ -77,16 +80,16 @@ export default function ArchiveView({
     if (!triggerConfirm) return;
     triggerConfirm('Bạn có chắc chắn muốn hoàn tác chuyển ca này không?', () => {
       const patch = { TransferredToCathLab: false };
+      const patient = findPatientByKey(patients, c.PatientKey);
       onPatchConsult?.(c.ConsultKey, patch);
-      fetch(`/api/consults/${c.ConsultKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('Không thể hoàn tác');
-          onRefreshData();
-        })
+      persistWithSheetsSync(
+        reportMutationResponse,
+        `/api/consults/${c.ConsultKey}`,
+        { method: 'PUT', body: JSON.stringify(patch) },
+        buildSyncContext('archive', { patientName: patient?.PatientName, patientKey: c.PatientKey }),
+        { baseMessage: 'Đã hoàn tác chuyển ca' }
+      )
+        .then(() => onRefreshData())
         .catch(err => {
           console.error(err);
           onRefreshData();
@@ -105,16 +108,16 @@ export default function ArchiveView({
         TransferredToCathLab: false,
         Removed: false
       };
+      const patient = findPatientByKey(patients, c.PatientKey);
       onPatchConsult?.(c.ConsultKey, patch);
-      fetch(`/api/consults/${c.ConsultKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('Không thể hoàn tác lưu trữ');
-          onRefreshData();
-        })
+      persistWithSheetsSync(
+        reportMutationResponse,
+        `/api/consults/${c.ConsultKey}`,
+        { method: 'PUT', body: JSON.stringify(patch) },
+        buildSyncContext('archive', { patientName: patient?.PatientName, patientKey: c.PatientKey }),
+        { baseMessage: 'Đã hoàn tác lưu trữ' }
+      )
+        .then(() => onRefreshData())
         .catch(err => {
           console.error(err);
           onRefreshData();

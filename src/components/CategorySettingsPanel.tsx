@@ -18,6 +18,8 @@ import {
   getSourceConsultResultOptions,
   getSourceDiagnosisOptions,
 } from '../data/source';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 interface CategorySettingsPanelProps {
   sources: Source[];
@@ -37,6 +39,7 @@ export default function CategorySettingsPanel({
   triggerAlert,
   triggerConfirm,
 }: CategorySettingsPanelProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   // 1. Initial State from sources
   const initialProvinces = useMemo(() => getSourceProvinceOptions(sources), [sources]);
   const initialDiagnoses = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
@@ -187,23 +190,23 @@ export default function CategorySettingsPanel({
   const handleSaveAll = async () => {
     setSaving(true);
     try {
-      const response = await fetch('/api/sources/update-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          PatientAddress: provinces,
-          DiagnosisID: diagnoses,
-          ResultConsultID: consultResults,
-          CathMethod: cathMethods,
-          diagnosisRenames,
-        }),
-      });
+      await persistWithSheetsSync(
+        reportMutationResponse,
+        '/api/sources/update-all',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            PatientAddress: provinces,
+            DiagnosisID: diagnoses,
+            ResultConsultID: consultResults,
+            CathMethod: cathMethods,
+            diagnosisRenames,
+          })
+        },
+        buildSyncContext('staff-mgmt', { viewLabel: 'Cài đặt danh mục' }),
+        { baseMessage: 'Đã lưu danh mục cấu hình' }
+      );
 
-      if (!response.ok) {
-        throw new Error('Lỗi từ máy chủ khi lưu cấu hình danh mục');
-      }
-
-      triggerAlert?.('Đã lưu và đồng bộ danh mục cấu hình thành công lên Google Sheets!', 'Lưu thành công');
       setDiagnosisRenames([]);
       onRefreshData();
     } catch (err) {

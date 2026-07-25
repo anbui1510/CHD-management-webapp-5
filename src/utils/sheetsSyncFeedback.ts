@@ -15,6 +15,8 @@ export type SheetsSyncStatus = {
   lastPushMessage: string;
 };
 
+export const SHEETS_SUCCESS_MESSAGE = 'Đã ghi lên Google Sheets';
+
 export function extractSheetsSync(data: unknown): SheetsSyncMeta | undefined {
   if (!data || typeof data !== 'object') return undefined;
   const sync = (data as { _sheetsSync?: SheetsSyncMeta })._sheetsSync;
@@ -22,24 +24,41 @@ export function extractSheetsSync(data: unknown): SheetsSyncMeta | undefined {
   return sync;
 }
 
+export function evaluateSheetsSync(data: unknown): {
+  kind: 'success' | 'failure' | 'local_only' | 'none';
+  message: string;
+} {
+  const sync = extractSheetsSync(data);
+  if (!sync) {
+    return { kind: 'none', message: '' };
+  }
+  if (!sync.configured) {
+    return { kind: 'local_only', message: sync.message };
+  }
+  if (sync.ok) {
+    return { kind: 'success', message: SHEETS_SUCCESS_MESSAGE };
+  }
+  return { kind: 'failure', message: sync.message };
+}
+
 export function appendSheetsSyncToSaveMessage(
   base: string,
   data: unknown
 ): { message: string; isWarning: boolean } {
-  const sync = extractSheetsSync(data);
-  if (!sync) {
-    return {
-      message: `${base} (đã lưu trên máy chủ app — chưa xác nhận Google Sheets)`,
-      isWarning: false
-    };
+  const evaluation = evaluateSheetsSync(data);
+  if (evaluation.kind === 'success') {
+    return { message: SHEETS_SUCCESS_MESSAGE, isWarning: false };
   }
-  if (!sync.configured) {
-    return { message: `${base}. ${sync.message}`, isWarning: false };
+  if (evaluation.kind === 'failure') {
+    return { message: `${base} — ${evaluation.message}`, isWarning: true };
   }
-  if (sync.ok) {
-    return { message: `${base} ✓ ${sync.message}`, isWarning: false };
+  if (evaluation.kind === 'local_only') {
+    return { message: `${base}. ${evaluation.message}`, isWarning: false };
   }
-  return { message: `${base} ⚠ ${sync.message}`, isWarning: true };
+  return {
+    message: `${base} (đã lưu trên máy chủ app — chưa xác nhận Google Sheets)`,
+    isWarning: false
+  };
 }
 
 export function formatSheetsSyncStatusLabel(status: SheetsSyncStatus | null): {
@@ -58,7 +77,7 @@ export function formatSheetsSyncStatusLabel(status: SheetsSyncStatus | null): {
     return {
       label: 'Sheets: chưa liên kết',
       tone: 'muted',
-      title: 'Chưa cấu hình URL Apps Script — dữ liệu chỉ lưu trên máy chủ app'
+      title: 'Chưa cấu hình URL Apps Script — dữ liệu chỉ lưu trên app'
     };
   }
   if (!status.lastPushOk || !status.lastPullOk) {

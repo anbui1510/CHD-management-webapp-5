@@ -18,6 +18,8 @@ import {
 } from '../types';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { VNDateInput } from './VNDateInput';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 interface MRIResultViewProps {
   patients: Patient[];
@@ -64,6 +66,7 @@ export default function MRIResultView({
   onPatchCmr,
   onEditPatientAdmin
 }: MRIResultViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<ResultTab>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -201,15 +204,17 @@ export default function MRIResultView({
     onPatchCmr?.(key, payload);
     closeItem();
 
-    fetch(`/api/cmrs/${encodeURIComponent(key)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Không lưu được kết quả MRI (server trả lỗi)');
-        onRefreshData();
-      })
+    persistWithSheetsSync(
+      reportMutationResponse,
+      `/api/cmrs/${encodeURIComponent(key)}`,
+      { method: 'PUT', body: JSON.stringify(payload) },
+      buildSyncContext('mri-result', {
+        patientName: selectedItem.__patient?.PatientName,
+        patientKey: selectedItem.PatientKey
+      }),
+      { baseMessage: 'Đã lưu kết quả MRI' }
+    )
+      .then(() => onRefreshData())
       .catch((err: any) => {
         console.error(err);
         const msg = err?.message || '';

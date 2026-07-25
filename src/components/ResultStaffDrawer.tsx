@@ -22,7 +22,8 @@ import { getSourceDiagnosisOptions, getSourceConsultResultOptions } from '../dat
 import { getShortStaffName } from '../utils/staffNameMatch';
 import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
-import { appendSheetsSyncToSaveMessage } from '../utils/sheetsSyncFeedback';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -119,6 +120,7 @@ export default function ResultStaffDrawer({
   layout = 'modal',
   autoEdit = false
 }: ResultStaffDrawerProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ResultFormState | null>(null);
   const [formSnapshot, setFormSnapshot] = useState<ResultFormState | null>(null);
@@ -231,10 +233,14 @@ export default function ResultStaffDrawer({
     }
 
     try {
+      const syncContext = buildSyncContext('results-staff', {
+        patientName: patient?.PatientName || consult.PatientKey,
+        patientKey: consult.PatientKey
+      });
       const response = await fetch(`/api/consults/${consultKey}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalData)
+        body: JSON.stringify(withSyncContext(finalData, syncContext))
       });
       if (!response.ok) {
         const d = await response.json().catch(() => ({}));
@@ -244,24 +250,26 @@ export default function ResultStaffDrawer({
 
       if (consult.PatientKey && automaticOutcome) {
         onPatchPatient(consult.PatientKey, { Outcome: automaticOutcome });
-        await fetch(`/api/patients/${consult.PatientKey}`, {
+        const patientRes = await fetch(`/api/patients/${consult.PatientKey}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ Outcome: automaticOutcome })
+          body: JSON.stringify(withSyncContext({ Outcome: automaticOutcome }, buildSyncContext('results-staff', {
+            patientName: patient?.PatientName,
+            patientKey: consult.PatientKey
+          })))
         });
+        if (patientRes.ok) {
+          reportMutationResponse(await patientRes.json(), { baseMessage: 'Đã cập nhật trạng thái bệnh nhi' });
+        }
       }
       onRefreshData();
-      const { message, isWarning } = appendSheetsSyncToSaveMessage(
-        'Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi',
-        savedData
-      );
+      reportMutationResponse(savedData, {
+        baseMessage: 'Đã cập nhật chỉ định kết quả hội chẩn'
+      });
       if (options?.closeOnSuccess !== false) {
         forceClose();
       }
-      if (isWarning) {
-        triggerAlert(message, 'Lưu app OK — Google Sheets chưa xác nhận');
-      }
-      onSaveSuccess?.(message);
+      onSaveSuccess?.('Đã ghi lên Google Sheets');
       return true;
     } catch (err) {
       console.error(err);

@@ -32,6 +32,8 @@ import {
   openTransplantFile,
   readFileAsDataUrl,
 } from './transplant/transplantUtils';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 const ADDRESS_OPTIONS = [
   'TP Hồ Chí Minh', 'TP Hà Nội', 'Gia Lai', 'Đắk Lắk', 'Khánh Hoà', 'An Giang',
@@ -119,6 +121,7 @@ export default function TransplantRegisterModal({
   onAddTransplant,
   triggerAlert,
 }: TransplantRegisterModalProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [patientMode, setPatientMode] = useState<'select' | 'create'>('select');
   const [searchPatQuery, setSearchPatQuery] = useState('');
   const [selectedPatKey, setSelectedPatKey] = useState('');
@@ -173,28 +176,33 @@ export default function TransplantRegisterModal({
     setSaving(true);
     try {
       let patientKey = selectedPatKey;
+      let patientName = selectedPatient?.PatientName;
       if (patientMode === 'create') {
-        const patRes = await fetch('/api/patients', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            PatientID1: newPatient.PatientID1.trim(),
-            PatientName: newPatient.PatientName.trim(),
-            PatientDOB: newPatient.PatientDOB.trim(),
-            PatientSex: newPatient.PatientSex,
-            PatientAddress: newPatient.PatientAddress,
-            PatientPhone1: newPatient.PatientPhone1.trim(),
-            PatientID2: '',
-            OtherPatientName: '',
-            PatientPhone2: '',
-            PatientCreateBy: currentStaff?.StaffKey || '',
-            PatientCreateTime: new Date().toISOString(),
-            Outcome: '',
-          }),
-        });
-        if (!patRes.ok) throw new Error('Tạo bệnh nhi thất bại.');
-        const createdPat = await patRes.json();
+        const createdPat = await persistWithSheetsSync<Patient>(
+          reportMutationResponse,
+          '/api/patients',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              PatientID1: newPatient.PatientID1.trim(),
+              PatientName: newPatient.PatientName.trim(),
+              PatientDOB: newPatient.PatientDOB.trim(),
+              PatientSex: newPatient.PatientSex,
+              PatientAddress: newPatient.PatientAddress,
+              PatientPhone1: newPatient.PatientPhone1.trim(),
+              PatientID2: '',
+              OtherPatientName: '',
+              PatientPhone2: '',
+              PatientCreateBy: currentStaff?.StaffKey || '',
+              PatientCreateTime: new Date().toISOString(),
+              Outcome: '',
+            })
+          },
+          buildSyncContext('heart-transplant', { patientName: newPatient.PatientName.trim() }),
+          { baseMessage: 'Đã tạo bệnh nhi mới' }
+        );
         patientKey = createdPat.PatientKey || '';
+        patientName = createdPat.PatientName;
         onAddPatient?.(createdPat);
       }
       if (!patientKey) throw new Error('Không xác định được bệnh nhi.');
@@ -208,13 +216,13 @@ export default function TransplantRegisterModal({
         TransUpdateBy: currentStaff?.StaffKey || '',
         TransStatus: form.TransStatus || TRANS_STATUS_NOT_READY,
       };
-      const res = await fetch('/api/transplants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Lưu đăng ký ghép tim thất bại.');
-      const saved = await res.json();
+      const saved = await persistWithSheetsSync<Transplant>(
+        reportMutationResponse,
+        '/api/transplants',
+        { method: 'POST', body: JSON.stringify(payload) },
+        buildSyncContext('heart-transplant', { patientName, patientKey }),
+        { baseMessage: 'Đã lưu đăng ký ghép tim' }
+      );
       await onAddTransplant(saved);
       setSuccessMsg('Đã lưu đăng ký ghép tim!');
       setTimeout(onClose, 900);

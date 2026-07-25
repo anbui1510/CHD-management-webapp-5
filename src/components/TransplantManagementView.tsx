@@ -52,6 +52,8 @@ import {
   type TransplantSortField,
 } from './transplant/transplantUtils';
 import { exportTransplantExcel } from './transplant/transplantExcelExport';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 interface TransplantManagementViewProps {
   patients: Patient[];
@@ -83,6 +85,7 @@ export default function TransplantManagementView({
   onEditPatientAdmin,
   triggerAlert,
 }: TransplantManagementViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<StatusTab>('notReady');
   const [searchQuery, setSearchQuery] = useState('');
   const [showRegister, setShowRegister] = useState(false);
@@ -162,15 +165,18 @@ export default function TransplantManagementView({
         TransUpdateTime: new Date().toISOString(),
         TransUpdateBy: currentStaff?.StaffKey || detailForm.TransUpdateBy,
       };
-      const res = await fetch(`/api/transplants/${encodeURIComponent(selectedItem.TransKey)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const syncContext = buildSyncContext('heart-transplant', {
+        patientName: selectedItem.__patient?.PatientName,
+        patientKey: selectedItem.PatientKey
       });
-      if (!res.ok) throw new Error('Lưu thất bại');
-      const saved = await res.json();
+      const saved = await persistWithSheetsSync<Transplant>(
+        reportMutationResponse,
+        `/api/transplants/${encodeURIComponent(selectedItem.TransKey)}`,
+        { method: 'PUT', body: JSON.stringify(payload) },
+        syncContext,
+        { baseMessage: 'Đã lưu hồ sơ ghép tim' }
+      );
       await onPatchTransplant(selectedItem.TransKey, saved);
-      triggerAlert?.('Đã lưu hồ sơ ghép tim.', 'Thành công');
       onRefreshData();
     } catch {
       triggerAlert?.('Lưu thất bại.', 'Lỗi');
@@ -181,8 +187,20 @@ export default function TransplantManagementView({
 
   const handleDelete = async (key: string) => {
     try {
-      const res = await fetch(`/api/transplants/${encodeURIComponent(key)}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Xóa thất bại');
+      const item = enriched.find(r => r.TransKey === key);
+      await persistWithSheetsSync(
+        reportMutationResponse,
+        `/api/transplants/${encodeURIComponent(key)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({})
+        },
+        buildSyncContext('heart-transplant', {
+          patientName: item?.__patient?.PatientName,
+          patientKey: item?.PatientKey
+        }),
+        { baseMessage: 'Đã xóa hồ sơ ghép tim' }
+      );
       await onDeleteTransplant(key);
       if (selectedKey === key) setSelectedKey('');
       setDeleteConfirmKey('');

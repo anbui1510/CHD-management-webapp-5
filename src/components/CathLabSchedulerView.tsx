@@ -23,6 +23,8 @@ import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { SortColumnIcon } from './SortColumnIcon';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { 
   ClipboardList, 
   Search, 
@@ -355,6 +357,29 @@ export default function CathLabSchedulerView({
   onTogglePureMode,
   mobileLeaveGuardRef
 }: CathLabSchedulerViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
+
+  const getSyncContextForConsult = useCallback((patientKey?: string) => {
+    const patient = patientKey ? findPatientByKey(patients, patientKey) : undefined;
+    return buildSyncContext('schedule-tt', {
+      patientName: patient?.PatientName,
+      patientKey: patient?.PatientKey || patientKey
+    });
+  }, [patients]);
+
+  const persistConsultUpdate = useCallback((
+    consultKey: string,
+    payload: Partial<Consult>,
+    patientKey?: string,
+    baseMessage = 'Đã cập nhật xếp lịch'
+  ) => persistWithSheetsSync(
+    reportMutationResponse,
+    `/api/consults/${consultKey}`,
+    { method: 'PUT', body: JSON.stringify(payload) },
+    getSyncContextForConsult(patientKey || String(payload.PatientKey || '')),
+    { baseMessage }
+  ), [getSyncContextForConsult, reportMutationResponse]);
+
   const diagnosisOptions = useMemo(
     () => getSourceDiagnosisOptions(sources),
     [sources]
@@ -372,15 +397,13 @@ export default function CathLabSchedulerView({
     const trimmed = normalizeDiagnosisID(DiagnosisID);
     if (!trimmed) return;
 
-    const response = await fetch('/api/sources', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ DiagnosisID: trimmed })
-    });
-
-    if (!response.ok) {
-      throw new Error('Không thể thêm DiagnosisID vào Source');
-    }
+    await persistWithSheetsSync(
+      reportMutationResponse,
+      '/api/sources',
+      { method: 'POST', body: JSON.stringify({ DiagnosisID: trimmed }) },
+      buildSyncContext('schedule-tt', { viewLabel: 'Xếp lịch dụng cụ' }),
+      { baseMessage: 'Đã thêm mã chẩn đoán' }
+    );
 
     onRefreshData();
   };
@@ -1306,15 +1329,17 @@ Xin cảm ơn!`;
       if (updates.length > 0) {
         updates.forEach(u => onPatchConsult?.(u.consultKey, u.payload));
         void Promise.allSettled(
-          updates.map(u =>
-            fetch(`/api/consults/${u.consultKey}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(u.payload)
-            })
-          )
+          updates.map(u => {
+            const consult = consults.find(c => c.ConsultKey === u.consultKey);
+            return persistConsultUpdate(
+              u.consultKey,
+              u.payload,
+              consult?.PatientKey,
+              'Đã cập nhật dụng cụ từ Excel'
+            );
+          })
         ).then(results => {
-          const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)).length;
+          const failed = results.filter(r => r.status === 'rejected').length;
           if (failed > 0) onRefreshData();
         });
         setErrorMsg(`Đã cập nhật dụng cụ xong ${updates.length} ca!`);
@@ -1787,11 +1812,12 @@ Xin cảm ơn!`;
     setSuccessMsg('Đã kích hoạt lượt hội chẩn và mở form Xếp lịch.');
     setTimeout(() => setSuccessMsg(''), 4000);
 
-    void fetch(`/api/consults/${pendingConsult.ConsultKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).catch(err => {
+    void persistConsultUpdate(
+      pendingConsult.ConsultKey,
+      payload as Partial<Consult>,
+      pendingConsult.PatientKey,
+      'Đã kích hoạt lượt hội chẩn'
+    ).catch(err => {
       console.error('Error activating consult in background:', err);
       onRefreshData(true);
     });
@@ -1828,17 +1854,23 @@ Xin cảm ơn!`;
           CreatedTime: new Date().toISOString()
         };
 
-        const markRes = await fetch('/api/doctor-performance-marks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
-          },
-          body: JSON.stringify(markPayload)
+        const schedSyncContext = buildSyncContext('schedule-tt', {
+          patientName: patName,
+          patientKey: pendingConsult.PatientKey,
+          patientID: patId
         });
-        if (!markRes.ok) {
-          console.error('Không thể ghi sẹo phạt BS Tài:', markPayload);
-        }
+
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          '/api/doctor-performance-marks',
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}` },
+            body: JSON.stringify(markPayload)
+          },
+          schedSyncContext,
+          { baseMessage: 'Đã ghi sẹo phạt BS Tài' }
+        );
 
         const notifPayload = {
           NotificationKey: `notif_override_sched_${Date.now()}_tai`,
@@ -1846,7 +1878,7 @@ Xin cảm ơn!`;
           StaffName: nameTai,
           Title: 'Phạt sẹo workflow',
           Message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do bạn chưa điền kết quả hội chẩn đúng hạn. Bạn bị phạt 1 sẹo.`,
-          Severity: 'warning',
+          Severity: 'warning' as const,
           RelatedEntityType: 'Consult' as const,
           RelatedEntityKey: pendingConsult.ConsultKey,
           PatientKey: pendingConsult.PatientKey,
@@ -1858,17 +1890,17 @@ Xin cảm ơn!`;
           ReadTime: ''
         };
 
-        const notifRes = await fetch('/api/notifications', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          '/api/notifications',
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}` },
+            body: JSON.stringify(notifPayload)
           },
-          body: JSON.stringify(notifPayload)
-        });
-        if (!notifRes.ok) {
-          console.error('Không thể ghi thông báo phạt BS Tài:', notifPayload);
-        }
+          schedSyncContext,
+          { baseMessage: 'Đã ghi thông báo phạt BS Tài' }
+        );
       } catch (markErr) {
         console.error('Lỗi khi lưu sẹo phạt BS Tài:', markErr);
       }
@@ -2055,11 +2087,12 @@ Xin cảm ơn!`;
     setShowConfirmRemoveDialog(false);
     setSaving(false);
 
-    fetch(`/api/consults/${consultKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch)
-    }).catch((err) => {
+    void persistConsultUpdate(
+      consultKey,
+      patch,
+      selectedConsult?.PatientKey,
+      'Đã cập nhật trạng thái gọi bệnh'
+    ).catch((err) => {
       console.error('Error updating call status in background:', err);
       setErrorMsg(err instanceof Error ? err.message : 'Lỗi khi loại bệnh nhân');
       onRefreshData();
@@ -2202,28 +2235,32 @@ Xin cảm ơn!`;
     setShowAdHocModal(false);
 
     const persist = async () => {
+      const syncContext = getSyncContextForConsult(patientKey);
       if (adHocPatientMode === 'new') {
-        const patRes = await fetch('/api/patients', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patientData)
-        });
-        if (!patRes.ok) throw new Error(await patRes.text() || 'Không thể thêm mới hành chính bệnh nhi');
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          '/api/patients',
+          { method: 'POST', body: JSON.stringify(patientData) },
+          syncContext,
+          { baseMessage: 'Đã thêm bệnh nhi mới' }
+        );
       } else {
-        const patRes = await fetch(`/api/patients/${adHocSelectedPatientKey}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patientData)
-        });
-        if (!patRes.ok) throw new Error(await patRes.text() || 'Không thể cập nhật hành chính bệnh nhi');
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          `/api/patients/${adHocSelectedPatientKey}`,
+          { method: 'PUT', body: JSON.stringify(patientData) },
+          syncContext,
+          { baseMessage: 'Đã cập nhật hành chính bệnh nhi' }
+        );
       }
 
-      const conRes = await fetch('/api/consults', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(consultData)
-      });
-      if (!conRes.ok) throw new Error(await conRes.text() || 'Không thể thêm xếp lịch hội chẩn bổ sung');
+      await persistWithSheetsSync(
+        reportMutationResponse,
+        '/api/consults',
+        { method: 'POST', body: JSON.stringify(consultData) },
+        syncContext,
+        { baseMessage: 'Đã thêm xếp lịch hội chẩn bổ sung' }
+      );
     };
 
     persist()
@@ -2371,23 +2408,17 @@ Xin cảm ơn!`;
     setSaving(false);
 
     // Run fetch in the background to be instantaneous
-    fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedData)
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          const d = await response.json();
-          throw new Error(d.error || 'Failed to update consult');
-        }
-      })
-      .catch((err) => {
-        console.error('Error saving consult in background:', err);
-        const msg = err.message || 'Error saving data';
-        setErrorMsg(`Lỗi khi đồng bộ dữ liệu: ${msg}`);
-        onRefreshData();
-      });
+    void persistConsultUpdate(
+      selectedConsult.ConsultKey,
+      updatedData,
+      selectedConsult.PatientKey,
+      isTransfer ? 'Đã chuyển phòng thông tim' : 'Đã lưu thông tin xếp lịch'
+    ).catch((err) => {
+      console.error('Error saving consult in background:', err);
+      const msg = err instanceof Error ? err.message : 'Error saving data';
+      setErrorMsg(`Lỗi khi đồng bộ dữ liệu: ${msg}`);
+      onRefreshData();
+    });
 
     return true;
   };
@@ -2492,11 +2523,12 @@ Xin cảm ơn!`;
       }
       setSuccessMsg('Đã rút ca về danh sách Chưa xếp lịch.');
       setSaving(false);
-      fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
-      }).catch(e => {
+      void persistConsultUpdate(
+        currentAction.consultToUpdate.ConsultKey,
+        patch,
+        currentAction.consultToUpdate.PatientKey,
+        'Đã rút ca về danh sách Chưa xếp lịch'
+      ).catch(e => {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể rút ca về danh sách Chưa xếp lịch');
         onRefreshData();
@@ -2510,11 +2542,12 @@ Xin cảm ơn!`;
         setSuccessMsg('Đã chuyển phòng thông tim thành công!');
       }
       setSaving(false);
-      fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
-      }).catch(e => {
+      void persistConsultUpdate(
+        currentAction.consultToUpdate.ConsultKey,
+        patch,
+        currentAction.consultToUpdate.PatientKey,
+        'Đã chuyển phòng thông tim'
+      ).catch(e => {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể chuyển phòng thông tim');
         onRefreshData();
@@ -2527,11 +2560,12 @@ Xin cảm ơn!`;
       }
       setWaitlistBannerMsg('Đã loại bệnh nhân khỏi danh sách.');
       setSaving(false);
-      fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
-      }).catch(e => {
+      void persistConsultUpdate(
+        currentAction.consultToUpdate.ConsultKey,
+        patch,
+        currentAction.consultToUpdate.PatientKey,
+        'Đã loại bệnh nhân khỏi danh sách'
+      ).catch(e => {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể loại bệnh nhân');
         onRefreshData();

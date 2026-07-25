@@ -306,6 +306,32 @@ export interface Notification {
   ReadTime?: string;
 }
 
+/** Client gửi kèm mutation body để server ghi log lỗi đồng bộ Sheets */
+export interface SheetsSyncContext {
+  viewModule?: string;
+  viewLabel?: string;
+  patientName?: string;
+  patientKey?: string;
+  patientID?: string;
+}
+
+/** Lỗi ghi Google Sheets chưa thành công — lưu trên server để nhắc lại khi đăng nhập */
+export interface SheetsSyncFailure {
+  FailureKey: string;
+  StaffKey: string;
+  EntityType: string;
+  EntityKey: string;
+  Action: 'insert' | 'update' | 'delete';
+  ViewModule: string;
+  ViewLabel: string;
+  PatientName: string;
+  PatientKey?: string;
+  PatientID?: string;
+  Message: string;
+  CreatedTime: string;
+  IsAcknowledged: boolean;
+}
+
 export type DoctorPerformanceMarkType =
   | 'missing_staff_result'
   | 'requester_overdue_staff_result'
