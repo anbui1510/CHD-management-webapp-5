@@ -8,7 +8,7 @@ import {
 } from '../api/medicalDataRefresh';
 
 const REFRESH_COOLDOWN_MS = 2500;
-const BACKGROUND_SYNC_TIMEOUT_MS = 45000;
+const SYNC_TIMEOUT_MS = 20000;
 
 export type MedicalDataLoadPhase = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
@@ -128,19 +128,24 @@ export function useRefreshMedicalData(
 
     meta.syncPending = withTimeout(
       fetchMedicalDataBundle(true),
-      BACKGROUND_SYNC_TIMEOUT_MS,
-      'Đồng bộ Google Sheets quá lâu. Đang dùng dữ liệu cache trên máy chủ.'
+      SYNC_TIMEOUT_MS,
+      'Không đồng bộ được Google Sheets sau 20 giây. Kiểm tra mạng hoặc cấu hình Apps Script rồi bấm Đồng bộ lại.'
     )
       .then(bundle => {
         applyMedicalDataBundle(bundle, scope, setters, { allowEmpty: true });
         meta.lastAt = Date.now();
+        emitState({ phase: 'ready', startedAt: null });
       })
       .catch(err => {
         console.warn('Background medical data sync failed:', err);
+        emitState({
+          phase: 'error',
+          startedAt: null,
+          message: err instanceof Error ? err.message : 'Không đồng bộ được Google Sheets.'
+        });
       })
       .finally(() => {
         meta.syncPending = null;
-        emitState({ phase: 'ready', startedAt: null });
       });
 
     return meta.syncPending;

@@ -72,7 +72,7 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
   const url = force ? '/api/all?force=true' : '/api/all';
   const res = await fetch(url, {
     headers: authHeaders(token),
-    signal: AbortSignal.timeout(45000)
+    signal: AbortSignal.timeout(20000)
   });
   if (res.status === 401) {
     localStorage.removeItem('CHD_AUTH_TOKEN');

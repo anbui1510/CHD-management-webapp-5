@@ -386,6 +386,27 @@ async function fetchWithTimeout(url: string, options: any = {}, timeout = 60000)
 // Throttle sync pulls so we don't spam Google Sheets on concurrent requests
 let lastSyncTime = 0;
 const SYNC_COOLDOWN_MS = 6000; // 6 seconds minimum between background pulls
+const SHEETS_PUSH_TIMEOUT_MS = 20000;
+
+type SheetsSyncResult = {
+  configured: boolean;
+  ok: boolean;
+  message: string;
+  at: number;
+};
+
+const sheetsSyncState = {
+  lastPullAt: 0,
+  lastPullOk: true,
+  lastPullMessage: '',
+  lastPushAt: 0,
+  lastPushOk: true,
+  lastPushMessage: ''
+};
+
+function withSheetsSync<T extends Record<string, unknown>>(record: T, sync: SheetsSyncResult) {
+  return { ...record, _sheetsSync: sync };
+}
 
 const recentLocalEdits = new Map<string, { timestamp: number; data: any }>();
 
@@ -475,7 +496,7 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
     const response = await fetchWithTimeout(fetchUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
-    }, 60000);
+    }, 20000);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -685,11 +706,23 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
         writeDB(DOCTOR_MARKS_FILE, Array.from(mMap.values()));
       }
       lastSyncTime = Date.now();
+      sheetsSyncState.lastPullAt = Date.now();
+      sheetsSyncState.lastPullOk = true;
+      sheetsSyncState.lastPullMessage = 'Đã kéo dữ liệu mới từ Google Sheets.';
       checkSchedulingDelays();
       console.log('Successfully pulling synced and updated local database cache!');
       return true;
     }
+    sheetsSyncState.lastPullAt = Date.now();
+    sheetsSyncState.lastPullOk = false;
+    sheetsSyncState.lastPullMessage = 'Google Sheets trả về dữ liệu không hợp lệ.';
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    sheetsSyncState.lastPullAt = Date.now();
+    sheetsSyncState.lastPullOk = false;
+    sheetsSyncState.lastPullMessage = message.includes('abort') || message.includes('Abort')
+      ? 'Kéo Google Sheets quá 20 giây — đang dùng dữ liệu cache trên máy chủ.'
+      : `Không kéo được Google Sheets: ${message}`;
     console.error('Failed to pull from Google Sheets (will use caching instead):', err);
   }
   return false;
@@ -839,6 +872,65 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
     console.error(`Failed to push update to Google Sheet for key ${key}:`, err);
   }
   return false;
+}
+
+async function pushToGoogleSheetsAwaited(
+  type: 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'CMR' | 'Transplant' | 'Source' | 'DeviceTemplate' | 'RolePreset' | 'Notification' | 'DoctorPerformanceMark',
+  action: 'insert' | 'update' | 'delete',
+  key: string,
+  record: any,
+  timeoutMs = SHEETS_PUSH_TIMEOUT_MS
+): Promise<SheetsSyncResult> {
+  const config = getSyncConfig();
+  const at = Date.now();
+
+  if (!config.scriptUrl) {
+    const result: SheetsSyncResult = {
+      configured: false,
+      ok: true,
+      at,
+      message: 'Chưa liên kết Google Sheets — dữ liệu chỉ lưu trên máy chủ app.'
+    };
+    sheetsSyncState.lastPushAt = at;
+    sheetsSyncState.lastPushOk = true;
+    sheetsSyncState.lastPushMessage = result.message;
+    return result;
+  }
+
+  try {
+    const ok = await Promise.race<boolean>([
+      syncToGoogleSheets(type, action, key, record),
+      new Promise<boolean>((_, reject) => {
+        setTimeout(() => reject(new Error('Ghi Google Sheets quá 20 giây')), timeoutMs);
+      })
+    ]);
+    const result: SheetsSyncResult = {
+      configured: true,
+      ok,
+      at,
+      message: ok
+        ? 'Đã ghi lên Google Sheets.'
+        : 'Google Sheets không xác nhận ghi dữ liệu — kiểm tra Apps Script hoặc thử Đồng bộ lại.'
+    };
+    sheetsSyncState.lastPushAt = at;
+    sheetsSyncState.lastPushOk = ok;
+    sheetsSyncState.lastPushMessage = result.message;
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const result: SheetsSyncResult = {
+      configured: true,
+      ok: false,
+      at,
+      message: message.includes('20 giây')
+        ? 'Ghi Google Sheets quá 20 giây — dữ liệu đã lưu trên app, chưa chắc đã lên Sheet.'
+        : `Lỗi ghi Google Sheets: ${message}`
+    };
+    sheetsSyncState.lastPushAt = at;
+    sheetsSyncState.lastPushOk = false;
+    sheetsSyncState.lastPushMessage = result.message;
+    return result;
+  }
 }
 
 // Initial Staff Data
@@ -1572,6 +1664,7 @@ app.get('/api/all', requireAuth, async (req, res) => {
   void syncFromGoogleSheets(force).catch(err => {
     console.warn('Background sync failed:', err);
   });
+  const config = getSyncConfig();
   const rawStaff = readDB<Staff>(STAFF_FILE, defaultStaff);
   res.json({
     patients: readDB<Patient>(PATIENTS_FILE, defaultPatients),
@@ -1585,7 +1678,29 @@ app.get('/api/all', requireAuth, async (req, res) => {
     deviceTemplates: readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []),
     rolePresets: ensureRolePresetsDB(),
     notifications: readDB<Notification>(NOTIFICATIONS_FILE, []),
-    doctorPerformanceMarks: readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, [])
+    doctorPerformanceMarks: readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []),
+    _syncStatus: {
+      configured: !!config.scriptUrl,
+      lastPullAt: sheetsSyncState.lastPullAt,
+      lastPullOk: sheetsSyncState.lastPullOk,
+      lastPullMessage: sheetsSyncState.lastPullMessage,
+      lastPushAt: sheetsSyncState.lastPushAt,
+      lastPushOk: sheetsSyncState.lastPushOk,
+      lastPushMessage: sheetsSyncState.lastPushMessage
+    }
+  });
+});
+
+app.get('/api/sync/status', requireAuth, (req, res) => {
+  const config = getSyncConfig();
+  res.json({
+    configured: !!config.scriptUrl,
+    lastPullAt: sheetsSyncState.lastPullAt,
+    lastPullOk: sheetsSyncState.lastPullOk,
+    lastPullMessage: sheetsSyncState.lastPullMessage,
+    lastPushAt: sheetsSyncState.lastPushAt,
+    lastPushOk: sheetsSyncState.lastPushOk,
+    lastPushMessage: sheetsSyncState.lastPushMessage
   });
 });
 
@@ -2062,12 +2177,10 @@ app.post('/api/patients', requireAuth, async (req, res) => {
   // Track this locally so we don't overwrite with stale Google Sheets data
   recentLocalEdits.set(`Patient_${newPatient.PatientKey}`, { timestamp: Date.now(), data: newPatient });
   
-  // Sync to Google Sheet asynchronously in the background so API stays fast
-  syncToGoogleSheets('Patient', 'insert', newPatient.PatientKey, newPatient).catch(err => {
-    console.error('Error syncing patient to google sheets background:', err);
-  });
+  // Ghi Google Sheets và trả kết quả cho client (timeout 20 giây)
+  const sheetsSync = await pushToGoogleSheetsAwaited('Patient', 'insert', newPatient.PatientKey, newPatient);
   
-  res.status(201).json(newPatient);
+  res.status(201).json(withSheetsSync(newPatient, sheetsSync));
 });
 
 app.put('/api/patients/:key', requireAuth, async (req, res) => {
@@ -2100,12 +2213,9 @@ app.put('/api/patients/:key', requireAuth, async (req, res) => {
     // Track this locally so we don't overwrite with stale Google Sheets data
     recentLocalEdits.set(`Patient_${patients[index].PatientKey}`, { timestamp: Date.now(), data: patients[index] });
     
-    // Sync to Google Sheet asynchronously in the background so API stays fast
-    syncToGoogleSheets('Patient', 'update', patients[index].PatientKey, patients[index]).catch(err => {
-      console.error('Error syncing patient update to google sheets background:', err);
-    });
+    const sheetsSync = await pushToGoogleSheetsAwaited('Patient', 'update', patients[index].PatientKey, patients[index]);
     
-    res.json(patients[index]);
+    res.json(withSheetsSync(patients[index], sheetsSync));
   } else {
     res.status(404).json({ error: 'Patient not found' });
   }
@@ -2437,12 +2547,9 @@ app.post('/api/consults', requireAuth, async (req, res) => {
   // Track this locally so we don't overwrite with stale Google Sheets data
   recentLocalEdits.set(`Consult_${newConsult.ConsultKey}`, { timestamp: Date.now(), data: newConsult });
   
-  // Sync to Google Sheet asynchronously in the background so API stays fast
-  syncToGoogleSheets('Consult', 'insert', newConsult.ConsultKey, newConsult).catch(err => {
-    console.error('Error syncing consult to google sheets background:', err);
-  });
+  const sheetsSync = await pushToGoogleSheetsAwaited('Consult', 'insert', newConsult.ConsultKey, newConsult);
   
-  res.status(201).json(newConsult);
+  res.status(201).json(withSheetsSync(newConsult, sheetsSync));
 });
 
 // Update an existing consult result (or details)
@@ -2464,10 +2571,7 @@ app.put('/api/consults/:key', requireAuth, async (req, res) => {
     // Track this locally so we don't overwrite with stale Google Sheets data
     recentLocalEdits.set(`Consult_${consults[index].ConsultKey}`, { timestamp: Date.now(), data: consults[index] });
     
-    // Sync to Google Sheet asynchronously in the background so API stays fast
-    syncToGoogleSheets('Consult', 'update', consults[index].ConsultKey, consults[index]).catch(err => {
-      console.error('Error syncing consult update to google sheets background:', err);
-    });
+    const sheetsSync = await pushToGoogleSheetsAwaited('Consult', 'update', consults[index].ConsultKey, consults[index]);
 
     try {
       const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
@@ -2477,7 +2581,7 @@ app.put('/api/consults/:key', requireAuth, async (req, res) => {
       console.error('Error evaluating consult workflow mutation:', err);
     }
     
-    res.json(consults[index]);
+    res.json(withSheetsSync(consults[index], sheetsSync));
   } else {
     res.status(404).json({ error: 'Consult not found' });
   }
@@ -2534,12 +2638,9 @@ app.post('/api/cathlabs', requireAuth, async (req, res) => {
   // Track this locally so we don't overwrite with stale Google Sheets data
   recentLocalEdits.set(`CathLab_${newCathLab.CathKey}`, { timestamp: Date.now(), data: newCathLab });
   
-  // Sync to Google Sheet asynchronously in the background so API stays fast
-  syncToGoogleSheets('CathLab', 'insert', newCathLab.CathKey, newCathLab).catch(err => {
-    console.error('Error syncing cathlab to google sheets background:', err);
-  });
+  const sheetsSync = await pushToGoogleSheetsAwaited('CathLab', 'insert', newCathLab.CathKey, newCathLab);
   
-  res.status(201).json(newCathLab);
+  res.status(201).json(withSheetsSync(newCathLab, sheetsSync));
 });
 
 app.put('/api/cathlabs/:key', requireAuth, async (req, res) => {
@@ -2557,12 +2658,9 @@ app.put('/api/cathlabs/:key', requireAuth, async (req, res) => {
     // Track this locally so we don't overwrite with stale Google Sheets data
     recentLocalEdits.set(`CathLab_${cathlabs[index].CathKey}`, { timestamp: Date.now(), data: cathlabs[index] });
     
-    // Sync to Google Sheet asynchronously in the background so API stays fast
-    syncToGoogleSheets('CathLab', 'update', cathlabs[index].CathKey, cathlabs[index]).catch(err => {
-      console.error('Error syncing cathlab update to google sheets background:', err);
-    });
+    const sheetsSync = await pushToGoogleSheetsAwaited('CathLab', 'update', cathlabs[index].CathKey, cathlabs[index]);
     
-    res.json(cathlabs[index]);
+    res.json(withSheetsSync(cathlabs[index], sheetsSync));
   } else {
     res.status(404).json({ error: 'CathLab not found' });
   }
