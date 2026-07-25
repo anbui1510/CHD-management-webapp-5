@@ -58,6 +58,7 @@ interface StaffProfileViewProps {
     error: string;
     enablePush: () => Promise<boolean>;
     disablePush: () => Promise<void>;
+    testPush: () => Promise<boolean>;
     resetDismiss: () => void;
   };
 }
@@ -437,6 +438,11 @@ export default function StaffProfileView({
     && !webPush.subscribed;
 
   const canDisablePush = !!webPush && webPush.subscribed;
+  const canTestPush = !!webPush
+    && webPush.supported
+    && webPush.configured
+    && webPush.subscribed
+    && webPush.permission === 'granted';
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50 animate-in fade-in duration-300">
@@ -770,6 +776,25 @@ export default function StaffProfileView({
                             className="px-3 py-1.5 rounded-xl border border-amber-300 text-amber-900 text-[10px] font-bold hover:bg-amber-100 disabled:opacity-60"
                           >
                             {webPush.loading ? 'Đang tắt...' : 'Tắt thông báo'}
+                          </button>
+                        )}
+                        {canTestPush && (
+                          <button
+                            type="button"
+                            disabled={webPush.loading}
+                            onClick={() => {
+                              void webPush.testPush().then(ok => {
+                                if (ok) {
+                                  triggerAlert?.(
+                                    'Đã gửi push thử. Thu nhỏ app hoặc khóa màn hình để kiểm tra banner iOS.',
+                                    'Thành công'
+                                  );
+                                }
+                              });
+                            }}
+                            className="px-3 py-1.5 rounded-xl border border-amber-400 bg-white text-amber-900 text-[10px] font-bold hover:bg-amber-100 disabled:opacity-60"
+                          >
+                            {webPush.loading ? 'Đang gửi...' : 'Gửi thử push'}
                           </button>
                         )}
                         {!webPush.subscribed && webPush.supported && webPush.permission !== 'denied' && (

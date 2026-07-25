@@ -124,16 +124,17 @@ async function removeSubscription(kv: PushKvStore, staffKey: string, endpoint: s
 
 async function sendToStaff(kv: PushKvStore, env: CloudflarePushEnv, staffKey: string, payload: WebPushPayload) {
   if (!configureWebPush(env)) {
-    return { sent: 0, removed: 0, skipped: true };
+    return { sent: 0, removed: 0, skipped: true, attempted: 0, needsResubscribe: false, errors: [] as string[] };
   }
 
   const subscriptions = (await readSubscriptions(kv)).filter(item => String(item.StaffKey) === String(staffKey));
   if (subscriptions.length === 0) {
-    return { sent: 0, removed: 0, skipped: false };
+    return { sent: 0, removed: 0, skipped: false, attempted: 0, needsResubscribe: false, errors: [] as string[] };
   }
 
   let sent = 0;
   const staleEndpoints: string[] = [];
+  const errors: string[] = [];
   const body = JSON.stringify(payload);
 
   for (const subscription of subscriptions) {
@@ -151,7 +152,9 @@ async function sendToStaff(kv: PushKvStore, env: CloudflarePushEnv, staffKey: st
       sent += 1;
     } catch (error: any) {
       const statusCode = error?.statusCode || error?.status;
-      if (statusCode === 404 || statusCode === 410) {
+      const message = String(error?.body || error?.message || 'Push delivery failed').slice(0, 180);
+      errors.push(statusCode ? `HTTP ${statusCode}: ${message}` : message);
+      if ([400, 401, 403, 404, 410].includes(Number(statusCode))) {
         staleEndpoints.push(subscription.endpoint);
       }
     }
@@ -162,7 +165,14 @@ async function sendToStaff(kv: PushKvStore, env: CloudflarePushEnv, staffKey: st
     await writeSubscriptions(kv, next);
   }
 
-  return { sent, removed: staleEndpoints.length, skipped: false };
+  return {
+    sent,
+    removed: staleEndpoints.length,
+    skipped: false,
+    attempted: subscriptions.length,
+    needsResubscribe: subscriptions.length > 0 && sent === 0,
+    errors,
+  };
 }
 
 function parseStaffKeyFromRequest(request: Request, body?: any): string {
@@ -210,7 +220,16 @@ export async function handleCloudflarePushRequest(request: Request, env: Cloudfl
     if (!record) {
       return json({ error: 'Thiếu endpoint hoặc keys push subscription' }, 400);
     }
-    return json(record, 201);
+
+    const testPayload: WebPushPayload = {
+      title: 'CHD Management',
+      body: 'Đã bật thông báo điện thoại thành công.',
+      url: '/?view=home',
+      notificationKey: `push_test_${Date.now()}`,
+    };
+    const testResult = await sendToStaff(env.PUSH_KV, env, record.StaffKey, testPayload);
+
+    return json({ ...record, testPush: testResult }, 201);
   }
 
   if (action === 'unsubscribe' && method === 'DELETE') {
@@ -235,6 +254,22 @@ export async function handleCloudflarePushRequest(request: Request, env: Cloudfl
       body: String(body?.body || 'Bạn có thông báo mới'),
       url: String(body?.url || '/?view=home'),
       notificationKey: String(body?.notificationKey || ''),
+    };
+    const result = await sendToStaff(env.PUSH_KV, env, staffKey, payload);
+    return json(result);
+  }
+
+  if (action === 'test' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const staffKey = String(body?.StaffKey || '').trim();
+    if (!staffKey) {
+      return json({ error: 'Thiếu StaffKey' }, 400);
+    }
+    const payload: WebPushPayload = {
+      title: 'CHD Management — thử push',
+      body: 'Nếu bạn thấy thông báo này, push điện thoại đang hoạt động.',
+      url: '/?view=home',
+      notificationKey: `push_manual_test_${Date.now()}`,
     };
     const result = await sendToStaff(env.PUSH_KV, env, staffKey, payload);
     return json(result);
