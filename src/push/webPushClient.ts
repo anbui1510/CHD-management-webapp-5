@@ -31,6 +31,10 @@ export function dismissPushPrompt(): void {
   localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, '1');
 }
 
+export function clearPushPromptDismiss(): void {
+  localStorage.removeItem(PUSH_PROMPT_DISMISSED_KEY);
+}
+
 export function wasPwaInstallDismissed(): boolean {
   return localStorage.getItem(PWA_INSTALL_DISMISSED_KEY) === '1';
 }

@@ -4,6 +4,7 @@ import {
   Activity,
   AlertTriangle,
   Award,
+  BellRing,
   CalendarDays,
   Camera,
   ChevronDown,
@@ -48,6 +49,17 @@ interface StaffProfileViewProps {
   onClose?: () => void;
   onStaffUpdated?: (updated: Staff) => void;
   triggerAlert?: (message: string, title?: string) => void;
+  webPush?: {
+    supported: boolean;
+    configured: boolean;
+    subscribed: boolean;
+    permission: NotificationPermission;
+    loading: boolean;
+    error: string;
+    enablePush: () => Promise<boolean>;
+    disablePush: () => Promise<void>;
+    resetDismiss: () => void;
+  };
 }
 
 type AdminDraft = Pick<
@@ -206,6 +218,7 @@ export default function StaffProfileView({
   onClose,
   onStaffUpdated,
   triggerAlert,
+  webPush,
 }: StaffProfileViewProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const now = new Date();
@@ -406,6 +419,24 @@ export default function StaffProfileView({
     setAdminDraft(toAdminDraft(profileStaff));
     setIsEditingAdmin(false);
   };
+
+  const pushStatusLabel = (() => {
+    if (!webPush) return '';
+    if (!webPush.supported) return 'Thiết bị hoặc trình duyệt không hỗ trợ push';
+    if (webPush.permission === 'denied') return 'Đã chặn — bật lại trong Cài đặt iOS → Thông báo';
+    if (!webPush.configured) return 'Server chưa cấu hình push (VAPID)';
+    if (webPush.subscribed) return 'Đang bật — nhận alert màn hình khóa';
+    if (webPush.permission === 'granted') return 'Đã cho phép nhưng chưa đăng ký thiết bị';
+    return 'Chưa bật';
+  })();
+
+  const canEnablePush = !!webPush
+    && webPush.supported
+    && webPush.configured
+    && webPush.permission !== 'denied'
+    && !webPush.subscribed;
+
+  const canDisablePush = !!webPush && webPush.subscribed;
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-slate-50 animate-in fade-in duration-300">
@@ -703,6 +734,56 @@ export default function StaffProfileView({
                       </p>
                     </div>
                   </div>
+
+                  {webPush && (
+                    <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <BellRing className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black uppercase text-amber-800">Thông báo điện thoại</p>
+                          <p className="text-xs font-semibold text-amber-900 mt-0.5 leading-snug">{pushStatusLabel}</p>
+                          {webPush.error && (
+                            <p className="text-[10px] font-bold text-rose-700 mt-1">{webPush.error}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {canEnablePush && (
+                          <button
+                            type="button"
+                            disabled={webPush.loading}
+                            onClick={() => {
+                              void webPush.enablePush().then(ok => {
+                                if (ok) triggerAlert?.('Đã bật thông báo điện thoại', 'Thành công');
+                              });
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black disabled:opacity-60"
+                          >
+                            {webPush.loading ? 'Đang bật...' : 'Bật thông báo'}
+                          </button>
+                        )}
+                        {canDisablePush && (
+                          <button
+                            type="button"
+                            disabled={webPush.loading}
+                            onClick={() => { void webPush.disablePush(); }}
+                            className="px-3 py-1.5 rounded-xl border border-amber-300 text-amber-900 text-[10px] font-bold hover:bg-amber-100 disabled:opacity-60"
+                          >
+                            {webPush.loading ? 'Đang tắt...' : 'Tắt thông báo'}
+                          </button>
+                        )}
+                        {!webPush.subscribed && webPush.supported && webPush.permission !== 'denied' && (
+                          <button
+                            type="button"
+                            onClick={webPush.resetDismiss}
+                            className="px-3 py-1.5 rounded-xl border border-amber-200 text-amber-800 text-[10px] font-bold hover:bg-amber-100"
+                          >
+                            Hiện lại banner
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="space-y-3">

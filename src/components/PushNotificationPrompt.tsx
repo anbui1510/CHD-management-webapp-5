@@ -4,6 +4,7 @@ import { BellRing, X } from 'lucide-react';
 interface PushNotificationPromptProps {
   visible: boolean;
   loading: boolean;
+  configured?: boolean;
   error?: string;
   isIosStandaloneHint?: boolean;
   onEnable: () => void;
@@ -13,6 +14,7 @@ interface PushNotificationPromptProps {
 export default function PushNotificationPrompt({
   visible,
   loading,
+  configured = true,
   error,
   isIosStandaloneHint,
   onEnable,
@@ -35,17 +37,22 @@ export default function PushNotificationPrompt({
                 Trên iPhone, cần <strong>Thêm vào Màn hình chính</strong> trước khi push hoạt động (iOS 16.4+).
               </p>
             )}
+            {!configured && (
+              <p className="text-[11px] text-amber-700 mt-2 leading-relaxed">
+                Server chưa cấu hình push. Bạn vẫn có thể bật trong <strong>Hồ sơ cá nhân</strong> sau khi quản trị cấu hình VAPID.
+              </p>
+            )}
             {error && (
               <p className="text-[11px] text-rose-700 mt-2 font-semibold">{error}</p>
             )}
             <div className="flex flex-wrap gap-2 mt-3">
               <button
                 type="button"
-                disabled={loading}
+                disabled={loading || !configured}
                 onClick={onEnable}
                 className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black disabled:opacity-60"
               >
-                {loading ? 'Đang bật...' : 'Bật thông báo'}
+                {loading ? 'Đang bật...' : configured ? 'Bật thông báo' : 'Chưa sẵn sàng'}
               </button>
               <button
                 type="button"

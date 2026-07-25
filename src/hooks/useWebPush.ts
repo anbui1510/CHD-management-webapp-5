@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  clearPushPromptDismiss,
   dismissPushPrompt,
   fetchPushStatus,
   isPushSupported,
@@ -36,7 +37,7 @@ export function useWebPush(staffKey?: string) {
   }, [refreshStatus]);
 
   useEffect(() => {
-    if (!staffKey || !isPushSupported() || !configured) {
+    if (!staffKey || !isPushSupported()) {
       setShowPrompt(false);
       return;
     }
@@ -53,7 +54,7 @@ export function useWebPush(staffKey?: string) {
       return;
     }
     setShowPrompt(true);
-  }, [staffKey, configured, permission, subscribed]);
+  }, [staffKey, permission, subscribed]);
 
   useEffect(() => {
     if (!staffKey || permission !== 'granted') return;
@@ -108,6 +109,14 @@ export function useWebPush(staffKey?: string) {
     setShowPrompt(false);
   }, []);
 
+  const resetDismiss = useCallback(() => {
+    clearPushPromptDismiss();
+    if (!staffKey || !isPushSupported()) return;
+    if (permission === 'granted' && subscribed) return;
+    if (permission === 'denied') return;
+    setShowPrompt(true);
+  }, [staffKey, permission, subscribed]);
+
   return {
     supported: isPushSupported(),
     configured,
@@ -119,6 +128,7 @@ export function useWebPush(staffKey?: string) {
     enablePush,
     disablePush,
     dismissPrompt,
+    resetDismiss,
     refreshStatus,
   };
 }
