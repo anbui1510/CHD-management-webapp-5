@@ -1,7 +1,8 @@
 import { handleChdBriefRequest, type ChdBriefEnv } from '../src/chdDailyBrief/cloudflareApi';
 import { handleCloudflarePushRequest, type CloudflarePushEnv } from '../src/push/cloudflarePushApi';
+import { handleCloudflareSyncConfigRequest, type CloudflareSyncConfigEnv } from '../src/sync/cloudflareSyncConfigApi';
 
-interface Env extends ChdBriefEnv, CloudflarePushEnv {
+interface Env extends ChdBriefEnv, CloudflarePushEnv, CloudflareSyncConfigEnv {
   ASSETS: Fetcher;
 }
 
@@ -15,6 +16,10 @@ export default {
 
     if (url.pathname.startsWith('/api/push')) {
       return handleCloudflarePushRequest(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/sync-config')) {
+      return handleCloudflareSyncConfigRequest(request, env);
     }
 
     return env.ASSETS.fetch(request);

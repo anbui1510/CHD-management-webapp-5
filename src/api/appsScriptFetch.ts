@@ -972,47 +972,7 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       await loadAllData(true);
       return jsonResponse({ message: 'Đã tải lại dữ liệu từ Google Sheets.' });
     }
-    if (method === 'GET') {
-      const scriptSecret = getScriptSecret();
-      return jsonResponse({ scriptUrl, scriptSecret, isSynced: !!scriptUrl });
-    }
-    if (method === 'POST') {
-      const body = await parseBody(init);
-      const nextUrl = String(body.scriptUrl || '').trim();
-      const nextSecret = String(body.scriptSecret || '').trim();
-      if (nextUrl && !nextUrl.startsWith('https://script.google.com/macros/s/')) {
-        return jsonResponse({ error: 'Địa chỉ Apps Script không hợp lệ.' }, { status: 400 });
-      }
-      if (nextUrl) {
-        try {
-          let setupUrl = `${nextUrl}?action=setup`;
-          if (nextSecret) {
-            setupUrl += `&apiKey=${encodeURIComponent(nextSecret)}`;
-          }
-          const setupRes = await fetchWithTimeout(setupUrl);
-          if (!setupRes.ok) {
-            throw new Error(`Google Apps Script setup trả về HTTP ${setupRes.status}`);
-          }
-          const text = (await setupRes.text()).trim();
-          if (text.startsWith('<!DOCTYPE') || text.startsWith('<html') || text.startsWith('<!doctype')) {
-            throw new Error("Không thể cấu hình kết nối. Hãy chắc chắn Apps Script đã deploy với quyền Anyone.");
-          }
-          const parsedRes = JSON.parse(text);
-          if (parsedRes.status === 'error') {
-            throw new Error(parsedRes.message || 'Lỗi thiết lập API Key.');
-          }
-        } catch (err: any) {
-          return jsonResponse({ error: err.message || 'Không thể liên kết và cấu hình API Key với Apps Script.' }, { status: 500 });
-        }
-      }
-      setScriptUrl(nextUrl);
-      setScriptSecret(nextSecret);
-      if (nextUrl) {
-        await loadAllData(true);
-        return jsonResponse({ message: 'Kết nối Google Apps Script thành công!', scriptUrl: nextUrl, scriptSecret: nextSecret, isSynced: true });
-      }
-      return jsonResponse({ message: 'Đã hủy liên kết Google Apps Script.', scriptUrl: '', scriptSecret: '', isSynced: false });
-    }
+    return null;
   }
 
   if (endpoint === 'reset') {
@@ -1374,6 +1334,42 @@ export const clearAllPersistedCache = async (): Promise<void> => {
   await clearLocalCache();
   await clearPersistedData();
 };
+
+export async function hydrateSyncConfigFromServer(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
+  const requestFetch = nativeFetch || window.fetch.bind(window);
+
+  try {
+    const res = await requestFetch('/api/sync-config');
+    if (!res.ok) return false;
+    const data = await res.json() as { scriptUrl?: string; scriptSecret?: string; isSynced?: boolean };
+
+    if (data.scriptUrl) {
+      setScriptUrl(data.scriptUrl);
+      if (data.scriptSecret) setScriptSecret(data.scriptSecret);
+      return true;
+    }
+
+    const localUrl = localStorage.getItem(SCRIPT_URL_STORAGE_KEY) || '';
+    if (!localUrl) return false;
+
+    const localSecret = getScriptSecret();
+    const migrateRes = await requestFetch('/api/sync-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptUrl: localUrl, scriptSecret: localSecret }),
+    });
+    if (!migrateRes.ok) return false;
+    setScriptUrl(localUrl);
+    if (localSecret) setScriptSecret(localSecret);
+    return true;
+  } catch (err) {
+    console.warn('Failed to hydrate sync config from server:', err);
+    return false;
+  }
+}
 
 export const installAppsScriptFetchBridge = () => {
   if (typeof window === 'undefined') return;

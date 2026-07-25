@@ -14,6 +14,7 @@ import {
 } from '../utils/cathlabReconciliation';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { hydrateSyncConfigFromServer } from '../api/appsScriptFetch';
 
 interface VirtualSheetsProps {
   patients: Patient[];
@@ -108,7 +109,8 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
         }
         return data;
       })
-      .then(data => {
+      .then(async data => {
+        await hydrateSyncConfigFromServer();
         setActionLoading(false);
         setActionSuccess(data.message);
         setSyncConfig({ scriptUrl: inputUrl.trim(), scriptSecret: inputSecret.trim(), isSynced: true });

@@ -63,7 +63,7 @@ import { buildSyncContext, withSyncContext } from './utils/sheetsSyncMutation';
 import { SheetsSyncFeedbackProvider } from './context/SheetsSyncFeedbackContext';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError } from './api/medicalDataRefresh';
-import { clearLocalCache } from './api/appsScriptFetch';
+import { clearLocalCache, hydrateSyncConfigFromServer } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
@@ -784,10 +784,11 @@ export default function App() {
           if (!res.ok) throw new Error('Token expired');
           return res.json();
         })
-        .then((staffData: Staff) => {
+        .then(async (staffData: Staff) => {
           localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
+          await hydrateSyncConfigFromServer();
           void loadMedicalDataAfterAuth('full').catch(handleAuthDataFailure);
         })
         .catch(() => {
@@ -1012,6 +1013,7 @@ export default function App() {
       setCurrentStaff(staffData);
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
 
+      await hydrateSyncConfigFromServer();
       void loadMedicalDataAfterAuth('full').catch(err => {
         if (err instanceof AuthRequiredError) {
           handleAuthDataFailure(err);
