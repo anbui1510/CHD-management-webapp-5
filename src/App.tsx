@@ -2376,6 +2376,17 @@ export default function App() {
                   refreshStaffData();
                 }}
                 triggerAlert={triggerAlert}
+                webPush={{
+                  supported: webPush.supported,
+                  configured: webPush.configured,
+                  subscribed: webPush.subscribed,
+                  permission: webPush.permission,
+                  loading: webPush.loading,
+                  error: webPush.error,
+                  enablePush: webPush.enablePush,
+                  disablePush: webPush.disablePush,
+                  resetDismiss: webPush.resetDismiss,
+                }}
               />
             </div>
           )}
@@ -4401,6 +4412,7 @@ export default function App() {
           <PushNotificationPrompt
             visible={webPush.showPrompt}
             loading={webPush.loading}
+            configured={webPush.configured}
             error={webPush.error}
             isIosStandaloneHint={shouldShowIosInstallHint()}
             onEnable={() => { void webPush.enablePush(); }}
