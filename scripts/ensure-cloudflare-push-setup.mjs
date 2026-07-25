@@ -14,7 +14,9 @@ function run(command, options = {}) {
 function runJson(command) {
   const output = run(command);
   if (!output) return null;
-  return JSON.parse(output);
+  const start = output.indexOf('[') >= 0 ? output.indexOf('[') : output.indexOf('{');
+  if (start < 0) return null;
+  return JSON.parse(output.slice(start));
 }
 
 function patchWranglerKvId(kvId) {
@@ -31,13 +33,13 @@ function patchWranglerKvId(kvId) {
 }
 
 function ensureKvNamespace() {
-  const listed = runJson('npx wrangler kv namespace list') || [];
+  const listed = runJson('npx wrangler kv namespace list --json') || [];
   const existing = listed.find(item => item.title === namespaceTitle);
   if (existing?.id) {
     console.log(`[cloudflare-push-setup] Reusing KV namespace ${existing.id}`);
     return existing.id;
   }
-  const created = runJson(`npx wrangler kv namespace create ${namespaceTitle}`);
+  const created = runJson(`npx wrangler kv namespace create ${namespaceTitle} --json`);
   if (!created?.id) {
     throw new Error('Failed to create PUSH_KV namespace');
   }
@@ -46,7 +48,7 @@ function ensureKvNamespace() {
 }
 
 function ensureVapidSecrets() {
-  const secrets = runJson('npx wrangler secret list') || [];
+  const secrets = runJson('npx wrangler secret list --json') || [];
   const hasPrivate = secrets.some(item => item.name === 'VAPID_PRIVATE_KEY');
   const hasPublic = secrets.some(item => item.name === 'VAPID_PUBLIC_KEY');
 
@@ -56,10 +58,10 @@ function ensureVapidSecrets() {
   }
 
   const keys = webpush.generateVAPIDKeys();
-  run('npx wrangler secret put VAPID_PRIVATE_KEY', { input: keys.privateKey });
-  run('npx wrangler secret put VAPID_PUBLIC_KEY', { input: keys.publicKey });
+  execSync('npx wrangler secret put VAPID_PRIVATE_KEY', { input: keys.privateKey, stdio: ['pipe', 'inherit', 'inherit'] });
+  execSync('npx wrangler secret put VAPID_PUBLIC_KEY', { input: keys.publicKey, stdio: ['pipe', 'inherit', 'inherit'] });
   if (!secrets.some(item => item.name === 'VAPID_SUBJECT')) {
-    run('npx wrangler secret put VAPID_SUBJECT', { input: 'mailto:chd-admin@hospital.vn' });
+    execSync('npx wrangler secret put VAPID_SUBJECT', { input: 'mailto:chd-admin@hospital.vn', stdio: ['pipe', 'inherit', 'inherit'] });
   }
   console.log('[cloudflare-push-setup] Generated and uploaded VAPID secrets to Cloudflare Worker.');
 }
