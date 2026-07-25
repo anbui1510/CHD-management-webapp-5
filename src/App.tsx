@@ -846,6 +846,17 @@ export default function App() {
   }, [currentStaff?.StaffKey, refreshMedicalData]);
 
   useEffect(() => {
+    if (!currentStaff?.StaffKey) return;
+    const onBridgeDataUpdated = () => {
+      void refreshMedicalData('full', true, { silent: true }).catch(err => {
+        console.warn('Bridge cache refresh apply failed:', err);
+      });
+    };
+    window.addEventListener('chd-bridge-data-updated', onBridgeDataUpdated);
+    return () => window.removeEventListener('chd-bridge-data-updated', onBridgeDataUpdated);
+  }, [currentStaff?.StaffKey, refreshMedicalData]);
+
+  useEffect(() => {
     if (!currentStaff?.StaffKey || staffList.length === 0) return;
     const updated = staffList.find(staff => staff.StaffKey === currentStaff.StaffKey);
     if (updated && JSON.stringify(updated) !== JSON.stringify(currentStaff)) {

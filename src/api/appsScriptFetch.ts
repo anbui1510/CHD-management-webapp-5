@@ -566,15 +566,25 @@ const fetchAllDataFromNetwork = (force = false): Promise<SheetData> => {
 
 const refreshAllDataInBackground = (): void => {
   if (!getScriptUrl() || pendingLoad) return;
-  void fetchAllDataFromNetwork(true).catch(err => {
-    console.warn('Background data sync failed:', err);
-  });
+  void fetchAllDataFromNetwork(true)
+    .then(data => {
+      if (typeof window !== 'undefined' && data.patients.length + data.consults.length > 0) {
+        window.dispatchEvent(new CustomEvent('chd-bridge-data-updated'));
+      }
+    })
+    .catch(err => {
+      console.warn('Background data sync failed:', err);
+    });
 };
 
 const hydrateCacheFromPersisted = async (): Promise<SheetData | null> => {
   const cachedAll = await getPersistedData('all_data');
+  const hasClinicalData =
+    (Array.isArray(cachedAll?.patients) && cachedAll.patients.length > 0) ||
+    (Array.isArray(cachedAll?.consults) && cachedAll.consults.length > 0);
   if (
     cachedAll &&
+    hasClinicalData &&
     Array.isArray(cachedAll.staff) &&
     cachedAll.staff.length > 0 &&
     cachedAll.staff[0].Role !== undefined
@@ -588,6 +598,10 @@ const hydrateCacheFromPersisted = async (): Promise<SheetData | null> => {
 };
 
 const loadAllData = async (force = false): Promise<SheetData> => {
+  if (force) {
+    return fetchAllDataFromNetwork(true);
+  }
+
   if (cache) {
     refreshAllDataInBackground();
     return cache;

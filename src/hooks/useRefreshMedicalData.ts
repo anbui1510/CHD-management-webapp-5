@@ -153,7 +153,7 @@ export function useRefreshMedicalData(
 
   const loadMedicalDataAfterAuth = useCallback(async (scope: RefreshScope = 'full') => {
     try {
-      await refreshMedicalData(scope, false);
+      await refreshMedicalData(scope, true);
     } catch (err) {
       if (err instanceof AuthRequiredError) throw err;
     }
