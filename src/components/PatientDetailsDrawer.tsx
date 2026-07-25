@@ -9,6 +9,7 @@ import {
   filterPatientCathlabs,
   filterPatientOperations
 } from '../utils/latestDiagnosis';
+import { hasPlannedCathLabDate } from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge } from '../utils/patientDisplay';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import {
@@ -244,7 +245,11 @@ export default function PatientDetailsDrawer({
                 </div>
                 <div>
                   <span className="text-slate-500 font-medium">📅 Ngày TT dự kiến:</span>{' '}
-                  <span className="font-extrabold text-indigo-950 font-mono">{formatVNTime(latestPendingPrep.PlannedCathLabDate || latestPendingPrep.ConsultDate)}</span>
+                  <span className="font-extrabold text-indigo-950 font-mono">
+                    {hasPlannedCathLabDate(latestPendingPrep)
+                      ? formatVNTime(latestPendingPrep.PlannedCathLabDate)
+                      : 'Chưa xếp'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-slate-500 font-medium">👨‍⚕️ PTV:</span>{' '}
