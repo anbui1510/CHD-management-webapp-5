@@ -21,7 +21,7 @@ export default function PushNotificationPrompt({
   if (!visible) return null;
 
   return (
-    <div className="fixed top-16 md:top-20 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-lg z-[90] animate-in slide-in-from-top-2">
+    <div className="fixed top-[calc(4rem+env(safe-area-inset-top))] md:top-20 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-lg z-[90] animate-in slide-in-from-top-2">
       <div className="rounded-2xl border border-amber-200 bg-amber-50 shadow-xl overflow-hidden">
         <div className="px-4 py-3 flex items-start gap-3">
           <BellRing className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
