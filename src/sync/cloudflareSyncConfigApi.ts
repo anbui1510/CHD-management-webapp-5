@@ -90,6 +90,28 @@ export async function handleCloudflareSyncConfigRequest(
     return json({ message: 'Đã yêu cầu tải lại dữ liệu từ Google Sheets.', shouldReload: true });
   }
 
+  if (action === 'migrate' && method === 'POST') {
+    const body = await request.json().catch(() => ({})) as SyncConfigRecord;
+    const nextUrl = String(body.scriptUrl || '').trim();
+    const nextSecret = String(body.scriptSecret || '').trim();
+
+    if (!nextUrl) {
+      return json({ error: 'Thiếu scriptUrl để đồng bộ cấu hình.' }, 400);
+    }
+
+    if (!nextUrl.startsWith('https://script.google.com/')) {
+      return json({ error: 'Địa chỉ Apps Script không hợp lệ.' }, 400);
+    }
+
+    await writeSyncConfig(env, { scriptUrl: nextUrl, scriptSecret: nextSecret });
+    return json({
+      message: 'Đã đồng bộ cấu hình Google Sheets lên server dùng chung.',
+      scriptUrl: nextUrl,
+      scriptSecret: nextSecret,
+      isSynced: true,
+    });
+  }
+
   if (method === 'GET') {
     const config = await readSyncConfig(env);
     return json({
