@@ -10,9 +10,26 @@ export interface CloudflareSyncConfigEnv {
   };
   GOOGLE_SCRIPT_URL?: string;
   GOOGLE_SCRIPT_SECRET?: string;
+  GOOGLE_SCRIPT_API_KEY?: string;
+  VITE_GOOGLE_SCRIPT_URL?: string;
+  VITE_GOOGLE_SCRIPT_SECRET?: string;
+  VITE_GOOGLE_SCRIPT_API_KEY?: string;
 }
 
 const SYNC_CONFIG_KEY = 'sync_config_v1';
+
+function readEnvScriptConfig(env: CloudflareSyncConfigEnv): SyncConfigRecord {
+  return {
+    scriptUrl: String(env.GOOGLE_SCRIPT_URL || env.VITE_GOOGLE_SCRIPT_URL || '').trim(),
+    scriptSecret: String(
+      env.GOOGLE_SCRIPT_SECRET ||
+      env.VITE_GOOGLE_SCRIPT_SECRET ||
+      env.GOOGLE_SCRIPT_API_KEY ||
+      env.VITE_GOOGLE_SCRIPT_API_KEY ||
+      ''
+    ).trim(),
+  };
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -35,10 +52,7 @@ async function readSyncConfig(env: CloudflareSyncConfigEnv): Promise<SyncConfigR
     }
   }
 
-  return {
-    scriptUrl: String(env.GOOGLE_SCRIPT_URL || '').trim(),
-    scriptSecret: String(env.GOOGLE_SCRIPT_SECRET || '').trim(),
-  };
+  return readEnvScriptConfig(env);
 }
 
 async function writeSyncConfig(env: CloudflareSyncConfigEnv, config: SyncConfigRecord): Promise<void> {

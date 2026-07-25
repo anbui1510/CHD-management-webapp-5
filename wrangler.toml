@@ -1,3 +1,5 @@
+# Cloudflare Workers + static assets (PWA)
+# prebuild hook auto-resolves PUSH_KV namespace id before deploy (see scripts/ensure-cloudflare-push-setup.mjs)
 name = "chdmanagementwebapp5"
 main = "worker/index.ts"
 compatibility_date = "2024-09-23"

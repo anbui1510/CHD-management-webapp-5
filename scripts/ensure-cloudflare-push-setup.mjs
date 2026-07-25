@@ -6,6 +6,17 @@ import webpush from 'web-push';
 const root = process.cwd();
 const wranglerPath = path.join(root, 'wrangler.toml');
 const namespaceTitle = 'chdmanagementwebapp5-PUSH_KV';
+const PLACEHOLDER_KV_ID = '00000000000000000000000000000000';
+
+function isCloudflareCi() {
+  return process.env.WORKERS_CI === '1' || process.env.CF_PAGES === '1' || process.env.CI === 'true';
+}
+
+function readCurrentKvId() {
+  const content = fs.readFileSync(wranglerPath, 'utf8');
+  const match = content.match(/\[\[kv_namespaces\]\][\s\S]*?id\s*=\s*"([^"]+)"/);
+  return match?.[1] || '';
+}
 
 function patchWranglerKvId(kvId) {
   const content = fs.readFileSync(wranglerPath, 'utf8');
@@ -43,7 +54,7 @@ async function cfAccountApi(pathname, options = {}) {
   return payload.result;
 }
 
-async function ensureKvNamespace() {
+async function ensureKvNamespaceViaApi() {
   const namespaces = await cfAccountApi('/storage/kv/namespaces?per_page=100');
   const existing = namespaces.find(item => item.title === namespaceTitle);
   if (existing?.id) {
@@ -62,7 +73,47 @@ async function ensureKvNamespace() {
   return created.id;
 }
 
+function parseWranglerJson(output) {
+  const start = output.indexOf('[') >= 0 ? output.indexOf('[') : output.indexOf('{');
+  if (start < 0) return null;
+  return JSON.parse(output.slice(start));
+}
+
+function ensureKvNamespaceViaWrangler() {
+  try {
+    const listOutput = execSync('npx wrangler kv namespace list --json', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const namespaces = parseWranglerJson(listOutput);
+    if (Array.isArray(namespaces)) {
+      const existing = namespaces.find(item => item.title === namespaceTitle);
+      if (existing?.id) {
+        console.log(`[cloudflare-push-setup] Reusing KV namespace via wrangler ${existing.id}`);
+        return existing.id;
+      }
+    }
+
+    const createOutput = execSync(`npx wrangler kv namespace create "${namespaceTitle}" --json`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const created = parseWranglerJson(createOutput);
+    const createdId = created?.id || created?.namespace_id;
+    if (!createdId) {
+      throw new Error('wrangler kv namespace create returned no id');
+    }
+    console.log(`[cloudflare-push-setup] Created KV namespace via wrangler ${createdId}`);
+    return createdId;
+  } catch (error) {
+    console.warn('[cloudflare-push-setup] wrangler KV setup failed:', error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 function ensureVapidSecrets() {
+  if (!process.env.CLOUDFLARE_API_TOKEN) return;
+
   let secrets = [];
   try {
     const output = execSync('npx wrangler secret list', {
@@ -107,13 +158,36 @@ function ensureVapidSecrets() {
   console.log('[cloudflare-push-setup] Generated and uploaded VAPID secrets to Cloudflare Worker.');
 }
 
+async function resolveKvNamespaceId() {
+  const currentId = readCurrentKvId();
+  if (currentId && currentId !== PLACEHOLDER_KV_ID) {
+    console.log(`[cloudflare-push-setup] Using existing PUSH_KV id=${currentId}`);
+    return currentId;
+  }
+
+  if (process.env.CLOUDFLARE_API_TOKEN && process.env.CLOUDFLARE_ACCOUNT_ID) {
+    try {
+      return await ensureKvNamespaceViaApi();
+    } catch (error) {
+      console.warn('[cloudflare-push-setup] Cloudflare API KV setup failed:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  return ensureKvNamespaceViaWrangler();
+}
+
 async function main() {
-  if (!process.env.CLOUDFLARE_API_TOKEN) {
-    console.log('[cloudflare-push-setup] CLOUDFLARE_API_TOKEN missing — skipped remote setup.');
+  const kvId = await resolveKvNamespaceId();
+  if (!kvId) {
+    if (isCloudflareCi()) {
+      throw new Error(
+        'Không tạo được PUSH_KV namespace trước khi deploy. Hãy thêm CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID vào Build variables hoặc chạy npm run setup:cloudflare-push một lần trên máy có quyền Cloudflare.'
+      );
+    }
+    console.log('[cloudflare-push-setup] skipped — no KV namespace resolved.');
     process.exit(0);
   }
 
-  const kvId = await ensureKvNamespace();
   patchWranglerKvId(kvId);
   ensureVapidSecrets();
 }

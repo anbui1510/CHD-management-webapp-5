@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { readGoogleScriptConfigFromEnv } from './cloudflare-env.mjs';
 
 const root = process.cwd();
 const wranglerPath = path.join(root, 'wrangler.toml');
@@ -38,8 +39,7 @@ async function cfAccountApi(pathname, options = {}) {
 }
 
 async function main() {
-  const scriptUrl = String(process.env.GOOGLE_SCRIPT_URL || '').trim();
-  const scriptSecret = String(process.env.GOOGLE_SCRIPT_SECRET || process.env.GOOGLE_SCRIPT_API_KEY || '').trim();
+  const { scriptUrl, scriptSecret } = readGoogleScriptConfigFromEnv();
 
   if (!process.env.CLOUDFLARE_API_TOKEN) {
     console.log('[cloudflare-sync-config] CLOUDFLARE_API_TOKEN missing — skipped KV seed.');
@@ -47,7 +47,7 @@ async function main() {
   }
 
   if (!scriptUrl) {
-    console.log('[cloudflare-sync-config] GOOGLE_SCRIPT_URL missing — skipped KV seed.');
+    console.log('[cloudflare-sync-config] GOOGLE_SCRIPT_URL / VITE_GOOGLE_SCRIPT_URL missing — skipped KV seed.');
     process.exit(0);
   }
 
