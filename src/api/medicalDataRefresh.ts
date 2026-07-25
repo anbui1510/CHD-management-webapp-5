@@ -107,10 +107,13 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
     throw new AuthRequiredError();
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Không thể tải dữ liệu (HTTP ${res.status})`);
+    const err = await res.json().catch(() => ({})) as { error?: string; _syncWarning?: string };
+    throw new Error(err._syncWarning || err.error || `Không thể tải dữ liệu (HTTP ${res.status})`);
   }
-  const data = await res.json();
+  const data = await res.json() as MedicalDataBundle & { _syncWarning?: string };
+  if (data._syncWarning) {
+    throw new Error(data._syncWarning);
+  }
   return {
     patients: Array.isArray(data.patients) ? data.patients : EMPTY_BUNDLE.patients,
     consults: Array.isArray(data.consults) ? data.consults : EMPTY_BUNDLE.consults,

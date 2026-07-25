@@ -1173,9 +1173,17 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     }
     if (!resolvedScriptUrl) {
       if (isLocalHost()) return null;
+      const cached = await hydrateCacheFromPersisted();
+      if (cached) {
+        return jsonResponse({
+          ...sanitizeDataBundle(cached),
+          _syncWarning: 'Chưa đồng bộ cấu hình Google Sheets cho thiết bị này. Mở app trên máy tính đã kết nối Sheets một lần, hoặc vào mục Google Sheets để cấu hình.'
+        });
+      }
       return jsonResponse(
         {
-          error: 'Chưa cấu hình Google Apps Script URL. Mở app trên máy tính đã liên kết Google Sheets hoặc liên hệ quản trị viên.'
+          ...sanitizeDataBundle(EMPTY_DATA),
+          _syncWarning: 'Chưa cấu hình Google Apps Script URL. Mở app trên máy tính đã liên kết Google Sheets (đăng nhập một lần để đồng bộ), hoặc vào mục Google Sheets trên máy tính để cấu hình.'
         },
         { status: 503 }
       );
@@ -1413,6 +1421,43 @@ export const clearAllPersistedCache = async (): Promise<void> => {
   await clearPersistedData();
 };
 
+const applySyncConfigRecord = (scriptUrl: string, scriptSecret?: string): boolean => {
+  const trimmedUrl = String(scriptUrl || '').trim();
+  if (!trimmedUrl) return false;
+  setScriptUrl(trimmedUrl);
+  if (scriptSecret) setScriptSecret(scriptSecret);
+  return true;
+};
+
+export async function migrateLocalSyncConfigToServer(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  const localUrl = localStorage.getItem(SCRIPT_URL_STORAGE_KEY) || getScriptUrl();
+  if (!localUrl) return false;
+
+  const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
+  const requestFetch = nativeFetch || window.fetch.bind(window);
+  const localSecret = getScriptSecret();
+
+  try {
+    const migrateRes = await requestFetch('/api/sync-config/migrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptUrl: localUrl, scriptSecret: localSecret }),
+    });
+    if (!migrateRes.ok) {
+      const err = await migrateRes.json().catch(() => ({})) as { error?: string };
+      console.warn('Failed to migrate sync config to server:', err.error || migrateRes.status);
+      return false;
+    }
+    applySyncConfigRecord(localUrl, localSecret);
+    return true;
+  } catch (err) {
+    console.warn('Failed to migrate sync config to server:', err);
+    return false;
+  }
+}
+
 export async function hydrateSyncConfigFromServer(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
@@ -1425,24 +1470,10 @@ export async function hydrateSyncConfigFromServer(): Promise<boolean> {
     const data = await res.json() as { scriptUrl?: string; scriptSecret?: string; isSynced?: boolean };
 
     if (data.scriptUrl) {
-      setScriptUrl(data.scriptUrl);
-      if (data.scriptSecret) setScriptSecret(data.scriptSecret);
-      return true;
+      return applySyncConfigRecord(data.scriptUrl, data.scriptSecret);
     }
 
-    const localUrl = localStorage.getItem(SCRIPT_URL_STORAGE_KEY) || '';
-    if (!localUrl) return false;
-
-    const localSecret = getScriptSecret();
-    const migrateRes = await requestFetch('/api/sync-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptUrl: localUrl, scriptSecret: localSecret }),
-    });
-    if (!migrateRes.ok) return false;
-    setScriptUrl(localUrl);
-    if (localSecret) setScriptSecret(localSecret);
-    return true;
+    return migrateLocalSyncConfigToServer();
   } catch (err) {
     console.warn('Failed to hydrate sync config from server:', err);
     return false;
@@ -1450,7 +1481,10 @@ export async function hydrateSyncConfigFromServer(): Promise<boolean> {
 }
 
 export async function ensureSyncConfigHydrated(): Promise<boolean> {
-  if (getScriptUrl()) return true;
+  if (getScriptUrl()) {
+    void migrateLocalSyncConfigToServer();
+    return true;
+  }
   return hydrateSyncConfigFromServer();
 }
 
