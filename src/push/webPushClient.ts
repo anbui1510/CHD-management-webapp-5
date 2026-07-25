@@ -166,15 +166,13 @@ export async function syncExistingPushSubscription(staffKey: string): Promise<bo
   return res.ok;
 }
 
-export async function fetchPushStatus(): Promise<{ configured: boolean; subscribed: boolean; permission: NotificationPermission }> {
+export async function fetchPushStatus(staffKey?: string): Promise<{ configured: boolean; subscribed: boolean; permission: NotificationPermission }> {
   const permission = isPushSupported() ? Notification.permission : 'denied';
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  if (!token) {
-    return { configured: false, subscribed: false, permission };
-  }
-  const res = await fetch('/api/push/status', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const staffQuery = staffKey ? `?staffKey=${encodeURIComponent(staffKey)}` : '';
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`/api/push/status${staffQuery}`, { headers });
   if (!res.ok) {
     return { configured: false, subscribed: false, permission };
   }

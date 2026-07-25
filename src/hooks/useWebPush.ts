@@ -26,7 +26,7 @@ export function useWebPush(staffKey?: string) {
       setSubscribed(false);
       return;
     }
-    const status = await fetchPushStatus();
+    const status = await fetchPushStatus(staffKey);
     setConfigured(status.configured);
     setSubscribed(status.subscribed);
     setPermission(status.permission);

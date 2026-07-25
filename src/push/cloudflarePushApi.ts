@@ -1,0 +1,244 @@
+import webpush from 'web-push';
+import type { WebPushPayload } from './pushPayload';
+
+export interface PushSubscriptionRecord {
+  PushSubKey: string;
+  StaffKey: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  UserAgent?: string;
+  CreatedTime: string;
+  UpdatedTime: string;
+}
+
+export interface PushKvStore {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string): Promise<void>;
+}
+
+export interface CloudflarePushEnv {
+  PUSH_KV: PushKvStore;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
+}
+
+const SUBSCRIPTIONS_KEY = 'push_subscriptions_v1';
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
+
+function isConfigured(env: CloudflarePushEnv): boolean {
+  return !!(String(env.VAPID_PUBLIC_KEY || '').trim() && String(env.VAPID_PRIVATE_KEY || '').trim());
+}
+
+function configureWebPush(env: CloudflarePushEnv): boolean {
+  const publicKey = String(env.VAPID_PUBLIC_KEY || '').trim();
+  const privateKey = String(env.VAPID_PRIVATE_KEY || '').trim();
+  const subject = String(env.VAPID_SUBJECT || 'mailto:chd-admin@hospital.vn').trim();
+  if (!publicKey || !privateKey) return false;
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  return true;
+}
+
+async function readSubscriptions(kv: PushKvStore): Promise<PushSubscriptionRecord[]> {
+  const raw = await kv.get(SUBSCRIPTIONS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeSubscriptions(kv: PushKvStore, records: PushSubscriptionRecord[]): Promise<void> {
+  await kv.put(SUBSCRIPTIONS_KEY, JSON.stringify(records));
+}
+
+function normalizeSubscribeBody(body: any): Omit<PushSubscriptionRecord, 'PushSubKey' | 'CreatedTime' | 'UpdatedTime'> | null {
+  const endpoint = String(body?.endpoint || '').trim();
+  const keys = body?.keys || {};
+  const p256dh = String(keys.p256dh || body?.p256dh || '').trim();
+  const auth = String(keys.auth || body?.auth || '').trim();
+  const staffKey = String(body?.StaffKey || '').trim();
+  if (!endpoint || !p256dh || !auth || !staffKey) return null;
+  return {
+    StaffKey: staffKey,
+    endpoint,
+    p256dh,
+    auth,
+    UserAgent: String(body?.UserAgent || '').trim(),
+  };
+}
+
+function createPushSubKey(existing: PushSubscriptionRecord[]): string {
+  return `pushsub_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+async function upsertSubscription(kv: PushKvStore, body: any): Promise<PushSubscriptionRecord | null> {
+  const normalized = normalizeSubscribeBody(body);
+  if (!normalized) return null;
+
+  const subscriptions = await readSubscriptions(kv);
+  const now = nowIso();
+  const existingIndex = subscriptions.findIndex(item => item.endpoint === normalized.endpoint);
+
+  if (existingIndex >= 0) {
+    subscriptions[existingIndex] = {
+      ...subscriptions[existingIndex],
+      ...normalized,
+      UpdatedTime: now,
+    };
+    await writeSubscriptions(kv, subscriptions);
+    return subscriptions[existingIndex];
+  }
+
+  const record: PushSubscriptionRecord = {
+    PushSubKey: createPushSubKey(subscriptions),
+    ...normalized,
+    CreatedTime: now,
+    UpdatedTime: now,
+  };
+  subscriptions.push(record);
+  await writeSubscriptions(kv, subscriptions);
+  return record;
+}
+
+async function removeSubscription(kv: PushKvStore, staffKey: string, endpoint: string): Promise<boolean> {
+  const subscriptions = await readSubscriptions(kv);
+  const next = subscriptions.filter(item => !(item.endpoint === endpoint && item.StaffKey === staffKey));
+  if (next.length === subscriptions.length) return false;
+  await writeSubscriptions(kv, next);
+  return true;
+}
+
+async function sendToStaff(kv: PushKvStore, env: CloudflarePushEnv, staffKey: string, payload: WebPushPayload) {
+  if (!configureWebPush(env)) {
+    return { sent: 0, removed: 0, skipped: true };
+  }
+
+  const subscriptions = (await readSubscriptions(kv)).filter(item => String(item.StaffKey) === String(staffKey));
+  if (subscriptions.length === 0) {
+    return { sent: 0, removed: 0, skipped: false };
+  }
+
+  let sent = 0;
+  const staleEndpoints: string[] = [];
+  const body = JSON.stringify(payload);
+
+  for (const subscription of subscriptions) {
+    try {
+      await webpush.sendNotification(
+        {
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: subscription.p256dh,
+            auth: subscription.auth,
+          },
+        },
+        body
+      );
+      sent += 1;
+    } catch (error: any) {
+      const statusCode = error?.statusCode || error?.status;
+      if (statusCode === 404 || statusCode === 410) {
+        staleEndpoints.push(subscription.endpoint);
+      }
+    }
+  }
+
+  if (staleEndpoints.length > 0) {
+    const next = (await readSubscriptions(kv)).filter(item => !staleEndpoints.includes(item.endpoint));
+    await writeSubscriptions(kv, next);
+  }
+
+  return { sent, removed: staleEndpoints.length, skipped: false };
+}
+
+function parseStaffKeyFromRequest(request: Request, body?: any): string {
+  const url = new URL(request.url);
+  const fromQuery = String(url.searchParams.get('staffKey') || url.searchParams.get('StaffKey') || '').trim();
+  if (fromQuery) return fromQuery;
+  if (body) {
+    const fromBody = String(body.StaffKey || '').trim();
+    if (fromBody) return fromBody;
+  }
+  return '';
+}
+
+export async function handleCloudflarePushRequest(request: Request, env: CloudflarePushEnv): Promise<Response> {
+  const url = new URL(request.url);
+  const method = request.method.toUpperCase();
+  const parts = url.pathname.replace(/^\/api\/push\/?/, '').split('/').filter(Boolean);
+  const action = parts[0] || '';
+
+  if (!env.PUSH_KV) {
+    return json({ error: 'Push KV chưa được cấu hình trên Worker', configured: false }, 503);
+  }
+
+  if (action === 'vapid-public-key' && method === 'GET') {
+    const publicKey = String(env.VAPID_PUBLIC_KEY || '').trim();
+    if (!publicKey) {
+      return json({ error: 'Web Push chưa được cấu hình trên server', configured: false }, 503);
+    }
+    return json({ publicKey, configured: true });
+  }
+
+  if (action === 'status' && method === 'GET') {
+    const staffKey = parseStaffKeyFromRequest(request);
+    if (!staffKey) {
+      return json({ error: 'Thiếu staffKey', configured: isConfigured(env), subscribed: false }, 400);
+    }
+    const subscriptions = await readSubscriptions(env.PUSH_KV);
+    const subscribed = subscriptions.some(item => String(item.StaffKey) === staffKey);
+    return json({ configured: isConfigured(env), subscribed });
+  }
+
+  if (action === 'subscribe' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const record = await upsertSubscription(env.PUSH_KV, body);
+    if (!record) {
+      return json({ error: 'Thiếu endpoint hoặc keys push subscription' }, 400);
+    }
+    return json(record, 201);
+  }
+
+  if (action === 'unsubscribe' && method === 'DELETE') {
+    const body = await request.json().catch(() => ({}));
+    const staffKey = parseStaffKeyFromRequest(request, body);
+    const endpoint = String(body?.endpoint || '').trim();
+    if (!staffKey || !endpoint) {
+      return json({ error: 'Thiếu endpoint hoặc StaffKey' }, 400);
+    }
+    const removed = await removeSubscription(env.PUSH_KV, staffKey, endpoint);
+    return json({ success: removed });
+  }
+
+  if (action === 'deliver' && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const staffKey = String(body?.StaffKey || '').trim();
+    if (!staffKey) {
+      return json({ error: 'Thiếu StaffKey' }, 400);
+    }
+    const payload: WebPushPayload = {
+      title: String(body?.title || 'CHD Management'),
+      body: String(body?.body || 'Bạn có thông báo mới'),
+      url: String(body?.url || '/?view=home'),
+      notificationKey: String(body?.notificationKey || ''),
+    };
+    const result = await sendToStaff(env.PUSH_KV, env, staffKey, payload);
+    return json(result);
+  }
+
+  return json({ error: 'Không tìm thấy endpoint push.' }, 404);
+}

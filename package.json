@@ -9,6 +9,7 @@
     "start": "node dist/server.cjs",
     "generate:vapid": "node scripts/generate-vapid-keys.mjs",
     "setup:vapid-env": "node scripts/setup-vapid-env.mjs",
+    "setup:cloudflare-push": "node scripts/ensure-cloudflare-push-setup.mjs",
     "clean": "rm -rf dist server.js data",
     "lint": "tsc --noEmit",
     "extract:apps-script": "node scripts/extract-apps-script.mjs",
