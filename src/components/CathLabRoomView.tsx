@@ -326,6 +326,11 @@ type DoneSortField = 'name' | 'dob' | 'postDiagnosis' | 'postDiagnosisText' | 'm
 
 const PLANS_REQUIRING_FOLLOW_UP = ['Theo dõi sát', 'Cần thông tim can thiệp lại'];
 
+const suggestCathPlanFromMethods = (methods: string[]): string => {
+  const hasSpecial = methods.some(method => CATH_METHODS_SPECIAL.includes(method));
+  return hasSpecial ? 'Theo dõi sát' : 'Tái khám thường';
+};
+
 const buildCathFormSnapshot = (data: Partial<CathLab>, note: string): string =>
   JSON.stringify({
     CathDate: data.CathDate || '',
@@ -484,6 +489,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
   const [exitConfirmError, setExitConfirmError] = useState('');
   const [saving, setSaving] = useState(false);
+  const cathPlanManuallySetRef = useRef(false);
 
   // AdHoc State
   const [adHocPatientMode, setAdHocPatientMode] = useState<'existing' | 'new'>('existing');
@@ -513,6 +519,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const loggedInStaffNameShort = loggedInStaff ? (['bs', 'bs.', 'pgs', 'gs', 'th.s', 'ths', 'pgs.ts', 'gs.ts'].includes(loggedInStaff.StaffName.split(' ')[0].toLowerCase()) ? loggedInStaff.StaffName : `BS. ${loggedInStaff.StaffName.split(' ').pop()}`) : '';
   
   const openPendingForm = (c: Consult, p: Patient) => {
+    cathPlanManuallySetRef.current = false;
     const initial = {
       ...INIT_CATHLAB,
       CathDate: new Date().toISOString().split('T')[0],
@@ -533,6 +540,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     const p = findPatientByKey(patients, cath.PatientKey);
     
     if(p) {
+      cathPlanManuallySetRef.current = true;
       const initial = {
         ...cath,
         CathMethod: parseCathMethods(cath.CathMethod)
@@ -548,6 +556,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const forceCloseModal = () => {
+    cathPlanManuallySetRef.current = false;
     setSelectedPending(null);
     setSelectedDone(null);
     setIsAdHocModalOpen(false);
@@ -589,6 +598,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const openAdHocForm = () => {
+    cathPlanManuallySetRef.current = false;
     setFormData({
       ...INIT_CATHLAB,
       CathDate: new Date().toISOString().split('T')[0],
@@ -1600,26 +1610,25 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      });
   };
 
-  // Logic: Auto fill CathPlan based on CathMethod
-  useEffect(() => {
-    if (Array.isArray(formData.CathMethod) && formData.CathMethod.length > 0) {
-      const hasSpecial = formData.CathMethod.some(m => CATH_METHODS_SPECIAL.includes(m));
-      if (hasSpecial) {
-        setFormData(prev => ({ ...prev, CathPlan: 'Theo dõi sát' }));
-      } else {
-        setFormData(prev => ({ ...prev, CathPlan: 'Tái khám thường' }));
-      }
-    }
-  }, [formData.CathMethod]);
+  const applyCathMethodChange = (methods: string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      CathMethod: methods,
+      ...(cathPlanManuallySetRef.current ? {} : { CathPlan: suggestCathPlanFromMethods(methods) }),
+    }));
+  };
 
   const handleCathMethodToggle = (method: string) => {
      setFormData(prev => {
         const methods = parseCathMethods(prev.CathMethod);
-        if (methods.includes(method)) {
-           return { ...prev, CathMethod: methods.filter(m => m !== method) };
-        } else {
-           return { ...prev, CathMethod: [...methods, method] };
-        }
+        const nextMethods = methods.includes(method)
+          ? methods.filter(m => m !== method)
+          : [...methods, method];
+        return {
+          ...prev,
+          CathMethod: nextMethods,
+          ...(cathPlanManuallySetRef.current ? {} : { CathPlan: suggestCathPlanFromMethods(nextMethods) }),
+        };
      });
   };
 
@@ -2336,7 +2345,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                         <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Kế hoạch sau thông tim <span className="text-rose-500">*</span></label>
                         <select 
                           value={formData.CathPlan} 
-                          onChange={e => setFormData({...formData, CathPlan: e.target.value})}
+                          onChange={e => {
+                            cathPlanManuallySetRef.current = true;
+                            setFormData({...formData, CathPlan: e.target.value});
+                          }}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         >
                            <option value="Tái khám thường">Tái khám thường</option>
@@ -2362,7 +2374,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                            required
                            options={cathMethodOptions}
                            values={parseCathMethods(formData.CathMethod)}
-                           onMultiChange={(methods) => setFormData({...formData, CathMethod: methods})}
+                           onMultiChange={applyCathMethodChange}
                            placeholder="Chọn phương pháp..."
                            searchPlaceholder="Gõ phương pháp để tìm..."
                            direction="up"
