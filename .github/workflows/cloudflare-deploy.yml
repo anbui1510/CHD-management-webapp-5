@@ -32,6 +32,9 @@ jobs:
         run: node scripts/ensure-cloudflare-push-setup.mjs
 
       - name: Build frontend + server bundle
+        env:
+          VITE_GOOGLE_SCRIPT_URL: ${{ secrets.GOOGLE_SCRIPT_URL }}
+          VITE_GOOGLE_SCRIPT_SECRET: ${{ secrets.GOOGLE_SCRIPT_SECRET }}
         run: npm run build
 
       - name: Deploy to Cloudflare Workers
@@ -46,5 +49,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GOOGLE_SCRIPT_URL: ${{ secrets.GOOGLE_SCRIPT_URL }}
+          VITE_GOOGLE_SCRIPT_URL: ${{ secrets.GOOGLE_SCRIPT_URL }}
           GOOGLE_SCRIPT_SECRET: ${{ secrets.GOOGLE_SCRIPT_SECRET }}
+          VITE_GOOGLE_SCRIPT_SECRET: ${{ secrets.GOOGLE_SCRIPT_SECRET }}
         run: node scripts/ensure-cloudflare-sync-config.mjs
