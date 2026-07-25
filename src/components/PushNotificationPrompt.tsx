@@ -39,7 +39,7 @@ export default function PushNotificationPrompt({
             )}
             {!configured && (
               <p className="text-[11px] text-amber-700 mt-2 leading-relaxed">
-                Server chưa cấu hình push. Bạn vẫn có thể bật trong <strong>Hồ sơ cá nhân</strong> sau khi quản trị cấu hình VAPID.
+                Hệ thống đang khởi tạo push trên server. Nếu vẫn không bật được sau vài phút deploy, báo quản trị kiểm tra Cloudflare Worker.
               </p>
             )}
             {error && (

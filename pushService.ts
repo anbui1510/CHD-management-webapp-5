@@ -1,6 +1,10 @@
 import webpush from 'web-push';
 import path from 'path';
 import type { Notification } from './src/types';
+import { buildWebPushPayload, type WebPushPayload } from './src/push/pushPayload';
+
+export type { WebPushPayload };
+export { buildWebPushPayload, resolveNotificationDeepLink } from './src/push/pushPayload';
 
 export interface PushSubscriptionRecord {
   PushSubKey: string;
@@ -11,13 +15,6 @@ export interface PushSubscriptionRecord {
   UserAgent?: string;
   CreatedTime: string;
   UpdatedTime: string;
-}
-
-export interface WebPushPayload {
-  title: string;
-  body: string;
-  url: string;
-  notificationKey: string;
 }
 
 type ReadWriteDb = {
@@ -51,23 +48,6 @@ export function getVapidPublicKey(): string {
 
 export function isWebPushConfigured(): boolean {
   return vapidConfigured && !!getVapidPublicKey();
-}
-
-export function resolveNotificationDeepLink(notification: Pick<Notification, 'RelatedEntityType' | 'Severity'>): string {
-  const entityType = String(notification.RelatedEntityType || '').trim().toLowerCase();
-  if (entityType === 'consult') return '/?view=schedule-tt';
-  if (entityType === 'patient') return '/?view=patients';
-  if (entityType === 'cathlab') return '/?view=cathlab-room';
-  return '/?view=home';
-}
-
-export function buildWebPushPayload(notification: Notification): WebPushPayload {
-  return {
-    title: notification.Title || 'CHD Management',
-    body: notification.Message || 'Bạn có thông báo mới',
-    url: resolveNotificationDeepLink(notification),
-    notificationKey: notification.NotificationKey,
-  };
 }
 
 function normalizeSubscriptionInput(body: any): Omit<PushSubscriptionRecord, 'PushSubKey' | 'CreatedTime' | 'UpdatedTime'> | null {

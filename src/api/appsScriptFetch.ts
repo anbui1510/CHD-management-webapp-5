@@ -1,4 +1,5 @@
 import { handleChdBriefRequest } from './chdBriefBridge';
+import { buildWebPushPayload } from '../push/pushPayload';
 import { getAppVersionPayload } from '../appVersion';
 import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
 import type { Staff, Source } from '../types';
@@ -811,6 +812,21 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
     key: String(finalKey),
     data: record
   });
+
+  if (endpoint === 'notifications' && isInsert && record?.StaffKey) {
+    const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
+    if (nativeFetch) {
+      const payload = buildWebPushPayload(record);
+      void nativeFetch('/api/push/deliver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          StaffKey: record.StaffKey,
+          ...payload,
+        }),
+      }).catch(() => undefined);
+    }
+  }
 
   return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
 };

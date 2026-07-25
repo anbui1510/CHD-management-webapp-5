@@ -424,7 +424,7 @@ export default function StaffProfileView({
     if (!webPush) return '';
     if (!webPush.supported) return 'Thiết bị hoặc trình duyệt không hỗ trợ push';
     if (webPush.permission === 'denied') return 'Đã chặn — bật lại trong Cài đặt iOS → Thông báo';
-    if (!webPush.configured) return 'Server chưa cấu hình push (VAPID)';
+    if (!webPush.configured) return 'Đang khởi tạo push trên server — thử lại sau vài phút';
     if (webPush.subscribed) return 'Đang bật — nhận alert màn hình khóa';
     if (webPush.permission === 'granted') return 'Đã cho phép nhưng chưa đăng ký thiết bị';
     return 'Chưa bật';
