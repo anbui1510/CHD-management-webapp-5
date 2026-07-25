@@ -660,8 +660,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               setSortOrder('asc');
             }
           }}
-          className={`px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider ${
-            freezeName ? 'sticky left-10 top-0 z-30 min-w-[160px] border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
+          className={`px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20 ${
+            freezeName ? 'sticky left-10 z-30 min-w-[160px] border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
           }`}
         >
           <div className="flex items-center gap-1.5 justify-start">
@@ -698,11 +698,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
             </div>
           </div>
         )}
-      <div className="overflow-x-auto w-full rounded-2xl shadow-xs bg-white custom-scrollbar">
+      <div className="w-full rounded-2xl shadow-xs bg-white">
         <table className="min-w-full border-separate border-spacing-0 table-auto text-left font-sans text-xs">
-          <thead className="bg-slate-55 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20">
+          <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider">
             <tr>
-              <th scope="col" className="px-2 py-3 bg-slate-50 border-b border-slate-200 text-center w-10 sticky left-0 top-0 z-30 border-r border-slate-200">
+              <th scope="col" className="px-2 py-3 bg-slate-50 border-b border-slate-200 text-center w-10 sticky left-0 top-0 z-40 border-r border-slate-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -727,7 +727,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               {renderSortableHeader('dob', 'Ngày sinh / GT')}
               {renderSortableHeader('diagnosis', 'Chẩn đoán')}
               {renderSortableHeader('date', 'Ngày staff')}
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200 text-center text-slate-500 font-extrabold uppercase text-[10px] tracking-wider">Hành động</th>
+              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200 text-center text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20">Hành động</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
@@ -972,8 +972,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           </button>
         </div>
 
-        {/* Cards Grid */}
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+        {/* Cards Grid — single scroll container for sticky header + frozen columns */}
+        <div className="flex-1 min-h-0 overflow-auto pr-1 custom-scrollbar">
           {renderList(displayedConsults)}
         </div>
 
