@@ -3278,6 +3278,7 @@ export default function App() {
                 setActiveMenu('patients');
                 setSelectedPatientForDetail(pat);
               }}
+              onSaveSuccess={showSuccessBanner}
             />
           )}
 

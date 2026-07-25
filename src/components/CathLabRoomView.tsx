@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
-import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User, Upload } from 'lucide-react';
+import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User, Upload, AlertTriangle } from 'lucide-react';
 import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceCathMethodOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
@@ -30,6 +30,7 @@ interface Props {
   onAddCathlab?: (cath: CathLab) => void;
   onAddConsult?: (consult: Consult) => void;
   onAddPatient?: (patient: Patient) => void;
+  onSaveSuccess?: (message: string) => void;
 }
 
 const CATH_METHODS_SPECIAL = [
@@ -309,11 +310,39 @@ const chunkArray = <T,>(items: T[], size: number): T[][] => {
   return chunks;
 };
 
-export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient }: Props) {
+const compareSortText = (a: string, b: string): number =>
+  removeVietnameseTones(a).toLowerCase().localeCompare(removeVietnameseTones(b).toLowerCase());
+
+type PendingSortField = 'name' | 'dob' | 'diagnosis' | 'date' | 'ptv';
+type DoneSortField = 'name' | 'dob' | 'postDiagnosis' | 'postDiagnosisText' | 'method' | 'date' | 'ptv';
+
+const PLANS_REQUIRING_FOLLOW_UP = ['Theo dõi sát', 'Cần thông tim can thiệp lại'];
+
+const buildCathFormSnapshot = (data: Partial<CathLab>, note: string): string =>
+  JSON.stringify({
+    CathDate: data.CathDate || '',
+    PostDiagnosisID: data.PostDiagnosisID || '',
+    PostDiagnosis: data.PostDiagnosis || '',
+    CathResultID: data.CathResultID || '',
+    CathMethod: parseCathMethods(data.CathMethod).slice().sort().join(' + '),
+    CathPlan: data.CathPlan || '',
+    CathNote: data.CathNote || '',
+    _1stInterventionist: data._1stInterventionist || '',
+    _2ndInterventionist: data._2ndInterventionist || '',
+    _3rdInterventionist: data._3rdInterventionist || '',
+    _4thInterventionist: data._4thInterventionist || '',
+    PlannedFollowUpDate: data.PlannedFollowUpDate || '',
+    callNote: note
+  });
+
+export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient, onSaveSuccess }: Props) {
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortAsc, setSortAsc] = useState(true);
+  const [pendingSortField, setPendingSortField] = useState<PendingSortField>('date');
+  const [pendingSortOrder, setPendingSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [doneSortField, setDoneSortField] = useState<DoneSortField>('date');
+  const [doneSortOrder, setDoneSortOrder] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
 
@@ -359,13 +388,31 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      }
 
      list.sort((a, b) => {
-        const da = new Date(a.PlannedCathLabDate || '2100-01-01').getTime();
-        const db = new Date(b.PlannedCathLabDate || '2100-01-01').getTime();
-        return sortAsc ? da - db : db - da;
+        const pA = findPatientByKey(patients, a.PatientKey);
+        const pB = findPatientByKey(patients, b.PatientKey);
+        let comparison = 0;
+        switch (pendingSortField) {
+          case 'name':
+            comparison = compareSortText(String(pA?.PatientName || ''), String(pB?.PatientName || ''));
+            break;
+          case 'dob':
+            comparison = new Date(pA?.PatientDOB || '1970-01-01').getTime() - new Date(pB?.PatientDOB || '1970-01-01').getTime();
+            break;
+          case 'diagnosis':
+            comparison = compareSortText(String(a.DiagnosisID || ''), String(b.DiagnosisID || ''));
+            break;
+          case 'date':
+            comparison = new Date(a.PlannedCathLabDate || '2100-01-01').getTime() - new Date(b.PlannedCathLabDate || '2100-01-01').getTime();
+            break;
+          case 'ptv':
+            comparison = compareSortText(String(a.Scheduled2ndInterventionist || ''), String(b.Scheduled2ndInterventionist || ''));
+            break;
+        }
+        return pendingSortOrder === 'asc' ? comparison : -comparison;
      });
 
      return list;
-  }, [consults, cathlabs, patients, searchTerm, sortAsc]);
+  }, [consults, cathlabs, patients, searchTerm, pendingSortField, pendingSortOrder]);
 
   const doneCathlabs = useMemo(() => {
      let list = cathlabs;
@@ -379,12 +426,36 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         });
      }
      list.sort((a, b) => {
-        const da = new Date(a.CathDate || '1970-01-01').getTime();
-        const db = new Date(b.CathDate || '1970-01-01').getTime();
-        return sortAsc ? da - db : db - da;
+        const pA = findPatientByKey(patients, a.PatientKey);
+        const pB = findPatientByKey(patients, b.PatientKey);
+        let comparison = 0;
+        switch (doneSortField) {
+          case 'name':
+            comparison = compareSortText(String(pA?.PatientName || ''), String(pB?.PatientName || ''));
+            break;
+          case 'dob':
+            comparison = new Date(pA?.PatientDOB || '1970-01-01').getTime() - new Date(pB?.PatientDOB || '1970-01-01').getTime();
+            break;
+          case 'postDiagnosis':
+            comparison = compareSortText(String(a.PostDiagnosisID || ''), String(b.PostDiagnosisID || ''));
+            break;
+          case 'postDiagnosisText':
+            comparison = compareSortText(String(a.PostDiagnosis || ''), String(b.PostDiagnosis || ''));
+            break;
+          case 'method':
+            comparison = compareSortText(parseCathMethods(a.CathMethod).join(', '), parseCathMethods(b.CathMethod).join(', '));
+            break;
+          case 'date':
+            comparison = new Date(a.CathDate || '1970-01-01').getTime() - new Date(b.CathDate || '1970-01-01').getTime();
+            break;
+          case 'ptv':
+            comparison = compareSortText(String(a._2ndInterventionist || ''), String(b._2ndInterventionist || ''));
+            break;
+        }
+        return doneSortOrder === 'asc' ? comparison : -comparison;
      });
      return list;
-  }, [cathlabs, patients, searchTerm, sortAsc]);
+  }, [cathlabs, patients, searchTerm, doneSortField, doneSortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(doneCathlabs.length / ITEMS_PER_PAGE));
   const paginatedDoneCathlabs = useMemo(() => {
@@ -401,6 +472,11 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   // Form State
   const [formData, setFormData] = useState<Partial<CathLab>>(INIT_CATHLAB);
   const [callNote, setCallNote] = useState('');
+  const [formSnapshot, setFormSnapshot] = useState<string | null>(null);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
+  const [exitConfirmError, setExitConfirmError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // AdHoc State
   const [adHocPatientMode, setAdHocPatientMode] = useState<'existing' | 'new'>('existing');
@@ -430,8 +506,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const loggedInStaffNameShort = loggedInStaff ? (['bs', 'bs.', 'pgs', 'gs', 'th.s', 'ths', 'pgs.ts', 'gs.ts'].includes(loggedInStaff.StaffName.split(' ')[0].toLowerCase()) ? loggedInStaff.StaffName : `BS. ${loggedInStaff.StaffName.split(' ').pop()}`) : '';
   
   const openPendingForm = (c: Consult, p: Patient) => {
-    setSelectedPending({c, p});
-    setFormData({
+    const initial = {
       ...INIT_CATHLAB,
       CathDate: new Date().toISOString().split('T')[0],
       PostDiagnosisID: c.DiagnosisID || '',
@@ -440,31 +515,70 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       _1stInterventionist: c.Scheduled1stInterventionist || '',
       _2ndInterventionist: c.Scheduled2ndInterventionist || loggedInStaffNameShort || '',
       _3rdInterventionist: c.Scheduled3rdInterventionist || ''
-    });
+    };
+    setSelectedPending({c, p});
+    setFormData(initial);
     setCallNote('');
+    setFormSnapshot(buildCathFormSnapshot(initial, ''));
   };
 
   const openDoneForm = (cath: CathLab) => {
     const p = findPatientByKey(patients, cath.PatientKey);
     
     if(p) {
+      const initial = {
+        ...cath,
+        CathMethod: parseCathMethods(cath.CathMethod)
+      };
       setSelectedDone({p, cath});
       try {
-        setFormData({
-          ...cath,
-          CathMethod: parseCathMethods(cath.CathMethod)
-        });
+        setFormData(initial);
+        setFormSnapshot(buildCathFormSnapshot(initial, ''));
       } catch (err) {
         console.error("Error setting form data:", err);
       }
     }
   };
 
-  const closeModal = () => {
+  const forceCloseModal = () => {
     setSelectedPending(null);
     setSelectedDone(null);
     setIsAdHocModalOpen(false);
     setAdHocPriorityOrder('Cấp cứu');
+    setFormSnapshot(null);
+  };
+
+  const hasUnsavedChanges = () => {
+    if (!formSnapshot || (!selectedPending && !selectedDone)) return false;
+    return buildCathFormSnapshot(formData, callNote) !== formSnapshot;
+  };
+
+  const requestCloseModal = (onClose?: () => void) => {
+    const close = onClose || forceCloseModal;
+    if ((selectedPending || selectedDone) && hasUnsavedChanges()) {
+      setExitConfirmError('');
+      setPendingExitAction(() => close);
+      setExitConfirmOpen(true);
+      return;
+    }
+    close();
+  };
+
+  const closeModal = () => requestCloseModal();
+
+  const handleExitCancel = () => {
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
+  };
+
+  const handleExitDiscard = () => {
+    const action = pendingExitAction;
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
+    setFormSnapshot(null);
+    action?.();
   };
 
   const openAdHocForm = () => {
@@ -1359,7 +1473,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        onPatchConsult?.(consultPayload.ConsultKey, consultPayload);
      }
      onAddCathlab?.(cathPayload);
-     closeModal();
+     forceCloseModal();
 
      // Save to database
      const persist = async () => {
@@ -1468,11 +1582,16 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      });
   };
 
-  const saveCathLab = async (isEdit: boolean) => {
+  const saveCathLab = async (isEdit: boolean, options?: { closeOnSuccess?: boolean }): Promise<boolean> => {
      const safeCathMethod = parseCathMethods(formData.CathMethod);
      if (!formData.CathDate || !formData.PostDiagnosisID || !formData.CathResultID || safeCathMethod.length === 0 || !formData.CathPlan || !formData._1stInterventionist || !formData._2ndInterventionist) {
         alert("Vui lòng điền đầy đủ các thông tin bắt buộc (*)");
-        return;
+        return false;
+     }
+
+     if (PLANS_REQUIRING_FOLLOW_UP.includes(String(formData.CathPlan || '')) && !formData.PlannedFollowUpDate) {
+        alert("Vui lòng nhập Ngày hẹn tái khám");
+        return false;
      }
 
      const method = isEdit ? 'PUT' : 'POST';
@@ -1488,27 +1607,93 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        CathMethod: safeCathMethod.join(' + ')
      };
 
-     if (isEdit && formData.CathKey) {
-       onPatchCathlab?.(formData.CathKey, payload);
-     } else {
-       onAddCathlab?.(payload as CathLab);
+     const closeOnSuccess = options?.closeOnSuccess !== false;
+     if (closeOnSuccess) {
+       if (isEdit && formData.CathKey) {
+         onPatchCathlab?.(formData.CathKey, payload);
+       } else {
+         onAddCathlab?.(payload as CathLab);
+       }
+       forceCloseModal();
      }
-     closeModal();
 
-     fetch(url, {
-       method,
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify(payload)
-     })
-       .then(res => {
-         if (!res.ok) throw new Error('Không thể lưu kết quả thông tim');
-         onRefreshData();
-       })
-       .catch(e => {
-         console.error(e);
-         alert(e instanceof Error ? e.message : 'Không thể lưu kết quả thông tim');
-         onRefreshData();
+     setSaving(true);
+     try {
+       const res = await fetch(url, {
+         method,
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(payload)
        });
+       if (!res.ok) throw new Error('Không thể lưu kết quả thông tim');
+       onRefreshData();
+       onSaveSuccess?.('Đã lưu kết quả thông tim thành công!');
+       return true;
+     } catch (e) {
+       console.error(e);
+       alert(e instanceof Error ? e.message : 'Không thể lưu kết quả thông tim');
+       onRefreshData();
+       return false;
+     } finally {
+       setSaving(false);
+     }
+  };
+
+  const handleExitSave = async () => {
+    setExitConfirmError('');
+    const ok = await saveCathLab(!!selectedDone, { closeOnSuccess: true });
+    if (ok) {
+      handleExitDiscard();
+    } else if (!formData.CathDate || !formData.PostDiagnosisID) {
+      setExitConfirmError('Vui lòng điền đầy đủ các thông tin bắt buộc trước khi lưu.');
+    }
+  };
+
+  const handlePendingSort = (field: PendingSortField) => {
+    if (pendingSortField === field) {
+      setPendingSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setPendingSortField(field);
+      setPendingSortOrder('asc');
+    }
+  };
+
+  const handleDoneSort = (field: DoneSortField) => {
+    if (doneSortField === field) {
+      setDoneSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setDoneSortField(field);
+      setDoneSortOrder('asc');
+    }
+  };
+
+  const renderPendingSortHeader = (field: PendingSortField, label: string, className = '') => {
+    const isSorted = pendingSortField === field;
+    return (
+      <th
+        className={`py-3 px-4 shadow-sm cursor-pointer select-none hover:bg-slate-100 transition ${className}`}
+        onClick={() => handlePendingSort(field)}
+      >
+        <div className={`flex items-center gap-1 ${className.includes('text-center') ? 'justify-center' : ''}`}>
+          <span>{label}</span>
+          <span className="text-[11px] text-slate-400 font-semibold">{isSorted ? (pendingSortOrder === 'asc' ? '▲' : '▼') : '↕'}</span>
+        </div>
+      </th>
+    );
+  };
+
+  const renderDoneSortHeader = (field: DoneSortField, label: string, className = '') => {
+    const isSorted = doneSortField === field;
+    return (
+      <th
+        className={`py-3 px-4 shadow-sm cursor-pointer select-none hover:bg-slate-100 transition ${className}`}
+        onClick={() => handleDoneSort(field)}
+      >
+        <div className={`flex items-center gap-1 ${className.includes('text-center') ? 'justify-center' : ''}`}>
+          <span>{label}</span>
+          <span className="text-[11px] text-slate-400 font-semibold">{isSorted ? (doneSortOrder === 'asc' ? '▲' : '▼') : '↕'}</span>
+        </div>
+      </th>
+    );
   };
 
   const handlePostpone = (action: 'return' | 'remove') => {
@@ -1540,7 +1725,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            };
 
        onPatchConsult?.(selectedPending.c.ConsultKey, payload);
-       closeModal();
+       forceCloseModal();
 
        fetch(`/api/consults/${selectedPending.c.ConsultKey}`, {
          method: 'PUT',
@@ -1633,31 +1818,24 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
               <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] uppercase font-black tracking-wider font-mono">
-                    <th className="py-3 px-4 w-12 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-8">STT</div></th>
-                    <th className="py-3 px-4 shadow-sm min-w-[250px] w-72 relative"><div className="resize-x overflow-hidden w-full h-full min-w-[150px]">Họ tên Bệnh Nhi</div></th>
-                    <th className="py-3 px-4 w-32 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-[100px]">Ngày sinh</div></th>
-                    <th className="py-3 px-4 w-32 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-[100px]">Mã bệnh (ICD)</div></th>
-                    <th className="py-3 px-4 w-40 text-center shadow-sm cursor-pointer group relative" onClick={() => setSortAsc(!sortAsc)}>
-                      <div className="flex items-center justify-center gap-1 resize-x overflow-hidden w-full h-full min-w-[120px]">
-                        Ngày TT dự kiến
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 inline" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-4 w-48 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-[150px]">PTV Phụ 1</div></th>
+                    {renderPendingSortHeader('name', 'Họ tên Bệnh Nhi', 'min-w-[250px] w-72')}
+                    {renderPendingSortHeader('dob', 'Ngày sinh', 'w-32 text-center')}
+                    {renderPendingSortHeader('diagnosis', 'Mã bệnh (ICD)', 'w-32 text-center')}
+                    {renderPendingSortHeader('date', 'Ngày TT dự kiến', 'w-40 text-center')}
+                    {renderPendingSortHeader('ptv', 'PTV Phụ 1', 'w-48 text-center')}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                    {pendingConsults.length === 0 && (
                      <tr>
-                       <td colSpan={6} className="p-8 text-center text-slate-400 italic font-semibold">Chưa có ca chờ thông tim</td>
+                       <td colSpan={5} className="p-8 text-center text-slate-400 italic font-semibold">Chưa có ca chờ thông tim</td>
                      </tr>
                    )}
-                   {pendingConsults.map((c, i) => {
+                   {pendingConsults.map((c) => {
                       const p = findPatientByKey(patients, c.PatientKey);
                       if (!p) return null;
                       return (
                         <tr key={c.ConsultKey} onClick={() => openPendingForm(c, p)} className="hover:bg-slate-50 cursor-pointer transition">
-                          <td className="py-4 px-4 text-center text-slate-400 font-bold">{i+1}</td>
                           <td className="py-4 px-4 text-slate-800 font-extrabold uppercase">{p.PatientName}</td>
                           <td className="py-4 px-4 text-slate-600 text-center font-medium">{formatVNTime(p.PatientDOB) || '-'}</td>
                           <td className="py-4 px-4 text-center font-extrabold text-[#d2145a]">{c.DiagnosisID || '-'}</td>
@@ -1686,29 +1864,26 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
               <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] uppercase font-black tracking-wider font-mono">
-                    <th className="py-3 px-4 w-12 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-8">STT</div></th>
-                    <th className="py-3 px-4 shadow-sm min-w-[250px] w-72 relative"><div className="resize-x overflow-hidden w-full h-full min-w-[150px]">Họ tên Bệnh Nhi</div></th>
-                    <th className="py-3 px-4 w-32 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-[100px]">Ngày sinh</div></th>
-                    <th className="py-3 px-4 w-32 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-[100px]">ICD (Sau TT)</div></th>
-                    <th className="py-3 px-4 shadow-sm min-w-[250px] w-64 relative"><div className="resize-x overflow-hidden w-full h-full min-w-[150px]">Chẩn đoán sau TT</div></th>
-                    <th className="py-3 px-4 shadow-sm min-w-[250px] w-64 relative"><div className="resize-x overflow-hidden w-full h-full min-w-[150px]">PP Can thiệp</div></th>
-                    <th className="py-3 px-4 w-40 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-[120px]">Ngày thực hiện</div></th>
-                    <th className="py-3 px-4 w-48 text-center shadow-sm relative"><div className="resize-x overflow-hidden w-full h-full min-w-[150px]">PTV Phụ 1</div></th>
+                    {renderDoneSortHeader('name', 'Họ tên Bệnh Nhi', 'min-w-[250px] w-72')}
+                    {renderDoneSortHeader('dob', 'Ngày sinh', 'w-32 text-center')}
+                    {renderDoneSortHeader('postDiagnosis', 'ICD (Sau TT)', 'w-32 text-center')}
+                    {renderDoneSortHeader('postDiagnosisText', 'Chẩn đoán sau TT', 'min-w-[250px] w-64')}
+                    {renderDoneSortHeader('method', 'PP Can thiệp', 'min-w-[250px] w-64')}
+                    {renderDoneSortHeader('date', 'Ngày thực hiện', 'w-40 text-center')}
+                    {renderDoneSortHeader('ptv', 'PTV Phụ 1', 'w-48 text-center')}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                    {doneCathlabs.length === 0 && (
                      <tr>
-                       <td colSpan={8} className="p-8 text-center text-slate-400 italic font-semibold">Chưa có ca đã thông tim</td>
+                       <td colSpan={7} className="p-8 text-center text-slate-400 italic font-semibold">Chưa có ca đã thông tim</td>
                      </tr>
                    )}
-                   {paginatedDoneCathlabs.map((cath, index) => {
+                   {paginatedDoneCathlabs.map((cath) => {
                       const p = findPatientByKey(patients, cath.PatientKey);
                       if (!p) return null;
-                      const i = (currentPage - 1) * ITEMS_PER_PAGE + index;
                       return (
                         <tr key={cath.CathKey} onClick={() => openDoneForm(cath)} className="hover:bg-slate-50 cursor-pointer transition">
-                          <td className="py-4 px-4 text-center text-slate-400 font-bold">{i+1}</td>
                           <td className="py-4 px-4 text-slate-800 font-extrabold uppercase">{p.PatientName}</td>
                           <td className="py-4 px-4 text-slate-600 text-center font-medium">{formatVNTime(p.PatientDOB) || '-'}</td>
                           <td className="py-4 px-4 text-center font-extrabold text-[#d2145a]">{typeof cath.PostDiagnosisID === 'string' ? cath.PostDiagnosisID : (cath.PostDiagnosisID ? String(cath.PostDiagnosisID) : '-')}</td>
@@ -2065,7 +2240,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                       </div>
                       
                       <div>
-                        <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">ICD Sau TT <span className="text-rose-500">*</span></label>
+                        <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">ICD sau thông tim <span className="text-rose-500">*</span></label>
                         <SearchableEnumSelect
                           required
                           options={diagnosisOptions}
@@ -2080,7 +2255,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                       </div>
 
                       <div>
-                        <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Kế hoạch (Sau TT) <span className="text-rose-500">*</span></label>
+                        <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Kế hoạch sau thông tim <span className="text-rose-500">*</span></label>
                         <select 
                           value={formData.CathPlan} 
                           onChange={e => setFormData({...formData, CathPlan: e.target.value})}
@@ -2110,7 +2285,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                          />
                        </div>
 
-                       {formData.CathPlan === 'Theo dõi sát' && (
+                       {PLANS_REQUIRING_FOLLOW_UP.includes(String(formData.CathPlan || '')) && (
                           <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl animate-in slide-in-from-top-1">
                              <label className="block text-amber-800 font-bold text-[10px] uppercase mb-1 flex items-center gap-1">
                                <CalendarDays className="w-3 h-3"/> Ngày hẹn tái khám <span className="text-rose-500">*</span>
@@ -2206,8 +2381,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                       {selectedDone && (
                         <button 
                           onClick={() => {
-                            closeModal();
-                            onViewPatientRecord(selectedDone.p);
+                            requestCloseModal(() => {
+                              forceCloseModal();
+                              onViewPatientRecord(selectedDone.p);
+                            });
                           }}
                           className="mr-auto px-6 py-2 bg-slate-200 text-slate-800 hover:bg-slate-300 rounded-xl font-black text-xs transition"
                         >Xem hồ sơ</button>
@@ -2215,11 +2392,58 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                       
                       <button 
                         onClick={() => saveCathLab(!!selectedDone)}
-                        className="px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-black text-xs transition flex items-center gap-2"
-                      ><Save className="w-4 h-4"/> Lưu hồ sơ TDTT</button>
+                        disabled={saving}
+                        className="px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-black text-xs transition flex items-center gap-2 disabled:opacity-50"
+                      ><Save className="w-4 h-4"/> {saving ? 'Đang lưu...' : 'Lưu'}</button>
                     </>
                  )}
               </div>
+           </div>
+         </div>
+       )}
+
+       {exitConfirmOpen && (
+         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[75] flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+             <div className="py-3 px-4 flex items-center gap-2 bg-amber-50 border-b border-amber-100">
+               <AlertTriangle className="w-5 h-5 text-amber-600" />
+               <h3 className="font-extrabold text-[13px] uppercase tracking-wide text-amber-900">Thay đổi chưa lưu</h3>
+             </div>
+             <div className="p-5 space-y-3">
+               <p className="text-sm font-semibold text-slate-700 leading-relaxed">
+                 Bạn có thay đổi chưa được lưu. Bạn có muốn lưu kết quả thông tim không?
+               </p>
+               {exitConfirmError && (
+                 <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
+                   {exitConfirmError}
+                 </div>
+               )}
+             </div>
+             <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-2">
+               <button
+                 type="button"
+                 onClick={handleExitCancel}
+                 className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer"
+               >
+                 Ở lại
+               </button>
+               <button
+                 type="button"
+                 onClick={handleExitDiscard}
+                 disabled={saving}
+                 className="px-4 py-2 font-bold text-xs bg-white border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 transition shadow-sm cursor-pointer disabled:opacity-50"
+               >
+                 Không lưu
+               </button>
+               <button
+                 type="button"
+                 onClick={handleExitSave}
+                 disabled={saving}
+                 className="px-4 py-2 font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer"
+               >
+                 {saving ? 'Đang lưu...' : 'Lưu'}
+               </button>
+             </div>
            </div>
          </div>
        )}
