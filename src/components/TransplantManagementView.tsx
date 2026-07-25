@@ -34,6 +34,7 @@ import {
   type TransplantFilterField,
 } from '../data/transplantDefaults';
 import TransplantRegisterModal from './TransplantRegisterModal';
+import { SortColumnIcon } from './SortColumnIcon';
 import {
   COLUMN_LABELS,
   DEFAULT_VISIBLE_COLUMNS,
@@ -68,11 +69,6 @@ interface TransplantManagementViewProps {
 }
 
 type StatusTab = 'notReady' | 'ready';
-
-function SortIcon({ active, order }: { active: boolean; order: 'asc' | 'desc' }) {
-  if (!active) return <span className="text-[10px] text-slate-400">↕</span>;
-  return <span className="text-[10px] text-indigo-600">{order === 'asc' ? '▲' : '▼'}</span>;
-}
 
 export default function TransplantManagementView({
   patients,
@@ -228,7 +224,7 @@ export default function TransplantManagementView({
     >
       <div className="flex items-center gap-1">
         <span>{COLUMN_LABELS[col]}</span>
-        {sortableField && <SortIcon active={sortField === sortableField} order={sortOrder} />}
+        {sortableField && <SortColumnIcon active={sortField === sortableField} order={sortOrder} />}
       </div>
     </th>
   );
