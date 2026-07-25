@@ -97,6 +97,7 @@ import {
   MOBILE_QUICK_SLOT_COUNT,
 } from './utils/mobileQuickTabs';
 import { PatientAdminEditButton } from './components/PatientAdminEditButton';
+import { SortColumnIcon } from './components/SortColumnIcon';
 
 import { 
   Users, 
@@ -135,7 +136,8 @@ import {
   Archive,
   LayoutDashboard,
   UserCog,
-  Activity
+  Activity,
+  ArrowUpDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -539,6 +541,7 @@ export default function App() {
   const [customEditDocVal, setCustomEditDocVal] = useState('');
 
   // Sort State for Waiting Consults
+  const [consultSortField, setConsultSortField] = useState<'name' | 'date'>('date');
   const [consultSortOrder, setConsultSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Filter & Export Screen States
@@ -1723,6 +1726,15 @@ export default function App() {
     });
 
     return list.sort((a, b) => {
+      if (consultSortField === 'name') {
+        const patA = getPatientByKey(a.PatientKey);
+        const patB = getPatientByKey(b.PatientKey);
+        const nameA = removeDiacritics(String(patA?.PatientName || '')).toLowerCase();
+        const nameB = removeDiacritics(String(patB?.PatientName || '')).toLowerCase();
+        const cmp = nameA.localeCompare(nameB, 'vi');
+        return consultSortOrder === 'asc' ? cmp : -cmp;
+      }
+
       const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
       const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
       return consultSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
@@ -1784,7 +1796,7 @@ export default function App() {
   const CONSULTS_PER_PAGE = 100;
   const filteredConsultsList = useMemo(() => {
     return getFilteredConsults();
-  }, [consults, patientsMap, filterType, filterDate, consultListSearch, consultSortOrder, isPendingStaffConsult]);
+  }, [consults, patientsMap, filterType, filterDate, consultListSearch, consultSortField, consultSortOrder, isPendingStaffConsult]);
   const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
   const displayedConsults = useMemo(() => {
     if (isMobile) return filteredConsultsList;
@@ -2755,8 +2767,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
+                    <div className="grid grid-cols-3 max-md:grid-cols-12 gap-3">
+                      <div className="max-md:col-span-2">
                         <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Cân nặng (kg) *</label>
                         <input
                           type="text"
@@ -2768,7 +2780,7 @@ export default function App() {
                         />
                       </div>
 
-                      <div>
+                      <div className="max-md:col-span-2">
                         <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Chiều cao (cm)</label>
                         <input
                           type="text"
@@ -2779,7 +2791,7 @@ export default function App() {
                         />
                       </div>
 
-                      <div>
+                      <div className="max-md:col-span-8 min-w-0">
                         <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Người đăng ký *</label>
                         <SearchableEnumSelect
                           required
@@ -2790,6 +2802,7 @@ export default function App() {
                           createLabel={(val) => `Thêm BS "${val}"`}
                           placeholder="-- Chọn BS --"
                           searchPlaceholder="Gõ tên BS..."
+                          className="min-w-0"
                         />
                       </div>
                     </div>
@@ -2812,7 +2825,7 @@ export default function App() {
                       <textarea
                         rows={2}
                         required
-                        placeholder="vd: Buồng thất trái giãn nhẹ, dòng chảy qua lỗ thông liên thất shunt Trái-Phải..."
+                        placeholder="Điền kết luận siêu âm tim hoặc chẩn đoán chi tiết trong hồ sơ"
                         value={newConsultData.DetailDiagnosis}
                         onChange={(e) => setNewConsultData(prev => ({ ...prev, DetailDiagnosis: e.target.value }))}
                         className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold placeholder-slate-400 focus:outline-none text-xs"
@@ -2915,6 +2928,18 @@ export default function App() {
                     </div>
                     <button
                       type="button"
+                      onClick={() => {
+                        setConsultSortField('name');
+                        setConsultSortOrder(prev => (consultSortField === 'name' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+                      }}
+                      className="lg:hidden w-10 h-10 shrink-0 rounded-full bg-white border border-slate-200 text-slate-600 shadow-sm flex items-center justify-center"
+                      title="Sắp xếp tên bệnh nhi A-Z / Z-A"
+                      aria-label="Sắp xếp tên bệnh nhi"
+                    >
+                      <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${consultSortField === 'name' && consultSortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setIsFilterExpanded(true)}
                       className="lg:hidden w-10 h-10 shrink-0 rounded-full bg-white border border-slate-200 text-[#d2145a] shadow-sm flex items-center justify-center"
                       title="Bộ lọc & xuất báo cáo"
@@ -2993,32 +3018,45 @@ export default function App() {
                   onScroll={handleBottomScroll}
                   className="flex-1 min-h-0 overflow-x-auto overflow-y-auto custom-scrollbar"
                 >
-                  <table className="w-full text-left text-xs border-collapse min-w-[850px]">
+                  <table className="w-full text-left text-xs border-collapse min-w-[620px] md:min-w-[850px]">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
-                        <th className="py-2.5 px-3 sticky left-0 z-20 bg-slate-50 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none">Bệnh nhi</th>
+                        <th
+                          className="py-2.5 px-3 sticky left-0 z-20 bg-slate-50 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none cursor-pointer hover:text-[#d2145a] select-none transition-colors duration-150"
+                          onClick={() => {
+                            setConsultSortField('name');
+                            setConsultSortOrder(prev => (consultSortField === 'name' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+                          }}
+                          title="Click để sắp xếp tên A-Z / Z-A"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Bệnh nhi</span>
+                            <SortColumnIcon active={consultSortField === 'name'} order={consultSortOrder} />
+                          </div>
+                        </th>
                         <th className="py-2.5 px-3">Kiểu staff</th>
                         <th className="py-2.5 px-3">Chẩn đoán</th>
-                        <th 
+                        <th
                           className="py-2.5 px-3 cursor-pointer hover:text-[#d2145a] select-none transition-colors duration-150"
-                          onClick={() => setConsultSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                          title="Click để sắp xếp theo thời gian"
+                          onClick={() => {
+                            setConsultSortField('date');
+                            setConsultSortOrder(prev => (consultSortField === 'date' ? (prev === 'asc' ? 'desc' : 'asc') : 'desc'));
+                          }}
+                          title="Click để sắp xếp theo ngày staff"
                         >
                           <div className="flex items-center gap-1">
                             <span>Ngày staff</span>
-                            <span className="text-[12px] text-[#d2145a]">
-                              {consultSortOrder === 'asc' ? '↑' : '↓'}
-                            </span>
+                            <SortColumnIcon active={consultSortField === 'date'} order={consultSortOrder} />
                           </div>
                         </th>
                         <th className="py-2.5 px-3">BS đăng ký</th>
-                        <th className="py-2.5 px-3 text-right">Biên bản PDF / Kịch bản</th>
+                        <th className="hidden md:table-cell py-2.5 px-3 text-right">Biên bản PDF / Kịch bản</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {filteredConsultsList.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="text-center py-8 italic text-slate-400">
+                          <td colSpan={isMobile ? 5 : 6} className="text-center py-8 italic text-slate-400">
                             Hộp thư rỗng. Không tìm thấy đợt hội chẩn nào khớp với bộ lọc dữ liệu.
                           </td>
                         </tr>
@@ -3052,7 +3090,7 @@ export default function App() {
                               <td className="py-3 px-3 font-semibold text-slate-700 text-xs">
                                 {item.RequestBy || '—'}
                               </td>
-                              <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                              <td className="hidden md:table-cell py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
                                   {item.ConsultResultID && !item.FilePDFBBHC && (
                                     <button
@@ -4019,7 +4057,7 @@ export default function App() {
                     <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Mã người bệnh khác</label>
                     <input
                       type="text"
-                      placeholder="vd: MHN-850"
+                      placeholder=""
                       value={newPatientData.PatientID2}
                       onChange={(e) => setNewPatientData(prev => ({ ...prev, PatientID2: e.target.value }))}
                       className="w-full bg-slate-50 border border-slate-255 rounded-xl px-3 py-2 font-mono"
@@ -4043,7 +4081,7 @@ export default function App() {
                     <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Tên lúc khai sinh</label>
                     <input
                       type="text"
-                      placeholder="vd: BÉ AN"
+                      placeholder="Tên CB"
                       value={newPatientData.OtherPatientName}
                       onChange={(e) => setNewPatientData(prev => ({ ...prev, OtherPatientName: e.target.value }))}
                       className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2"
@@ -4051,7 +4089,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Ngày sinh *</label>
                     <VNDateInput
@@ -4074,7 +4112,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Số điện thoại 1</label>
                     <input
@@ -4110,9 +4148,9 @@ export default function App() {
                 </div>
 
                 {/* Patient Creator Admin Details (Grayed Out ReadOnly Column inputs) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Người tạo mới</label>
+                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Người cập nhật</label>
                     <input
                       type="text"
                       disabled
@@ -4124,7 +4162,7 @@ export default function App() {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1 font-sans">Thời gian tạo mới</label>
+                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1 font-sans">Thời gian cập nhật</label>
                     <input
                       type="text"
                       disabled
@@ -4181,7 +4219,7 @@ export default function App() {
       />
 
       {/* Printable Clinical A4 Document Viewer/PDF Simulator */}
-      {selectedConsultForPDF && selectedPatientForPDF && (
+      {selectedConsultForPDF && selectedPatientForPDF && !(isMobile && activeMenu === 'consult-list') && (
         <A4Report 
           consult={selectedConsultForPDF}
           patient={selectedPatientForPDF}
