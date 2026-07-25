@@ -3042,6 +3042,65 @@ Xin cảm ơn!`;
                 <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 object-center ${waitlistSortOrder === 'asc' ? 'rotate-180' : ''}`} />
               )}
             </button>
+            {showWaitlistTable && (
+              <div className="relative shrink-0" ref={columnDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowColumnDropdown(!showColumnDropdown)}
+                  className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-colors cursor-pointer"
+                  title="Tùy chọn hiển thị cột"
+                >
+                  <Filter className="w-4 h-4" />
+                </button>
+                {showColumnDropdown && (
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-xl z-50 text-slate-700 normal-case font-normal text-left">
+                    <p className="font-semibold text-xs text-slate-500 mb-2 border-b border-slate-100 pb-1.5">Hiển thị cột</p>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.icd} onChange={() => setVisibleColumns(prev => ({ ...prev, icd: !prev.icd }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>ICD</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.priority} onChange={() => setVisibleColumns(prev => ({ ...prev, priority: !prev.priority }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>Ưu tiên</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.requestBy} onChange={() => setVisibleColumns(prev => ({ ...prev, requestBy: !prev.requestBy }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>BS Đăng ký</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.ptvPhu1} onChange={() => setVisibleColumns(prev => ({ ...prev, ptvPhu1: !prev.ptvPhu1 }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>PTV Phụ 1</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.consultDate} onChange={() => setVisibleColumns(prev => ({ ...prev, consultDate: !prev.consultDate }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>Ngày hội chẩn</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.consultResultId} onChange={() => setVisibleColumns(prev => ({ ...prev, consultResultId: !prev.consultResultId }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>Kết luận chính</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.plannedDate} onChange={() => setVisibleColumns(prev => ({ ...prev, plannedDate: !prev.plannedDate }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>Dự kiến ngày thông tim</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.checkDevice} onChange={() => setVisibleColumns(prev => ({ ...prev, checkDevice: !prev.checkDevice }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>Kiểm dụng cụ</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.callStatus} onChange={() => setVisibleColumns(prev => ({ ...prev, callStatus: !prev.callStatus }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>Trạng thái gọi</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
+                        <input type="checkbox" checked={visibleColumns.missSchedule} onChange={() => setVisibleColumns(prev => ({ ...prev, missSchedule: !prev.missSchedule }))} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+                        <span>Trễ xếp lịch</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Internal scroll table container (Overflow horizontal and vertical is isolated within card!) */}
@@ -3241,118 +3300,6 @@ Xin cảm ơn!`;
                     {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>}
                     {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200">Trạng thái gọi</th>}
                     {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center">Trễ xếp lịch</th>}
-                    <th className="py-3 px-2 border-b border-slate-200 text-center w-12 sticky top-0 right-0 bg-slate-50 z-30 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] border-l border-slate-200">
-                      <div className="relative inline-block text-left" ref={columnDropdownRef}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowColumnDropdown(!showColumnDropdown);
-                          }}
-                          className="flex items-center justify-center p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-650 hover:text-indigo-600 transition cursor-pointer shadow-xs"
-                          title="Tùy chọn hiển thị cột"
-                        >
-                          <Filter className="w-3.5 h-3.5" />
-                        </button>
-                        
-                        {showColumnDropdown && (
-                          <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-xl z-50 text-slate-700 normal-case font-normal text-left">
-                            <p className="font-semibold text-xs text-slate-500 mb-2 border-b border-slate-100 pb-1.5">Hiển thị cột</p>
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.icd}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, icd: !prev.icd }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>ICD</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.priority}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, priority: !prev.priority }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>Ưu tiên</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.requestBy}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, requestBy: !prev.requestBy }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>BS Đăng ký</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.ptvPhu1}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, ptvPhu1: !prev.ptvPhu1 }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>PTV Phụ 1</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.consultDate}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, consultDate: !prev.consultDate }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>Ngày hội chẩn</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.consultResultId}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, consultResultId: !prev.consultResultId }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>Kết luận chính</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.plannedDate}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, plannedDate: !prev.plannedDate }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>Dự kiến ngày thông tim</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.checkDevice}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, checkDevice: !prev.checkDevice }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>Kiểm dụng cụ</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.callStatus}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, callStatus: !prev.callStatus }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>Trạng thái gọi</span>
-                              </label>
-                              <label className="flex items-center gap-2.5 px-1 py-0.5 hover:bg-slate-50 rounded cursor-pointer transition text-xs font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns.missSchedule}
-                                  onChange={() => setVisibleColumns(prev => ({ ...prev, missSchedule: !prev.missSchedule }))}
-                                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                                />
-                                <span>Trễ xếp lịch</span>
-                              </label>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -3478,9 +3425,6 @@ Xin cảm ơn!`;
                             {missedDays > 0 ? `${missedDays} ngày` : '0 ngày'}
                           </td>
                         )}
-                        <td className={`py-3.5 px-2 text-center sticky right-0 z-10 border-l border-slate-200 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
-                          isSelected ? 'bg-indigo-50' : 'bg-white'
-                        }`} />
                       </tr>
                     );
                   })}
