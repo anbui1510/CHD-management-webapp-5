@@ -2386,7 +2386,7 @@ Xin cảm ơn!`;
     setActionConfirm({
       type: 'transfer',
       title: 'Chuyển phòng thông tim',
-      message: 'Bạn có muốn chuyển bệnh nhân sang phòng Thông tim không? Ca này vẫn được giữ trong Lịch thông tim dự kiến.'
+      message: 'Bạn có muốn chuyển bệnh nhân sang phòng Thông tim không?'
     });
   };
 
