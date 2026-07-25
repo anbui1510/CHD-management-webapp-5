@@ -1,4 +1,4 @@
-import { ArrowUpDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 interface SortColumnIconProps {
@@ -17,17 +17,18 @@ export function SortColumnIcon({ active, order }: SortColumnIconProps) {
     );
   }
 
-  return (
-    <span
-      className={`inline-flex items-center justify-center w-5 h-5 rounded-full shrink-0 border ${
-        active
-          ? 'bg-white border-indigo-200 text-indigo-600'
-          : 'bg-white border-slate-200 text-slate-400'
-      }`}
-    >
-      <ArrowUpDown
-        className={`w-2.5 h-2.5 transition-transform duration-200 ${active && order === 'asc' ? 'rotate-180' : ''}`}
-      />
-    </span>
-  );
+  if (!active) {
+    return (
+      <span className="inline-flex flex-col items-center justify-center leading-none text-slate-400 shrink-0">
+        <ChevronUp className="w-2.5 h-2.5 -mb-0.5" strokeWidth={2.5} />
+        <ChevronDown className="w-2.5 h-2.5" strokeWidth={2.5} />
+      </span>
+    );
+  }
+
+  if (order === 'asc') {
+    return <ChevronDown className="w-3 h-3 text-indigo-600 shrink-0" strokeWidth={2.5} />;
+  }
+
+  return <ChevronUp className="w-3 h-3 text-indigo-600 shrink-0" strokeWidth={2.5} />;
 }
