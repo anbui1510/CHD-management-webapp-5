@@ -5147,7 +5147,7 @@ Xin cảm ơn!`;
                     
                     {/* Header of summary */}
                     <div className={isMobile ? '' : 'border-b-2 border-slate-800 flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}>
-                      <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[13px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
+                      <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
                         {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
                       </div>
                     </div>
@@ -5233,10 +5233,10 @@ Xin cảm ơn!`;
                           
                           <div className="space-y-1.5 text-[12.5px]">
                             {isMobile ? (
-                              <div className="flex justify-between items-start gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider leading-tight">Kiểm dụng cụ:</span>
-                                  <span className={`self-start px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                              <div className="flex justify-between items-center gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-1 min-w-0 flex-1">
+                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider shrink-0 leading-tight">Kiểm dụng cụ:</span>
+                                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase leading-tight ${
                                     checkDevice === 'Đủ'
                                       ? 'bg-emerald-100 text-emerald-850 border border-emerald-200'
                                       : checkDevice === 'Thiếu'
@@ -5246,8 +5246,8 @@ Xin cảm ơn!`;
                                     {checkDevice || 'Chưa kiểm'}
                                   </span>
                                 </div>
-                                <div className="flex flex-col gap-0.5 min-w-0 flex-1 items-end text-right">
-                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider leading-tight">Số tiền dự kiến:</span>
+                                <div className="flex items-center gap-1 min-w-0 flex-1 justify-end text-right">
+                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider shrink-0 leading-tight">Số tiền dự kiến:</span>
                                   <span className="font-black text-rose-650 font-mono text-[10px] leading-tight">{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
                                 </div>
                               </div>
@@ -5299,10 +5299,10 @@ Xin cảm ơn!`;
                           
                           <div className="space-y-1.5 text-[12.5px]">
                             {isMobile ? (
-                              <div className="flex justify-between items-start gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase leading-tight">Lịch can thiệp dự kiến:</span>
-                                  <span className={`self-start px-1.5 py-0.5 rounded-md text-[9px] font-black border uppercase ${
+                              <div className="flex justify-between items-center gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-1 min-w-0 flex-1">
+                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase shrink-0 leading-tight">Lịch can thiệp dự kiến:</span>
+                                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black border uppercase leading-tight ${
                                     plannedCathLabDate
                                       ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
                                       : 'bg-rose-100 border-rose-300 text-rose-850'
@@ -5310,8 +5310,8 @@ Xin cảm ơn!`;
                                     {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
                                   </span>
                                 </div>
-                                <div className="flex flex-col gap-0.5 min-w-0 flex-1 items-end text-right">
-                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase leading-tight">Trạng thái gọi:</span>
+                                <div className="flex items-center gap-1 min-w-0 flex-1 justify-end text-right">
+                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase shrink-0 leading-tight">Trạng thái gọi:</span>
                                   <span className="font-bold text-slate-800 text-[10px] leading-tight">{callStatus || '—'}</span>
                                 </div>
                               </div>
