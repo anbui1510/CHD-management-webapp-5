@@ -89,6 +89,10 @@ import {
   MOBILE_BOTTOM_TAB_ITEMS,
 } from './config/navigation';
 import { useIsMobile } from './hooks/useMediaQuery';
+import { useWebPush } from './hooks/useWebPush';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
+import PushNotificationPrompt from './components/PushNotificationPrompt';
+import { clearViewQueryParam, parseViewFromLocation, shouldShowIosInstallHint } from './push/webPushClient';
 import {
   loadMobileQuickTabs,
   pinMobileQuickTab,
@@ -304,6 +308,7 @@ export default function App() {
   const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
   const [mobileQuickTabIds, setMobileQuickTabIds] = useState<ActiveMenuId[]>(DEFAULT_MOBILE_QUICK_SLOTS);
   const isMobile = useIsMobile();
+  const webPush = useWebPush(currentStaff?.StaffKey);
 
   // Collapsible Filter Panel State
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
@@ -860,6 +865,49 @@ export default function App() {
     if (!canAccessModule(currentStaff, activeMenu as AppModule)) {
       setActiveMenu('workspace');
     }
+  }, [currentStaff, activeMenu]);
+
+  useEffect(() => {
+    if (!currentStaff) return;
+    const view = parseViewFromLocation();
+    if (!view) return;
+    const viewMap: Partial<Record<string, typeof activeMenu>> = {
+      home: 'home',
+      workspace: 'workspace',
+      'schedule-tt': 'schedule-tt',
+      patients: 'patients',
+      'cathlab-room': 'cathlab-room',
+    };
+    const target = viewMap[view];
+    if (target && canAccessModule(currentStaff, target as AppModule)) {
+      setActiveMenu(target);
+    }
+    clearViewQueryParam();
+  }, [currentStaff]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'CHD_OPEN_URL' || !event.data.url) return;
+      const nextUrl = new URL(String(event.data.url), window.location.origin);
+      window.history.replaceState({}, '', `${nextUrl.pathname}${nextUrl.search}`);
+      const view = nextUrl.searchParams.get('view');
+      if (!view || !currentStaff) return;
+      const viewMap: Partial<Record<string, typeof activeMenu>> = {
+        home: 'home',
+        workspace: 'workspace',
+        'schedule-tt': 'schedule-tt',
+        patients: 'patients',
+        'cathlab-room': 'cathlab-room',
+      };
+      const target = viewMap[view];
+      if (target && canAccessModule(currentStaff, target as AppModule)) {
+        setActiveMenu(target);
+      }
+      clearViewQueryParam();
+    };
+    navigator.serviceWorker.addEventListener('message', onServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
   }, [currentStaff, activeMenu]);
 
   useEffect(() => {
@@ -4347,6 +4395,20 @@ export default function App() {
         pendingStaffCount={pendingStaffConsultCount}
         quickTabIds={mobileBottomTabIds}
       />
+
+      {currentStaff && (
+        <>
+          <PushNotificationPrompt
+            visible={webPush.showPrompt}
+            loading={webPush.loading}
+            error={webPush.error}
+            isIosStandaloneHint={shouldShowIosInstallHint()}
+            onEnable={() => { void webPush.enablePush(); }}
+            onDismiss={webPush.dismissPrompt}
+          />
+          <PwaInstallPrompt />
+        </>
+      )}
 
       <MobileMoreMenu
         isOpen={isMobileMoreMenuOpen}

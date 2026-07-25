@@ -24,6 +24,16 @@ import {
 import { docxPath } from './src/chdDailyBrief/paths';
 import { formatAnnouncementVN } from './src/chdDailyBrief/formatAnnouncement';
 import { startChdBriefScheduler } from './src/chdDailyBrief/scheduler';
+import {
+  buildWebPushPayload,
+  getPushSubscriptionsFile,
+  getVapidPublicKey,
+  initWebPushFromEnv,
+  isWebPushConfigured,
+  removePushSubscription,
+  sendWebPushToStaff,
+  upsertPushSubscription,
+} from './pushService';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
@@ -326,6 +336,7 @@ const SOURCES_FILE = path.join(DB_DIR, 'sources.json');
 const DEVICE_TEMPLATES_FILE = path.join(DB_DIR, 'device-templates.json');
 const ROLE_PRESETS_FILE = path.join(DB_DIR, 'role-presets.json');
 const NOTIFICATIONS_FILE = path.join(DB_DIR, 'notifications.json');
+const PUSH_SUBSCRIPTIONS_FILE = getPushSubscriptionsFile(DB_DIR);
 const DOCTOR_MARKS_FILE = path.join(DB_DIR, 'doctor-performance-marks.json');
 const SHEETS_SYNC_FAILURES_FILE = path.join(DB_DIR, 'sheets-sync-failures.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
@@ -334,6 +345,8 @@ const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR);
 }
+
+initWebPushFromEnv();
 
 // Google Sheets Sync Config Interface & Helpers
 interface SyncConfig {
@@ -1609,6 +1622,16 @@ async function appendNotificationIfMissing(
         }
       : undefined
   );
+
+  void sendWebPushToStaff(
+    { readDB, writeDB, createUniqueKey, newTimestamp },
+    PUSH_SUBSCRIPTIONS_FILE,
+    record.StaffKey,
+    buildWebPushPayload(record)
+  ).catch(err => {
+    console.warn('[web-push] Delivery failed:', err);
+  });
+
   return { record, sheetsSync };
 }
 
@@ -1966,6 +1989,57 @@ app.get('/api/notifications', requireAuth, async (req, res) => {
   }
   notifications.sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || '')));
   res.json(notifications);
+});
+
+app.get('/api/push/vapid-public-key', (_req, res) => {
+  const publicKey = getVapidPublicKey();
+  if (!publicKey) {
+    res.status(503).json({ error: 'Web Push chưa được cấu hình trên server', configured: false });
+    return;
+  }
+  res.json({ publicKey, configured: true });
+});
+
+app.get('/api/push/status', requireAuth, (req, res) => {
+  const staffKey = String((req as any).staffKey || '').trim();
+  const subscriptions = readDB<any[]>(PUSH_SUBSCRIPTIONS_FILE, []);
+  const subscribed = subscriptions.some(item => String(item.StaffKey) === staffKey);
+  res.json({
+    configured: isWebPushConfigured(),
+    subscribed,
+    permissionHint: 'granted',
+  });
+});
+
+app.post('/api/push/subscribe', requireAuth, (req, res) => {
+  const staffKey = String((req as any).staffKey || '').trim();
+  const record = upsertPushSubscription(
+    { readDB, writeDB, createUniqueKey, newTimestamp },
+    PUSH_SUBSCRIPTIONS_FILE,
+    staffKey,
+    req.body
+  );
+  if (!record) {
+    res.status(400).json({ error: 'Thiếu endpoint hoặc keys push subscription' });
+    return;
+  }
+  res.status(201).json(record);
+});
+
+app.delete('/api/push/unsubscribe', requireAuth, (req, res) => {
+  const staffKey = String((req as any).staffKey || '').trim();
+  const endpoint = String(req.body?.endpoint || '').trim();
+  if (!endpoint) {
+    res.status(400).json({ error: 'Thiếu endpoint push subscription' });
+    return;
+  }
+  const removed = removePushSubscription(
+    { readDB, writeDB, createUniqueKey, newTimestamp },
+    PUSH_SUBSCRIPTIONS_FILE,
+    staffKey,
+    endpoint
+  );
+  res.json({ success: removed });
 });
 
 app.post('/api/notifications', requireAuth, async (req, res) => {
