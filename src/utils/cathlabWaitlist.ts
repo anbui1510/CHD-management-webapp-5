@@ -165,6 +165,13 @@ export function isConsultLateForScheduling(
   return true;
 }
 
+function isTransferredToCathLabConsult(consult: Consult): boolean {
+  return consult.TransferredToCathLab === true
+    || String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'true'
+    || String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'yes'
+    || String(consult.TransferredToCathLab || '').trim().toLowerCase() === 'có';
+}
+
 export function isConsultCathCompleted(consult: Consult, patientCathlabs: CathLab[] | undefined): boolean {
   if (!patientCathlabs?.length) return false;
 
@@ -181,7 +188,12 @@ export function isConsultCathCompleted(consult: Consult, patientCathlabs: CathLa
 
     if (plannedDate && cathDate === plannedDate) return true;
 
-    if (consultDate && cathDate >= consultDate) return true;
+    // Cath logged without ConsultKey link — only when this consult was actively queued for cath.
+    // Repeat-intervention consults are created after cath with the same ConsultDate but must
+    // remain visible in Xếp lịch & Dụng cụ for the next procedure.
+    if (consultDate && cathDate >= consultDate) {
+      return hasPlannedCathLabDate(consult) || isTransferredToCathLabConsult(consult);
+    }
 
     return false;
   });
