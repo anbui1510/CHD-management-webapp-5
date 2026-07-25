@@ -1,4 +1,5 @@
 import type { CathLab, CMR, Consult, DeviceTemplate, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff, Transplant } from '../types';
+import { ensureSyncConfigHydrated } from './appsScriptFetch';
 
 export class AuthRequiredError extends Error {
   constructor(message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') {
@@ -44,6 +45,18 @@ function getAuthToken(): string {
   return localStorage.getItem('CHD_AUTH_TOKEN') || '';
 }
 
+const isLikelyMobileDevice = (): boolean => {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+};
+
+const getMedicalDataFetchTimeout = (force: boolean): number => {
+  const desktopTimeout = force ? 60000 : 20000;
+  if (!isLikelyMobileDevice()) return desktopTimeout;
+  return force ? 90000 : 45000;
+};
+
 /** Build fetch headers with optional Authorization */
 function authHeaders(token?: string): HeadersInit {
   const t = token || getAuthToken();
@@ -69,9 +82,12 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
     }
   }
 
+  await ensureSyncConfigHydrated();
+
   const url = force ? '/api/all?force=true' : '/api/all';
+  const fetchTimeoutMs = getMedicalDataFetchTimeout(force);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const timeoutId = setTimeout(() => controller.abort(), fetchTimeoutMs);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -80,7 +96,7 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
     });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('Không tải được dữ liệu sau 20 giây — kiểm tra mạng hoặc bấm Đồng bộ lại.');
+      throw new Error(`Không tải được dữ liệu sau ${Math.round(fetchTimeoutMs / 1000)} giây — kiểm tra mạng hoặc bấm Đồng bộ lại.`);
     }
     throw err;
   } finally {

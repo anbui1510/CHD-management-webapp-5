@@ -763,6 +763,7 @@ export default function App() {
     const storedBuildId = localStorage.getItem(CHD_APP_BUILD_ID_KEY);
     if (isAppBuildIdMismatch(storedBuildId)) {
       localStorage.removeItem('CHD_AUTH_TOKEN');
+      localStorage.removeItem('CHD_AUTH_STAFF_KEY');
       localStorage.removeItem('CurrentStaffKey');
       localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
       setAuthToken('');
@@ -793,6 +794,7 @@ export default function App() {
         })
         .catch(() => {
           localStorage.removeItem('CHD_AUTH_TOKEN');
+          localStorage.removeItem('CHD_AUTH_STAFF_KEY');
           localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
           setAuthToken('');
           setCurrentStaff(null);
@@ -1039,6 +1041,7 @@ export default function App() {
       }).catch(() => {});
     }
     localStorage.removeItem('CHD_AUTH_TOKEN');
+    localStorage.removeItem('CHD_AUTH_STAFF_KEY');
     localStorage.removeItem(CHD_APP_BUILD_ID_KEY);
     // Also clean up legacy keys
     localStorage.removeItem('CurrentStaffKey');
