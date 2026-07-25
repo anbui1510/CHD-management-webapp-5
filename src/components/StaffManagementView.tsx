@@ -34,6 +34,8 @@ import {
   parsePermissions,
   serializePermissions,
 } from '../auth/permissions';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 interface StaffManagementViewProps {
   staffList: Staff[];
@@ -80,6 +82,7 @@ export default function StaffManagementView({
   triggerAlert,
   triggerConfirm,
 }: StaffManagementViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [searchQuery, setSearchQuery] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -282,20 +285,15 @@ export default function StaffManagementView({
     }
 
     onPatchStaff?.(draft.StaffKey, payload);
-    triggerAlert?.('Đã cập nhật nhân sự và phân quyền thành công!', 'Lưu thành công');
 
-    fetch(`/api/staff/${encodeURIComponent(draft.StaffKey)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-      .then(async response => {
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || 'Không thể lưu nhân sự');
-        }
-        onRefreshData();
-      })
+    persistWithSheetsSync(
+      reportMutationResponse,
+      `/api/staff/${encodeURIComponent(draft.StaffKey)}`,
+      { method: 'PUT', body: JSON.stringify(payload) },
+      buildSyncContext('staff-mgmt', { viewLabel: 'Quản lý nhân sự' }),
+      { baseMessage: 'Đã cập nhật nhân sự và phân quyền' }
+    )
+      .then(() => onRefreshData())
       .catch(error => {
         console.error(error);
         triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu nhân sự', 'Lỗi');

@@ -12,6 +12,8 @@ import {
   parsePermissions,
   serializePermissions,
 } from '../auth/permissions';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 interface RolePresetMatrixPanelProps {
   rolePresetRecords: RolePreset[];
@@ -44,6 +46,7 @@ export default function RolePresetMatrixPanel({
   triggerAlert,
   triggerConfirm,
 }: RolePresetMatrixPanelProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const groupedModules = useMemo(() => modulesByGroup(), []);
   const runtimePresets = getRuntimeRolePresets();
 
@@ -113,18 +116,14 @@ export default function RolePresetMatrixPanel({
         : `/api/role-presets/${encodeURIComponent(draft.RolePresetID)}`;
       const method = draft.isNew ? 'POST' : 'PUT';
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      await persistWithSheetsSync(
+        reportMutationResponse,
+        url,
+        { method, body: JSON.stringify(payload) },
+        buildSyncContext('staff-mgmt', { viewLabel: 'Ma trận vai trò mẫu' }),
+        { baseMessage: 'Đã lưu vai trò mẫu' }
+      );
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Không thể lưu vai trò mẫu');
-      }
-
-      triggerAlert?.('Đã lưu vai trò mẫu. Preset áp dụng ngay cho nhân sự mới chọn.', 'Lưu thành công');
       cancelEdit();
       onRefresh();
     } catch (error) {
@@ -141,17 +140,20 @@ export default function RolePresetMatrixPanel({
     }
 
     const proceed = async () => {
-      const response = await fetch(`/api/role-presets/${encodeURIComponent(record.RolePresetID)}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        triggerAlert?.(err.error || 'Không thể xóa preset', 'Lỗi');
-        return;
+      try {
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          `/api/role-presets/${encodeURIComponent(record.RolePresetID)}`,
+          { method: 'DELETE', body: JSON.stringify({}) },
+          buildSyncContext('staff-mgmt', { viewLabel: 'Ma trận vai trò mẫu' }),
+          { baseMessage: 'Đã xóa vai trò mẫu' }
+        );
+        triggerAlert?.('Đã xóa vai trò mẫu.', 'Xóa thành công');
+        if (editingId === record.RolePresetID) cancelEdit();
+        onRefresh();
+      } catch (error) {
+        triggerAlert?.(error instanceof Error ? error.message : 'Không thể xóa preset', 'Lỗi');
       }
-      triggerAlert?.('Đã xóa vai trò mẫu.', 'Xóa thành công');
-      if (editingId === record.RolePresetID) cancelEdit();
-      onRefresh();
     };
 
     if (triggerConfirm) {

@@ -17,7 +17,7 @@ import {
   shouldSkipDuplicateHisImport,
 } from '../utils/hisCathImport';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
-import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
+import { buildSyncContext, persistWithSheetsSync, withSyncContext } from '../utils/sheetsSyncMutation';
 
 interface Props {
   patients: Patient[];
@@ -361,15 +361,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     const trimmed = normalizeDiagnosisID(DiagnosisID);
     if (!trimmed) return;
 
-    const response = await fetch('/api/sources', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ DiagnosisID: trimmed })
-    });
-
-    if (!response.ok) {
-      throw new Error('Không thể thêm DiagnosisID vào Source');
-    }
+    await persistWithSheetsSync(
+      reportMutationResponse,
+      '/api/sources',
+      { method: 'POST', body: JSON.stringify({ DiagnosisID: trimmed }) },
+      buildSyncContext('cathlab-room', { viewLabel: 'Phòng thông tim' }),
+      { baseMessage: 'Đã thêm mã chẩn đoán vào danh mục' }
+    );
 
     onRefreshData();
   };
@@ -797,15 +795,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
   const postBatchWrite = async (operations: BatchWriteOperation[]) => {
     if (operations.length === 0) return;
-    const response = await fetch('/api/batch-write', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operations })
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(text || 'Không thể ghi dữ liệu theo lô');
-    }
+    await persistWithSheetsSync(
+      reportMutationResponse,
+      '/api/batch-write',
+      { method: 'POST', body: JSON.stringify({ operations }) },
+      buildSyncContext('cathlab-room', { viewLabel: 'Phòng thông tim' }),
+      { baseMessage: 'Đã ghi dữ liệu HIS theo lô' }
+    );
   };
 
   const handleHisImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1107,15 +1103,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     setActiveTab('pending');
     openPendingForm(mergedConsult, patient);
 
-    fetch(`/api/consults/${consult.ConsultKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Không thể cập nhật trạng thái chuyển phòng thông tim');
-        onRefreshData();
-      })
+    persistWithSheetsSync(
+      reportMutationResponse,
+      `/api/consults/${consult.ConsultKey}`,
+      { method: 'PUT', body: JSON.stringify(payload) },
+      buildSyncContext('cathlab-room', { patientName: patient?.PatientName, patientKey: consult.PatientKey }),
+      { baseMessage: 'Đã chuyển phòng thông tim cấp cứu' }
+    )
+      .then(() => onRefreshData())
       .catch(err => {
         console.error(err);
         alert(err instanceof Error ? err.message : 'Không thể chuyển phòng thông tim. Vui lòng thử lại.');
@@ -1482,15 +1477,20 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      // Save to database
      const persist = async () => {
        if (adHocPatientMode === 'new') {
-         const patRes = await fetch('/api/patients', {
-           method: 'POST',
-           headers: { 
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+         await persistWithSheetsSync(
+           reportMutationResponse,
+           '/api/patients',
+           {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
+             },
+             body: JSON.stringify(newPatientObj)
            },
-           body: JSON.stringify(newPatientObj)
-         });
-         if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
+           syncContext,
+           { baseMessage: 'Đã tạo bệnh nhi mới' }
+         );
        }
 
        // Save consult (either POST for Case A or PUT for Case B/C)
@@ -1525,35 +1525,40 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
        // Save scars if any
        for (const mark of marksToCreate) {
-         const markRes = await fetch('/api/doctor-performance-marks', {
-           method: 'POST',
-           headers: { 
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
-           },
-           body: JSON.stringify(mark)
-         });
-          if (!markRes.ok) {
-            const errData = await markRes.json().catch(() => ({}));
-            const errMsg = errData.error || markRes.statusText || 'Lỗi không xác định';
-            alert(`Lỗi khi lưu sẹo workflow cho BS: ${errMsg}`);
-            console.error('Lỗi khi lưu sẹo BS:', mark, errMsg);
-          }
+         try {
+           await persistWithSheetsSync(
+             reportMutationResponse,
+             '/api/doctor-performance-marks',
+             {
+               method: 'POST',
+               headers: { Authorization: `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}` },
+               body: JSON.stringify(mark)
+             },
+             syncContext,
+             { baseMessage: 'Đã ghi sẹo workflow' }
+           );
+         } catch (err) {
+           const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định';
+           alert(`Lỗi khi lưu sẹo workflow cho BS: ${errMsg}`);
+           console.error('Lỗi khi lưu sẹo BS:', mark, errMsg);
+         }
        }
 
-        // Save notifications if any
         for (const notif of notificationsToCreate) {
-          const notifRes = await fetch('/api/notifications', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
-            },
-            body: JSON.stringify(notif)
-          });
-          if (!notifRes.ok) {
-            const errData = await notifRes.json().catch(() => ({}));
-            const errMsg = errData.error || notifRes.statusText || 'Lỗi không xác định';
+          try {
+            await persistWithSheetsSync(
+              reportMutationResponse,
+              '/api/notifications',
+              {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}` },
+                body: JSON.stringify(notif)
+              },
+              syncContext,
+              { baseMessage: 'Đã ghi thông báo workflow' }
+            );
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định';
             alert(`Lỗi khi lưu thông báo sẹo: ${errMsg}`);
             console.error('Lỗi khi lưu thông báo:', notif, errMsg);
           }
@@ -1737,15 +1742,17 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        onPatchConsult?.(selectedPending.c.ConsultKey, payload);
        forceCloseModal();
 
-       fetch(`/api/consults/${selectedPending.c.ConsultKey}`, {
-         method: 'PUT',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(payload)
-       })
-         .then(res => {
-           if (!res.ok) throw new Error('Không thể cập nhật trạng thái ca');
-           onRefreshData();
-         })
+       persistWithSheetsSync(
+         reportMutationResponse,
+         `/api/consults/${selectedPending.c.ConsultKey}`,
+         { method: 'PUT', body: JSON.stringify(payload) },
+         buildSyncContext('cathlab-room', {
+           patientName: selectedPending.p?.PatientName,
+           patientKey: selectedPending.c.PatientKey
+         }),
+         { baseMessage: 'Đã cập nhật trạng thái ca' }
+       )
+         .then(() => onRefreshData())
          .catch(err => {
            console.error(err);
            alert(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái ca');

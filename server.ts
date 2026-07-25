@@ -162,7 +162,11 @@ app.post('/api/auth/login', async (req, res) => {
           localStaff.Password = hashedInput;
           writeDB(STAFF_FILE, staffList);
           if (config.scriptUrl) {
-            syncToGoogleSheets('Staff', 'update', localStaff.StaffKey, localStaff).catch(() => {});
+            await pushToGoogleSheetsAwaited('Staff', 'update', localStaff.StaffKey, localStaff, {
+              staffKey: localStaff.StaffKey,
+              entityType: 'Staff',
+              entityKey: localStaff.StaffKey
+            });
           }
         }
       }
@@ -799,7 +803,7 @@ function checkSchedulingDelays(): void {
         const patientContext = getPatientContext(c.PatientKey, patients);
         const months = Math.floor(diffDays / 30);
         
-        appendNotificationIfMissing({
+        void appendNotificationIfMissing({
           StaffKey: '01541', // BS Hiếu
           StaffName: 'Nguyễn Văn Hiếu',
           Title: 'Cảnh báo trễ xếp lịch',
@@ -811,7 +815,7 @@ function checkSchedulingDelays(): void {
           PatientID: patientContext.PatientID,
           PatientName: patientContext.PatientName,
           DedupKey: `missed_3m_delay_${c.ConsultKey}`
-        });
+        }).catch(err => console.error('Error pushing scheduling delay notification:', err));
       }
     }
   } catch (err) {
@@ -1029,7 +1033,7 @@ function recordSheetsSyncFailure(
 
   const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
   const staff = staffList.find(item => item.StaffKey === staffKey);
-  appendNotificationIfMissing({
+  void appendNotificationIfMissing({
     StaffKey: staffKey,
     StaffName: staff?.StaffName || '',
     Title: 'Chưa ghi lên Google Sheets',
@@ -1041,7 +1045,7 @@ function recordSheetsSyncFailure(
     PatientID: ctx.patientID,
     PatientName: ctx.patientName,
     DedupKey: `sheets-fail:${entityType}:${entityKey}:${staffKey}`
-  });
+  }).catch(err => console.error('Error pushing sheets-failure notification:', err));
 }
 
 function clearSheetsSyncFailure(staffKey: string, entityType: string, entityKey: string): void {
@@ -1554,11 +1558,19 @@ function getPatientContext(patientKey: string | undefined, patients: Patient[]) 
   };
 }
 
-function appendNotificationIfMissing(input: Omit<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'> & Partial<Pick<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'>>): Notification | null {
-  if (!input.StaffKey || !input.DedupKey) return null;
+async function appendNotificationIfMissing(
+  input: Omit<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'> & Partial<Pick<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'>>,
+  pushOptions?: {
+    staffKey?: string;
+    syncContext?: SheetsSyncContext;
+    entityType?: string;
+    entityKey?: string;
+  }
+): Promise<{ record: Notification | null; sheetsSync?: SheetsSyncResult }> {
+  if (!input.StaffKey || !input.DedupKey) return { record: null };
   const notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
   const existing = notifications.find(item => item.DedupKey === input.DedupKey && item.StaffKey === input.StaffKey);
-  if (existing) return existing;
+  if (existing) return { record: existing, sheetsSync: { configured: getSyncConfig().scriptUrl ? true : false, ok: true, at: Date.now(), message: 'Thông báo đã tồn tại.' } };
 
   const record: Notification = {
     NotificationKey: input.NotificationKey || createUniqueKey('notif', notifications.map(item => item.NotificationKey)),
@@ -1582,17 +1594,37 @@ function appendNotificationIfMissing(input: Omit<Notification, 'NotificationKey'
   writeDB(NOTIFICATIONS_FILE, notifications);
   markLocalMutation();
   recentLocalEdits.set(`Notification_${record.NotificationKey}`, { timestamp: Date.now(), data: record });
-  syncToGoogleSheets('Notification', 'insert', record.NotificationKey, record).catch(err => {
-    console.error('Error syncing notification insert:', err);
-  });
-  return record;
+
+  const sheetsSync = await pushToGoogleSheetsAwaited(
+    'Notification',
+    'insert',
+    record.NotificationKey,
+    record,
+    pushOptions?.staffKey
+      ? {
+          staffKey: pushOptions.staffKey,
+          syncContext: pushOptions.syncContext,
+          entityType: pushOptions.entityType || 'Notification',
+          entityKey: pushOptions.entityKey || record.NotificationKey
+        }
+      : undefined
+  );
+  return { record, sheetsSync };
 }
 
-function appendDoctorMarkIfMissing(input: Omit<DoctorPerformanceMark, 'MarkKey' | 'CreatedTime' | 'Score' | 'CreatedBy'> & Partial<Pick<DoctorPerformanceMark, 'MarkKey' | 'CreatedTime' | 'Score' | 'CreatedBy'>>): DoctorPerformanceMark | null {
-  if (!input.StaffKey || !input.DedupKey) return null;
+async function appendDoctorMarkIfMissing(
+  input: Omit<DoctorPerformanceMark, 'MarkKey' | 'CreatedTime' | 'Score' | 'CreatedBy'> & Partial<Pick<DoctorPerformanceMark, 'MarkKey' | 'CreatedTime' | 'Score' | 'CreatedBy'>>,
+  pushOptions?: {
+    staffKey?: string;
+    syncContext?: SheetsSyncContext;
+    entityType?: string;
+    entityKey?: string;
+  }
+): Promise<{ record: DoctorPerformanceMark | null; sheetsSync?: SheetsSyncResult }> {
+  if (!input.StaffKey || !input.DedupKey) return { record: null };
   const marks = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []);
   const existing = marks.find(item => item.DedupKey === input.DedupKey && item.StaffKey === input.StaffKey);
-  if (existing) return existing;
+  if (existing) return { record: existing, sheetsSync: { configured: getSyncConfig().scriptUrl ? true : false, ok: true, at: Date.now(), message: 'Sẹo workflow đã tồn tại.' } };
 
   const record: DoctorPerformanceMark = {
     MarkKey: input.MarkKey || createUniqueKey('mark', marks.map(item => item.MarkKey)),
@@ -1616,10 +1648,22 @@ function appendDoctorMarkIfMissing(input: Omit<DoctorPerformanceMark, 'MarkKey' 
   writeDB(DOCTOR_MARKS_FILE, marks);
   markLocalMutation();
   recentLocalEdits.set(`DoctorPerformanceMark_${record.MarkKey}`, { timestamp: Date.now(), data: record });
-  syncToGoogleSheets('DoctorPerformanceMark', 'insert', record.MarkKey, record).catch(err => {
-    console.error('Error syncing doctor mark insert:', err);
-  });
-  return record;
+
+  const sheetsSync = await pushToGoogleSheetsAwaited(
+    'DoctorPerformanceMark',
+    'insert',
+    record.MarkKey,
+    record,
+    pushOptions?.staffKey
+      ? {
+          staffKey: pushOptions.staffKey,
+          syncContext: pushOptions.syncContext,
+          entityType: pushOptions.entityType || 'DoctorPerformanceMark',
+          entityKey: pushOptions.entityKey || record.MarkKey
+        }
+      : undefined
+  );
+  return { record, sheetsSync };
 }
 
 function parseDateOnly(raw: string | undefined): Date | null {
@@ -1647,7 +1691,7 @@ function isRemovedConsult(consult: Consult): boolean {
 
 function notifyStaffAboutConsult(staff: Staff | undefined, consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, title: string, message: string, dedupPrefix: string, severity: Notification['Severity'] = 'warning') {
   if (!staff) return;
-  appendNotificationIfMissing({
+  void appendNotificationIfMissing({
     StaffKey: staff.StaffKey,
     StaffName: staff.StaffName,
     Title: title,
@@ -1659,13 +1703,13 @@ function notifyStaffAboutConsult(staff: Staff | undefined, consult: Consult, pat
     PatientID: patientCtx.PatientID,
     PatientName: patientCtx.PatientName,
     DedupKey: `${dedupPrefix}:${consult.ConsultKey}:${staff.StaffKey}`
-  });
+  }).catch(err => console.error('Error pushing workflow notification:', err));
 }
 
 function createSecretaryOverrideMark(consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, staffList: Staff[], actorKey = 'workflow-monitor') {
   const secretary = getDefaultSecretary(staffList);
   if (!secretary) return;
-  appendDoctorMarkIfMissing({
+  void appendDoctorMarkIfMissing({
     StaffKey: secretary.StaffKey,
     StaffName: secretary.StaffName,
     MarkType: 'missing_staff_result',
@@ -1678,7 +1722,7 @@ function createSecretaryOverrideMark(consult: Consult, patientCtx: ReturnType<ty
     PatientName: patientCtx.PatientName,
     DedupKey: `mark:secretary-missing-staff-result:${consult.ConsultKey}`,
     CreatedBy: actorKey
-  });
+  }).catch(err => console.error('Error pushing secretary override mark:', err));
   notifyStaffAboutConsult(
     secretary,
     consult,
@@ -1692,7 +1736,7 @@ function createSecretaryOverrideMark(consult: Consult, patientCtx: ReturnType<ty
 function createSchedulerEmergencyTransferMark(consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, staffList: Staff[], actorKey = 'workflow-monitor') {
   const scheduler = getDefaultScheduler(staffList);
   if (!scheduler) return;
-  appendDoctorMarkIfMissing({
+  void appendDoctorMarkIfMissing({
     StaffKey: scheduler.StaffKey,
     StaffName: scheduler.StaffName,
     MarkType: 'scheduler_missing_transfer',
@@ -1705,7 +1749,7 @@ function createSchedulerEmergencyTransferMark(consult: Consult, patientCtx: Retu
     PatientName: patientCtx.PatientName,
     DedupKey: `mark:scheduler-missing-transfer:${consult.ConsultKey}`,
     CreatedBy: actorKey
-  });
+  }).catch(err => console.error('Error pushing scheduler transfer mark:', err));
   notifyStaffAboutConsult(
     scheduler,
     consult,
@@ -1764,7 +1808,7 @@ function runWorkflowMonitor() {
         notifyStaffAboutConsult(secretary, consult, patientCtx, 'Chưa có kết quả hội chẩn', message, 'notif:pending-staff-result');
       }
       if (overdueDays > 28 && requestByStaff) {
-        appendDoctorMarkIfMissing({
+        void appendDoctorMarkIfMissing({
           StaffKey: requestByStaff.StaffKey,
           StaffName: requestByStaff.StaffName,
           MarkType: 'requester_overdue_staff_result',
@@ -1777,7 +1821,7 @@ function runWorkflowMonitor() {
           PatientName: patientCtx.PatientName,
           DedupKey: `mark:requester-overdue-staff-result:${consult.ConsultKey}`,
           CreatedBy: 'workflow-monitor'
-        });
+        }).catch(err => console.error('Error pushing overdue staff mark:', err));
       }
     }
 
@@ -1789,7 +1833,7 @@ function runWorkflowMonitor() {
     if (consult.PlannedCathLabDate && plannedOverdueDays > 30 && eligibleForCath && !hasCathResult) {
       const ptvAssistant = resolveStaff(consult.Scheduled2ndInterventionist, staffList);
       if (ptvAssistant) {
-        appendDoctorMarkIfMissing({
+        void appendDoctorMarkIfMissing({
           StaffKey: ptvAssistant.StaffKey,
           StaffName: ptvAssistant.StaffName,
           MarkType: 'missing_cath_result',
@@ -1802,7 +1846,7 @@ function runWorkflowMonitor() {
           PatientName: patientCtx.PatientName,
           DedupKey: `mark:missing-cath-result:${consult.ConsultKey}:${ptvAssistant.StaffKey}`,
           CreatedBy: 'workflow-monitor'
-        });
+        }).catch(err => console.error('Error pushing missing cath mark:', err));
         notifyStaffAboutConsult(
           ptvAssistant,
           consult,
@@ -1917,8 +1961,21 @@ app.get('/api/notifications', requireAuth, async (req, res) => {
 });
 
 app.post('/api/notifications', requireAuth, async (req, res) => {
-  const record = appendNotificationIfMissing(req.body);
-  res.status(record ? 201 : 400).json(record || { error: 'Notification requires StaffKey and DedupKey' });
+  const { payload, syncContext } = extractSyncContext(req.body);
+  const { record, sheetsSync } = await appendNotificationIfMissing(
+    payload,
+    getSheetsPushOptions(req, syncContext, 'Notification', String(payload?.NotificationKey || payload?.DedupKey || 'new'))
+  );
+  if (!record) {
+    res.status(400).json({ error: 'Notification requires StaffKey and DedupKey' });
+    return;
+  }
+  res.status(201).json(withSheetsSync(record, sheetsSync || {
+    configured: false,
+    ok: true,
+    at: Date.now(),
+    message: 'Chưa liên kết Google Sheets — dữ liệu chỉ lưu trên máy chủ app.'
+  }));
 });
 
 app.put('/api/notifications/:key/read', requireAuth, async (req, res) => {
@@ -1938,10 +1995,14 @@ app.put('/api/notifications/:key/read', requireAuth, async (req, res) => {
   writeDB(NOTIFICATIONS_FILE, notifications);
   markLocalMutation();
   recentLocalEdits.set(`Notification_${notifications[index].NotificationKey}`, { timestamp: Date.now(), data: notifications[index] });
-  syncToGoogleSheets('Notification', 'update', notifications[index].NotificationKey, notifications[index]).catch(err => {
-    console.error('Error syncing notification read update:', err);
-  });
-  res.json(notifications[index]);
+  const sheetsSync = await pushToGoogleSheetsAwaited(
+    'Notification',
+    'update',
+    notifications[index].NotificationKey,
+    notifications[index],
+    getSheetsPushOptions(req, undefined, 'Notification', notifications[index].NotificationKey)
+  );
+  res.json(withSheetsSync(notifications[index], sheetsSync));
 });
 
 app.get('/api/doctor-performance-marks', requireAuth, async (req, res) => {
@@ -1956,8 +2017,21 @@ app.get('/api/doctor-performance-marks', requireAuth, async (req, res) => {
 });
 
 app.post('/api/doctor-performance-marks', requireAuth, async (req, res) => {
-  const record = appendDoctorMarkIfMissing(req.body);
-  res.status(record ? 201 : 400).json(record || { error: 'Doctor performance mark requires StaffKey and DedupKey' });
+  const { payload, syncContext } = extractSyncContext(req.body);
+  const { record, sheetsSync } = await appendDoctorMarkIfMissing(
+    payload,
+    getSheetsPushOptions(req, syncContext, 'DoctorPerformanceMark', String(payload?.MarkKey || payload?.DedupKey || 'new'))
+  );
+  if (!record) {
+    res.status(400).json({ error: 'Doctor performance mark requires StaffKey and DedupKey' });
+    return;
+  }
+  res.status(201).json(withSheetsSync(record, sheetsSync || {
+    configured: false,
+    ok: true,
+    at: Date.now(),
+    message: 'Chưa liên kết Google Sheets — dữ liệu chỉ lưu trên máy chủ app.'
+  }));
 });
 
 type BatchEndpointConfig<T> = {
@@ -2356,11 +2430,21 @@ app.delete('/api/role-presets/:key', requireAdmin, async (req, res) => {
       return;
     }
 
+    const deleted = presets[index];
     presets.splice(index, 1);
     writeDB(ROLE_PRESETS_FILE, presets);
     markLocalMutation();
 
-    res.json({ success: true, RolePresetID: key });
+    const { syncContext } = extractSyncContext(req.body || {});
+    const sheetsSync = await pushToGoogleSheetsAwaited(
+      'RolePreset',
+      'delete',
+      key,
+      deleted,
+      getSheetsPushOptions(req, syncContext, 'RolePreset', key)
+    );
+
+    res.json(withSheetsSync({ success: true, RolePresetID: key }, sheetsSync));
   } catch (err) {
     console.error('Error in DELETE /api/role-presets/:key:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -2699,6 +2783,7 @@ app.post('/api/sources/update-all', requireAuth, async (req, res) => {
     }
 
     // 1. Cascade DiagnosisID changes
+    const cascadePushResults: SheetsSyncResult[] = [];
     if (Array.isArray(diagnosisRenames) && diagnosisRenames.length > 0) {
       const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
       let consultsChanged = false;
@@ -2716,17 +2801,22 @@ app.post('/api/sources/update-all', requireAuth, async (req, res) => {
         const oldId = String(rename.oldVal || '').trim();
         const newId = String(rename.newVal || '').trim();
         if (oldId && newId && oldId !== newId) {
-          // Consults
-          consults.forEach(c => {
+          for (const c of consults) {
             if (c.DiagnosisID === oldId) {
               c.DiagnosisID = newId;
               consultsChanged = true;
-              syncToGoogleSheets('Consult', 'update', c.ConsultKey, c).catch(() => {});
+              recentLocalEdits.set(`Consult_${c.ConsultKey}`, { timestamp: Date.now(), data: c });
+              cascadePushResults.push(await pushToGoogleSheetsAwaited(
+                'Consult',
+                'update',
+                c.ConsultKey,
+                c,
+                getSheetsPushOptions(req, syncContext, 'Consult', c.ConsultKey)
+              ));
             }
-          });
+          }
           
-          // Cathlabs
-          cathlabs.forEach(cl => {
+          for (const cl of cathlabs) {
             let clChanged = false;
             if (cl.DiagnosisID === oldId) {
               cl.DiagnosisID = newId;
@@ -2738,27 +2828,45 @@ app.post('/api/sources/update-all', requireAuth, async (req, res) => {
             }
             if (clChanged) {
               cathlabsChanged = true;
-              syncToGoogleSheets('CathLab', 'update', cl.CathKey, cl).catch(() => {});
+              recentLocalEdits.set(`CathLab_${cl.CathKey}`, { timestamp: Date.now(), data: cl });
+              cascadePushResults.push(await pushToGoogleSheetsAwaited(
+                'CathLab',
+                'update',
+                cl.CathKey,
+                cl,
+                getSheetsPushOptions(req, syncContext, 'CathLab', cl.CathKey)
+              ));
             }
-          });
+          }
 
-          // CMRs
-          cmrs.forEach(cmr => {
+          for (const cmr of cmrs) {
             if (cmr.CMRDiagnosisID === oldId) {
               cmr.CMRDiagnosisID = newId;
               cmrsChanged = true;
-              syncToGoogleSheets('CMR', 'update', cmr.CMRKey, cmr).catch(() => {});
+              recentLocalEdits.set(`CMR_${cmr.CMRKey}`, { timestamp: Date.now(), data: cmr });
+              cascadePushResults.push(await pushToGoogleSheetsAwaited(
+                'CMR',
+                'update',
+                cmr.CMRKey,
+                cmr,
+                getSheetsPushOptions(req, syncContext, 'CMR', cmr.CMRKey)
+              ));
             }
-          });
+          }
 
-          // DeviceTemplates
-          templates.forEach(t => {
+          for (const t of templates) {
             if (t.DiagnosisID === oldId) {
               t.DiagnosisID = newId;
               templatesChanged = true;
-              syncToGoogleSheets('DeviceTemplate', 'update', t.DeviceName, t).catch(() => {});
+              cascadePushResults.push(await pushToGoogleSheetsAwaited(
+                'DeviceTemplate',
+                'update',
+                t.DeviceName,
+                t,
+                getSheetsPushOptions(req, syncContext, 'DeviceTemplate', t.DeviceName)
+              ));
             }
-          });
+          }
         }
       }
 
@@ -2855,7 +2963,7 @@ app.post('/api/sources/update-all', requireAuth, async (req, res) => {
       }
     }
 
-    res.json(withSheetsSync({ success: true, count: nextSources.length }, sheetsSync));
+    res.json(withSheetsSync({ success: true, count: nextSources.length }, mergeSheetsSyncResults([sheetsSync, ...cascadePushResults])));
   } catch (err) {
     console.error('Error in POST /api/sources/update-all:', err);
     res.status(500).json({ error: 'Internal server error' });

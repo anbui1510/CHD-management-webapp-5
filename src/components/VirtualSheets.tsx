@@ -12,6 +12,8 @@ import {
   buildReconciliationPatchOperations,
   type ReconciliationItem
 } from '../utils/cathlabReconciliation';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 interface VirtualSheetsProps {
   patients: Patient[];
@@ -26,6 +28,7 @@ interface VirtualSheetsProps {
 }
 
 export default function VirtualSheets({ patients, consults, staff, cathlabs = [], operations = [], cmrs = [], sources = [], deviceTemplates = [], onRefreshData }: VirtualSheetsProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate'>('Patient');
   
   // Pagination State
@@ -219,13 +222,16 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
     setActionSuccess(null);
     try {
       const operations = buildReconciliationPatchOperations(confident);
-      const response = await fetch('/api/batch-write', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operations })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Không thể áp dụng đối soát.');
+      await persistWithSheetsSync(
+        reportMutationResponse,
+        '/api/batch-write',
+        {
+          method: 'POST',
+          body: JSON.stringify({ operations })
+        },
+        buildSyncContext('google-sheets', { viewLabel: 'Virtual Google Sheets' }),
+        { baseMessage: 'Đã áp dụng đối soát CathLab' }
+      );
       setActionSuccess(`Đã áp dụng ${confident.length} match chắc (${operations.length} bản ghi patch).`);
       setReconcileResults(null);
       onRefreshData?.();

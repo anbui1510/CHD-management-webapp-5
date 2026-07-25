@@ -25,6 +25,8 @@ import {
 } from '../data/cmrDefaults';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { VNDateInput } from './VNDateInput';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
@@ -119,6 +121,7 @@ export default function MRISchedulerView({
   onAddCmr,
   onAddPatient
 }: MRISchedulerViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<MriTab>('unscheduled');
   const [mobileActiveTab, setMobileActiveTab] = useState<'unscheduled' | 'scheduled' | 'calendar'>('unscheduled');
 
@@ -172,15 +175,13 @@ export default function MRISchedulerView({
     const trimmed = normalizeDiagnosisID(DiagnosisID);
     if (!trimmed) return;
 
-    const response = await fetch('/api/sources', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ DiagnosisID: trimmed })
-    });
-
-    if (!response.ok) {
-      throw new Error('Không thể thêm DiagnosisID vào Source');
-    }
+    await persistWithSheetsSync(
+      reportMutationResponse,
+      '/api/sources',
+      { method: 'POST', body: JSON.stringify({ DiagnosisID: trimmed }) },
+      buildSyncContext('mri-scheduler', { viewLabel: 'Xếp lịch MRI' }),
+      { baseMessage: 'Đã thêm mã chẩn đoán vào danh mục' }
+    );
 
     onRefreshData();
   };
@@ -655,15 +656,16 @@ export default function MRISchedulerView({
       const url = selectedItem.__isSynthetic
         ? '/api/cmrs'
         : `/api/cmrs/${encodeURIComponent(selectedItem.CMRKey || selectedItem.CMRkey || '')}`;
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error('Không lưu được lịch MRI (server trả lỗi)');
-      }
+      await persistWithSheetsSync(
+        reportMutationResponse,
+        url,
+        { method, body: JSON.stringify(payload) },
+        buildSyncContext('mri-scheduler', {
+          patientName: patient?.PatientName,
+          patientKey: payload.PatientKey
+        }),
+        { baseMessage: 'Đã lưu lịch MRI' }
+      );
 
       onRefreshData();
       return true;
@@ -853,33 +855,42 @@ export default function MRISchedulerView({
       setAdHocLoading(false);
 
       const persist = async () => {
-        if (adHocPatientMode === 'create') {
-          const patRes = await fetch('/api/patients', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              PatientKey: finalPatientKey,
-              PatientID1: adHocNewPatID1.trim(),
-              PatientID2: adHocNewPatID2.trim(),
-              PatientName: adHocNewPatName,
-              OtherPatientName: '',
-              PatientDOB: adHocNewPatDOB || '2020-01-01',
-              PatientSex: adHocNewPatSex,
-              PatientAddress: adHocNewPatAddress || 'TP Hà Nội',
-              PatientPhone1: adHocNewPatPhone || '',
-              PatientPhone2: '',
-              PatientCreateBy: currentStaff?.StaffKey || '01378',
-              PatientCreateTime: new Date().toISOString()
-            })
-          });
-          if (!patRes.ok) throw new Error('Không thể tạo bệnh nhi mới');
-        }
-        const res = await fetch('/api/cmrs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cmrPayload)
+        const syncContext = buildSyncContext('mri-scheduler', {
+          patientName: finalPatient?.PatientName,
+          patientKey: finalPatientKey
         });
-        if (!res.ok) throw new Error('Không thể xếp bổ sung MRI');
+        if (adHocPatientMode === 'create') {
+          await persistWithSheetsSync(
+            reportMutationResponse,
+            '/api/patients',
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                PatientKey: finalPatientKey,
+                PatientID1: adHocNewPatID1.trim(),
+                PatientID2: adHocNewPatID2.trim(),
+                PatientName: adHocNewPatName,
+                OtherPatientName: '',
+                PatientDOB: adHocNewPatDOB || '2020-01-01',
+                PatientSex: adHocNewPatSex,
+                PatientAddress: adHocNewPatAddress || 'TP Hà Nội',
+                PatientPhone1: adHocNewPatPhone || '',
+                PatientPhone2: '',
+                PatientCreateBy: currentStaff?.StaffKey || '01378',
+                PatientCreateTime: new Date().toISOString()
+              })
+            },
+            syncContext,
+            { baseMessage: 'Đã tạo bệnh nhi mới' }
+          );
+        }
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          '/api/cmrs',
+          { method: 'POST', body: JSON.stringify(cmrPayload) },
+          syncContext,
+          { baseMessage: 'Đã xếp bổ sung MRI' }
+        );
         onRefreshData();
       };
 

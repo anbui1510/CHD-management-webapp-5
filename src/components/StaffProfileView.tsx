@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import type { CathLab, Consult, DoctorPerformanceMark, Operation, Patient, Staff } from '../types';
 import { formatVNTime } from '../types';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { DateFieldWithCalendar, DateRangePickerPopover } from './MiniCalendarPopup';
 import {
   ActivityDateFilter,
@@ -205,6 +207,7 @@ export default function StaffProfileView({
   onStaffUpdated,
   triggerAlert,
 }: StaffProfileViewProps) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   const now = new Date();
   const [profileStaff, setProfileStaff] = useState<Staff>(staff);
   const [filter, setFilter] = useState<ActivityDateFilter>({
@@ -322,38 +325,35 @@ export default function StaffProfileView({
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          StaffName: adminDraft.StaffName?.trim(),
-          Name: adminDraft.Name?.trim() || '',
-          Department: adminDraft.Department?.trim() || '',
-          Career: adminDraft.Career?.trim() || '',
-          StaffDOB: adminDraft.StaffDOB || '',
-          StaffSex: adminDraft.StaffSex || '',
-          Email: adminDraft.Email?.trim() || '',
-          StaffPhone: adminDraft.StaffPhone?.trim() || '',
-          Avatar: adminDraft.Avatar || '',
-          Password: adminDraft.Password?.trim() || '',
-        }),
-      });
+      const updated = await persistWithSheetsSync<Staff>(
+        reportMutationResponse,
+        `/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            StaffName: adminDraft.StaffName?.trim(),
+            Name: adminDraft.Name?.trim() || '',
+            Department: adminDraft.Department?.trim() || '',
+            Career: adminDraft.Career?.trim() || '',
+            StaffDOB: adminDraft.StaffDOB || '',
+            StaffSex: adminDraft.StaffSex || '',
+            Email: adminDraft.Email?.trim() || '',
+            StaffPhone: adminDraft.StaffPhone?.trim() || '',
+            Avatar: adminDraft.Avatar || '',
+            Password: adminDraft.Password?.trim() || '',
+          })
+        },
+        buildSyncContext('profile', { viewLabel: 'Hồ sơ cá nhân' }),
+        { baseMessage: 'Đã cập nhật thông tin hành chính' }
+      );
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Không thể lưu hồ sơ');
-      }
-
-      // Save session timeout
       localStorage.setItem(`SessionTimeout_${profileStaff.StaffKey}`, sessionTimeout);
       window.dispatchEvent(new Event('storage'));
 
-      const updated = (await response.json()) as Staff;
       setProfileStaff(updated);
       setAdminDraft(toAdminDraft(updated));
       setIsEditingAdmin(false);
       onStaffUpdated?.(updated);
-      triggerAlert?.('Đã cập nhật thông tin hành chính.', 'Lưu thành công');
     } catch (error) {
       triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu hồ sơ', 'Lỗi');
     } finally {
@@ -382,20 +382,16 @@ export default function StaffProfileView({
 
       setSaving(true);
       try {
-        const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ Avatar: dataUrl }),
-        });
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || 'Không thể lưu avatar');
-        }
-        const updated = (await response.json()) as Staff;
+        const updated = await persistWithSheetsSync<Staff>(
+          reportMutationResponse,
+          `/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`,
+          { method: 'PUT', body: JSON.stringify({ Avatar: dataUrl }) },
+          buildSyncContext('profile', { viewLabel: 'Hồ sơ cá nhân' }),
+          { baseMessage: 'Đã cập nhật avatar' }
+        );
         setProfileStaff(updated);
         setAdminDraft(toAdminDraft(updated));
         onStaffUpdated?.(updated);
-        triggerAlert?.('Đã cập nhật avatar.', 'Lưu thành công');
       } catch (error) {
         triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu avatar', 'Lỗi');
       } finally {
