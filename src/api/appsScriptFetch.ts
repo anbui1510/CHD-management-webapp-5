@@ -24,6 +24,18 @@ type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CM
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
 const SCRIPT_SECRET_STORAGE_KEY = 'chd_apps_script_secret';
 
+const isLikelyMobileDevice = (): boolean => {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+};
+
+const getAppsScriptFetchTimeout = (force: boolean): number => {
+  const desktopTimeout = force ? 60000 : 20000;
+  if (!isLikelyMobileDevice()) return desktopTimeout;
+  return force ? 90000 : 45000;
+};
+
 const fetchWithTimeout = async (url: string, init?: RequestInit, timeout = 60000): Promise<Response> => {
   const nativeFetch = (typeof window !== 'undefined' && (window as any).__CHD_NATIVE_FETCH__) || fetch;
   const controller = new AbortController();
@@ -104,14 +116,42 @@ let pendingStaffLoad: Promise<any[]> | null = null;
 
 const BRIDGE_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 const BRIDGE_SESSION_STORAGE_KEY = 'chd_bridge_sessions_v1';
+const CHD_AUTH_STAFF_KEY = 'CHD_AUTH_STAFF_KEY';
 
 const bridgeTokenStore = new Map<string, { staffKey: string; expiresAt: number }>();
 
+const readBridgeSessionEntries = (): Record<string, { staffKey: string; expiresAt: number }> => {
+  try {
+    const raw = localStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, { staffKey: string; expiresAt: number }>;
+  } catch {
+    // ignore corrupt storage
+  }
+
+  // Migrate legacy sessionStorage entries (cleared often on iOS PWA reopen)
+  try {
+    const legacyRaw = sessionStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
+    if (!legacyRaw) return {};
+    const legacyEntries = JSON.parse(legacyRaw) as Record<string, { staffKey: string; expiresAt: number }>;
+    localStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, legacyRaw);
+    sessionStorage.removeItem(BRIDGE_SESSION_STORAGE_KEY);
+    return legacyEntries;
+  } catch {
+    return {};
+  }
+};
+
+const writeBridgeSessionEntries = (entries: Record<string, { staffKey: string; expiresAt: number }>): void => {
+  try {
+    localStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore quota / private mode errors
+  }
+};
+
 function hydrateBridgeSessions(): void {
   try {
-    const raw = sessionStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
-    if (!raw) return;
-    const entries = JSON.parse(raw) as Record<string, { staffKey: string; expiresAt: number }>;
+    const entries = readBridgeSessionEntries();
     const now = Date.now();
     const kept: Record<string, { staffKey: string; expiresAt: number }> = {};
     for (const [token, session] of Object.entries(entries)) {
@@ -120,7 +160,16 @@ function hydrateBridgeSessions(): void {
         kept[token] = session;
       }
     }
-    sessionStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, JSON.stringify(kept));
+    writeBridgeSessionEntries(kept);
+
+    const storedToken = localStorage.getItem('CHD_AUTH_TOKEN');
+    const storedStaffKey = localStorage.getItem(CHD_AUTH_STAFF_KEY);
+    if (storedToken && storedStaffKey && !bridgeTokenStore.has(storedToken)) {
+      const restored = { staffKey: storedStaffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS };
+      bridgeTokenStore.set(storedToken, restored);
+      kept[storedToken] = restored;
+      writeBridgeSessionEntries(kept);
+    }
   } catch {
     // ignore corrupt session storage
   }
@@ -128,10 +177,9 @@ function hydrateBridgeSessions(): void {
 
 function persistBridgeSession(token: string, session: { staffKey: string; expiresAt: number }): void {
   try {
-    const raw = sessionStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
-    const entries = raw ? JSON.parse(raw) as Record<string, { staffKey: string; expiresAt: number }> : {};
+    const entries = readBridgeSessionEntries();
     entries[token] = session;
-    sessionStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, JSON.stringify(entries));
+    writeBridgeSessionEntries(entries);
   } catch {
     // ignore quota / private mode errors
   }
@@ -140,11 +188,12 @@ function persistBridgeSession(token: string, session: { staffKey: string; expire
 function removeBridgeSession(token: string): void {
   bridgeTokenStore.delete(token);
   try {
-    const raw = sessionStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
-    if (!raw) return;
-    const entries = JSON.parse(raw) as Record<string, { staffKey: string; expiresAt: number }>;
+    const entries = readBridgeSessionEntries();
     delete entries[token];
-    sessionStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, JSON.stringify(entries));
+    writeBridgeSessionEntries(entries);
+    if (localStorage.getItem('CHD_AUTH_TOKEN') === token) {
+      localStorage.removeItem(CHD_AUTH_STAFF_KEY);
+    }
   } catch {
     // ignore
   }
@@ -161,12 +210,27 @@ function bridgeCreateSession(staffKey: string): string {
   const session = { staffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS };
   bridgeTokenStore.set(token, session);
   persistBridgeSession(token, session);
+  try {
+    localStorage.setItem(CHD_AUTH_STAFF_KEY, staffKey);
+  } catch {
+    // ignore quota errors
+  }
   return token;
 }
 
 function bridgeResolveSession(token: string): string | null {
-  const session = bridgeTokenStore.get(token);
-  if (!session) return null;
+  let session = bridgeTokenStore.get(token);
+  if (!session) {
+    const storedToken = localStorage.getItem('CHD_AUTH_TOKEN');
+    const storedStaffKey = localStorage.getItem(CHD_AUTH_STAFF_KEY);
+    if (storedToken === token && storedStaffKey) {
+      session = { staffKey: storedStaffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS };
+      bridgeTokenStore.set(token, session);
+      persistBridgeSession(token, session);
+    } else {
+      return null;
+    }
+  }
   if (Date.now() >= session.expiresAt) {
     removeBridgeSession(token);
     return null;
@@ -426,7 +490,7 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
 
-  pendingStaffLoad = fetchWithTimeout(fetchUrl, undefined, force ? 60000 : 15000)
+  pendingStaffLoad = fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force))
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
@@ -460,8 +524,12 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
 
 
 
-const fetchAllDataFromNetwork = (force = false): Promise<SheetData> => {
+const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
   if (pendingLoad) return pendingLoad;
+
+  if (!getScriptUrl()) {
+    await ensureSyncConfigHydrated();
+  }
 
   const scriptUrl = getScriptUrl();
 
@@ -494,7 +562,7 @@ const fetchAllDataFromNetwork = (force = false): Promise<SheetData> => {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
 
-  pendingLoad = fetchWithTimeout(fetchUrl, undefined, force ? 60000 : 20000)
+  pendingLoad = fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force))
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
@@ -1098,9 +1166,19 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       const authErr = requireAuthBridge(init);
       if (authErr) return authErr;
     }
-    if (!scriptUrl) {
+    let resolvedScriptUrl = scriptUrl;
+    if (!resolvedScriptUrl) {
+      await ensureSyncConfigHydrated();
+      resolvedScriptUrl = getScriptUrl();
+    }
+    if (!resolvedScriptUrl) {
       if (isLocalHost()) return null;
-      return jsonResponse(sanitizeDataBundle(EMPTY_DATA));
+      return jsonResponse(
+        {
+          error: 'Chưa cấu hình Google Apps Script URL. Mở app trên máy tính đã liên kết Google Sheets hoặc liên hệ quản trị viên.'
+        },
+        { status: 503 }
+      );
     }
     const force = parsed.searchParams.get('force') === 'true' || parsed.searchParams.get('refresh') === 'true';
     const allData = await loadAllData(force);
@@ -1369,6 +1447,11 @@ export async function hydrateSyncConfigFromServer(): Promise<boolean> {
     console.warn('Failed to hydrate sync config from server:', err);
     return false;
   }
+}
+
+export async function ensureSyncConfigHydrated(): Promise<boolean> {
+  if (getScriptUrl()) return true;
+  return hydrateSyncConfigFromServer();
 }
 
 export const installAppsScriptFetchBridge = () => {
