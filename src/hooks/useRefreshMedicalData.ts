@@ -132,7 +132,7 @@ export function useRefreshMedicalData(
       'Không đồng bộ được Google Sheets sau 20 giây. Kiểm tra mạng hoặc cấu hình Apps Script rồi bấm Đồng bộ lại.'
     )
       .then(bundle => {
-        applyMedicalDataBundle(bundle, scope, setters, { allowEmpty: true });
+        applyMedicalDataBundle(bundle, scope, setters);
         meta.lastAt = Date.now();
         emitState({ phase: 'ready', startedAt: null });
       })
