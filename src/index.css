@@ -6,6 +6,13 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
 /*
  * Mobile-only: prevent iOS Safari from auto-zooming when focusing inputs.
  * Safari zooms if editable field font-size is below 16px, which shifts/zooms the viewport.
