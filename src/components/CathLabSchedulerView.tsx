@@ -49,7 +49,9 @@ import {
   Undo2,
   ArrowRightLeft,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  LayoutList,
+  Table2
 } from 'lucide-react';
 
 const removeVietnameseTones = (str: any): string => {
@@ -435,6 +437,8 @@ export default function CathLabSchedulerView({
   const rowsPerWaitlistPage = 50;
   const isMobile = useIsMobile();
   const MOBILE_WAITLIST_BATCH = 50;
+  const [mobileWaitlistLayout, setMobileWaitlistLayout] = useState<'deck' | 'table'>('deck');
+  const [waitlistBannerMsg, setWaitlistBannerMsg] = useState('');
   const [mobileWaitlistVisibleCount, setMobileWaitlistVisibleCount] = useState(MOBILE_WAITLIST_BATCH);
   const waitlistScrollRef = useRef<HTMLDivElement>(null);
 
@@ -556,7 +560,13 @@ export default function CathLabSchedulerView({
   const [adHocOutcome, setAdHocOutcome] = useState<'Tử vong' | 'Nặng xin về' | 'Đã mổ' | 'Đã thông' | ''>('');
 
   const [adHocConsultType, setAdHocConsultType] = useState<'Staff mổ' | 'Staff thông'>('Staff thông');
-  const [actionConfirm, setActionConfirm] = useState<{type: 'save_schedule'|'loai'|'transfer'|'undo_scheduled'|'transfer_row'|'ad_hoc_override', title: string, message: string, consultToUpdate?: Consult} | null>(null);
+  const [actionConfirm, setActionConfirm] = useState<{
+    type: 'save_schedule' | 'loai' | 'transfer' | 'undo_scheduled' | 'transfer_row' | 'loai_row' | 'ad_hoc_override';
+    title: string;
+    message: string;
+    consultToUpdate?: Consult;
+    useCoKhong?: boolean;
+  } | null>(null);
   const [actionAlert, setActionAlert] = useState<string>('');
   const [formSnapshot, setFormSnapshot] = useState<SchedulingFormSnapshot | null>(null);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
@@ -612,6 +622,12 @@ export default function CathLabSchedulerView({
     const timer = window.setTimeout(() => setSuccessMsg(''), 4000);
     return () => window.clearTimeout(timer);
   }, [successMsg]);
+
+  useEffect(() => {
+    if (!waitlistBannerMsg) return;
+    const timer = window.setTimeout(() => setWaitlistBannerMsg(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [waitlistBannerMsg]);
 
   // Summary copyable modal states
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -1662,6 +1678,10 @@ Xin cảm ơn!`;
     return displayWaitlist.slice(0, mobileWaitlistVisibleCount);
   }, [displayWaitlist, mobileWaitlistVisibleCount]);
 
+  const waitlistRowsToRender = isMobile ? mobileDisplayedWaitlist : paginatedWaitlist;
+  const showMobileDeck = isMobile && mobileWaitlistLayout === 'deck';
+  const showWaitlistTable = !isMobile || mobileWaitlistLayout === 'table';
+
   const handleWaitlistScroll = useCallback(() => {
     if (!isMobile) return;
     const el = waitlistScrollRef.current;
@@ -2410,9 +2430,30 @@ Xin cảm ơn!`;
     }
     setActionConfirm({
       type: 'transfer_row',
-      title: 'Xác nhận chuyển',
-      message: `Bạn có muốn chuyển bệnh nhi ${p.PatientName} sang phòng Thông tim không?`,
-      consultToUpdate: c
+      title: 'Chuyển phòng thông tim',
+      message: isMobile ? 'Bạn có muốn chuyển phòng thông tim?' : `Bạn có muốn chuyển bệnh nhi ${p.PatientName} sang phòng Thông tim không?`,
+      consultToUpdate: c,
+      useCoKhong: isMobile
+    });
+  };
+
+  const handleDeckTransfer = (c: Consult) => {
+    setActionConfirm({
+      type: 'transfer_row',
+      title: 'Chuyển phòng thông tim',
+      message: 'Bạn có muốn chuyển phòng thông tim?',
+      consultToUpdate: c,
+      useCoKhong: true
+    });
+  };
+
+  const handleDeckLoai = (c: Consult) => {
+    setActionConfirm({
+      type: 'loai_row',
+      title: 'Loại bệnh nhân',
+      message: 'Bạn có muốn loại bệnh nhân này?',
+      consultToUpdate: c,
+      useCoKhong: true
     });
   };
 
@@ -2461,7 +2502,11 @@ Xin cảm ơn!`;
     } else if (currentAction.type === 'transfer_row' && currentAction.consultToUpdate) {
       const patch = { TransferredToCathLab: true };
       onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
-      setSuccessMsg('Đã chuyển phòng thông tim. Ca vẫn được giữ trong Lịch thông tim dự kiến.');
+      if (isMobile) {
+        setWaitlistBannerMsg('Đã chuyển phòng thông tim thành công!');
+      } else {
+        setSuccessMsg('Đã chuyển phòng thông tim thành công!');
+      }
       setSaving(false);
       fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
         method: 'PUT',
@@ -2470,6 +2515,23 @@ Xin cảm ơn!`;
       }).catch(e => {
         console.error(e);
         setErrorMsg(e instanceof Error ? e.message : 'Không thể chuyển phòng thông tim');
+        onRefreshData();
+      });
+    } else if (currentAction.type === 'loai_row' && currentAction.consultToUpdate) {
+      const patch = { CallStatus: 'Loại' as Consult['CallStatus'] };
+      onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
+      if (selectedConsult && selectedConsult.ConsultKey === currentAction.consultToUpdate.ConsultKey) {
+        setCallStatus('Loại');
+      }
+      setWaitlistBannerMsg('Đã loại bệnh nhân khỏi danh sách.');
+      setSaving(false);
+      fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }).catch(e => {
+        console.error(e);
+        setErrorMsg(e instanceof Error ? e.message : 'Không thể loại bệnh nhân');
         onRefreshData();
       });
     } else if (currentAction.type === 'ad_hoc_override' && currentAction.consultToUpdate) {
@@ -2955,6 +3017,11 @@ Xin cảm ơn!`;
             </div>
             <button
               onClick={() => {
+                if (isMobile) {
+                  setMobileWaitlistLayout(prev => prev === 'deck' ? 'table' : 'deck');
+                  waitlistScrollRef.current?.scrollTo({ top: 0 });
+                  return;
+                }
                 if (waitlistSortField === 'default') {
                   setWaitlistSortField('date');
                   setWaitlistSortOrder('desc');
@@ -2963,9 +3030,17 @@ Xin cảm ơn!`;
                 setWaitlistSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
               }}
               className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0 cursor-pointer"
-              title="Sắp xếp theo ngày hội chẩn (Tăng/Giảm)"
+              title={isMobile ? (mobileWaitlistLayout === 'deck' ? 'Chuyển sang dạng bảng' : 'Chuyển sang dạng thẻ') : 'Sắp xếp theo ngày hội chẩn (Tăng/Giảm)'}
             >
-              <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 object-center ${waitlistSortOrder === 'asc' ? 'rotate-180' : ''}`} />
+              {isMobile ? (
+                mobileWaitlistLayout === 'deck' ? (
+                  <Table2 className="w-4 h-4" />
+                ) : (
+                  <LayoutList className="w-4 h-4" />
+                )
+              ) : (
+                <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 object-center ${waitlistSortOrder === 'asc' ? 'rotate-180' : ''}`} />
+              )}
             </button>
           </div>
 
@@ -2981,7 +3056,7 @@ Xin cảm ơn!`;
               </div>
             ) : (
               <>
-              <div className="lg:hidden divide-y divide-slate-100">
+              <div className={`${showMobileDeck ? 'lg:hidden' : 'hidden'} divide-y divide-slate-100`}>
                 {mobileDisplayedWaitlist.map((c) => {
                   const pat = findPatientByKey(patients, c.PatientKey);
                   if (!pat) return null;
@@ -2990,44 +3065,72 @@ Xin cảm ơn!`;
                   const scheduleDelayWarning = getScheduleDelayWarningInfo(c);
 
                   return (
-                    <button
+                    <div
                       key={c.ConsultKey}
-                      type="button"
-                      onClick={() => handleSelectConsult(c)}
-                      className={`w-full text-left p-3 transition ${
+                      className={`flex items-stretch transition ${
                         isSelected ? 'bg-indigo-50/90 border-l-4 border-indigo-600' : 'hover:bg-indigo-50/45'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5">
-                        <ScheduleDelayWarningIcon warning={scheduleDelayWarning} />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-extrabold uppercase text-slate-900 leading-snug break-words">
-                            {pat.PatientName}
-                          </div>
-                          <div className="text-[9px] text-slate-400 font-bold font-mono mt-0.5">
-                            ID1: {pat.PatientID1}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectConsult(c)}
+                        className="flex-1 min-w-0 text-left p-3"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <ScheduleDelayWarningIcon warning={scheduleDelayWarning} />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-extrabold uppercase text-slate-900 leading-snug break-words">
+                              {pat.PatientName}
+                            </div>
+                            <div className="text-[9px] text-slate-400 font-bold font-mono mt-0.5">
+                              ID1: {pat.PatientID1}
+                            </div>
                           </div>
                         </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-2 text-[10px]">
+                          <span className="bg-slate-100 text-slate-800 font-extrabold px-1.5 py-0.5 rounded font-mono">
+                            {c.DiagnosisID || '—'}
+                          </span>
+                          <span className={`font-extrabold text-[8px] uppercase px-2 py-0.5 rounded-full border ${getPriorityBadgeClass(c.PriorityOrder || '')}`}>
+                            {normalizePriorityOrder(c.PriorityOrder)}
+                          </span>
+                          <span className="text-slate-500">
+                            {c.CheckDevice === 'Đủ' ? 'DC: Đủ' : c.CheckDevice === 'Thiếu' ? 'DC: Thiếu' : 'Chưa check DC'}
+                          </span>
+                          {c.PlannedCathLabDate && (
+                            <span className="font-mono text-slate-600">{formatVNTime(c.PlannedCathLabDate)}</span>
+                          )}
+                        </div>
+                      </button>
+                      <div className="flex flex-col justify-center gap-1.5 pr-2.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeckTransfer(c);
+                          }}
+                          className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition cursor-pointer"
+                          title="Chuyển phòng thông tim"
+                        >
+                          <ChevronsRight className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeckLoai(c);
+                          }}
+                          className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition cursor-pointer"
+                          title="Loại"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 mt-2 text-[10px]">
-                        <span className="bg-slate-100 text-slate-800 font-extrabold px-1.5 py-0.5 rounded font-mono">
-                          {c.DiagnosisID || '—'}
-                        </span>
-                        <span className={`font-extrabold text-[8px] uppercase px-2 py-0.5 rounded-full border ${getPriorityBadgeClass(c.PriorityOrder || '')}`}>
-                          {normalizePriorityOrder(c.PriorityOrder)}
-                        </span>
-                        <span className="text-slate-500">
-                          {c.CheckDevice === 'Đủ' ? 'DC: Đủ' : c.CheckDevice === 'Thiếu' ? 'DC: Thiếu' : 'Chưa check DC'}
-                        </span>
-                        {c.PlannedCathLabDate && (
-                          <span className="font-mono text-slate-600">{formatVNTime(c.PlannedCathLabDate)}</span>
-                        )}
-                      </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
-              <table className="hidden lg:table w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
+              <table className={`${showWaitlistTable ? 'table' : 'hidden lg:table'} w-full min-w-[720px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700`}>
                 <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-200 uppercase text-[9px] font-extrabold tracking-wider z-20 shadow-xs">
                   <tr>
                     {activeTab === 'scheduled' && (
@@ -3253,7 +3356,7 @@ Xin cảm ơn!`;
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {paginatedWaitlist.map((c) => {
+                  {waitlistRowsToRender.map((c) => {
                     const pat = findPatientByKey(patients, c.PatientKey);
                     if (!pat) return null;
                     const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
@@ -3386,6 +3489,13 @@ Xin cảm ơn!`;
               </>
             )}
           </div>
+
+          {waitlistBannerMsg && isMobile && (
+            <div className="lg:hidden shrink-0 px-4 py-3 bg-emerald-50 border-t border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-200">
+              <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{waitlistBannerMsg}</span>
+            </div>
+          )}
           
           {/* Pagination panel — desktop only; mobile uses infinite scroll */}
           {displayWaitlist.length > 0 && (
@@ -4810,19 +4920,19 @@ Xin cảm ơn!`;
       {actionConfirm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
-            <div className={`py-3 px-4 flex items-center gap-2 ${actionConfirm.type === 'loai' ? 'bg-rose-50 border-b border-rose-100' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-50 border-b border-emerald-100' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-50 border-b border-indigo-100' : 'bg-sky-50 border-b border-sky-100'}`}>
-               <AlertTriangle className={`w-5 h-5 ${actionConfirm.type === 'loai' ? 'text-rose-600' : actionConfirm.type === 'save_schedule' ? 'text-emerald-600' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-600' : 'text-sky-600'}`} />
-               <h3 className={`font-extrabold text-[13px] uppercase tracking-wide ${actionConfirm.type === 'loai' ? 'text-rose-900' : actionConfirm.type === 'save_schedule' ? 'text-emerald-900' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-900' : 'text-sky-900'}`}>{actionConfirm.title}</h3>
+            <div className={`py-3 px-4 flex items-center gap-2 ${actionConfirm.type === 'loai' || actionConfirm.type === 'loai_row' ? 'bg-rose-50 border-b border-rose-100' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-50 border-b border-emerald-100' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-50 border-b border-indigo-100' : 'bg-sky-50 border-b border-sky-100'}`}>
+               <AlertTriangle className={`w-5 h-5 ${actionConfirm.type === 'loai' || actionConfirm.type === 'loai_row' ? 'text-rose-600' : actionConfirm.type === 'save_schedule' ? 'text-emerald-600' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-600' : 'text-sky-600'}`} />
+               <h3 className={`font-extrabold text-[13px] uppercase tracking-wide ${actionConfirm.type === 'loai' || actionConfirm.type === 'loai_row' ? 'text-rose-900' : actionConfirm.type === 'save_schedule' ? 'text-emerald-900' : actionConfirm.type === 'ad_hoc_override' ? 'text-indigo-900' : 'text-sky-900'}`}>{actionConfirm.title}</h3>
             </div>
             <div className="p-5">
               <p className="text-sm font-semibold text-slate-700">{actionConfirm.message}</p>
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
                <button onClick={() => setActionConfirm(null)} className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer">
-                  Hủy bỏ
+                  {actionConfirm.useCoKhong ? 'Không' : 'Hủy bỏ'}
                </button>
-               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' ? 'bg-[#d2145a] hover:bg-rose-700' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-600 hover:bg-emerald-700' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
-                  {saving ? 'Đang thực hiện...' : actionConfirm.type === 'save_schedule' ? 'Đồng ý lưu' : 'Đồng ý'}
+               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' || actionConfirm.type === 'loai_row' ? 'bg-[#d2145a] hover:bg-rose-700' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-600 hover:bg-emerald-700' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
+                  {saving ? 'Đang thực hiện...' : actionConfirm.useCoKhong ? 'Có' : actionConfirm.type === 'save_schedule' ? 'Đồng ý lưu' : 'Đồng ý'}
                </button>
             </div>
           </div>
