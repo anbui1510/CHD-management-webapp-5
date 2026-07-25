@@ -876,15 +876,17 @@ const deliverWebPushForNotification = (record: Record<string, unknown>): void =>
         const err = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      return res.json() as Promise<{ sent?: number; skipped?: boolean }>;
+      return res.json() as Promise<{ sent?: number; skipped?: boolean; needsResubscribe?: boolean; errors?: string[] }>;
     });
 
   void send()
     .then(result => {
       if (result.skipped) {
         console.warn('[web-push] Server chưa cấu hình VAPID — không gửi được push OS.');
+      } else if (result.needsResubscribe) {
+        console.warn('[web-push] Subscription hết hạn — cần Tắt/Bật lại thông báo trên thiết bị nhận:', staffKey, result.errors);
       } else if (!result.sent) {
-        console.warn('[web-push] Không có thiết bị đăng ký push cho StaffKey', staffKey);
+        console.warn('[web-push] Không gửi được push OS cho StaffKey', staffKey, result.errors);
       }
     })
     .catch(err => {

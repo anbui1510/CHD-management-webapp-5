@@ -3,7 +3,9 @@ import {
   clearPushPromptDismiss,
   dismissPushPrompt,
   fetchPushStatus,
+  formatPushDeliverIssue,
   isPushSupported,
+  sendTestPush,
   subscribeToWebPush,
   syncExistingPushSubscription,
   unsubscribeFromWebPush,
@@ -104,6 +106,30 @@ export function useWebPush(staffKey?: string) {
     }
   }, [staffKey, refreshStatus]);
 
+  const testPush = useCallback(async () => {
+    if (!staffKey) return false;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await sendTestPush(staffKey);
+      const issue = formatPushDeliverIssue(result);
+      if (issue) {
+        setError(issue);
+        if (result.needsResubscribe) {
+          setSubscribed(false);
+        }
+        return false;
+      }
+      setError('');
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không gửi được push thử');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [staffKey]);
+
   const dismissPrompt = useCallback(() => {
     dismissPushPrompt();
     setShowPrompt(false);
@@ -127,6 +153,7 @@ export function useWebPush(staffKey?: string) {
     showPrompt,
     enablePush,
     disablePush,
+    testPush,
     dismissPrompt,
     resetDismiss,
     refreshStatus,

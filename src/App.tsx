@@ -2411,6 +2411,7 @@ export default function App() {
                   error: webPush.error,
                   enablePush: webPush.enablePush,
                   disablePush: webPush.disablePush,
+                  testPush: webPush.testPush,
                   resetDismiss: webPush.resetDismiss,
                 }}
               />
