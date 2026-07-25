@@ -18,6 +18,11 @@ import {
 } from '../utils/hisCathImport';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync, withSyncContext } from '../utils/sheetsSyncMutation';
+import {
+  REPEAT_INTERVENTION_WARNING,
+  createRepeatInterventionWorkflow,
+  isRepeatInterventionPlan,
+} from '../utils/repeatInterventionConsult';
 
 interface Props {
   patients: Patient[];
@@ -1523,6 +1528,27 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        if (!cathRes.ok) throw new Error('Không thể lưu kết quả thông tim');
        reportMutationResponse(await cathRes.json(), { baseMessage: 'Đã lưu kết quả thông tim' });
 
+       if (isRepeatInterventionPlan(formData.CathPlan)) {
+         const repeatPatient = adHocPatientMode === 'existing'
+           ? findPatientByKey(patients, patientKey)
+           : newPatientObj;
+         await createRepeatInterventionWorkflow({
+           patientKey,
+           patient: repeatPatient,
+           cathDate: formData.CathDate || '',
+           postDiagnosisID: formData.PostDiagnosisID || '',
+           postDiagnosis: formData.PostDiagnosis || '',
+           cathNote: formData.CathNote || '',
+           requestBy: loggedInStaff?.StaffName || loggedInStaffNameShort || '',
+           loggedInStaffId,
+           consults,
+           staffList,
+           reportMutationResponse,
+           onSaveSuccess,
+           onAddConsult,
+         });
+       }
+
        // Save scars if any
        for (const mark of marksToCreate) {
          try {
@@ -1614,6 +1640,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      
      const consultKey = isEdit ? selectedDone?.cath.ConsultKey : selectedPending?.c.ConsultKey;
      const patientKey = isEdit ? selectedDone?.p.PatientKey : selectedPending?.p.PatientKey;
+     const patient = isEdit ? selectedDone?.p : selectedPending?.p;
+     const needsRepeatWorkflow = !isEdit && isRepeatInterventionPlan(formData.CathPlan);
 
      const payload = {
        ...formData,
@@ -1634,14 +1662,47 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
      setSaving(true);
      try {
-       const res = await fetch(url, {
-         method,
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(payload)
+       const syncContext = buildSyncContext('cathlab-room', {
+         patientName: patient?.PatientName,
+         patientKey,
        });
-       if (!res.ok) throw new Error('Không thể lưu kết quả thông tim');
+
+       await persistWithSheetsSync(
+         reportMutationResponse,
+         url,
+         {
+           method,
+           headers: {
+             'Content-Type': 'application/json',
+             Authorization: `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`,
+           },
+           body: JSON.stringify(withSyncContext(payload, syncContext)),
+         },
+         syncContext,
+         { baseMessage: 'Đã lưu kết quả thông tim' }
+       );
+
+       if (needsRepeatWorkflow && patientKey && patient) {
+         await createRepeatInterventionWorkflow({
+           patientKey,
+           patient,
+           cathDate: formData.CathDate || '',
+           postDiagnosisID: formData.PostDiagnosisID || '',
+           postDiagnosis: formData.PostDiagnosis || '',
+           cathNote: formData.CathNote || '',
+           requestBy: loggedInStaff?.StaffName || loggedInStaffNameShort || '',
+           loggedInStaffId,
+           consults,
+           staffList,
+           reportMutationResponse,
+           onSaveSuccess,
+           onAddConsult,
+         });
+       } else {
+         onSaveSuccess?.('Đã lưu kết quả thông tim thành công!');
+       }
+
        onRefreshData();
-       onSaveSuccess?.('Đã lưu kết quả thông tim thành công!');
        return true;
      } catch (e) {
        console.error(e);
@@ -2271,7 +2332,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                         />
                       </div>
 
-                      <div>
+                      <div className="col-span-2 md:col-span-1">
                         <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Kế hoạch sau thông tim <span className="text-rose-500">*</span></label>
                         <select 
                           value={formData.CathPlan} 
@@ -2284,6 +2345,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                            <option value="Đăng ký staff nội-ngoại khoa">Đăng ký staff nội-ngoại khoa</option>
                            <option value="Mổ khẩn">Mổ khẩn</option>
                         </select>
+                        {isRepeatInterventionPlan(formData.CathPlan) && (
+                          <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] sm:text-[11px] font-semibold text-amber-800 leading-snug">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <span>{REPEAT_INTERVENTION_WARNING}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
