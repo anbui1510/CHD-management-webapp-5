@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CHD Management">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d2145a"/>
+      <stop offset="100%" stop-color="#9b0f43"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path fill="#ffffff" d="M256 132c-34 0-62 24-68 56-36 8-62 38-62 74 0 42 34 76 76 76h12v-44h-12c-18 0-32-14-32-32s14-32 32-32c6 0 12 2 16 5 8-28 34-48 64-48s56 20 64 48c4-3 10-5 16-5 18 0 32 14 32 32s-14 32-32 32h-12v44h12c42 0 76-34 76-76 0-36-26-66-62-74-6-32-34-56-68-56z"/>
+  <path fill="#ffd166" d="M256 292c-18 0-32 14-32 32v68c0 18 14 32 32 32s32-14 32-32v-68c0-18-14-32-32-32z"/>
+</svg>
