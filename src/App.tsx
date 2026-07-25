@@ -58,7 +58,10 @@ import BellNotificationMenu from './components/BellNotificationMenu';
 import StaffProfileView from './components/StaffProfileView';
 import { useRefreshMedicalData, type MedicalDataLoadState } from './hooks/useRefreshMedicalData';
 import { useSheetsSyncStatus } from './hooks/useSheetsSyncStatus';
-import { appendSheetsSyncToSaveMessage, formatSheetsSyncStatusLabel } from './utils/sheetsSyncFeedback';
+import { formatSheetsSyncStatusLabel } from './utils/sheetsSyncFeedback';
+import { buildSyncContext, withSyncContext } from './utils/sheetsSyncMutation';
+import { SheetsSyncFeedbackProvider } from './context/SheetsSyncFeedbackContext';
+import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError } from './api/medicalDataRefresh';
 import { clearLocalCache } from './api/appsScriptFetch';
 import {
@@ -556,6 +559,7 @@ export default function App() {
     onCancel?: () => void;
   } | null>(null);
   const confirmPendingRef = useRef(false);
+  const sheetsSyncReportRef = useRef<(data: unknown, options?: { baseMessage?: string }) => void>(() => {});
 
   const triggerAlert = (message: string, title = 'Thông báo') => {
     setCustomAlert({ message, title });
@@ -567,18 +571,18 @@ export default function App() {
     setTimeout(() => setFormSuccessMessage(''), durationMs);
   };
 
-  const showSaveFeedback = (baseMessage: string, responseData: unknown, durationMs = 6000) => {
-    const { message, isWarning } = appendSheetsSyncToSaveMessage(baseMessage, responseData);
+  const handleSheetsSuccessBanner = useCallback((message: string, isWarning = false) => {
     setFormSuccessWarning(isWarning);
     setFormSuccessMessage(message);
     void refreshSheetsSyncStatus();
     setTimeout(() => {
       setFormSuccessMessage('');
       setFormSuccessWarning(false);
-    }, durationMs);
-    if (isWarning) {
-      triggerAlert(message, 'Lưu app OK — Google Sheets chưa xác nhận');
-    }
+    }, isWarning ? 8000 : 6000);
+  }, [refreshSheetsSyncStatus]);
+
+  const showSaveFeedback = (baseMessage: string, responseData: unknown) => {
+    sheetsSyncReportRef.current(responseData, { baseMessage });
   };
 
   const triggerConfirm = (message: string, onConfirm: () => void, title = 'Xác nhận', onCancel?: () => void) => {
@@ -1222,7 +1226,11 @@ export default function App() {
       fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(withSyncContext(payload, buildSyncContext('patients', {
+          patientName: payload.PatientName,
+          patientKey: patientKey,
+          patientID: payload.PatientID1
+        })))
       })
         .then(res => {
           if (!res.ok) throw new Error('Không thể lưu hồ sơ bệnh nhi');
@@ -1342,7 +1350,10 @@ export default function App() {
       fetch('/api/consults', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(withSyncContext(payload, buildSyncContext('consult-form', {
+          patientName: patients.find(p => p.PatientKey === payload.PatientKey)?.PatientName,
+          patientKey: payload.PatientKey
+        })))
       })
         .then(res => {
           if (!res.ok) throw new Error('Không thể đăng ký hội chẩn');
@@ -1393,7 +1404,12 @@ export default function App() {
     fetch(`/api/consults/${consultKey}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editConsultData)
+      body: JSON.stringify(withSyncContext(editConsultData, buildSyncContext('consult-list', {
+        patientName: consults.find(c => c.ConsultKey === consultKey)?.PatientKey
+          ? patients.find(p => p.PatientKey === consults.find(c => c.ConsultKey === consultKey)?.PatientKey)?.PatientName
+          : undefined,
+        patientKey: consults.find(c => c.ConsultKey === consultKey)?.PatientKey
+      })))
     })
       .then(res => {
         if (!res.ok) throw new Error('Không thể cập nhật đăng ký staff');
@@ -2046,6 +2062,13 @@ export default function App() {
   const headerInfo = getHeaderContent();
 
   return (
+    <SheetsSyncFeedbackProvider
+      onSuccessBanner={handleSheetsSuccessBanner}
+      onRefreshNotifications={() => {
+        void refreshMedicalData('full', true, { silent: true });
+      }}
+      onRefreshSheetsStatus={refreshSheetsSyncStatus}
+    >
     <div className="min-h-dvh h-dvh bg-slate-50 text-slate-800 flex flex-col font-sans overflow-hidden">
       
       {/* Top Application Header Bar styled beautifully like the secondary custom red banner in screenshot */}
@@ -4282,6 +4305,12 @@ export default function App() {
         onNavigate={(menuId) => handleMobileMoreNavigate(menuId)}
       />
 
+      <SheetsSyncBridge
+        reportRef={sheetsSyncReportRef}
+        loadWhenReady={medicalDataLoadState.phase === 'ready'}
+      />
+
     </div>
+    </SheetsSyncFeedbackProvider>
   );
 }

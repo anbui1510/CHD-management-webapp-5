@@ -16,6 +16,8 @@ import {
   normalizeCathDateKey,
   shouldSkipDuplicateHisImport,
 } from '../utils/hisCathImport';
+import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
+import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
 
 interface Props {
   patients: Patient[];
@@ -337,6 +339,7 @@ const buildCathFormSnapshot = (data: Partial<CathLab>, note: string): string =>
   });
 
 export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient, onSaveSuccess }: Props) {
+  const { reportMutationResponse } = useSheetsSyncFeedback();
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1493,15 +1496,20 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        // Save consult (either POST for Case A or PUT for Case B/C)
        const consultUrl = consultCase === 'A' ? '/api/consults' : `/api/consults/${consultPayload.ConsultKey}`;
        const consultMethod = consultCase === 'A' ? 'POST' : 'PUT';
+       const syncContext = buildSyncContext('cathlab-room', {
+         patientName: adHocPatientName || pName,
+         patientKey: patientKey
+       });
        const conRes = await fetch(consultUrl, {
          method: consultMethod,
          headers: { 
            'Content-Type': 'application/json',
            'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
          },
-         body: JSON.stringify(consultPayload)
+         body: JSON.stringify(withSyncContext(consultPayload, syncContext))
        });
        if (!conRes.ok) throw new Error('Không thể lưu thông tin hội chẩn/chuyển phòng');
+       reportMutationResponse(await conRes.json(), { baseMessage: 'Đã lưu thông tin hội chẩn' });
 
        // Save CathLab result
        const cathRes = await fetch('/api/cathlabs', {
@@ -1510,9 +1518,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            'Content-Type': 'application/json',
            'Authorization': `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}`
          },
-         body: JSON.stringify(cathPayload)
+         body: JSON.stringify(withSyncContext(cathPayload, syncContext))
        });
        if (!cathRes.ok) throw new Error('Không thể lưu kết quả thông tim');
+       reportMutationResponse(await cathRes.json(), { baseMessage: 'Đã lưu kết quả thông tim' });
 
        // Save scars if any
        for (const mark of marksToCreate) {
