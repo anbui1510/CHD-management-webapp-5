@@ -1157,6 +1157,11 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return null;
   }
 
+  // Web Push runs on Cloudflare Worker — bypass bridge mock API
+  if (endpoint === 'push') {
+    return null;
+  }
+
   if (endpoint === 'staff' && method === 'GET') {
     if (!scriptUrl) {
       if (isLocalHost()) return null;
