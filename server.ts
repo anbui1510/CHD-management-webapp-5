@@ -1569,13 +1569,9 @@ function runWorkflowMonitor() {
 
 app.get('/api/all', requireAuth, async (req, res) => {
   const force = String(req.query.force || '') === 'true';
-  if (force) {
-    await syncFromGoogleSheets(true);
-  } else {
-    void syncFromGoogleSheets().catch(err => {
-      console.warn('Background sync failed:', err);
-    });
-  }
+  void syncFromGoogleSheets(force).catch(err => {
+    console.warn('Background sync failed:', err);
+  });
   const rawStaff = readDB<Staff>(STAFF_FILE, defaultStaff);
   res.json({
     patients: readDB<Patient>(PATIENTS_FILE, defaultPatients),

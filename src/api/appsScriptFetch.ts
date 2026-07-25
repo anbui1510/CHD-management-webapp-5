@@ -102,8 +102,52 @@ let pendingStaffLoad: Promise<any[]> | null = null;
 // ─────────────────────────────────────────────────────────────────
 
 const BRIDGE_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+const BRIDGE_SESSION_STORAGE_KEY = 'chd_bridge_sessions_v1';
 
 const bridgeTokenStore = new Map<string, { staffKey: string; expiresAt: number }>();
+
+function hydrateBridgeSessions(): void {
+  try {
+    const raw = sessionStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
+    if (!raw) return;
+    const entries = JSON.parse(raw) as Record<string, { staffKey: string; expiresAt: number }>;
+    const now = Date.now();
+    const kept: Record<string, { staffKey: string; expiresAt: number }> = {};
+    for (const [token, session] of Object.entries(entries)) {
+      if (now < session.expiresAt) {
+        bridgeTokenStore.set(token, session);
+        kept[token] = session;
+      }
+    }
+    sessionStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, JSON.stringify(kept));
+  } catch {
+    // ignore corrupt session storage
+  }
+}
+
+function persistBridgeSession(token: string, session: { staffKey: string; expiresAt: number }): void {
+  try {
+    const raw = sessionStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
+    const entries = raw ? JSON.parse(raw) as Record<string, { staffKey: string; expiresAt: number }> : {};
+    entries[token] = session;
+    sessionStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore quota / private mode errors
+  }
+}
+
+function removeBridgeSession(token: string): void {
+  bridgeTokenStore.delete(token);
+  try {
+    const raw = sessionStorage.getItem(BRIDGE_SESSION_STORAGE_KEY);
+    if (!raw) return;
+    const entries = JSON.parse(raw) as Record<string, { staffKey: string; expiresAt: number }>;
+    delete entries[token];
+    sessionStorage.setItem(BRIDGE_SESSION_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore
+  }
+}
 
 function bridgeGenerateToken(): string {
   const arr = new Uint8Array(32);
@@ -113,7 +157,9 @@ function bridgeGenerateToken(): string {
 
 function bridgeCreateSession(staffKey: string): string {
   const token = bridgeGenerateToken();
-  bridgeTokenStore.set(token, { staffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS });
+  const session = { staffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS };
+  bridgeTokenStore.set(token, session);
+  persistBridgeSession(token, session);
   return token;
 }
 
@@ -121,16 +167,17 @@ function bridgeResolveSession(token: string): string | null {
   const session = bridgeTokenStore.get(token);
   if (!session) return null;
   if (Date.now() >= session.expiresAt) {
-    bridgeTokenStore.delete(token);
+    removeBridgeSession(token);
     return null;
   }
   // Slide expiry on activity
   session.expiresAt = Date.now() + BRIDGE_SESSION_TTL_MS;
+  persistBridgeSession(token, session);
   return session.staffKey;
 }
 
 function bridgeRevokeToken(token: string): void {
-  bridgeTokenStore.delete(token);
+  removeBridgeSession(token);
 }
 
 async function bridgeHashPassword(password: string, salt: string): Promise<string> {
@@ -412,53 +459,33 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
 
 
 
-const refreshAllDataInBackground = (): void => {
-  if (!getScriptUrl() || pendingLoad) return;
-  void loadAllData(true).catch(err => {
-    console.warn('Background data sync failed:', err);
-  });
-};
+const fetchAllDataFromNetwork = (force = false): Promise<SheetData> => {
+  if (pendingLoad) return pendingLoad;
 
-const loadAllData = async (force = false): Promise<SheetData> => {
   const scriptUrl = getScriptUrl();
 
-  if (!force) {
-    if (cache) {
-      refreshAllDataInBackground();
-      return cache;
-    }
-    if (pendingLoad) return pendingLoad;
-
-    const cachedAll = await getPersistedData('all_data');
-    if (
-      cachedAll &&
-      cachedAll.staff &&
-      Array.isArray(cachedAll.staff) &&
-      cachedAll.staff.length > 0 &&
-      cachedAll.staff[0].Role !== undefined &&
-      Array.isArray(cachedAll.transplants)
-    ) {
-      cache = normalizeData(cachedAll);
-      staffCache = mergeStaffWithBundledPasswords(cache.staff);
-      cache.staff = staffCache;
-      refreshAllDataInBackground();
-      return cache;
-    }
-
-    if (!scriptUrl) {
-      cache = normalizeData({ staff: BUNDLED_STAFF });
-      staffCache = cache.staff;
-      return cache;
-    }
-  }
-
   if (!scriptUrl) {
-    cache = normalizeData({ staff: BUNDLED_STAFF });
-    staffCache = cache.staff;
-    return cache;
+    if (isLocalHost()) {
+      pendingLoad = (async () => {
+        const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ || window.fetch;
+        const localRes = await nativeFetch('/api/all');
+        if (!localRes.ok) throw new Error(`Local database HTTP ${localRes.status}`);
+        const localData = await localRes.json();
+        cache = normalizeData(localData);
+        staffCache = mergeStaffWithBundledPasswords(cache.staff);
+        cache.staff = staffCache;
+        void setPersistedData('all_data', {
+          ...localData,
+          staff: Array.isArray(cache.staff) ? cache.staff.map(stripBridgePassword) : []
+        });
+        return cache;
+      })().finally(() => {
+        pendingLoad = null;
+      });
+      return pendingLoad;
+    }
+    return Promise.resolve(normalizeData({ staff: BUNDLED_STAFF }));
   }
-
-  if (pendingLoad && !force) return pendingLoad;
 
   const apiKey = getScriptSecret();
   let fetchUrl = `${scriptUrl}?action=getAll`;
@@ -527,8 +554,6 @@ const loadAllData = async (force = false): Promise<SheetData> => {
         }
       }
 
-      cache = normalizeData({ staff: BUNDLED_STAFF });
-      staffCache = cache.staff;
       throw err;
     })
     .finally(() => {
@@ -536,6 +561,46 @@ const loadAllData = async (force = false): Promise<SheetData> => {
     });
 
   return pendingLoad;
+};
+
+const refreshAllDataInBackground = (): void => {
+  if (!getScriptUrl() || pendingLoad) return;
+  void fetchAllDataFromNetwork(true).catch(err => {
+    console.warn('Background data sync failed:', err);
+  });
+};
+
+const hydrateCacheFromPersisted = async (): Promise<SheetData | null> => {
+  const cachedAll = await getPersistedData('all_data');
+  if (
+    cachedAll &&
+    Array.isArray(cachedAll.staff) &&
+    cachedAll.staff.length > 0 &&
+    cachedAll.staff[0].Role !== undefined
+  ) {
+    cache = normalizeData(cachedAll);
+    staffCache = mergeStaffWithBundledPasswords(cache.staff);
+    cache.staff = staffCache;
+    return cache;
+  }
+  return null;
+};
+
+const loadAllData = async (force = false): Promise<SheetData> => {
+  if (cache) {
+    refreshAllDataInBackground();
+    return cache;
+  }
+
+  if (pendingLoad) return pendingLoad;
+
+  const persisted = await hydrateCacheFromPersisted();
+  if (persisted) {
+    refreshAllDataInBackground();
+    return persisted;
+  }
+
+  return fetchAllDataFromNetwork(force);
 };
 
 
@@ -986,14 +1051,13 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     if (subAction === 'logout' && method === 'POST') {
       const token = extractBridgeToken(init);
       if (token) bridgeRevokeToken(token);
-      
-      // Clear in-memory caches and IndexedDB persisted data
+
+      // Clear in-memory caches only — keep IndexedDB for fast next login on this device.
       cache = null;
       staffCache = null;
       pendingLoad = null;
       pendingStaffLoad = null;
-      void clearPersistedData();
-      
+
       return jsonResponse({ success: true });
     }
 
@@ -1269,6 +1333,10 @@ export const clearLocalCache = async (): Promise<void> => {
   staffCache = null;
   pendingLoad = null;
   pendingStaffLoad = null;
+};
+
+export const clearAllPersistedCache = async (): Promise<void> => {
+  await clearLocalCache();
   await clearPersistedData();
 };
 
@@ -1276,6 +1344,8 @@ export const installAppsScriptFetchBridge = () => {
   if (typeof window === 'undefined') return;
   if ((window as any).__CHD_APPS_SCRIPT_FETCH_BRIDGE__) return;
   (window as any).__CHD_APPS_SCRIPT_FETCH_BRIDGE__ = true;
+
+  hydrateBridgeSessions();
 
   const nativeFetch = window.fetch.bind(window);
   (window as any).__CHD_NATIVE_FETCH__ = nativeFetch;

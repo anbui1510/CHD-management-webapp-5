@@ -56,7 +56,8 @@ import StaffManagementView from './components/StaffManagementView';
 import StaffAccountMenu from './components/StaffAccountMenu';
 import BellNotificationMenu from './components/BellNotificationMenu';
 import StaffProfileView from './components/StaffProfileView';
-import { useRefreshMedicalData } from './hooks/useRefreshMedicalData';
+import { useRefreshMedicalData, type MedicalDataLoadState } from './hooks/useRefreshMedicalData';
+import { AuthRequiredError } from './api/medicalDataRefresh';
 import { clearLocalCache } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
@@ -114,6 +115,7 @@ import {
   Clock, 
   Workflow, 
   RefreshCw,
+  Loader2,
   Unlink,
   Home,
   Menu,
@@ -304,6 +306,11 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoadError, setLoginLoadError] = useState<string>('');
+  const [medicalDataLoadState, setMedicalDataLoadState] = useState<MedicalDataLoadState>({
+    phase: 'idle',
+    startedAt: null
+  });
+  const [medicalLoadElapsedSec, setMedicalLoadElapsedSec] = useState(0);
 
   // Search Filter State (Patient List & Globals)
   const [patientSearch, setPatientSearch] = useState<string>('');
@@ -416,7 +423,10 @@ export default function App() {
     []
   );
 
-  const refreshMedicalData = useRefreshMedicalData(medicalDataSetters);
+  const { refreshMedicalData, loadMedicalDataAfterAuth } = useRefreshMedicalData(
+    medicalDataSetters,
+    setMedicalDataLoadState
+  );
 
   const patchConsult = useCallback((consultKey: string, patch: Partial<Consult>) => {
     setConsults(prev => prev.map(c => (c.ConsultKey === consultKey ? { ...c, ...patch } : c)));
@@ -649,6 +659,28 @@ export default function App() {
   const handleLogoutRef = useRef<(() => void) | null>(null);
   const scheduleTtMobileLeaveGuardRef = useRef<((next: () => void) => void) | null>(null);
 
+  const handleAuthDataFailure = useCallback((err: unknown) => {
+    if (err instanceof AuthRequiredError) {
+      handleLogoutRef.current?.();
+      setLoginLoadError(err.message);
+      return;
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    setLoginLoadError(msg || 'Không tải được dữ liệu từ Google Sheets.');
+  }, []);
+
+  useEffect(() => {
+    if (medicalDataLoadState.phase !== 'loading' && medicalDataLoadState.phase !== 'syncing') {
+      setMedicalLoadElapsedSec(0);
+      return;
+    }
+    const startedAt = medicalDataLoadState.startedAt ?? Date.now();
+    const tick = () => setMedicalLoadElapsedSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [medicalDataLoadState.phase, medicalDataLoadState.startedAt]);
+
   const loadPublicStaffForLogin = useCallback(() => {
     setLoginLoadError('');
     void refreshMedicalData('staff', false).catch(err => {
@@ -705,16 +737,7 @@ export default function App() {
           localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
-          void refreshMedicalData('full', false).catch(err => {
-            console.warn('Initial cached data load failed:', err);
-            void refreshMedicalData('full', true).catch(syncErr => {
-              const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-              setLoginLoadError(msg || 'Không tải được dữ liệu từ Google Sheets.');
-            });
-          });
-          void refreshMedicalData('full', true).catch(err => {
-            console.warn('Background sync failed:', err);
-          });
+          void loadMedicalDataAfterAuth('full').catch(handleAuthDataFailure);
         })
         .catch(() => {
           localStorage.removeItem('CHD_AUTH_TOKEN');
@@ -726,7 +749,7 @@ export default function App() {
     } else {
       loadPublicStaffForLogin();
     }
-  }, [loadPublicStaffForLogin, refreshMedicalData]);
+  }, [handleAuthDataFailure, loadMedicalDataAfterAuth, loadPublicStaffForLogin]);
 
   // Detect new Cloudflare deploy while app is open → force logout + reload
   useEffect(() => {
@@ -884,15 +907,13 @@ export default function App() {
       setCurrentStaff(staffData);
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
 
-      void refreshMedicalData('full', false).catch(err => {
-        console.warn('Initial cached data load failed:', err);
-        void refreshMedicalData('full', true).catch(syncErr => {
-          const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-          setLoginError(msg || 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c d\u1eef li\u1ec7u t\u1eeb Google Sheets.');
-        });
-      });
-      void refreshMedicalData('full', true).catch(err => {
-        console.warn('Background sync after login failed:', err);
+      void loadMedicalDataAfterAuth('full').catch(err => {
+        if (err instanceof AuthRequiredError) {
+          handleAuthDataFailure(err);
+          return;
+        }
+        const msg = err instanceof Error ? err.message : String(err);
+        setLoginError(msg || 'Không tải được dữ liệu từ Google Sheets.');
       });
     } catch (err) {
       setLoginError('L\u1ed7i k\u1ebft n\u1ed1i. Vui l\u00f2ng ki\u1ec3m tra m\u1ea1ng v\u00e0 th\u1eed l\u1ea1i.');
@@ -2088,6 +2109,24 @@ export default function App() {
       {formSuccessMessage && (
         <div className="bg-green-600 text-white text-center py-2 text-xs font-bold shadow-inner">
           ✓ {formSuccessMessage}
+        </div>
+      )}
+
+      {(medicalDataLoadState.phase === 'loading' || medicalDataLoadState.phase === 'syncing') && (
+        <div className="bg-amber-500 text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+          <span>
+            {medicalDataLoadState.phase === 'loading'
+              ? `Đang tải dữ liệu vào app... ${medicalLoadElapsedSec}s`
+              : `Đang đồng bộ Google Sheets... ${medicalLoadElapsedSec}s`}
+          </span>
+        </div>
+      )}
+
+      {medicalDataLoadState.phase === 'error' && medicalDataLoadState.message && (
+        <div className="bg-red-600 text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{medicalDataLoadState.message}</span>
         </div>
       )}
 

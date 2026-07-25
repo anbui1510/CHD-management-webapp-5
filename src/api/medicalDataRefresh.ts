@@ -1,5 +1,12 @@
 import type { CathLab, CMR, Consult, DeviceTemplate, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff, Transplant } from '../types';
 
+export class AuthRequiredError extends Error {
+  constructor(message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') {
+    super(message);
+    this.name = 'AuthRequiredError';
+  }
+}
+
 export type MedicalDataBundle = {
   patients: Patient[];
   consults: Consult[];
@@ -65,9 +72,8 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
   const url = force ? '/api/all?force=true' : '/api/all';
   const res = await fetch(url, { headers: authHeaders(token) });
   if (res.status === 401) {
-    // Token expired — clear it
     localStorage.removeItem('CHD_AUTH_TOKEN');
-    return EMPTY_BUNDLE;
+    throw new AuthRequiredError();
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -107,9 +113,23 @@ export type MedicalDataSetters = {
   setDoctorPerformanceMarks: (value: DoctorPerformanceMark[]) => void;
 };
 
-export function applyMedicalDataBundle(bundle: MedicalDataBundle, scope: RefreshScope, setters: MedicalDataSetters) {
+export function applyMedicalDataBundle(
+  bundle: MedicalDataBundle,
+  scope: RefreshScope,
+  setters: MedicalDataSetters,
+  options?: { allowEmpty?: boolean }
+) {
+  const allowEmpty = options?.allowEmpty ?? false;
+  const isClinicalEmpty = bundle.patients.length === 0 && bundle.consults.length === 0;
+
   if (scope === 'staff') {
-    setters.setStaffList(bundle.staff);
+    if (bundle.staff.length > 0 || allowEmpty) {
+      setters.setStaffList(bundle.staff);
+    }
+    return;
+  }
+
+  if (!allowEmpty && isClinicalEmpty) {
     return;
   }
 
