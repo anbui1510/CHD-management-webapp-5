@@ -423,7 +423,7 @@ export default function App() {
     []
   );
 
-  const { refreshMedicalData, loadMedicalDataAfterAuth } = useRefreshMedicalData(
+  const { refreshMedicalData, syncMedicalDataInBackground, loadMedicalDataAfterAuth } = useRefreshMedicalData(
     medicalDataSetters,
     setMedicalDataLoadState
   );
@@ -636,8 +636,12 @@ export default function App() {
   }, [refreshMedicalData]);
 
   const refreshFullData = useCallback((force = false) => {
-    void refreshMedicalData('full', force);
-  }, [refreshMedicalData]);
+    if (force) {
+      void syncMedicalDataInBackground('full');
+      return;
+    }
+    void refreshMedicalData('full', false, { silent: true });
+  }, [refreshMedicalData, syncMedicalDataInBackground]);
 
   const markNotificationRead = useCallback((notificationKey: string) => {
     setNotifications(prev =>
@@ -652,7 +656,7 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' }
     }).catch(err => {
       console.error('Failed to mark notification as read:', err);
-      void refreshMedicalData('full', true);
+      void refreshMedicalData('full', true, { silent: true });
     });
   }, [refreshMedicalData]);
 
@@ -785,8 +789,8 @@ export default function App() {
     if (!currentStaff?.StaffKey) return;
 
     const interval = setInterval(() => {
-      if (document.hidden) return; // Skip update if browser tab is minimized or in background
-      void refreshMedicalData('full', false).catch(err => {
+      if (document.hidden) return;
+      void refreshMedicalData('full', false, { silent: true }).catch(err => {
         console.warn('Background auto data sync failed:', err);
       });
     }, 60 * 1000);

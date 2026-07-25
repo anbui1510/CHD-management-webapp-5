@@ -8,6 +8,7 @@ import {
 } from '../api/medicalDataRefresh';
 
 const REFRESH_COOLDOWN_MS = 2500;
+const BACKGROUND_SYNC_TIMEOUT_MS = 45000;
 
 export type MedicalDataLoadPhase = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
@@ -16,6 +17,26 @@ export type MedicalDataLoadState = {
   startedAt: number | null;
   message?: string;
 };
+
+export type RefreshMedicalDataOptions = {
+  /** Không đổi banner loading/syncing khi app đã sẵn sàng (dùng cho polling nền). */
+  silent?: boolean;
+};
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise
+      .then(value => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
 
 export function useRefreshMedicalData(
   setters: MedicalDataSetters,
@@ -40,13 +61,20 @@ export function useRefreshMedicalData(
     });
   }, [onLoadStateChange]);
 
-  const refreshMedicalData = useCallback(async (scope: RefreshScope = 'clinical', force = false) => {
+  const refreshMedicalData = useCallback(async (
+    scope: RefreshScope = 'clinical',
+    force = false,
+    options?: RefreshMedicalDataOptions
+  ) => {
     const meta = metaRef.current;
     const now = Date.now();
+    const silent = options?.silent ?? false;
+
     if (meta.pending) return meta.pending;
     if (!force && now - meta.lastAt < REFRESH_COOLDOWN_MS) return;
 
-    if (meta.phase === 'idle' || meta.phase === 'ready' || meta.phase === 'error') {
+    const shouldShowBanner = !silent && !meta.syncPending;
+    if (shouldShowBanner && (meta.phase === 'idle' || meta.phase === 'error')) {
       emitState({
         phase: 'loading',
         startedAt: now,
@@ -58,12 +86,9 @@ export function useRefreshMedicalData(
       .then(bundle => {
         applyMedicalDataBundle(bundle, scope, setters);
         meta.lastAt = Date.now();
-        const hasClinical = bundle.patients.length > 0 || bundle.consults.length > 0;
-        emitState({
-          phase: hasClinical ? 'ready' : 'syncing',
-          startedAt: hasClinical ? null : now,
-          message: hasClinical ? undefined : 'Đang đồng bộ dữ liệu từ Google Sheets...'
-        });
+        if (shouldShowBanner && !meta.syncPending) {
+          emitState({ phase: 'ready', startedAt: null });
+        }
       })
       .catch(err => {
         if (err instanceof AuthRequiredError) {
@@ -74,11 +99,13 @@ export function useRefreshMedicalData(
           });
           throw err;
         }
-        emitState({
-          phase: 'error',
-          startedAt: null,
-          message: err instanceof Error ? err.message : String(err)
-        });
+        if (shouldShowBanner && !meta.syncPending) {
+          emitState({
+            phase: 'error',
+            startedAt: null,
+            message: err instanceof Error ? err.message : String(err)
+          });
+        }
         throw err;
       })
       .finally(() => {
@@ -92,24 +119,28 @@ export function useRefreshMedicalData(
     const meta = metaRef.current;
     if (meta.syncPending) return meta.syncPending;
 
+    const startedAt = Date.now();
     emitState({
       phase: 'syncing',
-      startedAt: Date.now(),
+      startedAt,
       message: 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...'
     });
 
-    meta.syncPending = fetchMedicalDataBundle(true)
+    meta.syncPending = withTimeout(
+      fetchMedicalDataBundle(true),
+      BACKGROUND_SYNC_TIMEOUT_MS,
+      'Đồng bộ Google Sheets quá lâu. Đang dùng dữ liệu cache trên máy chủ.'
+    )
       .then(bundle => {
-        applyMedicalDataBundle(bundle, scope, setters);
+        applyMedicalDataBundle(bundle, scope, setters, { allowEmpty: true });
         meta.lastAt = Date.now();
-        emitState({ phase: 'ready', startedAt: null });
       })
       .catch(err => {
         console.warn('Background medical data sync failed:', err);
-        emitState({ phase: 'ready', startedAt: null });
       })
       .finally(() => {
         meta.syncPending = null;
+        emitState({ phase: 'ready', startedAt: null });
       });
 
     return meta.syncPending;
