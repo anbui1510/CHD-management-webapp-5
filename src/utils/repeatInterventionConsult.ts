@@ -55,8 +55,10 @@ export function buildRepeatInterventionConsult(input: {
     || String(input.latestConsult?.DetailDiagnosis || '').trim()
     || '';
 
+  const createdTime = new Date().toISOString();
+
   return {
-    ConsultKey: `consult_${Date.now()}`,
+    ConsultKey: `consult_repeat_${Date.now()}`,
     PatientKey: input.patientKey,
     ConsultType: 'Staff thông',
     PatientWeight: input.latestConsult?.PatientWeight || '',
@@ -66,9 +68,9 @@ export function buildRepeatInterventionConsult(input: {
     DetailDiagnosis: detailDiagnosis,
     Department: '',
     ConsultCreateBy: input.loggedInStaffId,
-    ConsultCreateTime: new Date().toISOString(),
+    ConsultCreateTime: createdTime,
     ConsultResultID: 'Can thiệp thông tim',
-    DetailConsultResult: input.cathNote || '',
+    DetailConsultResult: String(input.cathNote || '').trim() || 'Chỉ định can thiệp thông tim lại sau lần TT vừa rồi',
     ConsultNote: '',
     PlannedDevice: '',
     PlannedPrice: '',
@@ -92,12 +94,17 @@ export async function createRepeatInterventionWorkflow(input: {
   requestBy: string;
   loggedInStaffId: string;
   consults: Consult[];
+  /** Consult vừa lưu trong cùng phiên (vd. chương trình vượt HC) — dùng để lấy PatientWeight/DetailDiagnosis */
+  recentlySavedConsults?: Consult[];
   staffList: Staff[];
   reportMutationResponse: (data: unknown, options?: { baseMessage?: string }) => void;
   onSaveSuccess?: (message: string) => void;
   onAddConsult?: (consult: Consult) => void;
 }): Promise<void> {
-  const latestConsult = getLatestPatientConsult(input.patientKey, input.consults);
+  const consultPool = input.recentlySavedConsults?.length
+    ? [...input.consults, ...input.recentlySavedConsults]
+    : input.consults;
+  const latestConsult = getLatestPatientConsult(input.patientKey, consultPool);
   const newConsult = buildRepeatInterventionConsult({
     patientKey: input.patientKey,
     cathDate: input.cathDate,
