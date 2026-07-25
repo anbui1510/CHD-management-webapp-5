@@ -12,7 +12,7 @@ import {
 import { hasPlannedCathLabDate } from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge } from '../utils/patientDisplay';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
-import { ConsultSummaryReadOnly } from './ConsultSummaryReadOnly';
+import { ConsultSummaryModal } from './ConsultSummaryModal';
 import {
   X,
   MapPin,
@@ -62,7 +62,7 @@ export default function PatientDetailsDrawer({
   onRegisterNewConsult
 }: PatientDetailsDrawerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [selectedConsultKey, setSelectedConsultKey] = useState<string | null>(null);
+  const [summaryConsult, setSummaryConsult] = useState<Consult | null>(null);
   useLockBodyScroll(true);
   usePreventBackgroundTouchScroll(scrollContainerRef, true);
 
@@ -127,10 +127,6 @@ export default function PatientDetailsDrawer({
 
     return !hasMatchingCath;
   });
-
-  const selectedConsult = selectedConsultKey
-    ? patientConsults.find(c => c.ConsultKey === selectedConsultKey)
-    : undefined;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 overflow-hidden overscroll-none animate-in fade-in duration-200">
@@ -281,18 +277,12 @@ export default function PatientDetailsDrawer({
               </div>
 
               <div className="space-y-3">
-                {patientConsults.map((c) => {
-                  const isSelected = selectedConsultKey === c.ConsultKey;
-                  return (
+                {patientConsults.map((c) => (
                   <button
                     key={c.ConsultKey}
                     type="button"
-                    onClick={() => setSelectedConsultKey(prev => prev === c.ConsultKey ? null : c.ConsultKey)}
-                    className={`w-full text-left bg-white border text-xs rounded-2xl p-4 shadow-sm transition space-y-2 cursor-pointer ${
-                      isSelected
-                        ? 'border-[#d2145a] ring-2 ring-pink-200 shadow-md'
-                        : 'border-slate-200 hover:border-pink-300 hover:shadow'
-                    }`}
+                    onClick={() => setSummaryConsult(c)}
+                    className="w-full text-left bg-white border text-xs border-slate-200 hover:border-pink-300 rounded-2xl p-4 shadow-sm hover:shadow-md transition space-y-2 cursor-pointer active:scale-[0.99]"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-extrabold text-slate-900 uppercase">Ngày staff: {formatVNTime(c.ConsultDate)}</p>
@@ -320,19 +310,12 @@ export default function PatientDetailsDrawer({
                         </button>
                       </div>
                     )}
+                    <p className="text-[10px] font-bold text-emerald-700 uppercase pt-1 border-t border-slate-100">
+                      Bấm để xem tóm tắt &amp; copy ảnh
+                    </p>
                   </button>
-                  );
-                })}
+                ))}
               </div>
-
-              {selectedConsult && (
-                <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Tóm tắt đợt hội chẩn {formatVNTime(selectedConsult.ConsultDate)}
-                  </p>
-                  <ConsultSummaryReadOnly consult={selectedConsult} compact />
-                </div>
-              )}
             </div>
           )}
 
@@ -431,6 +414,14 @@ export default function PatientDetailsDrawer({
           )}
         </div>
       </div>
+
+      {summaryConsult && (
+        <ConsultSummaryModal
+          patient={patient}
+          consult={summaryConsult}
+          onClose={() => setSummaryConsult(null)}
+        />
+      )}
     </div>
   );
 }

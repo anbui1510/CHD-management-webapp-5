@@ -22,9 +22,10 @@ const normalizeConsultMembers = (value: Consult['ConsultMember']): string => {
 export interface ConsultSummaryReadOnlyProps {
   consult: Consult;
   compact?: boolean;
+  sectionsOnly?: boolean;
 }
 
-export function ConsultSummaryReadOnly({ consult, compact = false }: ConsultSummaryReadOnlyProps) {
+export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly = false }: ConsultSummaryReadOnlyProps) {
   const checkDevice = consult.CheckDevice || '';
   const plannedDevice = consult.PlannedDevice || '';
   const plannedPrice = consult.PlannedPrice || '';
@@ -48,8 +49,8 @@ export function ConsultSummaryReadOnly({ consult, compact = false }: ConsultSumm
   const labelSize = compact ? 'text-[7.5px]' : 'text-[9px]';
   const valueSize = compact ? 'text-[10px]' : 'text-[12.5px]';
 
-  return (
-    <div className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full ${compact ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-4 space-y-3 text-xs'}`}>
+  const sections = (
+    <>
       <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${boxPad}`}>
         <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider block border-b border-slate-200 pb-1">
           THÔNG TIN ĐĂNG KÝ HỘI CHẨN
@@ -169,6 +170,16 @@ export function ConsultSummaryReadOnly({ consult, compact = false }: ConsultSumm
           </div>
         </div>
       </div>
+    </>
+  );
+
+  if (sectionsOnly) {
+    return <div className={compact ? 'space-y-2 text-[10.5px]' : 'space-y-3 text-xs'}>{sections}</div>;
+  }
+
+  return (
+    <div className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full ${compact ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-4 space-y-3 text-xs'}`}>
+      {sections}
     </div>
   );
 }
