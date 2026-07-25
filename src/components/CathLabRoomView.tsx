@@ -5,6 +5,7 @@ import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Act
 import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceCathMethodOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
+import { SortColumnIcon } from './SortColumnIcon';
 import { classifyDiagnosisText } from '../utils/diagnosisClassifier';
 import { resolveStaffByNameOrKey } from '../utils/staffNameMatch';
 import {
@@ -1675,7 +1676,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       >
         <div className={`flex items-center gap-1 ${className.includes('text-center') ? 'justify-center' : ''}`}>
           <span>{label}</span>
-          <span className="text-[11px] text-slate-400 font-semibold">{isSorted ? (pendingSortOrder === 'asc' ? '▲' : '▼') : '↕'}</span>
+          <SortColumnIcon active={isSorted} order={pendingSortOrder} />
         </div>
       </th>
     );
@@ -1690,7 +1691,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       >
         <div className={`flex items-center gap-1 ${className.includes('text-center') ? 'justify-center' : ''}`}>
           <span>{label}</span>
-          <span className="text-[11px] text-slate-400 font-semibold">{isSorted ? (doneSortOrder === 'asc' ? '▲' : '▼') : '↕'}</span>
+          <SortColumnIcon active={isSorted} order={doneSortOrder} />
         </div>
       </th>
     );

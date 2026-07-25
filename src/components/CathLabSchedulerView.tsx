@@ -22,6 +22,7 @@ import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { SortColumnIcon } from './SortColumnIcon';
 import { 
   ClipboardList, 
   Search, 
@@ -1039,9 +1040,10 @@ Xin cảm ơn!`;
   };
 
   const renderFilterListSortIcon = (field: FilterListSortField) => (
-    <span className="text-[10px] font-bold opacity-80">
-      {filterListSortField === field ? (filterListSortOrder === 'asc' ? '▲' : '▼') : '↕'}
-    </span>
+    <SortColumnIcon
+      active={filterListSortField === field}
+      order={filterListSortOrder}
+    />
   );
 
   const handleExportDeviceExcel = async () => {
@@ -3210,7 +3212,7 @@ Xin cảm ơn!`;
                       <div className="flex items-center gap-1">
                         <span>Họ và tên</span>
                         <span className="text-[10px] text-slate-450 font-bold">
-                          {waitlistSortField === 'name' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                          <SortColumnIcon active={waitlistSortField === 'name'} order={waitlistSortOrder} />
                         </span>
                       </div>
                     </th>
@@ -3229,7 +3231,7 @@ Xin cảm ơn!`;
                         <div className="flex items-center gap-1">
                           <span>ICD</span>
                           <span className="text-[10px] text-slate-450 font-bold">
-                            {waitlistSortField === 'diagnosis' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                            <SortColumnIcon active={waitlistSortField === 'diagnosis'} order={waitlistSortOrder} />
                           </span>
                         </div>
                       </th>
@@ -3250,7 +3252,7 @@ Xin cảm ơn!`;
                         <div className="flex items-center gap-1">
                           <span>BS Đăng ký</span>
                           <span className="text-[10px] text-slate-450 font-bold">
-                            {waitlistSortField === 'requestBy' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                            <SortColumnIcon active={waitlistSortField === 'requestBy'} order={waitlistSortOrder} />
                           </span>
                         </div>
                       </th>
@@ -3271,7 +3273,7 @@ Xin cảm ơn!`;
                         <div className="flex items-center gap-1">
                           <span>Ngày hội chẩn</span>
                           <span className="text-[10px] text-slate-450 font-bold">
-                            {waitlistSortField === 'date' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                            <SortColumnIcon active={waitlistSortField === 'date'} order={waitlistSortOrder} />
                           </span>
                         </div>
                       </th>
@@ -3292,7 +3294,7 @@ Xin cảm ơn!`;
                         <div className="flex items-center gap-1 justify-center">
                           <span>Dự kiến ngày thông tim</span>
                           <span className="text-[10px] text-slate-450 font-bold">
-                            {waitlistSortField === 'plannedDate' ? (waitlistSortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                            <SortColumnIcon active={waitlistSortField === 'plannedDate'} order={waitlistSortOrder} />
                           </span>
                         </div>
                       </th>

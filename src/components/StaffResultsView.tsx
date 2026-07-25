@@ -8,6 +8,7 @@ import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { VNDateInput } from './VNDateInput';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ResultStaffDrawer from './ResultStaffDrawer';
+import { SortColumnIcon } from './SortColumnIcon';
 
 const DEFAULT_CONCLUSION_OPTIONS = [
   "Can thiệp thông tim",
@@ -646,7 +647,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     const allPageSelected = pageKeys.length > 0 && pageKeys.every(key => selectedDeleteKeys.has(key));
     const somePageSelected = pageKeys.some(key => selectedDeleteKeys.has(key));
 
-    const renderSortableHeader = (field: 'name' | 'id' | 'dob' | 'diagnosis' | 'date', label: string) => {
+    const renderSortableHeader = (field: 'name' | 'id' | 'dob' | 'diagnosis' | 'date', label: string, freezeName = false) => {
       const isSorted = sortField === field;
       return (
         <th 
@@ -659,13 +660,13 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               setSortOrder('asc');
             }
           }}
-          className="px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider"
+          className={`px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider ${
+            freezeName ? 'sticky left-10 top-0 z-30 min-w-[160px] border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
+          }`}
         >
           <div className="flex items-center gap-1.5 justify-start">
             <span>{label}</span>
-            <span className="text-[11px] text-slate-400 font-semibold inline-block">
-              {isSorted ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
-            </span>
+            <SortColumnIcon active={isSorted} order={sortOrder} />
           </div>
         </th>
       );
@@ -698,10 +699,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           </div>
         )}
       <div className="overflow-x-auto w-full rounded-2xl shadow-xs bg-white custom-scrollbar">
-        <table className="min-w-full divide-y divide-slate-200 table-auto text-left font-sans text-xs">
-          <thead className="bg-slate-55 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-10">
+        <table className="min-w-full border-separate border-spacing-0 table-auto text-left font-sans text-xs">
+          <thead className="bg-slate-55 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20">
             <tr>
-              <th scope="col" className="px-2 py-3 bg-slate-50 border-b border-slate-200 text-center w-10">
+              <th scope="col" className="px-2 py-3 bg-slate-50 border-b border-slate-200 text-center w-10 sticky left-0 top-0 z-30 border-r border-slate-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -721,7 +722,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   {allPageSelected ? <CheckSquare className="w-4 h-4" /> : somePageSelected ? <CheckSquare className="w-4 h-4 opacity-50" /> : <Square className="w-4 h-4" />}
                 </button>
               </th>
-              {renderSortableHeader('name', 'Họ và tên')}
+              {renderSortableHeader('name', 'Họ và tên', true)}
               {renderSortableHeader('id', 'Mã bệnh nhi')}
               {renderSortableHeader('dob', 'Ngày sinh / GT')}
               {renderSortableHeader('diagnosis', 'Chẩn đoán')}
@@ -741,7 +742,9 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : ''
                   } ${selectedConsultKey === c.ConsultKey ? 'bg-indigo-50/80 ring-1 ring-inset ring-indigo-200' : ''} ${deletingKeys.has(c.ConsultKey) ? 'opacity-50' : ''}`}
                 >
-                  <td className="px-2 py-3 text-center whitespace-nowrap">
+                  <td className={`px-2 py-3 text-center whitespace-nowrap sticky left-0 z-10 border-r border-slate-200 group-hover:bg-slate-50/80 ${
+                    selectedConsultKey === c.ConsultKey ? 'bg-indigo-50/80' : selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : 'bg-white'
+                  }`}>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -758,7 +761,9 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   </td>
                   <td 
                     onClick={() => handleOpenConsult(c)}
-                    className="px-4 py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer min-w-[160px]"
+                    className={`px-4 py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer min-w-[160px] sticky left-10 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] group-hover:bg-slate-50/80 ${
+                      selectedConsultKey === c.ConsultKey ? 'bg-indigo-50/80' : selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : 'bg-white'
+                    }`}
                   >
                     {pat.PatientName}
                   </td>
@@ -829,7 +834,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       
       {/* Header Area (Responsive Title, Search and Actions) */}
       <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="hidden md:flex items-center gap-2 shrink-0">
           <ClipboardList className="w-5 h-5 text-[#d2145a] animate-pulse" />
           <h2 className="text-base font-extrabold text-neutral-[#d2145a] tracking-tight uppercase">
             Nhập kết quả staff
