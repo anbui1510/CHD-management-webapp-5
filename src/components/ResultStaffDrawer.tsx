@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { AnimatePresence } from 'motion/react';
-import { ClipboardList, Stethoscope } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Stethoscope } from 'lucide-react';
 import {
   Consult,
   ConsultResultEnum,
@@ -121,6 +121,11 @@ export default function ResultStaffDrawer({
 }: ResultStaffDrawerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ResultFormState | null>(null);
+  const [formSnapshot, setFormSnapshot] = useState<ResultFormState | null>(null);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  const [exitConfirmError, setExitConfirmError] = useState('');
+  const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
+  const [saving, setSaving] = useState(false);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
   const conclusionOptions = useMemo(() => getSourceConsultResultOptions(sources), [sources]);
 
@@ -140,32 +145,72 @@ export default function ResultStaffDrawer({
       setIsEditing(false);
       return;
     }
-    setFormData(buildFormState(consult));
+    const snapshot = buildFormState(consult);
+    setFormData(snapshot);
+    setFormSnapshot(snapshot);
     setIsEditing(autoEdit);
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
   }, [consultKey, consult?.ConsultKey, autoEdit]);
 
   const isFormEditing = autoEdit || isEditing;
 
-  const handleClose = () => {
+  const formStatesEqual = (a: ResultFormState, b: ResultFormState) =>
+    JSON.stringify(a) === JSON.stringify(b);
+
+  const hasUnsavedChanges = () => {
+    if (!isFormEditing || !formData || !formSnapshot) return false;
+    return !formStatesEqual(formData, formSnapshot);
+  };
+
+  const forceClose = () => {
     setIsEditing(false);
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
+    setFormSnapshot(null);
     onClose();
   };
 
-  const submitResultUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!consultKey || !formData || !consult) return;
+  const requestClose = () => {
+    if (!hasUnsavedChanges()) {
+      forceClose();
+      return;
+    }
+    setExitConfirmError('');
+    setPendingExitAction(() => forceClose);
+    setExitConfirmOpen(true);
+  };
+
+  const handleExitCancel = () => {
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
+  };
+
+  const handleExitDiscard = () => {
+    const action = pendingExitAction;
+    setExitConfirmOpen(false);
+    setExitConfirmError('');
+    setPendingExitAction(null);
+    action?.();
+  };
+
+  const executeSave = async (options?: { closeOnSuccess?: boolean }): Promise<boolean> => {
+    if (!consultKey || !formData || !consult) return false;
 
     if (!formData.DiagnosisID) {
       triggerAlert('Vui lòng chọn ICD (DiagnosisID)!', 'Thiếu thông tin');
-      return;
+      return false;
     }
     if (!formData.ConsultResultID) {
       triggerAlert('Vui lòng chọn Kết luận chính (ConsultResultID)!', 'Thiếu thông tin');
-      return;
+      return false;
     }
     if (!formData.ConsultMember || !formData.ConsultMember.trim()) {
       triggerAlert('Vui lòng nhập Thành viên duyệt hội chẩn!', 'Thiếu thông tin');
-      return;
+      return false;
     }
 
     const finalData = {
@@ -175,9 +220,8 @@ export default function ResultStaffDrawer({
     };
 
     onPatchConsult(consultKey, finalData);
+    setFormSnapshot({ ...formData });
     if (!autoEdit) setIsEditing(false);
-    handleClose();
-    onSaveSuccess?.('Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi thành công!');
 
     let automaticOutcome: OutcomeType = '';
     if (formData.ConsultResultID === 'Can thiệp thông tim') {
@@ -206,11 +250,36 @@ export default function ResultStaffDrawer({
         });
       }
       onRefreshData();
+      onSaveSuccess?.('Đã cập nhật chỉ định kết quả hội chẩn và đồng bộ trạng thái bệnh nhi thành công!');
+      if (options?.closeOnSuccess !== false) {
+        forceClose();
+      }
+      return true;
     } catch (err) {
       console.error(err);
-      triggerAlert(err instanceof Error ? err.message : 'Không thể lưu kết quả hội chẩn', 'Lỗi lưu');
+      const message = err instanceof Error ? err.message : 'Không thể lưu kết quả hội chẩn';
+      triggerAlert(message, 'Lỗi lưu');
+      setExitConfirmError(message);
       onRefreshData();
+      return false;
     }
+  };
+
+  const handleExitSave = async () => {
+    setSaving(true);
+    setExitConfirmError('');
+    const ok = await executeSave({ closeOnSuccess: false });
+    setSaving(false);
+    if (ok) {
+      handleExitDiscard();
+    }
+  };
+
+  const submitResultUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    await executeSave({ closeOnSuccess: true });
+    setSaving(false);
   };
 
   if (!consultKey || !consult || !patient || !formData) return null;
@@ -219,14 +288,11 @@ export default function ResultStaffDrawer({
     <div className="bg-[#d2145a] text-white px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between shadow-sm shrink-0">
       <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
         <Stethoscope className="w-5 h-5 text-white shrink-0" />
-        <span className="truncate">Điền kết quả staff — {patient.PatientName}</span>
+        <span className="truncate">Điền kết quả staff</span>
       </h3>
       <button
         type="button"
-        onClick={() => {
-          handleClose();
-          setIsEditing(false);
-        }}
+        onClick={requestClose}
         className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors font-bold text-lg leading-none shrink-0"
       >
         ✕
@@ -250,11 +316,7 @@ export default function ResultStaffDrawer({
                         <div className="flex flex-col shrink-0">
                           <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-1 md:space-y-3 relative shadow-sm flex flex-col">
                             <div>
-                              <div className="flex items-center border-b border-slate-100 pb-2">
-                                <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-slate-400">Bệnh nhi đang hội chẩn</span>
-                              </div>
-                              
-                              <div className="flex items-start justify-between gap-2 mt-0 md:mt-3">
+                              <div className="flex items-start justify-between gap-2 mt-0 md:mt-1">
                                 <div className="min-w-0 flex-1">
                                   <h4 className="text-sm font-black text-[#d2145a] uppercase leading-tight">{patient.PatientName}</h4>
                                   {patient.OtherPatientName && (
@@ -262,10 +324,10 @@ export default function ResultStaffDrawer({
                                   )}
                                 </div>
                                 <PatientAdminEditButton
-                                  className="md:hidden shrink-0"
+                                  className="shrink-0"
                                   onClick={() => {
                                     onEditPatientAdmin(patient);
-                                    handleClose();
+                                    requestClose();
                                   }}
                                 />
                               </div>
@@ -316,14 +378,6 @@ export default function ResultStaffDrawer({
                                     </>
                                   )}
                                </div>
-
-                              <PatientAdminEditButton
-                                className="shrink-0"
-                                onClick={() => {
-                                  onEditPatientAdmin(patient);
-                                  handleClose();
-                                }}
-                              />
                             </div>
                           </div>
                         </div>
@@ -609,9 +663,19 @@ export default function ResultStaffDrawer({
                             <button
                               type="button"
                               onClick={() => {
+                                if (hasUnsavedChanges()) {
+                                  setExitConfirmError('');
+                                  setPendingExitAction(() => {
+                                    setFormData(buildFormState(consult));
+                                    setIsEditing(false);
+                                    if (autoEdit) forceClose();
+                                  });
+                                  setExitConfirmOpen(true);
+                                  return;
+                                }
                                 setFormData(buildFormState(consult));
                                 setIsEditing(false);
-                                if (autoEdit) handleClose();
+                                if (autoEdit) forceClose();
                               }}
                               className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl transition cursor-pointer text-xs font-sans text-center lg:w-48"
                             >
@@ -619,9 +683,10 @@ export default function ResultStaffDrawer({
                             </button>
                             <button
                               type="submit"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl shadow-md transition cursor-pointer text-xs font-sans text-center font-bold lg:w-48"
+                              disabled={saving}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl shadow-md transition cursor-pointer text-xs font-sans text-center font-bold lg:w-48 disabled:opacity-50"
                             >
-                              ✓ Lưu kết quả
+                              {saving ? 'Đang lưu...' : '✓ Lưu kết quả'}
                             </button>
                           </div>
                         )}
@@ -630,12 +695,61 @@ export default function ResultStaffDrawer({
               </form>
   );
 
+  const exitConfirmDialog = exitConfirmOpen ? (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[75] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+        <div className="py-3 px-4 flex items-center gap-2 bg-amber-50 border-b border-amber-100">
+          <AlertTriangle className="w-5 h-5 text-amber-600" />
+          <h3 className="font-extrabold text-[13px] uppercase tracking-wide text-amber-900">Thay đổi chưa lưu</h3>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-sm font-semibold text-slate-700 leading-relaxed">
+            Bạn có thay đổi chưa được lưu. Bạn có muốn lưu kết quả hội chẩn không?
+          </p>
+          {exitConfirmError && (
+            <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
+              {exitConfirmError}
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={handleExitCancel}
+            className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer"
+          >
+            Ở lại
+          </button>
+          <button
+            type="button"
+            onClick={handleExitDiscard}
+            disabled={saving}
+            className="px-4 py-2 font-bold text-xs bg-white border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 transition shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            Không lưu
+          </button>
+          <button
+            type="button"
+            onClick={handleExitSave}
+            disabled={saving}
+            className="px-4 py-2 font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer"
+          >
+            {saving ? 'Đang lưu...' : 'Lưu'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (layout === 'panel') {
     return (
-      <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-        {drawerHeader}
-        {drawerForm}
-      </div>
+      <>
+        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          {drawerHeader}
+          {drawerForm}
+        </div>
+        {exitConfirmDialog}
+      </>
     );
   }
 
@@ -645,15 +759,13 @@ export default function ResultStaffDrawer({
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in duration-200">
             <div 
               className="absolute inset-0" 
-              onClick={() => {
-                handleClose();
-                setIsEditing(false);
-              }}
+              onClick={requestClose}
             ></div>
             <div className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[96vh]">
               {drawerHeader}
               {drawerForm}
             </div>
+            {exitConfirmDialog}
           </div>
         )}
     </AnimatePresence>
