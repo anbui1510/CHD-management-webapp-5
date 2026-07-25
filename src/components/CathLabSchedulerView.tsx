@@ -5131,10 +5131,23 @@ Xin cảm ơn!`;
                 {/* Content printable/screenshot card with solid rigid constraints */}
                 <div className={`overflow-y-auto shrink min-h-0 ${isMobile ? 'p-2' : 'p-4 shrink-0'}`}>
                   <div id="screenshot-summary-card" className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full select-text ${isMobile ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-5 space-y-3.5 shrink-0'}`}>
+
+                    {isMobile && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-start gap-2 text-[9px] font-semibold text-slate-600 leading-tight">
+                          <span>Khoa Tim Mạch</span>
+                          <span className="text-right">Bệnh viện Nhi Đồng Thành Phố</span>
+                        </div>
+                        <h2 className="text-center font-black text-[13px] uppercase tracking-wide text-slate-900">
+                          HỒ SƠ CAN THIỆP
+                        </h2>
+                        <div className="h-1" />
+                      </div>
+                    )}
                     
                     {/* Header of summary */}
-                    <div className={`border-b-2 border-slate-800 ${isMobile ? 'pb-2' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}`}>
-                      <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[12px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
+                    <div className={isMobile ? '' : 'border-b-2 border-slate-800 flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}>
+                      <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[13px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
                         {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
                       </div>
                     </div>
@@ -5152,24 +5165,45 @@ Xin cảm ơn!`;
                       <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider block border-b border-slate-200 pb-1">
                         THÔNG TIN ĐĂNG KÝ HỘI CHẨN
                       </span>
-                      <div className={`grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 pb-1 ${isMobile ? 'text-[10px]' : 'text-[12px]'}`}>
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Ngày staff:</span>
-                          <span className="font-bold text-slate-800 font-mono text-[12.5px]">{formatVNTime(selectedConsult.ConsultDate)}</span>
+                      {isMobile ? (
+                        <div className="grid grid-cols-4 gap-x-1 gap-y-1 pb-1 text-[9px]">
+                          <div className="min-w-0">
+                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">Ngày staff:</span>
+                            <span className="font-bold text-slate-800 font-mono text-[10px] leading-tight">{formatVNTime(selectedConsult.ConsultDate)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">BS đăng ký:</span>
+                            <span className="font-extrabold text-slate-800 text-[10px] leading-tight break-words">{selectedConsult.RequestBy || '—'}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">Cân nặng:</span>
+                            <span className="font-extrabold text-slate-800 font-mono text-[10px] leading-tight">{formatSummaryWeight(selectedConsult.PatientWeight)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">Chiều cao:</span>
+                            <span className="font-semibold text-slate-700 font-mono text-[10px] leading-tight">{formatSummaryHeight(selectedConsult.PatientHeight)}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Người đăng ký:</span>
-                          <span className="font-extrabold text-slate-800 text-[12.5px]">{selectedConsult.RequestBy || '—'}</span>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 pb-1 text-[12px]">
+                          <div>
+                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Ngày staff:</span>
+                            <span className="font-bold text-slate-800 font-mono text-[12.5px]">{formatVNTime(selectedConsult.ConsultDate)}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Người đăng ký:</span>
+                            <span className="font-extrabold text-slate-800 text-[12.5px]">{selectedConsult.RequestBy || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Cân nặng:</span>
+                            <span className="font-extrabold text-slate-800 font-mono text-[12.5px]">{formatSummaryWeight(selectedConsult.PatientWeight)}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Chiều cao:</span>
+                            <span className="font-semibold text-slate-700 font-mono text-[12.5px]">{formatSummaryHeight(selectedConsult.PatientHeight)}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Cân nặng:</span>
-                          <span className="font-extrabold text-slate-800 font-mono text-[12.5px]">{formatSummaryWeight(selectedConsult.PatientWeight)}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Chiều cao:</span>
-                          <span className="font-semibold text-slate-700 font-mono text-[12.5px]">{formatSummaryHeight(selectedConsult.PatientHeight)}</span>
-                        </div>
-                      </div>
+                      )}
 
                       <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 pt-1.5 border-t border-slate-100 ${isMobile ? 'gap-2' : ''}`}>
                         <div>
@@ -5198,28 +5232,53 @@ Xin cảm ơn!`;
                           </span>
                           
                           <div className="space-y-1.5 text-[12.5px]">
-                            <div className="flex justify-between items-center bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                              <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Kiểm dụng cụ:</span>
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                                checkDevice === 'Đủ' 
-                                  ? 'bg-emerald-100 text-emerald-850 border border-emerald-200' 
-                                  : checkDevice === 'Thiếu' 
-                                    ? 'bg-rose-100 text-rose-850 border border-rose-200' 
-                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
-                              }`}>
-                                {checkDevice || 'Chưa kiểm'}
-                              </span>
-                            </div>
+                            {isMobile ? (
+                              <div className="flex justify-between items-start gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
+                                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider leading-tight">Kiểm dụng cụ:</span>
+                                  <span className={`self-start px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                                    checkDevice === 'Đủ'
+                                      ? 'bg-emerald-100 text-emerald-850 border border-emerald-200'
+                                      : checkDevice === 'Thiếu'
+                                        ? 'bg-rose-100 text-rose-850 border border-rose-200'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  }`}>
+                                    {checkDevice || 'Chưa kiểm'}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col gap-0.5 min-w-0 flex-1 items-end text-right">
+                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider leading-tight">Số tiền dự kiến:</span>
+                                  <span className="font-black text-rose-650 font-mono text-[10px] leading-tight">{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex justify-between items-center bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
+                                  <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Kiểm dụng cụ:</span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                    checkDevice === 'Đủ'
+                                      ? 'bg-emerald-100 text-emerald-850 border border-emerald-200'
+                                      : checkDevice === 'Thiếu'
+                                        ? 'bg-rose-100 text-rose-850 border border-rose-200'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  }`}>
+                                    {checkDevice || 'Chưa kiểm'}
+                                  </span>
+                                </div>
+                              </>
+                            )}
                             
                             <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
                               <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0">Dụng cụ dự kiến:</span>
                               <span className="font-extrabold text-slate-800 text-[12.5px] text-right break-words max-w-[70%]">{plannedDevice || '—'}</span>
                             </div>
 
-                            <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
-                              <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Số tiền dự kiến:</span>
-                              <span className="font-black text-rose-650 font-mono text-[12.5px]">{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
-                            </div>
+                            {!isMobile && (
+                              <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
+                                <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Số tiền dự kiến:</span>
+                                <span className="font-black text-rose-650 font-mono text-[12.5px]">{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
+                              </div>
+                            )}
 
                             {(supplyDepFeedback || operationFeedback) && (
                               <div className={`bg-amber-50/20 border border-amber-200 p-1.5 rounded-lg text-[10px] text-amber-900 font-semibold leading-normal mt-1 ${isMobile ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
@@ -5239,21 +5298,42 @@ Xin cảm ơn!`;
                           </span>
                           
                           <div className="space-y-1.5 text-[12.5px]">
-                            <div className="flex justify-between items-center bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                              <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Lịch can thiệp:</span>
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border uppercase ${
-                                plannedCathLabDate 
-                                  ? 'bg-emerald-100 border-emerald-300 text-emerald-850' 
-                                  : 'bg-rose-100 border-rose-300 text-rose-850'
-                              }`}>
-                                {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
-                              </span>
-                            </div>
+                            {isMobile ? (
+                              <div className="flex justify-between items-start gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
+                                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase leading-tight">Lịch can thiệp dự kiến:</span>
+                                  <span className={`self-start px-1.5 py-0.5 rounded-md text-[9px] font-black border uppercase ${
+                                    plannedCathLabDate
+                                      ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
+                                      : 'bg-rose-100 border-rose-300 text-rose-850'
+                                  }`}>
+                                    {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col gap-0.5 min-w-0 flex-1 items-end text-right">
+                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase leading-tight">Trạng thái gọi:</span>
+                                  <span className="font-bold text-slate-800 text-[10px] leading-tight">{callStatus || '—'}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex justify-between items-center bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
+                                  <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Lịch can thiệp:</span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border uppercase ${
+                                    plannedCathLabDate
+                                      ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
+                                      : 'bg-rose-100 border-rose-300 text-rose-850'
+                                  }`}>
+                                    {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
+                                  </span>
+                                </div>
 
-                            <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
-                              <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Trạng thái gọi:</span>
-                              <span className="font-bold text-slate-800 text-[12.5px]">{callStatus || '—'}</span>
-                            </div>
+                                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
+                                  <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Trạng thái gọi:</span>
+                                  <span className="font-bold text-slate-800 text-[12.5px]">{callStatus || '—'}</span>
+                                </div>
+                              </>
+                            )}
 
                             <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
                               <span className="text-[#d2145a] font-black text-[9px] tracking-wider uppercase shrink-0">PTV:</span>
