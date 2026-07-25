@@ -856,6 +856,45 @@ const prepareRecordForInsert = async (endpoint: string, record: any, config: (ty
   return next;
 };
 
+const deliverWebPushForNotification = (record: Record<string, unknown>): void => {
+  const staffKey = String(record?.StaffKey || '').trim();
+  if (!staffKey) return;
+
+  const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
+  if (!nativeFetch) return;
+
+  const payload = buildWebPushPayload(record as any);
+  const body = JSON.stringify({ StaffKey: staffKey, ...payload });
+
+  const send = () =>
+    nativeFetch('/api/push/deliver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }).then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json() as Promise<{ sent?: number; skipped?: boolean }>;
+    });
+
+  void send()
+    .then(result => {
+      if (result.skipped) {
+        console.warn('[web-push] Server chưa cấu hình VAPID — không gửi được push OS.');
+      } else if (!result.sent) {
+        console.warn('[web-push] Không có thiết bị đăng ký push cho StaffKey', staffKey);
+      }
+    })
+    .catch(err => {
+      console.warn('[web-push] Deliver failed, retrying once:', err);
+      void send().catch(retryErr => {
+        console.warn('[web-push] Deliver retry failed:', retryErr);
+      });
+    });
+};
+
 const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, method: string, init?: RequestInit) => {
   const config = endpointMap[endpoint];
   if (!config) return jsonResponse({ error: `Unsupported endpoint: ${endpoint}` }, { status: 404 });
@@ -896,18 +935,7 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   });
 
   if (endpoint === 'notifications' && isInsert && record?.StaffKey) {
-    const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
-    if (nativeFetch) {
-      const payload = buildWebPushPayload(record);
-      void nativeFetch('/api/push/deliver', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          StaffKey: record.StaffKey,
-          ...payload,
-        }),
-      }).catch(() => undefined);
-    }
+    deliverWebPushForNotification(record);
   }
 
   return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
@@ -1015,6 +1043,14 @@ const batchWriteRecords = async (init?: RequestInit) => {
     const config = Object.values(endpointMap).find(item => item.type === operation.type);
     if (config) upsertCachedRecord(config, responseRecords[index], operation.action === 'insert');
   });
+
+  for (let i = 0; i < incomingOperations.length; i += 1) {
+    const endpoint = String(incomingOperations[i]?.endpoint || '').trim();
+    const method = String(incomingOperations[i]?.method || 'POST').toUpperCase();
+    if (endpoint === 'notifications' && method === 'POST') {
+      deliverWebPushForNotification(responseRecords[i]);
+    }
+  }
 
   return jsonResponse({ success: true, count: responseRecords.length, records: responseRecords });
 };
