@@ -14,6 +14,7 @@ import {
 } from '../auth/permissions';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface RolePresetMatrixPanelProps {
   rolePresetRecords: RolePreset[];
@@ -94,7 +95,7 @@ export default function RolePresetMatrixPanel({
   const handleSave = async () => {
     if (!draft) return;
     if (!draft.RolePresetLabel.trim()) {
-      triggerAlert?.('Vui lòng nhập tên vai trò mẫu!', 'Thiếu thông tin');
+      triggerAlert?.('Vui lòng nhập tên vai trò mẫu!', MODAL_TITLE.missingInfo);
       return;
     }
 
@@ -127,7 +128,7 @@ export default function RolePresetMatrixPanel({
       cancelEdit();
       onRefresh();
     } catch (error) {
-      triggerAlert?.(error instanceof Error ? error.message : 'Lỗi lưu preset', 'Lỗi');
+      triggerAlert?.(error instanceof Error ? error.message : 'Lỗi lưu preset', MODAL_TITLE.saveError);
     } finally {
       setSaving(false);
     }
@@ -135,7 +136,7 @@ export default function RolePresetMatrixPanel({
 
   const handleDelete = (record: RolePreset) => {
     if (isSystemRolePresetId(record.RolePresetID)) {
-      triggerAlert?.('Không thể xóa preset hệ thống.', 'Từ chối');
+      triggerAlert?.('Không thể xóa preset hệ thống.', MODAL_TITLE.warning);
       return;
     }
 
@@ -148,16 +149,16 @@ export default function RolePresetMatrixPanel({
           buildSyncContext('staff-mgmt', { viewLabel: 'Ma trận vai trò mẫu' }),
           { baseMessage: 'Đã xóa vai trò mẫu' }
         );
-        triggerAlert?.('Đã xóa vai trò mẫu.', 'Xóa thành công');
+        triggerAlert?.('Đã xóa vai trò mẫu.', MODAL_TITLE.notify);
         if (editingId === record.RolePresetID) cancelEdit();
         onRefresh();
       } catch (error) {
-        triggerAlert?.(error instanceof Error ? error.message : 'Không thể xóa preset', 'Lỗi');
+        triggerAlert?.(error instanceof Error ? error.message : 'Không thể xóa preset', MODAL_TITLE.saveError);
       }
     };
 
     if (triggerConfirm) {
-      triggerConfirm(`Xóa vai trò mẫu "${record.RolePresetLabel}"?`, proceed, 'Xác nhận xóa');
+      triggerConfirm(`Xóa vai trò mẫu "${record.RolePresetLabel}"?`, proceed, MODAL_TITLE.confirm);
     } else {
       proceed();
     }

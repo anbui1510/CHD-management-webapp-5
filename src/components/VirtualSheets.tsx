@@ -15,6 +15,7 @@ import {
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { hydrateSyncConfigFromServer } from '../api/appsScriptFetch';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface VirtualSheetsProps {
   patients: Patient[];
@@ -26,9 +27,23 @@ interface VirtualSheetsProps {
   sources?: any[];
   deviceTemplates?: any[];
   onRefreshData?: () => void;
+  triggerAlert?: (message: string, title?: string) => void;
+  triggerConfirm?: (message: string, onConfirm: () => void, title?: string) => void;
 }
 
-export default function VirtualSheets({ patients, consults, staff, cathlabs = [], operations = [], cmrs = [], sources = [], deviceTemplates = [], onRefreshData }: VirtualSheetsProps) {
+export default function VirtualSheets({
+  patients,
+  consults,
+  staff,
+  cathlabs = [],
+  operations = [],
+  cmrs = [],
+  sources = [],
+  deviceTemplates = [],
+  onRefreshData,
+  triggerAlert,
+  triggerConfirm
+}: VirtualSheetsProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate'>('Patient');
   
@@ -125,34 +140,40 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
   };
 
   const handleDisconnect = () => {
-    if (!window.confirm('Bạn có chắc chắn muốn ngắt kết nối đồng bộ với Google Sheets? Ứng dụng sẽ chuyển lại sử dụng Database độc lập nội bộ.')) {
+    const proceedDisconnect = () => {
+      setActionLoading(true);
+      setActionError(null);
+      setActionSuccess(null);
+
+      fetch('/api/sync-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scriptUrl: '', scriptSecret: '' })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setActionLoading(false);
+          setActionSuccess('Đã hủy liên kết thành công!');
+          setInputUrl('');
+          setInputSecret('');
+          setSyncConfig({ scriptUrl: '', scriptSecret: '', isSynced: false });
+          if (onRefreshData) {
+            onRefreshData();
+          }
+        })
+        .catch(err => {
+          setActionLoading(false);
+          setActionError('Có lỗi xảy ra khi ngắt kết nối.');
+        });
+    };
+
+    const message =
+      'Bạn có chắc chắn muốn ngắt kết nối đồng bộ với Google Sheets? Ứng dụng sẽ chuyển lại sử dụng Database độc lập nội bộ.';
+    if (triggerConfirm) {
+      triggerConfirm(message, proceedDisconnect, MODAL_TITLE.confirm);
       return;
     }
-
-    setActionLoading(true);
-    setActionError(null);
-    setActionSuccess(null);
-
-    fetch('/api/sync-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scriptUrl: '', scriptSecret: '' })
-    })
-      .then(res => res.json())
-      .then(data => {
-        setActionLoading(false);
-        setActionSuccess('Đã hủy liên kết thành công!');
-        setInputUrl('');
-        setInputSecret('');
-        setSyncConfig({ scriptUrl: '', scriptSecret: '', isSynced: false });
-        if (onRefreshData) {
-          onRefreshData(); // Redraw with local offline database
-        }
-      })
-      .catch(err => {
-        setActionLoading(false);
-        setActionError('Có lỗi xảy ra khi ngắt kết nối.');
-      });
+    proceedDisconnect();
   };
 
   const handleForceSync = () => {
@@ -215,33 +236,43 @@ export default function VirtualSheets({ patients, consults, staff, cathlabs = []
       setActionError('Không có match chắc để áp dụng.');
       return;
     }
-    if (!window.confirm(`Áp dụng ${confident.length} match chắc? Hệ thống sẽ patch CathLab.ConsultKey và tự đóng workflow Consult liên quan.`)) {
+
+    const proceedApply = async () => {
+      setReconcileApplying(true);
+      setActionError(null);
+      setActionSuccess(null);
+      try {
+        const operations = buildReconciliationPatchOperations(confident);
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          '/api/batch-write',
+          {
+            method: 'POST',
+            body: JSON.stringify({ operations })
+          },
+          buildSyncContext('google-sheets', { viewLabel: 'Virtual Google Sheets' }),
+          { baseMessage: 'Đã áp dụng đối soát CathLab' }
+        );
+        setActionSuccess(`Đã áp dụng ${confident.length} match chắc (${operations.length} bản ghi patch).`);
+        setReconcileResults(null);
+        onRefreshData?.();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Không thể áp dụng đối soát.';
+        setActionError(message);
+        triggerAlert?.(message, MODAL_TITLE.saveError);
+      } finally {
+        setReconcileApplying(false);
+      }
+    };
+
+    const message = `Áp dụng ${confident.length} match chắc? Hệ thống sẽ patch CathLab.ConsultKey và tự đóng workflow Consult liên quan.`;
+    if (triggerConfirm) {
+      triggerConfirm(message, () => {
+        void proceedApply();
+      }, MODAL_TITLE.confirm);
       return;
     }
-
-    setReconcileApplying(true);
-    setActionError(null);
-    setActionSuccess(null);
-    try {
-      const operations = buildReconciliationPatchOperations(confident);
-      await persistWithSheetsSync(
-        reportMutationResponse,
-        '/api/batch-write',
-        {
-          method: 'POST',
-          body: JSON.stringify({ operations })
-        },
-        buildSyncContext('google-sheets', { viewLabel: 'Virtual Google Sheets' }),
-        { baseMessage: 'Đã áp dụng đối soát CathLab' }
-      );
-      setActionSuccess(`Đã áp dụng ${confident.length} match chắc (${operations.length} bản ghi patch).`);
-      setReconcileResults(null);
-      onRefreshData?.();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Không thể áp dụng đối soát.');
-    } finally {
-      setReconcileApplying(false);
-    }
+    await proceedApply();
   };
 
   // Pagination Logic Helper

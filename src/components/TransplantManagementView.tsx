@@ -54,6 +54,7 @@ import {
 import { exportTransplantExcel } from './transplant/transplantExcelExport';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface TransplantManagementViewProps {
   patients: Patient[];
@@ -179,7 +180,7 @@ export default function TransplantManagementView({
       await onPatchTransplant(selectedItem.TransKey, saved);
       onRefreshData();
     } catch {
-      triggerAlert?.('Lưu thất bại.', 'Lỗi');
+      triggerAlert?.('Lưu thất bại.', MODAL_TITLE.saveError);
     } finally {
       setSaving(false);
     }
@@ -206,7 +207,7 @@ export default function TransplantManagementView({
       setDeleteConfirmKey('');
       onRefreshData();
     } catch {
-      triggerAlert?.('Xóa thất bại.', 'Lỗi');
+      triggerAlert?.('Xóa thất bại.', MODAL_TITLE.saveError);
     }
   };
 
@@ -228,7 +229,7 @@ export default function TransplantManagementView({
       const dataUrl = await readFileAsDataUrl(file);
       setDetailForm(prev => ({ ...prev, [field]: dataUrl }));
     } catch {
-      triggerAlert?.('Không đọc được file.', 'Lỗi');
+      triggerAlert?.('Không đọc được file.', MODAL_TITLE.saveError);
     }
   };
 

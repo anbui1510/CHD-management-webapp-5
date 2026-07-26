@@ -23,6 +23,7 @@ import {
   createRepeatInterventionWorkflow,
   isRepeatInterventionPlan,
 } from '../utils/repeatInterventionConsult';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface Props {
   patients: Patient[];
@@ -31,6 +32,7 @@ interface Props {
   sources: Source[];
   staffList: Staff[];
   onRefreshData: (force?: boolean) => void;
+  triggerAlert: (msg: string, title?: string) => void;
   triggerConfirm: (msg: string, onConfirm: () => void, title?: string) => void;
   onViewPatientRecord: (pat: Patient) => void;
   onPatchConsult?: (consultKey: string, patch: Partial<Consult>) => void;
@@ -348,7 +350,7 @@ const buildCathFormSnapshot = (data: Partial<CathLab>, note: string): string =>
     callNote: note
   });
 
-export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient, onSaveSuccess }: Props) {
+export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerAlert, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient, onSaveSuccess }: Props) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
@@ -1006,7 +1008,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
       if (patientsToCreate.length === 0 && cathlabsToCreate.length === 0 && cathlabsToUpdate.length === 0) {
         setHisImportStatus(`Không có ca mới. Bỏ qua ${skippedExisting} ca đã có.`);
-        alert(`Không có ca mới để import.\nĐã bỏ qua: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}`);
+        triggerAlert(`Không có ca mới để import.\nĐã bỏ qua: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}`, MODAL_TITLE.notify);
         return;
       }
 
@@ -1083,13 +1085,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       const summaryText = importedSummaries.slice(0, 20).map((summary, idx) => `${idx + 1}. ${summary}`).join('\n');
       const truncatedNote = importedSummaries.length > 20 ? `\n... và ${importedSummaries.length - 20} ca khác` : '';
       setHisImportStatus(`Đã import ${savedCathCount} ca mới, gộp ${updatedCathCount} ca. Tự đóng ${autoClosedCount} workflow treo. Tạo mới ${patientsToCreate.length} BN. ${importedSummaries.slice(0, 3).join(' | ')}${importedSummaries.length > 3 ? '...' : ''}`);
-      alert(`Import HIS hoàn tất.\nCa CathLab mới: ${savedCathCount}\nCa gộp cập nhật: ${updatedCathCount}\nWorkflow tự đóng: ${autoClosedCount}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}${workflowSideEffectWarning}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`);
+      triggerAlert(`Import HIS hoàn tất.\nCa CathLab mới: ${savedCathCount}\nCa gộp cập nhật: ${updatedCathCount}\nWorkflow tự đóng: ${autoClosedCount}\nBN mới: ${patientsToCreate.length}\nBỏ qua ca đã có: ${skippedExisting}\nDòng thiếu dữ liệu: ${skippedInvalid}${workflowSideEffectWarning}\n\nCác ca bổ sung:\n${summaryText}${truncatedNote}`, MODAL_TITLE.notify);
       onRefreshData();
     } catch (error) {
       console.error(error);
       const message = error instanceof Error ? error.message : 'Không thể import file HIS';
       setHisImportStatus(message);
-      alert(message);
+      triggerAlert(message, MODAL_TITLE.saveError);
       onRefreshData();
     } finally {
       setHisImporting(false);
@@ -1128,7 +1130,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       .then(() => onRefreshData())
       .catch(err => {
         console.error(err);
-        alert(err instanceof Error ? err.message : 'Không thể chuyển phòng thông tim. Vui lòng thử lại.');
+        triggerAlert(err instanceof Error ? err.message : 'Không thể chuyển phòng thông tim. Vui lòng thử lại.', MODAL_TITLE.saveError);
         onRefreshData();
       });
   };
@@ -1159,12 +1161,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const saveAdHocCathLab = async () => {
      const safeCathMethod = parseCathMethods(formData.CathMethod);
      if (!formData.CathDate || !formData.PostDiagnosisID || !formData.CathResultID || safeCathMethod.length === 0 || !formData.CathPlan || !formData._1stInterventionist || !formData._2ndInterventionist) {
-        alert("Vui lòng điền đầy đủ các thông tin bắt buộc (*)");
+        triggerAlert('Vui lòng điền đầy đủ các thông tin bắt buộc (*)', MODAL_TITLE.missingInfo);
         return;
      }
      
      if (adHocPatientMode === 'existing' && !adHocSelectedPatientKey) {
-        alert("Vui lòng chọn bệnh nhân.");
+        triggerAlert('Vui lòng chọn bệnh nhân.', MODAL_TITLE.missingInfo);
         return;
      }
 
@@ -1189,7 +1191,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      }
 
      if (adHocPatientMode === 'new' && (!adHocPatientID1 || !adHocPatientName || !adHocPatientDOB || !adHocPatientAddress)) {
-        alert("Vui lòng điền đầy đủ thông tin hành chính bệnh nhân.");
+        triggerAlert('Vui lòng điền đầy đủ thông tin hành chính bệnh nhân.', MODAL_TITLE.missingInfo);
         return;
      }
 
@@ -1576,7 +1578,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            );
          } catch (err) {
            const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định';
-           alert(`Lỗi khi lưu sẹo workflow cho BS: ${errMsg}`);
+           triggerAlert(`Lỗi khi lưu sẹo workflow cho BS: ${errMsg}`, MODAL_TITLE.saveError);
            console.error('Lỗi khi lưu sẹo BS:', mark, errMsg);
          }
        }
@@ -1596,7 +1598,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
             );
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định';
-            alert(`Lỗi khi lưu thông báo sẹo: ${errMsg}`);
+            triggerAlert(`Lỗi khi lưu thông báo sẹo: ${errMsg}`, MODAL_TITLE.saveError);
             console.error('Lỗi khi lưu thông báo:', notif, errMsg);
           }
         }
@@ -1606,7 +1608,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
      persist().catch(e => {
        console.error(e);
-       alert(e instanceof Error ? e.message : 'Không thể lưu ca cấp cứu thông tim');
+       triggerAlert(e instanceof Error ? e.message : 'Không thể lưu ca cấp cứu thông tim', MODAL_TITLE.saveError);
        onRefreshData(true);
      });
   };
@@ -1636,12 +1638,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const saveCathLab = async (isEdit: boolean, options?: { closeOnSuccess?: boolean }): Promise<boolean> => {
      const safeCathMethod = parseCathMethods(formData.CathMethod);
      if (!formData.CathDate || !formData.PostDiagnosisID || !formData.CathResultID || safeCathMethod.length === 0 || !formData.CathPlan || !formData._1stInterventionist || !formData._2ndInterventionist) {
-        alert("Vui lòng điền đầy đủ các thông tin bắt buộc (*)");
+        triggerAlert('Vui lòng điền đầy đủ các thông tin bắt buộc (*)', MODAL_TITLE.missingInfo);
         return false;
      }
 
      if (PLANS_REQUIRING_FOLLOW_UP.includes(String(formData.CathPlan || '')) && !formData.PlannedFollowUpDate) {
-        alert("Vui lòng nhập Ngày hẹn tái khám");
+        triggerAlert('Vui lòng nhập Ngày hẹn tái khám', MODAL_TITLE.missingInfo);
         return false;
      }
 
@@ -1717,7 +1719,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        return true;
      } catch (e) {
        console.error(e);
-       alert(e instanceof Error ? e.message : 'Không thể lưu kết quả thông tim');
+       triggerAlert(e instanceof Error ? e.message : 'Không thể lưu kết quả thông tim', MODAL_TITLE.saveError);
        onRefreshData();
        return false;
      } finally {
@@ -1786,7 +1788,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const handlePostpone = (action: 'return' | 'remove') => {
      if(!selectedPending) return;
      if(!callNote) {
-       alert("Vui lòng điền ghi chú (Call Note) lý do trạng thái hoãn");
+       triggerAlert('Vui lòng điền ghi chú (Call Note) lý do trạng thái hoãn', MODAL_TITLE.missingInfo);
        return;
      }
 
@@ -1827,7 +1829,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
          .then(() => onRefreshData())
          .catch(err => {
            console.error(err);
-           alert(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái ca');
+           triggerAlert(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái ca', MODAL_TITLE.saveError);
            onRefreshData();
          });
      });

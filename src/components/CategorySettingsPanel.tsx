@@ -20,6 +20,7 @@ import {
 } from '../data/source';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface CategorySettingsPanelProps {
   sources: Source[];
@@ -87,7 +88,7 @@ export default function CategorySettingsPanel({
     if (!trimmed) return;
 
     if (list.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
-      triggerAlert?.(`Giá trị "${trimmed}" đã tồn tại trong danh sách!`, 'Trùng lặp');
+      triggerAlert?.(`Giá trị "${trimmed}" đã tồn tại trong danh sách!`, MODAL_TITLE.warning);
       return;
     }
 
@@ -113,7 +114,7 @@ export default function CategorySettingsPanel({
     triggerConfirm?.(
       `Bạn có chắc chắn muốn xóa "${value}" khỏi danh mục không? Lưu ý: Việc xóa ở đây không tự động xóa dữ liệu lịch sử ở các hồ sơ cũ.`,
       performDelete,
-      'Xác nhận xóa'
+      MODAL_TITLE.confirm
     );
   };
 
@@ -148,7 +149,7 @@ export default function CategorySettingsPanel({
     }
 
     if (list.some((item) => item.toLowerCase() === trimmed.toLowerCase() && item !== originalValue)) {
-      triggerAlert?.(`Giá trị "${trimmed}" đã tồn tại trong danh sách!`, 'Trùng lặp');
+      triggerAlert?.(`Giá trị "${trimmed}" đã tồn tại trong danh sách!`, MODAL_TITLE.warning);
       return;
     }
 
@@ -182,7 +183,7 @@ export default function CategorySettingsPanel({
         setDiagnosisRenames([]);
         cancelEdit();
       },
-      'Hủy thay đổi'
+      MODAL_TITLE.confirm
     );
   };
 
@@ -211,7 +212,7 @@ export default function CategorySettingsPanel({
       onRefreshData();
     } catch (err) {
       console.error(err);
-      triggerAlert?.(err instanceof Error ? err.message : 'Không thể lưu cấu hình', 'Lỗi lưu trữ');
+      triggerAlert?.(err instanceof Error ? err.message : 'Không thể lưu cấu hình', MODAL_TITLE.saveError);
     } finally {
       setSaving(false);
     }

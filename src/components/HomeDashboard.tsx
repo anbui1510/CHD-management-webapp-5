@@ -26,6 +26,7 @@ import {
 import { Patient, Consult, CathLab, findPatientByKey, normalizePatientKey } from '../types';
 import ChdDailyBriefHomeWidget from './ChdDailyBriefHomeWidget';
 import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface HomeDashboardProps {
   onNavigate: (menu: string) => void;
@@ -39,6 +40,7 @@ interface HomeDashboardProps {
   consults?: Consult[];
   cathlabs?: CathLab[];
   canAccessModule: (module: AppModule) => boolean;
+  triggerAlert?: (message: string, title?: string) => void;
 }
 
 const SHORTCUTS_POOL = [
@@ -180,6 +182,7 @@ export default function HomeDashboard({
   consults = [],
   cathlabs = [],
   canAccessModule,
+  triggerAlert,
 }: HomeDashboardProps) {
   
   const [isConfiguring, setIsConfiguring] = useState(false);
@@ -239,7 +242,10 @@ export default function HomeDashboard({
       });
     } else {
       if (selectedShortcutIds.length >= 4) {
-        alert("Tối đa hiển thị được 4 view truy cập nhanh! Vui lòng bỏ bớt 1 view trước khi chọn.");
+        triggerAlert?.(
+          'Tối đa hiển thị được 4 view truy cập nhanh! Vui lòng bỏ bớt 1 view trước khi chọn.',
+          MODAL_TITLE.warning
+        );
         return;
       }
       setSelectedShortcutIds(prev => {

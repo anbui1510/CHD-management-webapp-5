@@ -25,6 +25,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
 import { 
   ClipboardList, 
   Search, 
@@ -1264,8 +1265,8 @@ Xin cảm ơn!`;
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       window.setTimeout(() => {
-        setErrorMsg('Tải file thành công!');
-        setTimeout(() => setErrorMsg(''), 3000);
+        setSuccessMsg('Tải file thành công!');
+        setTimeout(() => setSuccessMsg(''), 3000);
       }, 0);
     } catch (err: any) {
       console.error("Lỗi xuất excel: ", err);
@@ -1342,8 +1343,8 @@ Xin cảm ơn!`;
           const failed = results.filter(r => r.status === 'rejected').length;
           if (failed > 0) onRefreshData();
         });
-        setErrorMsg(`Đã cập nhật dụng cụ xong ${updates.length} ca!`);
-        setTimeout(() => setErrorMsg(''), 4000);
+        setSuccessMsg(`Đã cập nhật dụng cụ xong ${updates.length} ca!`);
+        setTimeout(() => setSuccessMsg(''), 4000);
       } else {
         setErrorMsg("Không tìm thấy ca nào cần cập nhật/hoặc dòng dữ liệu rỗng từ file.");
       }
@@ -1617,8 +1618,8 @@ Xin cảm ơn!`;
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       window.setTimeout(() => {
-        setErrorMsg('Tải file thành công!');
-        setTimeout(() => setErrorMsg(''), 3000);
+        setSuccessMsg('Tải file thành công!');
+        setTimeout(() => setSuccessMsg(''), 3000);
       }, 0);
     } catch (err: any) {
       console.error("Lỗi xuất excel: ", err);
@@ -2142,13 +2143,10 @@ Xin cảm ơn!`;
     setAdHocValidationMsg('');
 
     if (adHocPatientMode === 'new') {
-      const cleanID1 = adHocPatientID1.trim().toLowerCase();
-      const duplicatePatient = patients.find(p => 
-        String(p.PatientID1 || '').trim().toLowerCase() === cleanID1
-      );
+      const duplicatePatient = findDuplicatePatientById1(patients, adHocPatientID1);
       if (duplicatePatient) {
         setAdHocErrors(['PatientID1']);
-        setAdHocValidationMsg(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${duplicatePatient.PatientName}). Đề nghị chọn bệnh nhi sẵn có hoặc kiểm tra lại thông tin!`);
+        setAdHocValidationMsg(PATIENT_VALIDATION_MSG.duplicateIdSuggestSelect(duplicatePatient.PatientName));
         return;
       }
     }

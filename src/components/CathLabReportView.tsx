@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Users
 } from 'lucide-react';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface CathLabReportViewProps {
   patients: Patient[];
@@ -22,6 +23,7 @@ interface CathLabReportViewProps {
   sources?: Source[];
   staffList?: Staff[];
   onViewPatientRecord?: (patient: Patient) => void;
+  triggerAlert?: (message: string, title?: string) => void;
 }
 
 // Safe helper to convert any object/value to string safely for rendering
@@ -58,7 +60,8 @@ function CathLabReportViewInner({
   cathlabs = [],
   sources = [],
   staffList = [],
-  onViewPatientRecord
+  onViewPatientRecord,
+  triggerAlert
 }: CathLabReportViewProps) {
   // Ensure we are working with arrays safely
   const safeCathlabs = useMemo(() => Array.isArray(cathlabs) ? cathlabs : [], [cathlabs]);
@@ -271,7 +274,7 @@ function CathLabReportViewInner({
       link.click();
       document.body.removeChild(link);
     } catch (e) {
-      alert('Lỗi xuất báo cáo CSV: ' + e);
+      triggerAlert?.(`Lỗi xuất báo cáo CSV: ${e}`, MODAL_TITLE.notify);
     }
   };
 

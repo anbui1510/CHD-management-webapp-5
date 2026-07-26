@@ -20,6 +20,8 @@ import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { VNDateInput } from './VNDateInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { formatFetchErrorMessage } from '../utils/patientFormValidation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface MRIResultViewProps {
   patients: Patient[];
@@ -30,6 +32,7 @@ interface MRIResultViewProps {
   onRefreshData: () => void;
   onPatchCmr?: (cmrKey: string, patch: Partial<CMR>) => void;
   onEditPatientAdmin?: (patient: Patient) => void;
+  triggerAlert?: (message: string, title?: string) => void;
 }
 
 type ResultTab = 'pending' | 'done';
@@ -64,7 +67,8 @@ export default function MRIResultView({
   cmrs,
   onRefreshData,
   onPatchCmr,
-  onEditPatientAdmin
+  onEditPatientAdmin,
+  triggerAlert
 }: MRIResultViewProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<ResultTab>('pending');
@@ -218,7 +222,10 @@ export default function MRIResultView({
       .catch((err: any) => {
         console.error(err);
         const msg = err?.message || '';
-        alert(msg.includes('Failed to fetch') ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.' : (msg || 'Có lỗi khi lưu kết quả MRI.'));
+        triggerAlert?.(
+          formatFetchErrorMessage(msg, 'Có lỗi khi lưu kết quả MRI.'),
+          MODAL_TITLE.saveError
+        );
         onRefreshData();
       });
   };

@@ -11,6 +11,11 @@ import ResultStaffDrawer from './ResultStaffDrawer';
 import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
+import {
+  findDuplicatePatientById1,
+  PATIENT_VALIDATION_MSG,
+} from '../utils/patientFormValidation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 const DEFAULT_CONCLUSION_OPTIONS = [
   "Can thiệp thông tim",
@@ -322,15 +327,15 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       if (patientMode === 'create') {
         if (!newPatID1.trim() || !newPatName.trim()) {
           setSubmitLoading(false);
-          setErrorMsg('Vui lòng nhập Mã bệnh nhi (ID1) và Họ tên bệnh nhi!');
+          setErrorMsg(PATIENT_VALIDATION_MSG.missingIdAndName);
           return;
         }
 
         // Check for duplicate PatientID1
-        const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === newPatID1.trim().toLowerCase());
+        const dup = findDuplicatePatientById1(patients, newPatID1);
         if (dup) {
           setSubmitLoading(false);
-          setErrorMsg(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${dup.PatientName}). Đề nghị chọn bệnh nhi sẵn có hoặc kiểm tra lại thông tin!`);
+          setErrorMsg(PATIENT_VALIDATION_MSG.duplicateIdSuggestSelect(dup.PatientName));
           return;
         }
 
@@ -355,7 +360,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         // Select mode: selected patient must be chose
         if (!finalPatientKey) {
           setSubmitLoading(false);
-          setErrorMsg('Vui lòng tìm và chọn bệnh nhi sẵn có hoặc đổi sang chế độ tạo mới!');
+          setErrorMsg(PATIENT_VALIDATION_MSG.selectExistingOrCreate);
           return;
         }
 
@@ -536,9 +541,9 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     const failedCount = results.filter(r => r.status === 'rejected').length;
     if (failedCount > 0) {
       onRefreshData?.();
-      alert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.`);
+      triggerAlert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.`, MODAL_TITLE.warning);
     }
-  }, [consults, onRemoveConsult, onRemoveConsults, onRefreshData, patients, reportMutationResponse]);
+  }, [consults, onRemoveConsult, onRemoveConsults, onRefreshData, patients, reportMutationResponse, triggerAlert]);
 
   useEffect(() => {
     setSelectedDeleteKeys(new Set());
