@@ -26,6 +26,13 @@ import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
+import {
+  SCAR_WORKFLOW_NOTIFY_TITLE,
+  SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER,
+  buildOverrideSchedulingConsultNote,
+  buildOverrideSchedulingScar,
+  buildSchedulingSummaryHeader,
+} from '../utils/workflowMessages';
 import { 
   ClipboardList, 
   Search, 
@@ -1791,7 +1798,10 @@ Xin cảm ơn!`;
   };
 
   const activatePendingConsultForScheduling = (pendingConsult: Consult) => {
-    const overrideNote = `[Kích hoạt xếp lịch bổ sung - ${currentStaff?.StaffName || currentStaff?.StaffKey || 'user'} ${new Date().toISOString()}]`;
+    const overrideNote = buildOverrideSchedulingConsultNote(
+      currentStaff?.StaffName || currentStaff?.StaffKey || 'user',
+      new Date().toISOString()
+    );
     const payload = {
       ConsultResultID: 'Can thiệp thông tim',
       DetailConsultResult: String(pendingConsult.DetailConsultResult || '').trim() || 'Can thiệp thông tim',
@@ -1837,14 +1847,16 @@ Xin cảm ơn!`;
         const patName = pat?.PatientName || 'Bệnh nhi';
         const patId = pat?.PatientID1 || '';
 
+        const scar = buildOverrideSchedulingScar({ patientName: patName, patientId: patId });
+
         const markPayload = {
           MarkKey: `mark_override_sched_${Date.now()}_tai`,
           StaffKey: keyTai,
           StaffName: nameTai,
           MarkType: 'missing_staff_result' as const,
           Score: 1,
-          Label: 'Trễ điền kết quả hội chẩn',
-          Reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do BS thư ký Tài chưa điền kết quả hội chẩn đúng hạn.`,
+          Label: scar.label,
+          Reason: scar.reason,
           RelatedEntityType: 'Consult' as const,
           RelatedEntityKey: pendingConsult.ConsultKey,
           PatientKey: pendingConsult.PatientKey,
@@ -1877,8 +1889,8 @@ Xin cảm ơn!`;
           NotificationKey: `notif_override_sched_${Date.now()}_tai`,
           StaffKey: keyTai,
           StaffName: nameTai,
-          Title: 'Phạt sẹo workflow',
-          Message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do bạn chưa điền kết quả hội chẩn đúng hạn. Bạn bị phạt 1 sẹo.`,
+          Title: SCAR_WORKFLOW_NOTIFY_TITLE,
+          Message: scar.message,
           Severity: 'warning' as const,
           RelatedEntityType: 'Consult' as const,
           RelatedEntityKey: pendingConsult.ConsultKey,
@@ -5035,7 +5047,7 @@ Xin cảm ơn!`;
               const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);
               const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : 'Chưa gán';
 
-              return `📋 *THÔNG TIN TÓM TẮT XẾP LỊCH: ${formatPatientWithPtvPhu(pObj.PatientName.toUpperCase(), ptvPhu1Display).toUpperCase()}* 📋\n` +
+              return `${buildSchedulingSummaryHeader(formatPatientWithPtvPhu(pObj.PatientName.toUpperCase(), ptvPhu1Display).toUpperCase())}\n` +
                 `-----------------------------------\n` +
                 `👤 *HÀNH CHÍNH BỆNH NHÂN:*\n` +
                 `- Họ và tên bệnh nhân: ${pObj.PatientName.toUpperCase()} (${pObj.PatientSex}, ${ageDesc})\n` +
@@ -5056,7 +5068,7 @@ Xin cảm ơn!`;
                 `- Số tiền dự kiến: ${plannedPrice ? `${plannedPrice} VNĐ` : '—'}\n` +
                 `- Ghi chú từ Phòng Vật tư: ${supplyDepFeedback || 'Không'}\n` +
                 `- Ghi chú từ Phòng Mổ: ${operationFeedback || 'Không'}\n\n` +
-                `📅 *THÔNG TIN CẬP NHẬT XẾP LỊCH:*\n` +
+                `${SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER}\n` +
                 `- Lịch thông tim chính thức: ${plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}\n` +
                 `- Trạng thái gọi bệnh nhân: ${callStatus || 'Chưa liên hệ'}\n` +
                 `- Mức độ ưu tiên gọi bệnh: ${priorityOrder}\n` +

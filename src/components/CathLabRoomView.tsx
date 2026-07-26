@@ -24,6 +24,20 @@ import {
   isRepeatInterventionPlan,
 } from '../utils/repeatInterventionConsult';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import {
+  SCAR_WORKFLOW_NOTIFY_TITLE,
+  HIS_IMPORT_AUTO_CLOSE_NOTIFY_TITLE,
+  buildEmergProgCaseAScar,
+  buildEmergProgCaseBHieuScar,
+  buildEmergProgCaseBTaiScar,
+  buildEmergProgCaseCScar,
+  buildHisAutoCloseConsultLogLine,
+  buildHisImportNotificationMessage,
+  getHisImportMarkScore,
+  getHisImportNotificationSeverity,
+  getHisStageLabel,
+  type HisWorkflowStage,
+} from '../utils/workflowMessages';
 
 interface Props {
   patients: Patient[];
@@ -297,19 +311,12 @@ const cathLabHasConsultKey = (cathlabs: CathLab[], consultKey: any): boolean => 
   return cathlabs.some(cath => normalizeRefKey(cath.ConsultKey) === normalizedConsultKey);
 };
 
-type HisWorkflowStage = 'missing_staff_result' | 'scheduler_missing_transfer' | 'missing_cath_result';
 type BatchWriteOperation = { endpoint: string; method: 'POST' | 'PUT' | 'PATCH'; key?: string; data: Record<string, any> };
 
 const getHisWorkflowStage = (consult: Consult): HisWorkflowStage => {
   if (!hasConsultResult(consult)) return 'missing_staff_result';
   if (!consult.PlannedCathLabDate || !isTransferredToCathLab(consult)) return 'scheduler_missing_transfer';
   return 'missing_cath_result';
-};
-
-const getHisStageLabel = (stage: HisWorkflowStage) => {
-  if (stage === 'missing_staff_result') return 'Chưa hoàn tất kết quả staff';
-  if (stage === 'scheduler_missing_transfer') return 'Chưa hoàn tất xếp lịch/chuyển phòng TT';
-  return 'Chưa nhập kết quả thông tim';
 };
 
 const chunkArray = <T,>(items: T[], size: number): T[][] => {
@@ -733,8 +740,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     adminStaff.forEach(staff => recipients.set(staff.StaffKey, staff));
 
     const baseDedup = `his-auto-close:${consult.ConsultKey}:${cathPayload.CathDate}:${stage}`;
-    const title = 'HIS import tự hoàn tất ca treo';
-    const message = `${patient.PatientName || patient.PatientID1} đã có kết quả thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)} từ HIS. Workflow treo "${getHisStageLabel(stage)}" đã được tự động đóng.`;
+    const title = HIS_IMPORT_AUTO_CLOSE_NOTIFY_TITLE;
+    const cathDateFormatted = formatVNTime(cathPayload.CathDate);
+    const message = buildHisImportNotificationMessage({
+      patientName: patient.PatientName || '',
+      patientId: patient.PatientID1,
+      cathDateFormatted,
+      stage,
+    });
     const operations: BatchWriteOperation[] = [];
 
     Array.from(recipients.values()).forEach(staff => {
@@ -747,7 +760,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           StaffName: staff.StaffName,
           Title: title,
           Message: message,
-          Severity: stage === 'missing_cath_result' ? 'critical' : 'warning',
+          Severity: getHisImportNotificationSeverity(stage),
           RelatedEntityType: 'Consult',
           RelatedEntityKey: consult.ConsultKey,
           PatientKey: patient.PatientKey,
@@ -770,7 +783,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           StaffKey: responsible.StaffKey,
           StaffName: responsible.StaffName,
           MarkType: stage,
-          Score: stage === 'missing_cath_result' ? 2 : 1,
+          Score: getHisImportMarkScore(stage),
           Label: getHisStageLabel(stage),
           Reason: message,
           RelatedEntityType: 'Consult',
@@ -789,7 +802,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const buildHisAutoCloseConsultPatch = (consult: Consult, cathPayload: CathLab, stage: HisWorkflowStage): Partial<Consult> => {
-    const logLine = `[HIS import ${new Date().toISOString()}] Đã tự hoàn tất workflow "${getHisStageLabel(stage)}" vì HIS ghi nhận ca thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)}. CathKey=${cathPayload.CathKey}`;
+    const logLine = buildHisAutoCloseConsultLogLine({
+      isoTimestamp: new Date().toISOString(),
+      stage,
+      cathDateFormatted: formatVNTime(cathPayload.CathDate),
+      cathKey: cathPayload.CathKey,
+    });
     const resultPatch = hasConsultResult(consult)
       ? {}
       : {
@@ -1318,14 +1336,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        const patientIdVal = adHocPatientMode === 'existing' ? (existingPat?.PatientID1 || '') : adHocPatientID1;
 
        if (consultCase === 'A') {
+         const scar = buildEmergProgCaseAScar({ patientName: pName, patientId: patientIdVal });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
            StaffName: nameHieu,
            MarkType: 'scheduler_missing_transfer',
            Score: 1,
-           Label: 'Thông tim CT bỏ qua hội chẩn',
-           Reason: `Bệnh nhi ${pName} (ID1: ${patientIdVal}) làm chương trình nhưng chưa được đăng ký hội chẩn. Phạt BS xếp lịch Hiếu không kiểm soát thông tin.`,
+           Label: scar.label,
+           Reason: scar.reason,
            RelatedEntityType: 'Patient',
            RelatedEntityKey: patientKey,
            PatientKey: patientKey,
@@ -1340,8 +1359,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
            StaffName: nameHieu,
-           Title: 'Phạt sẹo workflow',
-           Message: `Bệnh nhi ${pName} (ID1: ${patientIdVal}) làm chương trình nhưng chưa được đăng ký hội chẩn. Bạn bị phạt 1 sẹo.`,
+           Title: SCAR_WORKFLOW_NOTIFY_TITLE,
+           Message: scar.message,
            Severity: 'warning',
            RelatedEntityType: 'Patient',
            RelatedEntityKey: patientKey,
@@ -1354,14 +1373,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            ReadTime: ''
          });
        } else if (consultCase === 'B' && latestConsult) {
+         const scarTai = buildEmergProgCaseBTaiScar({ patientName: pName });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_tai`,
            StaffKey: keyTai,
            StaffName: nameTai,
            MarkType: 'missing_staff_result',
            Score: 1,
-           Label: 'Trễ điền kết quả hội chẩn',
-           Reason: `Bệnh nhi ${pName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Phạt BS thư ký Tài.`,
+           Label: scarTai.label,
+           Reason: scarTai.reason,
            RelatedEntityType: 'Consult',
            RelatedEntityKey: latestConsult.ConsultKey,
            PatientKey: patientKey,
@@ -1376,8 +1396,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            NotificationKey: `notif_emerg_prog_${Date.now()}_tai`,
            StaffKey: keyTai,
            StaffName: nameTai,
-           Title: 'Phạt sẹo workflow',
-           Message: `Bệnh nhi ${pName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Bạn bị phạt 1 sẹo.`,
+           Title: SCAR_WORKFLOW_NOTIFY_TITLE,
+           Message: scarTai.message,
            Severity: 'warning',
            RelatedEntityType: 'Consult',
            RelatedEntityKey: latestConsult.ConsultKey,
@@ -1390,14 +1410,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            ReadTime: ''
          });
 
+         const scarHieu = buildEmergProgCaseBHieuScar({ patientName: pName });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
            StaffName: nameHieu,
            MarkType: 'scheduler_missing_transfer',
            Score: 1,
-           Label: 'Treo ca chờ hội chẩn',
-           Reason: `Bệnh nhi ${pName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Phạt BS xếp lịch Hiếu.`,
+           Label: scarHieu.label,
+           Reason: scarHieu.reason,
            RelatedEntityType: 'Consult',
            RelatedEntityKey: latestConsult.ConsultKey,
            PatientKey: patientKey,
@@ -1412,8 +1433,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
            StaffName: nameHieu,
-           Title: 'Phạt sẹo workflow',
-           Message: `Bệnh nhi ${pName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Bạn bị phạt 1 sẹo.`,
+           Title: SCAR_WORKFLOW_NOTIFY_TITLE,
+           Message: scarHieu.message,
            Severity: 'warning',
            RelatedEntityType: 'Consult',
            RelatedEntityKey: latestConsult.ConsultKey,
@@ -1426,14 +1447,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            ReadTime: ''
          });
        } else if (consultCase === 'C' && latestConsult) {
+         const scar = buildEmergProgCaseCScar({ patientName: pName });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
            StaffName: nameHieu,
            MarkType: 'scheduler_missing_transfer',
            Score: 1,
-           Label: 'Chậm chuyển phòng thông tim',
-           Reason: `Bệnh nhi ${pName} đã có chỉ định thông tim nhưng BS xếp lịch Hiếu không chuyển phòng đúng hạn.`,
+           Label: scar.label,
+           Reason: scar.reason,
            RelatedEntityType: 'Consult',
            RelatedEntityKey: latestConsult.ConsultKey,
            PatientKey: patientKey,
@@ -1448,8 +1470,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
            StaffName: nameHieu,
-           Title: 'Phạt sẹo workflow',
-           Message: `Bệnh nhi ${pName} đã có chỉ định thông tim nhưng bạn không chuyển phòng đúng hạn. Bạn bị phạt 1 sẹo.`,
+           Title: SCAR_WORKFLOW_NOTIFY_TITLE,
+           Message: scar.message,
            Severity: 'warning',
            RelatedEntityType: 'Consult',
            RelatedEntityKey: latestConsult.ConsultKey,
