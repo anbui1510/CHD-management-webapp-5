@@ -22,6 +22,7 @@ import type { CathLab, Consult, DoctorPerformanceMark, Operation, Patient, Staff
 import { formatVNTime } from '../types';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 import { DateFieldWithCalendar, DateRangePickerPopover } from './MiniCalendarPopup';
 import {
   ActivityDateFilter,
@@ -369,7 +370,7 @@ export default function StaffProfileView({
       setIsEditingAdmin(false);
       onStaffUpdated?.(updated);
     } catch (error) {
-      triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu hồ sơ', 'Lỗi');
+      triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu hồ sơ', MODAL_TITLE.saveError);
     } finally {
       setSaving(false);
     }
@@ -379,11 +380,11 @@ export default function StaffProfileView({
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      triggerAlert?.('Vui lòng chọn file ảnh (JPG, PNG, WEBP...).', 'Không hợp lệ');
+      triggerAlert?.('Vui lòng chọn file ảnh (JPG, PNG, WEBP...).', MODAL_TITLE.warning);
       return;
     }
     if (file.size > 1024 * 1024) {
-      triggerAlert?.('Ảnh quá lớn. Vui lòng chọn file dưới 1MB.', 'Không hợp lệ');
+      triggerAlert?.('Ảnh quá lớn. Vui lòng chọn file dưới 1MB.', MODAL_TITLE.warning);
       return;
     }
 
@@ -407,7 +408,7 @@ export default function StaffProfileView({
         setAdminDraft(toAdminDraft(updated));
         onStaffUpdated?.(updated);
       } catch (error) {
-        triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu avatar', 'Lỗi');
+        triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu avatar', MODAL_TITLE.saveError);
       } finally {
         setSaving(false);
       }
@@ -760,7 +761,7 @@ export default function StaffProfileView({
                             disabled={webPush.loading}
                             onClick={() => {
                               void webPush.enablePush().then(ok => {
-                                if (ok) triggerAlert?.('Đã bật thông báo điện thoại', 'Thành công');
+                                if (ok) triggerAlert?.('Đã bật thông báo điện thoại', MODAL_TITLE.notify);
                               });
                             }}
                             className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black disabled:opacity-60"
@@ -787,7 +788,7 @@ export default function StaffProfileView({
                                 if (ok) {
                                   triggerAlert?.(
                                     'Đã gửi push thử. Thu nhỏ app hoặc khóa màn hình để kiểm tra banner iOS.',
-                                    'Thành công'
+                                    MODAL_TITLE.notify
                                   );
                                 }
                               });

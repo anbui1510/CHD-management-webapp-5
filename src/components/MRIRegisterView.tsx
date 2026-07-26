@@ -35,6 +35,14 @@ import {
 } from '../data/cmrDefaults';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import {
+  findBlockingPendingCmr,
+  findDuplicatePatientById1,
+  formatFetchErrorMessage,
+  getFormattedDateKey,
+  PATIENT_VALIDATION_MSG,
+} from '../utils/patientFormValidation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface MRIRegisterViewProps {
   patients: Patient[];
@@ -48,6 +56,7 @@ interface MRIRegisterViewProps {
   onAddCmr?: (cmr: CMR) => void;
   onAddPatient?: (patient: Patient) => void;
   onEditPatientAdmin?: (patient: Patient) => void;
+  triggerAlert?: (message: string, title?: string) => void;
 }
 
 type RegisterTab = 'pending' | 'done';
@@ -57,29 +66,6 @@ type MRIRegisterItem = CMR & { __patient?: Patient };
 const ADDRESS_OPTIONS = [
   "TP Hà Nội", "Tuyên Quang", "Cao Bằng", "Lai Châu", "Lào Cai", "Thái Nguyên", "Điện Biên", "Lạng Sơn", "Sơn La", "Phú Thọ", "Bắc Ninh", "Quảng Ninh", "TP Hải Phòng", "Hưng Yên", "Ninh Bình", "Thanh Hoá", "Nghệ An", "Hà Tĩnh", "Quảng Trị", "TP Huế", "TP Đà Nẵng", "Quảng Ngãi", "Gia Lai", "Đắk Lắk", "Khánh Hoà", "Lâm Đồng", "Đồng Nai", "Tây Ninh", "TP Hồ Chí Minh", "Đồng Tháp", "An Giang", "Vĩnh Long", "TP Cần Thơ", "Cà Mau"
 ];
-
-const getFormattedDateKey = (str?: string): string => {
-  if (!str) return '';
-  const trimmed = String(str).trim().split('T')[0];
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-
-  const slashParts = trimmed.split('/');
-  if (slashParts.length === 3) {
-    if (slashParts[2].length === 4) {
-      return `${slashParts[2]}-${slashParts[1].padStart(2, '0')}-${slashParts[0].padStart(2, '0')}`;
-    }
-    if (slashParts[0].length === 4) {
-      return `${slashParts[0]}-${slashParts[1].padStart(2, '0')}-${slashParts[2].padStart(2, '0')}`;
-    }
-  }
-
-  const dashParts = trimmed.split('-');
-  if (dashParts.length === 3 && dashParts[2].length === 4) {
-    return `${dashParts[2]}-${dashParts[1].padStart(2, '0')}-${dashParts[0].padStart(2, '0')}`;
-  }
-
-  return trimmed;
-};
 
 const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] = []): string => {
   if (!fullName) return '';
@@ -118,7 +104,8 @@ export default function MRIRegisterView({
   onPatchCmr,
   onAddCmr,
   onAddPatient,
-  onEditPatientAdmin
+  onEditPatientAdmin,
+  triggerAlert
 }: MRIRegisterViewProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<RegisterTab>('pending');
@@ -272,15 +259,7 @@ export default function MRIRegisterView({
   };
 
   // Block: a patient with an existing CMR record still pending (no scheduled date AND no imaging date)
-  const getBlockingCmr = (patientKey: string): CMR | undefined => {
-    const normalized = normalizePatientKey(patientKey);
-    if (!normalized) return undefined;
-    return cmrs.find(cmr =>
-      normalizePatientKey(cmr.PatientKey) === normalized &&
-      !getFormattedDateKey(cmr.CMRScheduledDate) &&
-      !getFormattedDateKey(cmr.CMRDate)
-    );
-  };
+  const getBlockingCmr = (patientKey: string): CMR | undefined => findBlockingPendingCmr(cmrs, patientKey);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,13 +279,13 @@ export default function MRIRegisterView({
 
       if (patientMode === 'create') {
         if (!newPatID1.trim() || !newPatName.trim()) {
-          setErrorMsg('Vui lòng nhập Mã bệnh nhi (ID1) và Họ tên bệnh nhi!');
+          setErrorMsg(PATIENT_VALIDATION_MSG.missingIdAndName);
           setSubmitLoading(false);
           return;
         }
-        const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === newPatID1.trim().toLowerCase());
+        const dup = findDuplicatePatientById1(patients, newPatID1);
         if (dup) {
-          setErrorMsg(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${dup.PatientName}). Đề nghị chọn bệnh nhi sẵn có hoặc kiểm tra lại thông tin!`);
+          setErrorMsg(PATIENT_VALIDATION_MSG.duplicateIdSuggestSelect(dup.PatientName));
           setSubmitLoading(false);
           return;
         }
@@ -331,13 +310,13 @@ export default function MRIRegisterView({
         finalPatient = patientPayload;
       } else {
         if (!finalPatientKey) {
-          setErrorMsg('Vui lòng tìm và chọn bệnh nhi sẵn có hoặc đổi sang chế độ tạo mới!');
+          setErrorMsg(PATIENT_VALIDATION_MSG.selectExistingOrCreate);
           setSubmitLoading(false);
           return;
         }
         const blocking = getBlockingCmr(finalPatientKey);
         if (blocking) {
-          setErrorMsg('Bệnh nhi này đã có lượt đăng ký MRI đang chờ (chưa xếp lịch và chưa chụp). Không thể đăng ký thêm cho đến khi hoàn tất lượt hiện tại!');
+          setErrorMsg(PATIENT_VALIDATION_MSG.pendingMriBlock);
           setSubmitLoading(false);
           return;
         }
@@ -501,7 +480,10 @@ export default function MRIRegisterView({
       .catch((err: any) => {
         console.error(err);
         const msg = err?.message || '';
-        alert(msg.includes('Failed to fetch') ? 'Không kết nối được server. Vui lòng kiểm tra kết nối và thử lại.' : (msg || 'Có lỗi khi cập nhật đăng ký MRI.'));
+        triggerAlert?.(
+          formatFetchErrorMessage(msg, 'Có lỗi khi cập nhật đăng ký MRI.'),
+          MODAL_TITLE.saveError
+        );
         onRefreshData();
       });
   };
@@ -819,7 +801,7 @@ export default function MRIRegisterView({
                         <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-3 text-[10px] flex gap-2">
                           <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
                           <div>
-                            <p className="font-bold">Bệnh nhi đã có lượt đăng ký MRI đang chờ (chưa xếp lịch và chưa chụp).</p>
+                            <p className="font-bold">{PATIENT_VALIDATION_MSG.pendingMriUiHint}</p>
                             <p>Không thể đăng ký thêm cho đến khi hoàn tất lượt hiện tại.</p>
                           </div>
                         </div>

@@ -25,6 +25,14 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
+import {
+  WORKFLOW_INFO_NOTIFY_TITLE,
+  SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER,
+  buildOverrideSchedulingConsultNote,
+  buildOverrideSchedulingScar,
+  buildSchedulingSummaryHeader,
+} from '../utils/workflowMessages';
 import { 
   ClipboardList, 
   Search, 
@@ -1264,8 +1272,8 @@ Xin cảm ơn!`;
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       window.setTimeout(() => {
-        setErrorMsg('Tải file thành công!');
-        setTimeout(() => setErrorMsg(''), 3000);
+        setSuccessMsg('Tải file thành công!');
+        setTimeout(() => setSuccessMsg(''), 3000);
       }, 0);
     } catch (err: any) {
       console.error("Lỗi xuất excel: ", err);
@@ -1342,8 +1350,8 @@ Xin cảm ơn!`;
           const failed = results.filter(r => r.status === 'rejected').length;
           if (failed > 0) onRefreshData();
         });
-        setErrorMsg(`Đã cập nhật dụng cụ xong ${updates.length} ca!`);
-        setTimeout(() => setErrorMsg(''), 4000);
+        setSuccessMsg(`Đã cập nhật dụng cụ xong ${updates.length} ca!`);
+        setTimeout(() => setSuccessMsg(''), 4000);
       } else {
         setErrorMsg("Không tìm thấy ca nào cần cập nhật/hoặc dòng dữ liệu rỗng từ file.");
       }
@@ -1617,8 +1625,8 @@ Xin cảm ơn!`;
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       window.setTimeout(() => {
-        setErrorMsg('Tải file thành công!');
-        setTimeout(() => setErrorMsg(''), 3000);
+        setSuccessMsg('Tải file thành công!');
+        setTimeout(() => setSuccessMsg(''), 3000);
       }, 0);
     } catch (err: any) {
       console.error("Lỗi xuất excel: ", err);
@@ -1790,7 +1798,10 @@ Xin cảm ơn!`;
   };
 
   const activatePendingConsultForScheduling = (pendingConsult: Consult) => {
-    const overrideNote = `[Kích hoạt xếp lịch bổ sung - ${currentStaff?.StaffName || currentStaff?.StaffKey || 'user'} ${new Date().toISOString()}]`;
+    const overrideNote = buildOverrideSchedulingConsultNote(
+      currentStaff?.StaffName || currentStaff?.StaffKey || 'user',
+      new Date().toISOString()
+    );
     const payload = {
       ConsultResultID: 'Can thiệp thông tim',
       DetailConsultResult: String(pendingConsult.DetailConsultResult || '').trim() || 'Can thiệp thông tim',
@@ -1836,14 +1847,16 @@ Xin cảm ơn!`;
         const patName = pat?.PatientName || 'Bệnh nhi';
         const patId = pat?.PatientID1 || '';
 
+        const scar = buildOverrideSchedulingScar({ patientName: patName, patientId: patId });
+
         const markPayload = {
           MarkKey: `mark_override_sched_${Date.now()}_tai`,
           StaffKey: keyTai,
           StaffName: nameTai,
           MarkType: 'missing_staff_result' as const,
           Score: 1,
-          Label: 'Trễ điền kết quả hội chẩn',
-          Reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do BS thư ký Tài chưa điền kết quả hội chẩn đúng hạn.`,
+          Label: scar.label,
+          Reason: scar.reason,
           RelatedEntityType: 'Consult' as const,
           RelatedEntityKey: pendingConsult.ConsultKey,
           PatientKey: pendingConsult.PatientKey,
@@ -1869,15 +1882,15 @@ Xin cảm ơn!`;
             body: JSON.stringify(markPayload)
           },
           schedSyncContext,
-          { baseMessage: 'Đã ghi sẹo phạt BS Tài' }
+          { baseMessage: 'Đã ghi cảnh báo workflow' }
         );
 
         const notifPayload = {
           NotificationKey: `notif_override_sched_${Date.now()}_tai`,
           StaffKey: keyTai,
           StaffName: nameTai,
-          Title: 'Phạt sẹo workflow',
-          Message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${patName} (ID1: ${patId}) do bạn chưa điền kết quả hội chẩn đúng hạn. Bạn bị phạt 1 sẹo.`,
+          Title: WORKFLOW_INFO_NOTIFY_TITLE,
+          Message: scar.message,
           Severity: 'warning' as const,
           RelatedEntityType: 'Consult' as const,
           RelatedEntityKey: pendingConsult.ConsultKey,
@@ -1899,10 +1912,10 @@ Xin cảm ơn!`;
             body: JSON.stringify(notifPayload)
           },
           schedSyncContext,
-          { baseMessage: 'Đã ghi thông báo phạt BS Tài' }
+          { baseMessage: 'Đã gửi thông báo cảnh báo' }
         );
       } catch (markErr) {
-        console.error('Lỗi khi lưu sẹo phạt BS Tài:', markErr);
+        console.error('Lỗi khi lưu cảnh báo workflow:', markErr);
       }
     })();
   };
@@ -2142,13 +2155,10 @@ Xin cảm ơn!`;
     setAdHocValidationMsg('');
 
     if (adHocPatientMode === 'new') {
-      const cleanID1 = adHocPatientID1.trim().toLowerCase();
-      const duplicatePatient = patients.find(p => 
-        String(p.PatientID1 || '').trim().toLowerCase() === cleanID1
-      );
+      const duplicatePatient = findDuplicatePatientById1(patients, adHocPatientID1);
       if (duplicatePatient) {
         setAdHocErrors(['PatientID1']);
-        setAdHocValidationMsg(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${duplicatePatient.PatientName}). Đề nghị chọn bệnh nhi sẵn có hoặc kiểm tra lại thông tin!`);
+        setAdHocValidationMsg(PATIENT_VALIDATION_MSG.duplicateIdSuggestSelect(duplicatePatient.PatientName));
         return;
       }
     }
@@ -5037,7 +5047,7 @@ Xin cảm ơn!`;
               const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);
               const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : 'Chưa gán';
 
-              return `📋 *THÔNG TIN TÓM TẮT XẾP LỊCH: ${formatPatientWithPtvPhu(pObj.PatientName.toUpperCase(), ptvPhu1Display).toUpperCase()}* 📋\n` +
+              return `${buildSchedulingSummaryHeader(formatPatientWithPtvPhu(pObj.PatientName.toUpperCase(), ptvPhu1Display).toUpperCase())}\n` +
                 `-----------------------------------\n` +
                 `👤 *HÀNH CHÍNH BỆNH NHÂN:*\n` +
                 `- Họ và tên bệnh nhân: ${pObj.PatientName.toUpperCase()} (${pObj.PatientSex}, ${ageDesc})\n` +
@@ -5058,7 +5068,7 @@ Xin cảm ơn!`;
                 `- Số tiền dự kiến: ${plannedPrice ? `${plannedPrice} VNĐ` : '—'}\n` +
                 `- Ghi chú từ Phòng Vật tư: ${supplyDepFeedback || 'Không'}\n` +
                 `- Ghi chú từ Phòng Mổ: ${operationFeedback || 'Không'}\n\n` +
-                `📅 *THÔNG TIN CẬP NHẬT XẾP LỊCH:*\n` +
+                `${SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER}\n` +
                 `- Lịch thông tim chính thức: ${plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}\n` +
                 `- Trạng thái gọi bệnh nhân: ${callStatus || 'Chưa liên hệ'}\n` +
                 `- Mức độ ưu tiên gọi bệnh: ${priorityOrder}\n` +

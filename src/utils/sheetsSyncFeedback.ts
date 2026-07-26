@@ -47,7 +47,10 @@ export function appendSheetsSyncToSaveMessage(
 ): { message: string; isWarning: boolean } {
   const evaluation = evaluateSheetsSync(data);
   if (evaluation.kind === 'success') {
-    return { message: SHEETS_SUCCESS_MESSAGE, isWarning: false };
+    return {
+      message: base ? `${base} — ${SHEETS_SUCCESS_MESSAGE}` : SHEETS_SUCCESS_MESSAGE,
+      isWarning: false
+    };
   }
   if (evaluation.kind === 'failure') {
     return { message: `${base} — ${evaluation.message}`, isWarning: true };

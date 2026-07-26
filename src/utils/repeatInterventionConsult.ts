@@ -1,11 +1,16 @@
 import { Consult, Patient, Staff, normalizePatientKey } from '../types';
 import { resolveStaffByNameOrKey } from './staffNameMatch';
 import { buildSyncContext, persistWithSheetsSync, withSyncContext } from './sheetsSyncMutation';
+import {
+  REPEAT_INTERVENTION_DEFAULT_DETAIL_CONSULT_RESULT,
+  REPEAT_INTERVENTION_NOTIFY_TITLE,
+  REPEAT_INTERVENTION_WARNING,
+  buildRepeatInterventionNotificationMessage,
+} from './workflowMessages';
 
 export const REPEAT_INTERVENTION_PLAN = 'Cần thông tim can thiệp lại';
 
-export const REPEAT_INTERVENTION_WARNING =
-  'Bệnh nhân này sẽ tự động chuyển vào view "Xếp lịch & Dụng cụ". Hãy thông báo cho người phụ trách nhận thông tin';
+export { REPEAT_INTERVENTION_WARNING };
 
 const DEFAULT_SCHEDULER_STAFF_KEY = '01541';
 const FALLBACK_SCHEDULER_STAFF_KEY = '77777';
@@ -70,7 +75,7 @@ export function buildRepeatInterventionConsult(input: {
     ConsultCreateBy: input.loggedInStaffId,
     ConsultCreateTime: createdTime,
     ConsultResultID: 'Can thiệp thông tim',
-    DetailConsultResult: String(input.cathNote || '').trim() || 'Chỉ định can thiệp thông tim lại sau lần TT vừa rồi',
+    DetailConsultResult: String(input.cathNote || '').trim() || REPEAT_INTERVENTION_DEFAULT_DETAIL_CONSULT_RESULT,
     ConsultNote: '',
     PlannedDevice: '',
     PlannedPrice: '',
@@ -151,8 +156,11 @@ export async function createRepeatInterventionWorkflow(input: {
       NotificationKey: `notif_repeat_tt_${Date.now()}`,
       StaffKey: scheduler.StaffKey,
       StaffName: scheduler.StaffName || scheduler.Name || '',
-      Title: 'Chỉ định can thiệp lại',
-      Message: `Bệnh nhân ${patientName} chẩn đoán ${input.postDiagnosisID} có chỉ định can thiệp lại đã được lưu trong "Xếp lịch & Dụng cụ". Mời BS xem lại`,
+      Title: REPEAT_INTERVENTION_NOTIFY_TITLE,
+      Message: buildRepeatInterventionNotificationMessage({
+        patientName,
+        postDiagnosisID: input.postDiagnosisID,
+      }),
       Severity: 'info',
       RelatedEntityType: 'Consult',
       RelatedEntityKey: newConsult.ConsultKey,

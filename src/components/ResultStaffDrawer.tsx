@@ -24,6 +24,7 @@ import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -203,15 +204,15 @@ export default function ResultStaffDrawer({
     if (!consultKey || !formData || !consult) return false;
 
     if (!formData.DiagnosisID) {
-      triggerAlert('Vui lòng chọn ICD (DiagnosisID)!', 'Thiếu thông tin');
+      triggerAlert('Vui lòng chọn ICD (DiagnosisID)!', MODAL_TITLE.missingInfo);
       return false;
     }
     if (!formData.ConsultResultID) {
-      triggerAlert('Vui lòng chọn Kết luận chính (ConsultResultID)!', 'Thiếu thông tin');
+      triggerAlert('Vui lòng chọn Kết luận chính (ConsultResultID)!', MODAL_TITLE.missingInfo);
       return false;
     }
     if (!formData.ConsultMember || !formData.ConsultMember.trim()) {
-      triggerAlert('Vui lòng nhập Thành viên duyệt hội chẩn!', 'Thiếu thông tin');
+      triggerAlert('Vui lòng nhập Thành viên duyệt hội chẩn!', MODAL_TITLE.missingInfo);
       return false;
     }
 
@@ -274,7 +275,7 @@ export default function ResultStaffDrawer({
     } catch (err) {
       console.error(err);
       const message = err instanceof Error ? err.message : 'Không thể lưu kết quả hội chẩn';
-      triggerAlert(message, 'Lỗi lưu');
+      triggerAlert(message, MODAL_TITLE.saveError);
       setExitConfirmError(message);
       onRefreshData();
       return false;

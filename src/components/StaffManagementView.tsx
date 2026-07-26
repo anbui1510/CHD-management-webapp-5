@@ -36,6 +36,7 @@ import {
 } from '../auth/permissions';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 interface StaffManagementViewProps {
   staffList: Staff[];
@@ -224,7 +225,7 @@ export default function StaffManagementView({
     if (!copyFromKey || !draft.StaffKey) return;
     const source = staffList.find(staff => staff.StaffKey === copyFromKey);
     if (!source) {
-      triggerAlert?.('Không tìm thấy nhân viên nguồn.', 'Lỗi');
+      triggerAlert?.('Không tìm thấy nhân viên nguồn.', MODAL_TITLE.notify);
       return;
     }
     const modules = isAdminStaff(source) ? new Set(ALL_APP_MODULES) : getStaffPermissions(source);
@@ -234,7 +235,7 @@ export default function StaffManagementView({
       Permissions: serializePermissions(modules),
       moduleSet: modules,
     }));
-    triggerAlert?.(`Đã sao chép quyền từ ${source.StaffName}. Bấm Lưu để áp dụng.`, 'Sao chép quyền');
+    triggerAlert?.(`Đã sao chép quyền từ ${source.StaffName}. Bấm Lưu để áp dụng.`, MODAL_TITLE.notify);
   };
 
   const toggleModule = (module: AppModule) => {
@@ -259,7 +260,7 @@ export default function StaffManagementView({
   const handleSave = async () => {
     if (!selectedStaff || !draft.StaffKey) return;
     if (!draft.StaffName?.trim()) {
-      triggerAlert?.('Vui lòng nhập Họ tên hiển thị (StaffName)!', 'Thiếu thông tin');
+      triggerAlert?.('Vui lòng nhập Họ tên hiển thị (StaffName)!', MODAL_TITLE.missingInfo);
       return;
     }
 
@@ -296,7 +297,7 @@ export default function StaffManagementView({
       .then(() => onRefreshData())
       .catch(error => {
         console.error(error);
-        triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu nhân sự', 'Lỗi');
+        triggerAlert?.(error instanceof Error ? error.message : 'Lỗi khi lưu nhân sự', MODAL_TITLE.saveError);
         onRefreshData();
       })
       .finally(() => setSaving(false));

@@ -27,6 +27,12 @@ import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/pati
 import { VNDateInput } from './VNDateInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import {
+  findBlockingPendingCmr,
+  findDuplicatePatientById1,
+  getFormattedDateKey,
+  PATIENT_VALIDATION_MSG,
+} from '../utils/patientFormValidation';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
@@ -76,29 +82,6 @@ type MRISchedulerItem = CMR & {
 const CALL_STATUS_OPTIONS = ['', 'Đồng ý', 'Không đồng ý'];
 
 const ANESTHESIA_OPTIONS = ['', 'Khám gây mê trước', 'Không'];
-
-const getFormattedDateKey = (str?: string): string => {
-  if (!str) return '';
-  const trimmed = String(str).trim().split('T')[0];
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-
-  const slashParts = trimmed.split('/');
-  if (slashParts.length === 3) {
-    if (slashParts[2].length === 4) {
-      return `${slashParts[2]}-${slashParts[1].padStart(2, '0')}-${slashParts[0].padStart(2, '0')}`;
-    }
-    if (slashParts[0].length === 4) {
-      return `${slashParts[0]}-${slashParts[1].padStart(2, '0')}-${slashParts[2].padStart(2, '0')}`;
-    }
-  }
-
-  const dashParts = trimmed.split('-');
-  if (dashParts.length === 3 && dashParts[2].length === 4) {
-    return `${dashParts[2]}-${dashParts[1].padStart(2, '0')}-${dashParts[0].padStart(2, '0')}`;
-  }
-
-  return trimmed;
-};
 
 const getPatientDisplayName = (patientName?: string): string => {
   if (!patientName) return 'MRI';
@@ -756,15 +739,8 @@ export default function MRISchedulerView({
     setAdHocError('');
   };
 
-  const getAdHocBlockingCmr = (patientKey: string): CMR | undefined => {
-    const normalized = normalizePatientKey(patientKey);
-    if (!normalized) return undefined;
-    return cmrs.find(cmr =>
-      normalizePatientKey(cmr.PatientKey) === normalized &&
-      !getFormattedDateKey(cmr.CMRScheduledDate) &&
-      !getFormattedDateKey(cmr.CMRDate)
-    );
-  };
+  const getAdHocBlockingCmr = (patientKey: string): CMR | undefined =>
+    findBlockingPendingCmr(cmrs, patientKey);
 
   const adHocBlockingCmr = adHocSelectedPatKey ? getAdHocBlockingCmr(adHocSelectedPatKey) : undefined;
 
@@ -786,13 +762,13 @@ export default function MRISchedulerView({
 
       if (adHocPatientMode === 'create') {
         if (!adHocNewPatID1.trim() || !adHocNewPatName.trim()) {
-          setAdHocError('Vui lòng nhập Mã bệnh nhi (ID1) và Họ tên bệnh nhi!');
+          setAdHocError(PATIENT_VALIDATION_MSG.missingIdAndName);
           setAdHocLoading(false);
           return;
         }
-        const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === adHocNewPatID1.trim().toLowerCase());
+        const dup = findDuplicatePatientById1(patients, adHocNewPatID1);
         if (dup) {
-          setAdHocError(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${dup.PatientName}).`);
+          setAdHocError(PATIENT_VALIDATION_MSG.duplicateIdShort(dup.PatientName));
           setAdHocLoading(false);
           return;
         }
@@ -816,12 +792,12 @@ export default function MRISchedulerView({
         finalPatient = patientPayload;
       } else {
         if (!finalPatientKey) {
-          setAdHocError('Vui lòng tìm và chọn bệnh nhi sẵn có hoặc đổi sang chế độ tạo mới!');
+          setAdHocError(PATIENT_VALIDATION_MSG.selectExistingOrCreate);
           setAdHocLoading(false);
           return;
         }
         if (getAdHocBlockingCmr(finalPatientKey)) {
-          setAdHocError('Bệnh nhi này đã có lượt đăng ký MRI đang chờ (chưa xếp lịch và chưa chụp).');
+          setAdHocError(PATIENT_VALIDATION_MSG.pendingMriBlockShort);
           setAdHocLoading(false);
           return;
         }
@@ -1597,7 +1573,7 @@ export default function MRISchedulerView({
                         <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-3 text-[10px] flex gap-2">
                           <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
                           <div>
-                            <p className="font-bold">Bệnh nhi đã có lượt đăng ký MRI đang chờ (chưa xếp lịch và chưa chụp).</p>
+                            <p className="font-bold">{PATIENT_VALIDATION_MSG.pendingMriUiHint}</p>
                             <p>Không thể xếp bổ sung cho đến khi hoàn tất lượt hiện tại.</p>
                           </div>
                         </div>

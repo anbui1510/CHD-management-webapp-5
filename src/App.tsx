@@ -107,6 +107,8 @@ import {
 } from './utils/mobileQuickTabs';
 import { PatientAdminEditButton } from './components/PatientAdminEditButton';
 import { SortColumnIcon } from './components/SortColumnIcon';
+import { MODAL_TITLE } from './utils/modalTitles';
+import { PATIENT_VALIDATION_MSG } from './utils/patientFormValidation';
 
 import { 
   Users, 
@@ -575,8 +577,8 @@ export default function App() {
   const confirmPendingRef = useRef(false);
   const sheetsSyncReportRef = useRef<(data: unknown, options?: { baseMessage?: string }) => void>(() => {});
 
-  const triggerAlert = (message: string, title = 'Thông báo') => {
-    setCustomAlert({ message, title });
+  const triggerAlert = (message: string, title?: string) => {
+    setCustomAlert({ message, title: title || MODAL_TITLE.notify });
   };
 
   const showSuccessBanner = (message: string, durationMs = 4000) => {
@@ -599,8 +601,8 @@ export default function App() {
     sheetsSyncReportRef.current(responseData, { baseMessage });
   };
 
-  const triggerConfirm = (message: string, onConfirm: () => void, title = 'Xác nhận', onCancel?: () => void) => {
-    setCustomConfirm({ message, title, onConfirm, onCancel });
+  const triggerConfirm = (message: string, onConfirm: () => void, title?: string, onCancel?: () => void) => {
+    setCustomConfirm({ message, title: title || MODAL_TITLE.confirm, onConfirm, onCancel });
   };
 
   const fetchCathlabs = () => {
@@ -1131,7 +1133,7 @@ export default function App() {
           const elapsed = Date.now() - lastActivity;
           if (elapsed >= timeoutMs) {
             handleLogout();
-            alert('Phiên đăng nhập của bạn đã hết hạn do không hoạt động.');
+            triggerAlert('Phiên đăng nhập của bạn đã hết hạn do không hoạt động.', MODAL_TITLE.notify);
           }
         }
       }
@@ -1144,7 +1146,7 @@ export default function App() {
       });
       clearInterval(interval);
     };
-  }, [currentStaff, handleLogout]);
+  }, [currentStaff, handleLogout, triggerAlert]);
 
   const navigateMenu = (menuTarget: typeof activeMenu | string) => {
     const isMarks = menuTarget === 'staff-mgmt:marks';
@@ -1170,7 +1172,7 @@ export default function App() {
         return;
       }
       if (!canAccessModule(currentStaff, menu as AppModule)) {
-        triggerAlert('Bạn không có quyền truy cập module này.', 'Từ chối truy cập');
+        triggerAlert('Bạn không có quyền truy cập module này.', MODAL_TITLE.warning);
         setActiveMenu('workspace');
         return;
       }
@@ -1241,7 +1243,7 @@ export default function App() {
   const handleAddPatientSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPatientData.PatientID1 || !newPatientData.PatientName) {
-      triggerAlert('Vui lòng điền tối thiểu Mã bệnh nhân và Họ tên!');
+      triggerAlert('Vui lòng điền tối thiểu Mã bệnh nhân và Họ tên!', MODAL_TITLE.missingInfo);
       return;
     }
 
@@ -1258,7 +1260,7 @@ export default function App() {
     );
 
     if (duplicateIdPatient) {
-      triggerAlert(`Mã bệnh nhân này đã tồn tại trong hệ thống (Họ tên: ${duplicateIdPatient.PatientName}). Đề nghị cập nhật lại thông tin!`);
+      triggerAlert(PATIENT_VALIDATION_MSG.duplicateIdSuggestUpdate(duplicateIdPatient.PatientName), MODAL_TITLE.warning);
       return;
     }
 
@@ -1335,7 +1337,7 @@ export default function App() {
         })
         .catch(err => {
           console.error(err);
-          triggerAlert(err instanceof Error ? err.message : 'Không thể lưu hồ sơ bệnh nhi', 'Lỗi lưu');
+          triggerAlert(err instanceof Error ? err.message : 'Không thể lưu hồ sơ bệnh nhi', MODAL_TITLE.saveError);
           refreshConsultData();
         });
     };
@@ -1349,10 +1351,10 @@ export default function App() {
               ? "Bạn có chắc chắn muốn LƯU những thay đổi hành chính này không?" 
               : "Bạn có chắc chắn muốn TẠO MỚI hồ sơ bệnh nhi này không?",
             proceedSave,
-            "Xác nhận lưu hồ sơ"
+            MODAL_TITLE.confirm
           );
         },
-        "Cảnh báo trùng thông tin"
+        MODAL_TITLE.warning
       );
     } else {
       triggerConfirm(
@@ -1360,7 +1362,7 @@ export default function App() {
           ? "Bạn có chắc chắn muốn LƯU những thay đổi hành chính này không?" 
           : "Bạn có chắc chắn muốn TẠO MỚI hồ sơ bệnh nhi này không?",
         proceedSave,
-        "Xác nhận lưu"
+        MODAL_TITLE.confirm
       );
     }
   };
@@ -1388,7 +1390,7 @@ export default function App() {
   const handleAddConsultSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newConsultData.PatientKey) {
-      triggerAlert('Vui lòng chọn 1 bệnh nhân để đăng ký hội chẩn!');
+      triggerAlert('Vui lòng chọn 1 bệnh nhân để đăng ký hội chẩn!', MODAL_TITLE.missingInfo);
       return;
     }
 
@@ -1455,12 +1457,12 @@ export default function App() {
         })
         .catch(err => {
           console.error(err);
-          triggerAlert(err instanceof Error ? err.message : 'Không thể đăng ký hội chẩn', 'Lỗi lưu');
+          triggerAlert(err instanceof Error ? err.message : 'Không thể đăng ký hội chẩn', MODAL_TITLE.saveError);
           refreshConsultData();
         });
     };
 
-    triggerConfirm("Bạn có chắc chắn muốn Lưu đăng ký này không?", proceedSave, "Xác nhận đăng ký");
+    triggerConfirm("Bạn có chắc chắn muốn Lưu đăng ký này không?", proceedSave, MODAL_TITLE.confirm);
   };
 
   // Prepare registration edit
@@ -1511,7 +1513,7 @@ export default function App() {
       })
       .catch(err => {
         console.error(err);
-        triggerAlert(err instanceof Error ? err.message : 'Không thể cập nhật đăng ký staff', 'Lỗi lưu');
+        triggerAlert(err instanceof Error ? err.message : 'Không thể cập nhật đăng ký staff', MODAL_TITLE.saveError);
         refreshConsultData();
       });
   };
@@ -1558,7 +1560,7 @@ export default function App() {
       setTimeout(async () => {
         const filtered = getFilteredConsults();
         if (filtered.length === 0) {
-          triggerAlert('Không tìm thấy bản ghi nào khớp bộ lọc để xuất!', 'Cảnh báo');
+          triggerAlert('Không tìm thấy bản ghi nào khớp bộ lọc để xuất!', MODAL_TITLE.warning);
           setExportLoading(false);
           setBotMessage('');
           return;
@@ -1757,7 +1759,7 @@ export default function App() {
 
         } catch (error) {
           console.error("Export error:", error);
-          triggerAlert('Có lỗi xảy ra khi tạo file Excel! Vui lòng kiểm tra lại.', 'Lỗi xuất Excel');
+          triggerAlert('Có lỗi xảy ra khi tạo file Excel! Vui lòng kiểm tra lại.', MODAL_TITLE.notify);
           setExportLoading(false);
           setBotMessage('');
         }
@@ -1777,10 +1779,10 @@ export default function App() {
           .then(() => {
             refreshConsultData();
             refreshFullData();
-            triggerAlert('Khôi phục cơ sở dữ liệu về mặc định thành công!', 'Thành công');
+            triggerAlert('Khôi phục cơ sở dữ liệu về mặc định thành công!', MODAL_TITLE.notify);
           });
       },
-      "Xác nhận phục hồi DB"
+      MODAL_TITLE.confirm
     );
   };
 
@@ -2382,6 +2384,7 @@ export default function App() {
               consults={consults}
               cathlabs={cathlabs}
               canAccessModule={(module) => canAccessModule(currentStaff, module)}
+              triggerAlert={triggerAlert}
             />
           )}
 
@@ -2678,7 +2681,7 @@ export default function App() {
                       onClick={() => {
                         triggerConfirm("Bạn có chắc chắn muốn Hủy đăng ký không?", () => {
                           setShowAddConsult(false);
-                        }, "Xác nh��n Hủy");
+                        }, MODAL_TITLE.confirm);
                       }}
                       className="text-slate-400 hover:text-slate-600 transition cursor-pointer"
                     >
@@ -2964,7 +2967,7 @@ export default function App() {
                       onClick={() => {
                         triggerConfirm("Bạn có chắc chắn muốn Hủy đăng ký không?", () => {
                           setShowAddConsult(false);
-                        }, "Xác nhận Hủy");
+                        }, MODAL_TITLE.confirm);
                       }}
                       className="flex-1 bg-white hover:bg-slate-100 text-slate-700 font-extrabold uppercase py-2 rounded-xl transition border border-slate-200 shadow-sm cursor-pointer text-xs"
                     >
@@ -3478,6 +3481,7 @@ export default function App() {
               sources={sources}
               staffList={staffList}
               onRefreshData={refreshClinicalData}
+              triggerAlert={triggerAlert}
               triggerConfirm={triggerConfirm}
               onPatchConsult={patchConsult}
               onPatchCathlab={patchCathlab}
@@ -3498,6 +3502,7 @@ export default function App() {
               cathlabs={cathlabs}
               sources={sources}
               staffList={staffList}
+              triggerAlert={triggerAlert}
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');
                 setSelectedPatientForDetail(pat);
@@ -3635,6 +3640,7 @@ export default function App() {
               onAddCmr={addCmr}
               onAddPatient={addPatient}
               onEditPatientAdmin={handleEditPatientAdmin}
+              triggerAlert={triggerAlert}
             />
           )}
 
@@ -3649,6 +3655,7 @@ export default function App() {
               onRefreshData={refreshMriData}
               onPatchCmr={patchCmr}
               onEditPatientAdmin={handleEditPatientAdmin}
+              triggerAlert={triggerAlert}
             />
           )}
 
@@ -3760,6 +3767,8 @@ export default function App() {
               sources={sources}
               deviceTemplates={deviceTemplates}
               onRefreshData={refreshFullData}
+              triggerAlert={triggerAlert}
+              triggerConfirm={triggerConfirm}
             />
           )}
 
@@ -4131,7 +4140,7 @@ export default function App() {
                     triggerConfirm("Bạn có chắc chắn muốn Hủy thao tác này không?", () => {
                       setShowAddPatient(false);
                       setEditingPatientKey(null);
-                    }, "Xác nhận Hủy");
+                    }, MODAL_TITLE.confirm);
                   }}
                   className="text-slate-400 hover:text-slate-600 transition cursor-pointer"
                 >
@@ -4287,7 +4296,7 @@ export default function App() {
                       triggerConfirm("Bạn có chắc chắn muốn Hủy thao tác này không?", () => {
                         setShowAddPatient(false);
                         setEditingPatientKey(null);
-                      }, "Xác nhận Hủy");
+                      }, MODAL_TITLE.confirm);
                     }}
                     className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold uppercase py-3 rounded-2xl transition border border-slate-200 shadow-sm cursor-pointer"
                   >
@@ -4343,7 +4352,7 @@ export default function App() {
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-                {customAlert.title || 'Thông báo'}
+                {customAlert.title || MODAL_TITLE.notify}
               </h3>
               <p className="text-xs text-slate-505 font-semibold leading-relaxed">
                 {customAlert.message}
@@ -4376,7 +4385,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight">
-                    {customConfirm.title || 'Xác nhận yêu cầu'}
+                    {customConfirm.title || MODAL_TITLE.confirm}
                   </h3>
                   <p className="text-[10px] text-slate-400 mt-0.5 font-bold uppercase font-mono">Hệ thống quản lý CHD</p>
                 </div>

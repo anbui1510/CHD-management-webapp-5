@@ -45,7 +45,9 @@ export function buildMutationFeedback(
   if (evaluation.kind === 'success') {
     return {
       kind: 'success',
-      bannerMessage: SHEETS_SUCCESS_MESSAGE,
+      bannerMessage: baseMessage
+        ? `${baseMessage} — ${SHEETS_SUCCESS_MESSAGE}`
+        : SHEETS_SUCCESS_MESSAGE,
       overlayMessage: '',
       isFailure: false
     };

@@ -34,6 +34,7 @@ import {
 } from './transplant/transplantUtils';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { MODAL_TITLE } from '../utils/modalTitles';
 
 const ADDRESS_OPTIONS = [
   'TP Hồ Chí Minh', 'TP Hà Nội', 'Gia Lai', 'Đắk Lắk', 'Khánh Hoà', 'An Giang',
@@ -70,23 +71,25 @@ function FileField({
   label,
   value,
   onChange,
+  onAlert,
 }: {
   label: string;
   value?: string;
   onChange: (val: string) => void;
+  onAlert?: (msg: string, title?: string) => void;
 }) {
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > MAX_TRANSPLANT_FILE_BYTES) {
-      alert('File quá lớn. Vui lòng chọn file dưới 1MB.');
+      onAlert?.('File quá lớn. Vui lòng chọn file dưới 1MB.', MODAL_TITLE.warning);
       e.target.value = '';
       return;
     }
     try {
       onChange(await readFileAsDataUrl(file));
     } catch {
-      alert('Không đọc được file.');
+      onAlert?.('Không đọc được file.', MODAL_TITLE.saveError);
     }
     e.target.value = '';
   };
@@ -229,7 +232,7 @@ export default function TransplantRegisterModal({
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Lưu thất bại.';
       setErrorMsg(msg);
-      triggerAlert?.(msg, 'Lỗi');
+      triggerAlert?.(msg, MODAL_TITLE.saveError);
     } finally {
       setSaving(false);
     }
@@ -319,10 +322,10 @@ export default function TransplantRegisterModal({
               <div><label className="text-[9px] font-bold uppercase text-slate-500">Ngày ghép tim</label><VNDateInput value={form.TransDate || ''} onChange={v => setForm(f => ({ ...f, TransDate: v }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3 bg-white border rounded-2xl p-3">
-              {form.Gens === 'Có' && <FileField label="File XN gen" value={form.GensFile} onChange={v => setForm(f => ({ ...f, GensFile: v }))} />}
-              {form.MRI === 'Có' && <FileField label="File MRI" value={form.MRIFile} onChange={v => setForm(f => ({ ...f, MRIFile: v }))} />}
-              {form.Holter === 'Có' && <FileField label="File Holter" value={form.HolterFile} onChange={v => setForm(f => ({ ...f, HolterFile: v }))} />}
-              <FileField label="File TTE" value={form.TTEFile} onChange={v => setForm(f => ({ ...f, TTEFile: v }))} />
+              {form.Gens === 'Có' && <FileField label="File XN gen" value={form.GensFile} onChange={v => setForm(f => ({ ...f, GensFile: v }))} onAlert={triggerAlert} />}
+              {form.MRI === 'Có' && <FileField label="File MRI" value={form.MRIFile} onChange={v => setForm(f => ({ ...f, MRIFile: v }))} onAlert={triggerAlert} />}
+              {form.Holter === 'Có' && <FileField label="File Holter" value={form.HolterFile} onChange={v => setForm(f => ({ ...f, HolterFile: v }))} onAlert={triggerAlert} />}
+              <FileField label="File TTE" value={form.TTEFile} onChange={v => setForm(f => ({ ...f, TTEFile: v }))} onAlert={triggerAlert} />
             </div>
           </div>
           <div className="px-4 py-3 border-t flex gap-2">
