@@ -38,6 +38,19 @@ export const EMERG_PROG_LABEL_SLOW_TRANSFER = 'Chậm chuyển phòng thông tim
 
 export const SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER = '📅 *THÔNG TIN CẬP NHẬT XẾP LỊCH:*';
 
+export const SCHEDULE_DELAY_REMINDER_NOTIFY_TITLE = 'Cảnh báo trễ xếp lịch';
+
+export function buildScheduleDelayReminderMessage(input: {
+  patientName: string;
+  patientId: string;
+  delayLabel: string;
+  missedDays: number;
+}): string {
+  const name = input.patientName || 'không rõ tên';
+  const id = input.patientId || 'không rõ mã';
+  return `Bệnh nhi ${name} (ID1: ${id}) ${input.delayLabel.toLowerCase()} (${input.missedDays} ngày) chưa xếp lịch thông tim dự kiến. Mời bạn xem lại và xếp lịch.`;
+}
+
 export function getHisStageLabel(stage: HisWorkflowStage): string {
   return HIS_STAGE_LABELS[stage];
 }

@@ -14,6 +14,15 @@ import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
 import { resolveStaffByNameOrKey } from './src/utils/staffNameMatch';
+import {
+  buildScheduleDelayReminderDedupKey,
+  buildScheduleDelayReminderMessage,
+  buildCathlabsByPatientKey,
+  getMissScheduleDays,
+  getScheduleDelayNotificationLevelsForConsult,
+  isConsultEligibleForScheduleDelayReminder,
+  SCHEDULE_DELAY_REMINDER_NOTIFY_TITLE,
+} from './src/utils/scheduleDelayNotifications';
 import { getTopicForDate, formatDateISO, formatDateVN } from './src/chdDailyBrief/topics';
 import {
   runPipeline,
@@ -751,83 +760,41 @@ function checkSchedulingDelays(): void {
     const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
     const consults = readDB<Consult>(CONSULTS_FILE, defaultConsults);
     const cathlabs = readDB<CathLab>(CATHLABS_FILE, defaultCathlabs);
-
-    // Build map
-    const cathlabsMap = new Map<string, CathLab[]>();
-    for (const cath of cathlabs) {
-      const pKey = String(cath.PatientKey || '').trim().replace(/_dup_\d+$/i, '').toLowerCase();
-      if (!pKey) continue;
-      const bucket = cathlabsMap.get(pKey);
-      if (bucket) bucket.push(cath);
-      else cathlabsMap.set(pKey, [cath]);
+    const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const scheduler = getDefaultScheduler(staffList);
+    if (!scheduler?.StaffKey) {
+      console.warn('checkSchedulingDelays: không tìm thấy BS xếp lịch (BS. Hiếu).');
+      return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const cathlabsByPatientKey = buildCathlabsByPatientKey(cathlabs);
+    const referenceDate = new Date();
 
-    for (const c of consults) {
-      if (c.ConsultType !== 'Staff thông') continue;
+    for (const consult of consults) {
+      if (!isConsultEligibleForScheduleDelayReminder(consult, cathlabsByPatientKey, referenceDate)) continue;
 
-      // Check if planned date is set
-      const hasPlannedDate = c.PlannedCathLabDate && !['', '—', '-', 'nodata'].includes(String(c.PlannedCathLabDate).trim().toLowerCase());
-      if (hasPlannedDate) continue;
+      const missedDays = getMissScheduleDays(consult.ConsultDate, referenceDate);
+      const levels = getScheduleDelayNotificationLevelsForConsult(consult, referenceDate);
+      const patientContext = getPatientContext(consult.PatientKey, patients);
 
-      // Check if status is excluded
-      const status = String(c.Status || '').trim().toLowerCase();
-      if (status === 'no data' || status.includes('đã thông tim') || status.includes('đã mổ')) continue;
-
-      // Check if cath is already completed
-      const pKey = String(c.PatientKey || '').trim().replace(/_dup_\d+$/i, '').toLowerCase();
-      const patientCaths = cathlabsMap.get(pKey) || [];
-      const isCompleted = patientCaths.some(cath => {
-        const consultKey = String(c.ConsultKey || '').trim().toLowerCase();
-        const cathConsultKey = String(cath.ConsultKey || '').trim().toLowerCase();
-        if (consultKey && cathConsultKey === consultKey) return true;
-
-        const cathDate = String(cath.CathDate || '').trim().split('T')[0];
-        const consultDate = String(c.ConsultDate || '').trim().split('T')[0];
-        if (cathDate && consultDate && cathDate >= consultDate) return true;
-        return false;
-      });
-      if (isCompleted) continue;
-
-      // Calculate missed days
-      if (!c.ConsultDate) continue;
-      const dateStr = String(c.ConsultDate).trim().split('T')[0];
-      const parts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
-      let consultDate: Date;
-      if (parts.length === 3) {
-        if (parts[0].length === 4) {
-          consultDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        } else {
-          consultDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
-        }
-      } else {
-        consultDate = new Date(dateStr);
-      }
-
-      if (isNaN(consultDate.getTime())) continue;
-      consultDate.setHours(0, 0, 0, 0);
-
-      const diffTime = today.getTime() - consultDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays >= 90) {
-        const patientContext = getPatientContext(c.PatientKey, patients);
-        const months = Math.floor(diffDays / 30);
-        
+      for (const levelConfig of levels) {
         void appendNotificationIfMissing({
-          StaffKey: '01541', // BS Hiếu
-          StaffName: 'Nguyễn Văn Hiếu',
-          Title: 'Cảnh báo trễ xếp lịch',
-          Message: `Bệnh nhi ${patientContext.PatientName || 'không rõ tên'} (${patientContext.PatientID || 'không rõ mã'}) đã trễ ${months} tháng chưa được xếp lịch thông tim dự kiến.`,
-          Severity: 'warning',
+          StaffKey: scheduler.StaffKey,
+          StaffName: scheduler.StaffName || scheduler.Name || 'BS. Hiếu',
+          Title: SCHEDULE_DELAY_REMINDER_NOTIFY_TITLE,
+          Message: buildScheduleDelayReminderMessage({
+            patientName: patientContext.PatientName,
+            patientId: patientContext.PatientID,
+            delayLabel: levelConfig.label,
+            missedDays,
+          }),
+          Severity: levelConfig.severity,
           RelatedEntityType: 'Consult',
-          RelatedEntityKey: c.ConsultKey,
+          RelatedEntityKey: consult.ConsultKey,
           PatientKey: patientContext.PatientKey,
           PatientID: patientContext.PatientID,
           PatientName: patientContext.PatientName,
-          DedupKey: `missed_3m_delay_${c.ConsultKey}`
+          DedupKey: buildScheduleDelayReminderDedupKey(consult.ConsultKey, levelConfig),
         }).catch(err => console.error('Error pushing scheduling delay notification:', err));
       }
     }
@@ -2226,6 +2193,7 @@ app.post('/api/workflow-monitor/run', requireAuth, async (_req, res) => {
   try {
     await syncFromGoogleSheets();
     const result = runWorkflowMonitor();
+    checkSchedulingDelays();
     res.json({ success: true, ...result });
   } catch (err) {
     console.error('Error running workflow monitor:', err);
@@ -3253,6 +3221,7 @@ setInterval(() => {
     if (result.notificationsCreated > 0 || result.marksCreated > 0) {
       console.log(`Workflow monitor created ${result.notificationsCreated} notifications and ${result.marksCreated} marks.`);
     }
+    checkSchedulingDelays();
   } catch (err) {
     console.error('Workflow monitor interval failed:', err);
   }
@@ -3290,6 +3259,7 @@ async function launch() {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
       startChdBriefScheduler();
+      checkSchedulingDelays();
     });
   }
 }
