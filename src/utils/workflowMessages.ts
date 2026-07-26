@@ -1,8 +1,16 @@
 /**
  * Centralized workflow warning and scheduling notification message templates.
+ *
+ * Tone rules:
+ * - Informational (past event): cath/HIS/override already happened — state facts only.
+ * - Reminder (overdue): deadline passed, action still pending — may use "Mời bạn...".
  */
 
-export const SCAR_WORKFLOW_NOTIFY_TITLE = 'Cảnh báo';
+export const WORKFLOW_INFO_NOTIFY_TITLE = 'Thông báo';
+export const WORKFLOW_REMINDER_NOTIFY_TITLE = 'Cảnh báo';
+/** @deprecated Use WORKFLOW_INFO_NOTIFY_TITLE or WORKFLOW_REMINDER_NOTIFY_TITLE */
+export const SCAR_WORKFLOW_NOTIFY_TITLE = WORKFLOW_INFO_NOTIFY_TITLE;
+
 export const HIS_IMPORT_AUTO_CLOSE_NOTIFY_TITLE = 'HIS import tự hoàn tất ca treo';
 export const REPEAT_INTERVENTION_NOTIFY_TITLE = 'Chỉ định can thiệp lại';
 
@@ -61,43 +69,53 @@ export function buildHisAutoCloseConsultLogLine(input: {
   return `[HIS import ${input.isoTimestamp}] Đã tự hoàn tất workflow "${getHisStageLabel(input.stage)}" vì HIS ghi nhận ca thông tim thực tế ngày ${input.cathDateFormatted}. CathKey=${input.cathKey}`;
 }
 
+/** Ca CT đã TT khi chưa đăng ký HC — thông báo sự việc đã xảy ra. */
 export function buildEmergProgCaseAScar(input: { patientName: string; patientId: string }) {
+  const text = `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) đã thông tim chương trình khi chưa được đăng ký hội chẩn.`;
   return {
     label: EMERG_PROG_LABEL_SKIP_CONSULT,
-    reason: `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) làm chương trình nhưng chưa được đăng ký hội chẩn. BS xếp lịch cần rà soát thông tin.`,
-    message: `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) làm chương trình nhưng chưa được đăng ký hội chẩn. Mời bạn kiểm tra và xử lý.`,
+    reason: text,
+    message: text,
   };
 }
 
+/** Ca CT đã TT, HC vẫn treo chưa KQ staff — thông báo sự việc đã xảy ra. */
 export function buildEmergProgCaseBTaiScar(input: { patientName: string }) {
+  const text = `Bệnh nhi ${input.patientName} đã thông tim chương trình; hồ sơ hội chẩn vẫn còn treo chưa có kết quả staff.`;
   return {
     label: EMERG_PROG_LABEL_LATE_STAFF_RESULT,
-    reason: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. BS thư ký cần cập nhật kết quả.`,
-    message: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Mời bạn điền kết quả hội chẩn.`,
+    reason: text,
+    message: text,
   };
 }
 
+/** Ca CT đã TT, vẫn còn trên DS HC chưa chuyển phòng — thông báo sự việc đã xảy ra. */
 export function buildEmergProgCaseBHieuScar(input: { patientName: string }) {
+  const text = `Bệnh nhi ${input.patientName} đã thông tim chương trình; ca vẫn còn trên danh sách hội chẩn chưa chuyển phòng.`;
   return {
     label: EMERG_PROG_LABEL_PENDING_TRANSFER,
-    reason: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. BS xếp lịch cần thao tác chuyển phòng.`,
-    message: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Mời bạn chuyển phòng từ danh sách hội chẩn.`,
+    reason: text,
+    message: text,
   };
 }
 
+/** Ca CT đã TT khi HC chưa chuyển phòng đúng quy trình — thông báo sự việc đã xảy ra. */
 export function buildEmergProgCaseCScar(input: { patientName: string }) {
+  const text = `Bệnh nhi ${input.patientName} đã thông tim chương trình khi hồ sơ hội chẩn chưa được chuyển phòng.`;
   return {
     label: EMERG_PROG_LABEL_SLOW_TRANSFER,
-    reason: `Bệnh nhi ${input.patientName} đã có chỉ định thông tim nhưng chưa chuyển phòng đúng hạn.`,
-    message: `Bệnh nhi ${input.patientName} đã có chỉ định thông tim nhưng chưa chuyển phòng đúng hạn. Mời bạn xử lý chuyển phòng.`,
+    reason: text,
+    message: text,
   };
 }
 
+/** Vượt quyền xếp lịch đã kích hoạt — thông báo sự việc đã xảy ra. */
 export function buildOverrideSchedulingScar(input: { patientName: string; patientId: string }) {
+  const text = `BS xếp lịch đã vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}); kết quả hội chẩn của ca này chưa được điền đúng hạn.`;
   return {
     label: EMERG_PROG_LABEL_LATE_STAFF_RESULT,
-    reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}) khi kết quả hội chẩn chưa được điền đúng hạn.`,
-    message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}) khi bạn chưa điền kết quả hội chẩn đúng hạn. Mời bạn cập nhật kết quả hội chẩn.`,
+    reason: text,
+    message: text,
   };
 }
 
@@ -109,7 +127,7 @@ export function buildRepeatInterventionNotificationMessage(input: {
   patientName: string;
   postDiagnosisID: string;
 }): string {
-  return `Bệnh nhân ${input.patientName} chẩn đoán ${input.postDiagnosisID} có chỉ định can thiệp lại đã được lưu trong "Xếp lịch & Dụng cụ". Mời BS xem lại`;
+  return `Bệnh nhân ${input.patientName} chẩn đoán ${input.postDiagnosisID} có chỉ định can thiệp lại đã được lưu trong "Xếp lịch & Dụng cụ".`;
 }
 
 export function buildSchedulingSummaryHeader(patientNameWithPtvUpper: string): string {

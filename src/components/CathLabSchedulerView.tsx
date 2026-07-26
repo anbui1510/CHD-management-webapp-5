@@ -27,7 +27,7 @@ import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
 import {
-  SCAR_WORKFLOW_NOTIFY_TITLE,
+  WORKFLOW_INFO_NOTIFY_TITLE,
   SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER,
   buildOverrideSchedulingConsultNote,
   buildOverrideSchedulingScar,
@@ -1889,7 +1889,7 @@ Xin cảm ơn!`;
           NotificationKey: `notif_override_sched_${Date.now()}_tai`,
           StaffKey: keyTai,
           StaffName: nameTai,
-          Title: SCAR_WORKFLOW_NOTIFY_TITLE,
+          Title: WORKFLOW_INFO_NOTIFY_TITLE,
           Message: scar.message,
           Severity: 'warning' as const,
           RelatedEntityType: 'Consult' as const,
