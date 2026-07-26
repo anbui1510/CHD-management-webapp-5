@@ -1,9 +1,8 @@
 /**
- * Centralized scar-warning and scheduling notification message templates.
- * See plan: Danh mục câu mẫu cảnh báo sẹo & thông báo xếp lịch.
+ * Centralized workflow warning and scheduling notification message templates.
  */
 
-export const SCAR_WORKFLOW_NOTIFY_TITLE = 'Phạt sẹo workflow';
+export const SCAR_WORKFLOW_NOTIFY_TITLE = 'Cảnh báo';
 export const HIS_IMPORT_AUTO_CLOSE_NOTIFY_TITLE = 'HIS import tự hoàn tất ca treo';
 export const REPEAT_INTERVENTION_NOTIFY_TITLE = 'Chỉ định can thiệp lại';
 
@@ -65,40 +64,40 @@ export function buildHisAutoCloseConsultLogLine(input: {
 export function buildEmergProgCaseAScar(input: { patientName: string; patientId: string }) {
   return {
     label: EMERG_PROG_LABEL_SKIP_CONSULT,
-    reason: `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) làm chương trình nhưng chưa được đăng ký hội chẩn. Phạt BS xếp lịch Hiếu không kiểm soát thông tin.`,
-    message: `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) làm chương trình nhưng chưa được đăng ký hội chẩn. Bạn bị phạt 1 sẹo.`,
+    reason: `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) làm chương trình nhưng chưa được đăng ký hội chẩn. BS xếp lịch cần rà soát thông tin.`,
+    message: `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) làm chương trình nhưng chưa được đăng ký hội chẩn. Mời bạn kiểm tra và xử lý.`,
   };
 }
 
 export function buildEmergProgCaseBTaiScar(input: { patientName: string }) {
   return {
     label: EMERG_PROG_LABEL_LATE_STAFF_RESULT,
-    reason: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Phạt BS thư ký Tài.`,
-    message: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Bạn bị phạt 1 sẹo.`,
+    reason: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. BS thư ký cần cập nhật kết quả.`,
+    message: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền. Mời bạn điền kết quả hội chẩn.`,
   };
 }
 
 export function buildEmergProgCaseBHieuScar(input: { patientName: string }) {
   return {
     label: EMERG_PROG_LABEL_PENDING_TRANSFER,
-    reason: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Phạt BS xếp lịch Hiếu.`,
-    message: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Bạn bị phạt 1 sẹo.`,
+    reason: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. BS xếp lịch cần thao tác chuyển phòng.`,
+    message: `Bệnh nhi ${input.patientName} đã thông tim chương trình nhưng chưa chuyển phòng từ danh sách hội chẩn. Mời bạn chuyển phòng từ danh sách hội chẩn.`,
   };
 }
 
 export function buildEmergProgCaseCScar(input: { patientName: string }) {
   return {
     label: EMERG_PROG_LABEL_SLOW_TRANSFER,
-    reason: `Bệnh nhi ${input.patientName} đã có chỉ định thông tim nhưng BS xếp lịch Hiếu không chuyển phòng đúng hạn.`,
-    message: `Bệnh nhi ${input.patientName} đã có chỉ định thông tim nhưng bạn không chuyển phòng đúng hạn. Bạn bị phạt 1 sẹo.`,
+    reason: `Bệnh nhi ${input.patientName} đã có chỉ định thông tim nhưng chưa chuyển phòng đúng hạn.`,
+    message: `Bệnh nhi ${input.patientName} đã có chỉ định thông tim nhưng chưa chuyển phòng đúng hạn. Mời bạn xử lý chuyển phòng.`,
   };
 }
 
 export function buildOverrideSchedulingScar(input: { patientName: string; patientId: string }) {
   return {
     label: EMERG_PROG_LABEL_LATE_STAFF_RESULT,
-    reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}) do BS thư ký Tài chưa điền kết quả hội chẩn đúng hạn.`,
-    message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}) do bạn chưa điền kết quả hội chẩn đúng hạn. Bạn bị phạt 1 sẹo.`,
+    reason: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}) khi kết quả hội chẩn chưa được điền đúng hạn.`,
+    message: `BS xếp lịch vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}) khi bạn chưa điền kết quả hội chẩn đúng hạn. Mời bạn cập nhật kết quả hội chẩn.`,
   };
 }
 

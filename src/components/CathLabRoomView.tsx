@@ -1089,13 +1089,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       let workflowSideEffectWarning = '';
       if (workflowNotificationOps.length > 0) {
         try {
-          setHisImportStatus(`Đã ghi ${savedCathCount}/${totalCathCount} ca HIS. Đang ghi thông báo/sẹo workflow...`);
+          setHisImportStatus(`Đã ghi ${savedCathCount}/${totalCathCount} ca HIS. Đang ghi thông báo cảnh báo workflow...`);
           for (const notifyChunk of chunkArray(workflowNotificationOps, HIS_IMPORT_BATCH_SIZE)) {
             await postBatchWrite(notifyChunk);
           }
         } catch (notifyError) {
           console.error('Không thể ghi Notification/DoctorPerformanceMark sau import HIS:', notifyError);
-          workflowSideEffectWarning = '\nLưu ý: CathLab đã import xong nhưng một phần thông báo/sẹo workflow chưa ghi được. Có thể đồng bộ lại và import lại để bổ sung phần còn thiếu.';
+          workflowSideEffectWarning = '\nLưu ý: CathLab đã import xong nhưng một phần thông báo cảnh báo workflow chưa ghi được. Có thể đồng bộ lại và import lại để bổ sung phần còn thiếu.';
         }
       }
 
@@ -1596,12 +1596,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                body: JSON.stringify(mark)
              },
              syncContext,
-             { baseMessage: 'Đã ghi sẹo workflow' }
+             { baseMessage: 'Đã ghi cảnh báo workflow' }
            );
          } catch (err) {
            const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định';
-           triggerAlert(`Lỗi khi lưu sẹo workflow cho BS: ${errMsg}`, MODAL_TITLE.saveError);
-           console.error('Lỗi khi lưu sẹo BS:', mark, errMsg);
+           triggerAlert(`Lỗi khi lưu cảnh báo workflow cho BS: ${errMsg}`, MODAL_TITLE.saveError);
+           console.error('Lỗi khi lưu cảnh báo workflow BS:', mark, errMsg);
          }
        }
 
@@ -1620,7 +1620,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
             );
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định';
-            triggerAlert(`Lỗi khi lưu thông báo sẹo: ${errMsg}`, MODAL_TITLE.saveError);
+            triggerAlert(`Lỗi khi lưu thông báo cảnh báo: ${errMsg}`, MODAL_TITLE.saveError);
             console.error('Lỗi khi lưu thông báo:', notif, errMsg);
           }
         }

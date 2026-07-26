@@ -1882,7 +1882,7 @@ Xin cảm ơn!`;
             body: JSON.stringify(markPayload)
           },
           schedSyncContext,
-          { baseMessage: 'Đã ghi sẹo phạt BS Tài' }
+          { baseMessage: 'Đã ghi cảnh báo workflow' }
         );
 
         const notifPayload = {
@@ -1912,10 +1912,10 @@ Xin cảm ơn!`;
             body: JSON.stringify(notifPayload)
           },
           schedSyncContext,
-          { baseMessage: 'Đã ghi thông báo phạt BS Tài' }
+          { baseMessage: 'Đã gửi thông báo cảnh báo' }
         );
       } catch (markErr) {
-        console.error('Lỗi khi lưu sẹo phạt BS Tài:', markErr);
+        console.error('Lỗi khi lưu cảnh báo workflow:', markErr);
       }
     })();
   };
