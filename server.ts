@@ -2193,6 +2193,7 @@ app.post('/api/workflow-monitor/run', requireAuth, async (_req, res) => {
   try {
     await syncFromGoogleSheets();
     const result = runWorkflowMonitor();
+    checkSchedulingDelays();
     res.json({ success: true, ...result });
   } catch (err) {
     console.error('Error running workflow monitor:', err);
