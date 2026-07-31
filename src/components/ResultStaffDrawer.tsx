@@ -22,6 +22,7 @@ import { getSourceDiagnosisOptions, getSourceConsultResultOptions } from '../dat
 import { getShortStaffName } from '../utils/staffNameMatch';
 import { formatDateTime, getExcelAgeHelper } from '../utils/patientDisplay';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
 import { MODAL_TITLE } from '../utils/modalTitles';
