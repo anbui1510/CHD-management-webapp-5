@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User, Upload, AlertTriangle } from 'lucide-react';
@@ -25,6 +25,8 @@ import {
   isRepeatInterventionPlan,
 } from '../utils/repeatInterventionConsult';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import { useViewSubheader } from '../hooks/useViewSubheader';
+import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
 import {
   WORKFLOW_INFO_NOTIFY_TITLE,
   HIS_IMPORT_AUTO_CLOSE_NOTIFY_TITLE,
@@ -1858,6 +1860,44 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      });
   };
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <>
+        <button
+          type="button"
+          onClick={() => hisImportInputRef.current?.click()}
+          disabled={hisImporting}
+          className="font-extrabold text-[11px] px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 bg-white text-rose-700 border border-rose-200 shadow-sm hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Upload className="w-3.5 h-3.5 shrink-0" />
+          {hisImporting ? 'Đang import HIS...' : 'Import HIS'}
+        </button>
+        <button
+          type="button"
+          onClick={openAdHocForm}
+          className="font-extrabold text-[11px] px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 bg-rose-600 text-white shadow-sm hover:bg-rose-700"
+        >
+          <Plus className="w-3.5 h-3.5 shrink-0" />
+          Nhập TT cấp cứu
+        </button>
+      </>
+    ),
+    [hisImporting, openAdHocForm]
+  );
+
+  useViewSubheader({
+    title: getViewSubheaderTitle('cathlab-room'),
+    icon: <Activity className="w-4 h-4" />,
+    searchValue: searchTerm,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   return (
     <div className="flex-1 flex flex-col p-4 w-full h-full overflow-hidden bg-slate-50">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 shrink-0 lg:flex-nowrap">
@@ -1883,7 +1923,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
               </button>
            </div>
 
-           <div className="sm:ml-auto flex flex-wrap lg:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
+           <div className="md:hidden sm:ml-auto flex flex-wrap lg:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
               <div className="flex-1 sm:flex-initial flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5">
                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
                  <input 

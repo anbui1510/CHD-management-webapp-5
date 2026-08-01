@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Activity,
   ArrowUpDown,
   FileText,
   Pencil,
@@ -23,6 +24,7 @@ import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { formatFetchErrorMessage } from '../utils/patientFormValidation';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface MRIResultViewProps {
   patients: Patient[];
@@ -233,17 +235,39 @@ export default function MRIResultView({
 
   const isDoneSelected = selectedItem ? !!String(selectedItem.CMRResult || '').trim() : false;
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <button
+        type="button"
+        onClick={() => setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'))}
+        className="bg-white border border-slate-200 text-slate-600 p-2 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+        title="Sắp xếp theo ngày chụp"
+      >
+        <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+      </button>
+    ),
+    [sortOrder]
+  );
+
+  useModuleSubheader('mri-result', {
+    icon: <Activity className="w-4 h-4" />,
+    searchValue: searchQuery,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   return (
     <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50">
 
-      {/* Title */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
-        <div>
-          <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
-            <FileText className="w-5 h-5 text-[#d2145a]" /> Danh sách chờ điền kết quả MRI tim
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5 font-medium">Điền và theo dõi kết quả chụp MRI tim cho các ca đã xếp lịch.</p>
-        </div>
+      {/* Title — mobile only */}
+      <div className="shrink-0 md:hidden bg-white p-4 border border-slate-200 rounded-3xl shadow-sm">
+        <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
+          <FileText className="w-5 h-5 text-[#d2145a]" /> Điền kết quả MRI tim
+        </h2>
       </div>
 
       {/* Tabs + search */}
@@ -267,7 +291,7 @@ export default function MRIResultView({
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 md:hidden">
           <div className="relative flex-1">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />

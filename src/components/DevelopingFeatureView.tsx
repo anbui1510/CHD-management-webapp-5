@@ -1,5 +1,6 @@
 import React from 'react';
 import { Construction } from 'lucide-react';
+import { useViewSubheader } from '../hooks/useViewSubheader';
 
 interface DevelopingFeatureViewProps {
   title: string;
@@ -10,6 +11,8 @@ export default function DevelopingFeatureView({
   title,
   subtitle = 'Tính năng đang phát triển'
 }: DevelopingFeatureViewProps) {
+  useViewSubheader({ title, showSearch: false, icon: <Construction className="w-4 h-4" /> });
+
   return (
     <div className="flex-1 h-full flex items-center justify-center p-8 bg-slate-50 animate-in fade-in duration-200">
       <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-10 max-w-md text-center">

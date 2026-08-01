@@ -16,6 +16,8 @@ import {
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import { useViewSubheader } from '../hooks/useViewSubheader';
+import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
 
 const DEFAULT_CONCLUSION_OPTIONS = [
   "Can thiệp thông tim",
@@ -659,6 +661,45 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     return filteredConsultsAll.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredConsultsAll, currentPage]);
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <>
+        <button
+          type="button"
+          onClick={() => setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'))}
+          className="bg-white border border-slate-200 text-slate-600 p-2 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+          title="Sắp xếp theo thời gian"
+        >
+          <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            resetForm();
+            setShowCombinedForm(true);
+          }}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer uppercase tracking-wider"
+        >
+          <Plus className="w-3.5 h-3.5 text-white" /> Staff bổ sung
+        </button>
+      </>
+    ),
+    [sortOrder]
+  );
+
+  useViewSubheader({
+    title: getViewSubheaderTitle('results-staff'),
+    icon: <ClipboardList className="w-4 h-4" />,
+    searchValue: searchTerm,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   const renderList = (filtered: Consult[]) => {
     if (filtered.length === 0) {
       return (
@@ -857,9 +898,9 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   return (
     <div className="flex-1 h-full flex flex-col gap-3 md:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-4 lg:p-6 bg-slate-50 overflow-hidden">
       
-      {/* Header Area (Responsive Title, Search and Actions) */}
-      <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
-        <div className="hidden md:flex items-center gap-2 shrink-0">
+      {/* Header Area — mobile only; desktop dùng subheader toàn app */}
+      <div className="md:hidden shrink-0 flex flex-col gap-3 bg-white p-4 border border-slate-200 rounded-3xl shadow-sm">
+        <div className="flex items-center gap-2 shrink-0">
           <ClipboardList className="w-5 h-5 text-[#d2145a] animate-pulse" />
           <h2 className="text-base font-extrabold text-neutral-[#d2145a] tracking-tight uppercase">
             Nhập kết quả staff
@@ -867,7 +908,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         </div>
 
         {/* Search box in the center */}
-        <div className="flex-1 w-full max-w-xl relative">
+        <div className="flex-1 w-full relative">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <Search className="h-4 w-4 text-slate-400" />
           </span>
@@ -895,8 +936,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           )}
         </div>
 
-        {/* Action buttons (Sort and Add) */}
-        <div className="flex items-center justify-end gap-2 w-full md:w-auto shrink-0">
+        {/* Action buttons (Sort and Add) — mobile */}
+        <div className="flex items-center justify-end gap-2 w-full shrink-0">
           <button
             type="button"
             onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
@@ -912,7 +953,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               resetForm();
               setShowCombinedForm(true);
             }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition duration-200 cursor-pointer uppercase tracking-wider w-full md:w-auto text-center"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition duration-200 cursor-pointer uppercase tracking-wider w-full text-center"
           >
             <Plus className="w-4 h-4 text-white" /> Staff bổ sung
           </button>

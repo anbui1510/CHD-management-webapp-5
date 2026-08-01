@@ -20,6 +20,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { Patient, Consult, CMR, findPatientByKey, normalizePatientKey } from '../types';
+import { useModuleSubheaderTitleOnly } from '../hooks/useModuleSubheader';
 
 interface MRIOverviewViewProps {
   patients: Patient[];
@@ -117,6 +118,8 @@ export default function MRIOverviewView({
   const [pieFilterYear, setPieFilterYear] = useState<number>(2026);
   const [pieFilterMonth, setPieFilterMonth] = useState<number>(6);
   const [pieFilterQuarter, setPieFilterQuarter] = useState<number>(2);
+
+  useModuleSubheaderTitleOnly('mri-overview', <Activity className="w-4 h-4" />);
 
   // Build unified list of MRI items
   const patientsByKey = useMemo(() => {

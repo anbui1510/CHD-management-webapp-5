@@ -22,6 +22,7 @@ import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
@@ -2835,6 +2836,17 @@ Xin cảm ơn!`;
     setActiveDate(today);
   };
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  useModuleSubheader(pureCalendarMode ? 'schedule-view' : 'schedule-tt', {
+    icon: <CalendarDays className="w-4 h-4" />,
+    searchValue: pureCalendarMode ? undefined : searchQuery,
+    onSearchChange: pureCalendarMode ? undefined : handleSubheaderSearch,
+    showSearch: !pureCalendarMode,
+  });
+
   return (
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans transition-all duration-300">
       
@@ -3041,8 +3053,8 @@ Xin cảm ơn!`;
             })}
           </div>
 
-          {/* Search bar inside queue listing */}
-          <div className="p-3 border-b border-slate-200 flex items-center relative gap-2 shrink-0">
+          {/* Search bar inside queue listing — mobile/tablet; desktop dùng subheader */}
+          <div className="p-3 border-b border-slate-200 flex items-center relative gap-2 shrink-0 md:hidden">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
               <input

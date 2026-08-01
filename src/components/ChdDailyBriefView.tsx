@@ -18,6 +18,7 @@ import {
   getTodayClientPayload,
   getHistoryClientPayload,
 } from '../chdDailyBrief/browserApi';
+import { useModuleSubheaderTitleOnly } from '../hooks/useModuleSubheader';
 import { downloadBriefDocx } from '../chdDailyBrief/buildDocxBlob';
 import { formatAnnouncementVN } from '../chdDailyBrief/formatAnnouncement';
 import type { ChdBriefContent } from '../chdDailyBrief/types';
@@ -79,6 +80,8 @@ export default function ChdDailyBriefView() {
   const [selectedDate, setSelectedDate] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+
+  useModuleSubheaderTitleOnly('chd-daily-brief', <Newspaper className="w-4 h-4" />);
 
   const loadToday = useCallback(async () => {
     setLoading(true);

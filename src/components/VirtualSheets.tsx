@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitCompareArrows
 } from 'lucide-react';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../data/appsScriptCode';
+import { useModuleSubheaderTitleOnly } from '../hooks/useModuleSubheader';
 import { WEEKLY_SCHEDULE_APPS_SCRIPT_CODE } from '../data/weeklyScheduleAppsScriptCode';
 import {
   buildCathlabReconciliation,
@@ -46,6 +47,8 @@ export default function VirtualSheets({
 }: VirtualSheetsProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CMR' | 'Source' | 'DeviceTemplate'>('Patient');
+
+  useModuleSubheaderTitleOnly('google-sheets', <Database className="w-4 h-4" />);
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
