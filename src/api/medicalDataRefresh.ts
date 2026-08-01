@@ -175,11 +175,13 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
     throw new Error(err._syncWarning || err.error || `Không thể tải dữ liệu (HTTP ${res.status})`);
   }
   const data = await res.json() as MedicalDataBundle & { _syncWarning?: string; _syncStatus?: SheetsSyncStatus };
-  if (data._syncWarning) {
+  const bundle = sheetDataToBundle(data);
+  const hasClinicalData = bundle.patients.length > 0 || bundle.consults.length > 0;
+  if (data._syncWarning && !hasClinicalData) {
     throw new Error(data._syncWarning);
   }
   return {
-    ...sheetDataToBundle(data),
+    ...bundle,
     _syncStatus: data._syncStatus
   };
 }

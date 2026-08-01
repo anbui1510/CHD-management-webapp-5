@@ -63,11 +63,6 @@ export function SheetsSyncFeedbackProvider({
 
       if (feedback.isFailure) {
         onSuccessBanner(feedback.bannerMessage, true);
-        setGlobalOverlay({
-          title: 'Chưa ghi lên Google Sheets',
-          message: feedback.overlayMessage || feedback.bannerMessage
-        });
-        onRefreshNotifications();
         return;
       }
 

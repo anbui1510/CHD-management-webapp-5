@@ -410,6 +410,31 @@ async function fetchWithTimeout(url: string, options: any = {}, timeout = 60000)
   }
 }
 
+const APPS_SCRIPT_RETRYABLE_STATUSES = new Set([404, 408, 429, 500, 502, 503, 504]);
+
+async function fetchAppsScriptWithRetry(
+  url: string,
+  options: any = {},
+  timeout = 60000,
+  maxAttempts = 3
+): Promise<Response> {
+  let lastResponse: Response | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, options, timeout);
+      lastResponse = response;
+      if (response.ok || !APPS_SCRIPT_RETRYABLE_STATUSES.has(response.status) || attempt === maxAttempts) {
+        return response;
+      }
+    } catch (error) {
+      if (attempt === maxAttempts) throw error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1200 * attempt));
+  }
+  if (lastResponse) return lastResponse;
+  throw new Error('Không kết nối được Google Sheets.');
+}
+
 // Throttle sync pulls so we don't spam Google Sheets on concurrent requests
 let lastSyncTime = 0;
 const SYNC_COOLDOWN_MS = 6000; // 6 seconds minimum between background pulls
@@ -520,10 +545,10 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
       fetchUrl += `&apiKey=${encodeURIComponent(config.scriptSecret)}`;
     }
     console.log(`Pulling data from Google Sheets: ${config.scriptUrl}`);
-    const response = await fetchWithTimeout(fetchUrl, {
+    const response = await fetchAppsScriptWithRetry(fetchUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
-    }, 20000);
+    }, 20000, 3);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -830,10 +855,10 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
 
   try {
     console.log(`Pushing mutation to Google Sheets: type=${type}, action=${action}, key=${key}`);
-    const response = await fetchWithTimeout(config.scriptUrl, {
+    const response = await fetchAppsScriptWithRetry(config.scriptUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify({
         action,
@@ -842,16 +867,25 @@ async function syncToGoogleSheets(type: 'Patient' | 'Consult' | 'Staff' | 'CathL
         data: dataToPush,
         apiKey: config.scriptSecret || ''
       })
-    }, 60000);
+    }, 60000, 3);
 
     if (response.ok) {
-      const resData = await response.json() as any;
+      const text = await response.text();
+      let resData: any;
+      try {
+        resData = JSON.parse(text);
+      } catch {
+        console.warn('Google Sheet returned non-JSON response:', text.slice(0, 200));
+        return false;
+      }
       if (resData && resData.status === 'success') {
         console.log(`Successfully updated Google Sheet for key ${key}!`);
         return true;
       } else {
         console.warn('Google Sheet responded with error:', resData);
       }
+    } else {
+      console.warn(`Google Sheet push HTTP ${response.status} for key ${key}`);
     }
   } catch (err) {
     console.error(`Failed to push update to Google Sheet for key ${key}:`, err);

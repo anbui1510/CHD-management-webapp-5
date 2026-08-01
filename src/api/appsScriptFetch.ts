@@ -3,6 +3,11 @@ import { buildWebPushPayload } from '../push/pushPayload';
 import { getAppVersionPayload } from '../appVersion';
 import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
 import type { Staff, Source } from '../types';
+import {
+  fetchAppsScriptWithRetry,
+  formatAppsScriptFetchError,
+  formatAppsScriptHttpError
+} from '../utils/appsScriptRetry';
 
 type SheetData = {
   patients: any[];
@@ -402,7 +407,7 @@ const markClientPullOk = (message = 'Đã kéo dữ liệu mới từ Google She
 };
 
 const markClientPullFailed = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error || 'Không đồng bộ được Google Sheets.');
+  const message = formatAppsScriptFetchError(error);
   clientSheetsPullState = {
     ...clientSheetsPullState,
     lastPullAt: Date.now(),
@@ -410,6 +415,9 @@ const markClientPullFailed = (error: unknown) => {
     lastPullMessage: message
   };
 };
+
+let backgroundPullRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let backgroundPullRetryAttempt = 0;
 
 export const getClientSheetsSyncStatus = () => ({
   configured: !!getScriptUrl(),
@@ -529,11 +537,14 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
 
-  pendingStaffLoad = fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force))
+  pendingStaffLoad = fetchAppsScriptWithRetry(
+    () => fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force)),
+    { maxAttempts: force ? 3 : 2 }
+  )
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
-      if (!res.ok) throw new Error(`Apps Script trả về HTTP ${res.status}`);
+      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         throw new Error('Apps Script đang trả về HTML.');
       }
@@ -602,11 +613,14 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
 
-  pendingLoad = fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force))
+  pendingLoad = fetchAppsScriptWithRetry(
+    () => fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force)),
+    { maxAttempts: force ? 3 : 2 }
+  )
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
-      if (!res.ok) throw new Error(`Apps Script trả về HTTP ${res.status}`);
+      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         const scriptError = text.match(/<div[^>]*>([^<]+)<\/div>\s*<\/body>/i)?.[1]?.trim();
         throw new Error(
@@ -634,25 +648,10 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
     .catch(async err => {
       markClientPullFailed(err);
 
-      // Force pulls must surface failure so the UI banner matches reality.
-      // Soft polls may keep serving stale cache.
-      if (force) {
-        throw err;
-      }
-
-      if (cache) return cache;
-
-      const cachedAll = await getPersistedData('all_data');
-      if (
-        cachedAll &&
-        cachedAll.staff &&
-        Array.isArray(cachedAll.staff) &&
-        cachedAll.staff.length > 0
-      ) {
-        cache = normalizeData(cachedAll);
-        staffCache = mergeStaffWithBundledPasswords(cache.staff);
-        cache.staff = staffCache;
-        return cache;
+      const cachedAll = cache || await hydrateCacheFromPersisted();
+      if (cachedAll) {
+        scheduleBackgroundPullRetry();
+        return cachedAll;
       }
 
       if (isLocalHost()) {
@@ -692,6 +691,27 @@ const refreshAllDataInBackground = (): void => {
     .catch(err => {
       console.warn('Background data sync failed:', err);
     });
+};
+
+const scheduleBackgroundPullRetry = () => {
+  if (!getScriptUrl() || backgroundPullRetryTimer) return;
+  if (backgroundPullRetryAttempt >= 5) return;
+
+  const delayMs = Math.min(120000, 15000 * (backgroundPullRetryAttempt + 1));
+  backgroundPullRetryTimer = setTimeout(() => {
+    backgroundPullRetryTimer = null;
+    backgroundPullRetryAttempt += 1;
+    void fetchAllDataFromNetwork(true)
+      .then(data => {
+        backgroundPullRetryAttempt = 0;
+        if (typeof window !== 'undefined' && data.patients.length + data.consults.length > 0) {
+          window.dispatchEvent(new CustomEvent('chd-bridge-data-updated'));
+        }
+      })
+      .catch(() => {
+        scheduleBackgroundPullRetry();
+      });
+  }, delayMs);
 };
 
 const hydrateCacheFromPersisted = async (): Promise<SheetData | null> => {
@@ -821,11 +841,14 @@ const syncRecordToScript = (payload: { type: SheetType; action: 'insert' | 'upda
   if (!scriptUrl) return;
 
   const apiKey = getScriptSecret();
-  void fetchWithTimeout(scriptUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ ...payload, apiKey })
-  }).then(async (response) => {
+  void fetchAppsScriptWithRetry(
+    () => fetchWithTimeout(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ ...payload, apiKey })
+    }),
+    { maxAttempts: 3 }
+  ).then(async (response) => {
     const text = await response.text();
     if (!response.ok) {
       console.error(`Background upsert sync HTTP ${response.status}:`, text);
@@ -854,15 +877,18 @@ const postToScript = async (
   if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
 
   const apiKey = getScriptSecret();
-  const response = await fetchWithTimeout(scriptUrl, {
-    method: 'POST',
-    // text/plain avoids a browser preflight, which Apps Script Web Apps do not handle well.
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ ...payload, apiKey })
-  });
+  const response = await fetchAppsScriptWithRetry(
+    () => fetchWithTimeout(scriptUrl, {
+      method: 'POST',
+      // text/plain avoids a browser preflight, which Apps Script Web Apps do not handle well.
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ ...payload, apiKey })
+    }),
+    { maxAttempts: 3 }
+  );
 
   const text = await response.text();
-  if (!response.ok) throw new Error(`Apps Script trả về HTTP ${response.status}`);
+  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu');
@@ -876,14 +902,17 @@ const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'i
   if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
 
   const apiKey = getScriptSecret();
-  const response = await fetchWithTimeout(scriptUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'batch', operations, apiKey })
-  });
+  const response = await fetchAppsScriptWithRetry(
+    () => fetchWithTimeout(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'batch', operations, apiKey })
+    }),
+    { maxAttempts: 3 }
+  );
 
   const text = await response.text();
-  if (!response.ok) throw new Error(`Apps Script trả về HTTP ${response.status}`);
+  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu theo lô');
@@ -1312,12 +1341,32 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       );
     }
     const force = parsed.searchParams.get('force') === 'true' || parsed.searchParams.get('refresh') === 'true';
-    const allData = await loadAllData(force);
-    // Always strip passwords before sending to client
-    return jsonResponse({
-      ...sanitizeDataBundle(allData),
-      _syncStatus: getClientSheetsSyncStatus()
-    });
+    try {
+      const allData = await loadAllData(force);
+      const syncStatus = getClientSheetsSyncStatus();
+      return jsonResponse({
+        ...sanitizeDataBundle(allData),
+        _syncStatus: syncStatus,
+        ...(syncStatus.configured && !syncStatus.lastPullOk && syncStatus.lastPullMessage
+          ? { _syncWarning: syncStatus.lastPullMessage }
+          : {})
+      });
+    } catch (err) {
+      const cached = await hydrateCacheFromPersisted();
+      if (cached) {
+        markClientPullFailed(err);
+        scheduleBackgroundPullRetry();
+        return jsonResponse({
+          ...sanitizeDataBundle(cached),
+          _syncWarning: formatAppsScriptFetchError(err),
+          _syncStatus: getClientSheetsSyncStatus()
+        });
+      }
+      return jsonResponse(
+        { error: formatAppsScriptFetchError(err) },
+        { status: 503 }
+      );
+    }
   }
 
   if (endpoint === 'proxy' && parts[1] === 'drive-export') {
