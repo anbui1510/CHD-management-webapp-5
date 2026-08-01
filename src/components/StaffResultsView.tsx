@@ -36,6 +36,7 @@ const DEFAULT_CONCLUSION_OPTIONS = [
 ];
 
 const CONSULT_TYPE_OPTIONS = ['Staff mổ', 'Staff thông'] as const;
+const CATH_PTV_MAIN_OPTIONS = ['BS. Phụng', 'BS. Lợi', 'BS. Thịnh'];
 
 const DEFAULT_DEPARTMENTS = [
   'Ngoại trú',
@@ -377,6 +378,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       const chosenDept = department;
       const chosenDoc = requestBy;
       const isCathStaff = consultType === 'Staff thông';
+      if (isCathStaff && !scheduled1st.trim()) {
+        setSubmitLoading(false);
+        setErrorMsg('Vui lòng chọn Hội chẩn PTV chính!');
+        return;
+      }
 
       const consultPayload: Consult = {
         ConsultKey: `con_${Date.now()}`,
@@ -1550,25 +1556,24 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                     {consultType === 'Staff thông' ? (
                       <div className="pb-0.5">
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên hội chẩn</label>
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">
+                          Hội chẩn PTV chính <span className="text-red-500">*</span>
+                        </label>
                         <SearchableEnumSelect
-                          options={[
-                            'BS. Phụng', 'BS. Lợi', 'BS. Thịnh', 'BS. Ân', 'BS. Hiếu', 'BS. Tài', 'BS. Hùng', 'BS. Tĩnh',
-                            ...Array.from(new Set(consults.map(c => String(c.Scheduled1stInterventionist || '')).filter(Boolean)))
-                          ]}
+                          required
+                          options={CATH_PTV_MAIN_OPTIONS}
                           value={scheduled1st}
                           onChange={setScheduled1st}
-                          placeholder="-- Chọn thành viên --"
-                          searchPlaceholder="Gõ tên thành viên..."
+                          placeholder="-- Chọn PTV chính --"
+                          searchPlaceholder="Gõ tên PTV..."
                           direction="up"
                         />
                       </div>
                     ) : (
                       <div className="pb-0.5">
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên hội chẩn</label>
                         <MobileAutoExpandTextarea
                           minRows={2}
-                          required
                           value={consultMembers}
                           onChange={(e) => setConsultMembers(e.target.value)}
                           placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"

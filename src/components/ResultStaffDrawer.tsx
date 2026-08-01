@@ -43,6 +43,8 @@ const CONCLUSION_OPTIONS = [
   'Không có thông tin'
 ];
 
+const CATH_PTV_MAIN_OPTIONS = ['BS. Phụng', 'BS. Lợi', 'BS. Thịnh'];
+
 type ResultFormState = {
   ConsultResultID: ConsultResultEnum | '';
   DetailConsultResult: string;
@@ -212,8 +214,8 @@ export default function ResultStaffDrawer({
       triggerAlert('Vui lòng chọn Kết luận chính (ConsultResultID)!', MODAL_TITLE.missingInfo);
       return false;
     }
-    if (!formData.ConsultMember || !formData.ConsultMember.trim()) {
-      triggerAlert('Vui lòng nhập Thành viên duyệt hội chẩn!', MODAL_TITLE.missingInfo);
+    if (formData.ConsultType === 'Staff thông' && !formData.ConsultMember?.trim()) {
+      triggerAlert('Vui lòng chọn Hội chẩn PTV chính!', MODAL_TITLE.missingInfo);
       return false;
     }
 
@@ -412,7 +414,9 @@ export default function ResultStaffDrawer({
                                 <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{formData.RequestBy || ''}</span></p>
                                 {formData.ConsultMember && String(formData.ConsultMember).trim() && (
                                   <p>
-                                    <span className="text-slate-400">Thành viên duyệt HC:</span>{' '}
+                                    <span className="text-slate-400">
+                                      {formData.ConsultType === 'Staff thông' ? 'Hội chẩn PTV chính:' : 'Thành viên hội chẩn:'}
+                                    </span>{' '}
                                     <span className="font-bold text-slate-800">
                                       {String(formData.ConsultMember)}
                                     </span>
@@ -465,15 +469,32 @@ export default function ResultStaffDrawer({
                                 </div>
 
                                 <div className="pb-2">
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                                  <MobileAutoExpandTextarea
-                                    minRows={2}
-                                    required
-                                    value={formData.ConsultMember || ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, ConsultMember: e.target.value }))}
-                                    placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
-                                  />
+                                  {formData.ConsultType === 'Staff thông' ? (
+                                    <>
+                                      <label className="block text-slate-500 font-bold text-[10px] mb-1">
+                                        Hội chẩn PTV chính <span className="text-red-500">*</span>
+                                      </label>
+                                      <SearchableEnumSelect
+                                        required
+                                        options={CATH_PTV_MAIN_OPTIONS}
+                                        value={formData.ConsultMember || ''}
+                                        onChange={(val) => setFormData(prev => ({ ...prev, ConsultMember: val }))}
+                                        placeholder="-- Chọn PTV chính --"
+                                        searchPlaceholder="Gõ tên PTV..."
+                                      />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <label className="block text-slate-500 font-bold text-[10px] mb-1">Thành viên hội chẩn</label>
+                                      <MobileAutoExpandTextarea
+                                        minRows={2}
+                                        value={formData.ConsultMember || ''}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, ConsultMember: e.target.value }))}
+                                        placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"
+                                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
+                                      />
+                                    </>
+                                  )}
                                 </div>
 
                               </div>
