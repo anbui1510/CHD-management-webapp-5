@@ -739,31 +739,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     };
 
     return (
-      <div className="space-y-2">
-        {selectedDeleteKeys.size > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-            <span className="text-xs font-bold text-rose-800">
-              Đã chọn {selectedDeleteKeys.size} ca
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedDeleteKeys(new Set())}
-                className="text-[10px] font-bold uppercase text-slate-600 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-white cursor-pointer"
-              >
-                Bỏ chọn
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteKeys(Array.from(selectedDeleteKeys))}
-                className="text-[10px] font-extrabold uppercase bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Xoá đã chọn
-              </button>
-            </div>
-          </div>
-        )}
       <div className="w-full rounded-2xl shadow-xs bg-white">
         <table className="min-w-full border-separate border-spacing-0 table-auto text-left font-sans text-xs">
           <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider">
@@ -890,7 +865,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
             })}
           </tbody>
         </table>
-      </div>
       </div>
     );
   };
@@ -1037,6 +1011,31 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
             ✓ Đã staff <span className="text-[10px] opacity-75 font-mono">({staffType === 'cath' ? cathStats.completed : surgStats.completed})</span>
           </button>
         </div>
+
+        {selectedDeleteKeys.size > 0 && (
+          <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 shadow-sm">
+            <span className="text-xs font-bold text-rose-800">
+              Đã chọn {selectedDeleteKeys.size} ca
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDeleteKeys(new Set())}
+                className="text-[10px] font-bold uppercase text-slate-600 hover:text-slate-800 px-2 py-1 rounded-lg hover:bg-white cursor-pointer"
+              >
+                Bỏ chọn
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteKeys(Array.from(selectedDeleteKeys))}
+                className="text-[10px] font-extrabold uppercase bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Xoá đã chọn
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Cards Grid — single scroll container for sticky header + frozen columns */}
         <div className="flex-1 min-h-0 overflow-auto pr-1 custom-scrollbar">
