@@ -35,6 +35,8 @@ const DEFAULT_CONCLUSION_OPTIONS = [
   "Không có thông tin"
 ];
 
+const CONSULT_TYPE_OPTIONS = ['Staff mổ', 'Staff thông'] as const;
+
 const DEFAULT_DEPARTMENTS = [
   'Ngoại trú',
   'Tim Mạch',
@@ -394,7 +396,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         ConsultMember: isCathStaff ? '' : consultMembers,
         DiagnosisID: diagnosisID,
         DetailDiagnosis: detailDiagnosis,
-        Department: chosenDept || 'Tim Mạch',
+        Department: chosenDept || '',
         ConsultCreateBy: currentStaff?.StaffKey || '01378',
         ConsultCreateTime: new Date().toISOString(),
         ConsultResultID: consultResultID,
@@ -1466,14 +1468,14 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kiểu staff *</label>
-                        <select
+                        <SearchableEnumSelect
+                          required
+                          options={[...CONSULT_TYPE_OPTIONS]}
                           value={consultType}
-                          onChange={(e) => setConsultType(e.target.value as any)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-bold focus:outline-none text-xs"
-                        >
-                          <option value="Staff mổ">Staff mổ</option>
-                          <option value="Staff thông">Staff thông</option>
-                        </select>
+                          onChange={(val) => setConsultType(val as typeof CONSULT_TYPE_OPTIONS[number])}
+                          placeholder="— Chọn kiểu staff —"
+                          searchPlaceholder="Gõ để tìm..."
+                        />
                       </div>
 
                       <div>
@@ -1528,9 +1530,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       </div>
 
                       <div>
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nội trú *</label>
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nội trú</label>
                         <SearchableEnumSelect
-                          required
                           options={departmentOptions}
                           value={department}
                           onChange={setDepartment}
