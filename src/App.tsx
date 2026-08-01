@@ -1948,6 +1948,56 @@ export default function App() {
     [currentStaff]
   );
 
+  const openAddPatientForm = useCallback(() => {
+    setEditingPatientKey(null);
+    setNewPatientData({
+      PatientID1: '',
+      PatientID2: '',
+      PatientName: '',
+      OtherPatientName: '',
+      PatientDOB: '',
+      PatientSex: 'Nam',
+      PatientAddress: 'Hà Nội',
+      PatientPhone1: '',
+      PatientPhone2: '',
+      Outcome: ''
+    });
+    setShowAddPatient(true);
+  }, []);
+
+  const openAddConsultForm = useCallback(() => {
+    setNewConsultData({
+      PatientKey: '',
+      ConsultType: 'Staff mổ',
+      PatientWeight: '',
+      PatientHeight: '',
+      ConsultDate: new Date().toISOString().split('T')[0],
+      RequestBy: '',
+      DiagnosisID: '',
+      DetailDiagnosis: '',
+      Department: 'Tim Mạch',
+      PriorityOrder: 'Chương trình',
+      RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
+      CheckDevice: '',
+      ConsultNote: '',
+      PlannedDevice: '',
+      PlannedPrice: ''
+    });
+    setPendingConsultsCount(0);
+    setShowAddConsult(true);
+  }, []);
+
+  const handlePatientSubheaderSearch = useCallback((value: string) => {
+    setPatientSearch(value);
+    setPatientCurrentPage(1);
+    setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
+  }, []);
+
+  const handleConsultSubheaderSearch = useCallback((value: string) => {
+    setConsultListSearch(value);
+    setConsultCurrentPage(1);
+  }, []);
+
   // Return Login screen if not authenticated
   if (!currentStaff) {
     return (
@@ -2058,58 +2108,6 @@ export default function App() {
     }
     setIsSidebarExpanded(prev => !prev);
   };
-
-
-
-  const openAddPatientForm = useCallback(() => {
-    setEditingPatientKey(null);
-    setNewPatientData({
-      PatientID1: '',
-      PatientID2: '',
-      PatientName: '',
-      OtherPatientName: '',
-      PatientDOB: '',
-      PatientSex: 'Nam',
-      PatientAddress: 'Hà Nội',
-      PatientPhone1: '',
-      PatientPhone2: '',
-      Outcome: ''
-    });
-    setShowAddPatient(true);
-  }, []);
-
-  const openAddConsultForm = useCallback(() => {
-    setNewConsultData({
-      PatientKey: '',
-      ConsultType: 'Staff mổ',
-      PatientWeight: '',
-      PatientHeight: '',
-      ConsultDate: new Date().toISOString().split('T')[0],
-      RequestBy: '',
-      DiagnosisID: '',
-      DetailDiagnosis: '',
-      Department: 'Tim Mạch',
-      PriorityOrder: 'Chương trình',
-      RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
-      CheckDevice: '',
-      ConsultNote: '',
-      PlannedDevice: '',
-      PlannedPrice: ''
-    });
-    setPendingConsultsCount(0);
-    setShowAddConsult(true);
-  }, []);
-
-  const handlePatientSubheaderSearch = useCallback((value: string) => {
-    setPatientSearch(value);
-    setPatientCurrentPage(1);
-    setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
-  }, []);
-
-  const handleConsultSubheaderSearch = useCallback((value: string) => {
-    setConsultListSearch(value);
-    setConsultCurrentPage(1);
-  }, []);
 
   return (
     <SheetsSyncFeedbackProvider
