@@ -143,9 +143,14 @@ export function useRefreshMedicalData(
         meta.lastAt = Date.now();
         meta.lastForceAt = meta.lastAt;
         options?.onSyncStatus?.(bundle._syncStatus);
-        emitState({ phase: 'ready', startedAt: null });
+        const pullFailed = bundle._syncStatus?.configured && bundle._syncStatus.lastPullOk === false;
+        emitState({
+          phase: 'ready',
+          startedAt: null,
+          message: pullFailed ? bundle._syncStatus?.lastPullMessage : undefined
+        });
       })
-      .catch(err => {
+      .catch(async err => {
         console.warn('Force medical data sync failed:', err);
         options?.onSyncStatus?.(undefined);
         if (err instanceof AuthRequiredError) {
@@ -155,6 +160,18 @@ export function useRefreshMedicalData(
             message: err.message
           });
           throw err;
+        }
+        const cached = await peekCachedMedicalDataBundle();
+        const hasCache = !!cached && (cached.patients.length > 0 || cached.consults.length > 0);
+        if (hasCache && cached) {
+          applyMedicalDataBundle(cached, scope, setters);
+          meta.lastAt = Date.now();
+          emitState({
+            phase: 'ready',
+            startedAt: null,
+            message: err instanceof Error ? err.message : undefined
+          });
+          return;
         }
         emitState({
           phase: 'error',
