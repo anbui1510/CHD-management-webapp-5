@@ -1,7 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-import fs from 'fs';
 import path from 'path';
 import {defineConfig} from 'vite';
 import { APP_VERSION } from './src/appVersion';
@@ -65,16 +64,23 @@ export default defineConfig(() => {
       }),
       {
         name: 'chd-emit-version-json',
-        closeBundle() {
+        generateBundle(_options, bundle) {
+          // Skip the vite-plugin-pwa service-worker sub-build; only ship version.json with the app bundle.
+          const isServiceWorkerBuild = Object.keys(bundle).every(
+            (fileName) => fileName === 'sw.js' || fileName.endsWith('.map')
+          );
+          if (isServiceWorkerBuild) return;
+
           const payload = {
             version: APP_VERSION,
             buildId: appBuildId,
             buildTime: appBuildId,
           };
-          fs.writeFileSync(
-            path.resolve(__dirname, 'dist/version.json'),
-            `${JSON.stringify(payload)}\n`
-          );
+          this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: `${JSON.stringify(payload)}\n`,
+          });
         },
       },
     ],
