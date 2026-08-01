@@ -25,6 +25,7 @@ import {
 } from '../data/cmrDefaults';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { VNDateInput } from './VNDateInput';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import {
@@ -897,6 +898,22 @@ export default function MRISchedulerView({
     </div>
   );
 
+  const renderLongTextInput = (key: keyof CMR, label: string, placeholder = '', required = false) => (
+    <div>
+      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
+        {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
+      </label>
+      <MobileAutoExpandTextarea
+        minRows={2}
+        value={String(formData[key] || '')}
+        onChange={(event) => updateField(key, event.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+      />
+    </div>
+  );
+
   const renderEnumInput = (key: keyof CMR, label: string, options: string[], placeholder = 'Gõ để tìm hoặc chọn', required = false) => (
     <div>
       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
@@ -921,12 +938,12 @@ export default function MRISchedulerView({
       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
         {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
       </label>
-      <textarea
+      <MobileAutoExpandTextarea
+        minRows={3}
         value={String(formData[key] || '')}
         onChange={(event) => updateField(key, event.target.value)}
-        rows={3}
         required={required}
-        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a] resize-none"
+        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
       />
     </div>
   );
@@ -1240,8 +1257,8 @@ export default function MRISchedulerView({
                       {renderInput('PatientWeight', 'Cân nặng (kg)', 'vd: 12', true)}
                       {renderEnumInput('CMRDiagnosisID', 'Mã chẩn đoán MRI', diagnosisOptions, 'Gõ ICD để tìm', true)}
                       {renderEnumInput('DepartRequest', 'Khoa yêu cầu', departmentOptions, 'Gõ khoa để tìm')}
-                      {renderInput('CMRMethod', 'Phương thức chụp', 'Phương thức chụp')}
-                      {renderInput('CMRDevice', 'Dự trù dụng cụ', 'Dự trù dụng cụ')}
+                      {renderLongTextInput('CMRMethod', 'Phương thức chụp', 'Phương thức chụp')}
+                      {renderLongTextInput('CMRDevice', 'Dự trù dụng cụ', 'Dự trù dụng cụ')}
                       {renderEnumInput('PostDepart', 'Khoa sau chụp', departmentOptions, 'Gõ khoa để tìm')}
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
@@ -1682,11 +1699,11 @@ export default function MRISchedulerView({
                     </div>
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phương thức chụp</label>
-                      <input type="text" value={String(adHocForm.CMRMethod || '')} onChange={(e) => updateAdHocField('CMRMethod', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
+                      <MobileAutoExpandTextarea minRows={2} value={String(adHocForm.CMRMethod || '')} onChange={(e) => updateAdHocField('CMRMethod', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
                     </div>
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Dự trù dụng cụ</label>
-                      <input type="text" value={String(adHocForm.CMRDevice || '')} onChange={(e) => updateAdHocField('CMRDevice', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
+                      <MobileAutoExpandTextarea minRows={2} value={String(adHocForm.CMRDevice || '')} onChange={(e) => updateAdHocField('CMRDevice', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs" />
                     </div>
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa sau chụp</label>
@@ -1718,15 +1735,15 @@ export default function MRISchedulerView({
 
                   <div>
                     <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI *</label>
-                    <textarea required rows={2} value={String(adHocForm.CMRDiagnosis || '')} onChange={(e) => updateAdHocField('CMRDiagnosis', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
+                    <MobileAutoExpandTextarea required minRows={2} value={String(adHocForm.CMRDiagnosis || '')} onChange={(e) => updateAdHocField('CMRDiagnosis', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI *</label>
-                    <textarea required rows={2} value={String(adHocForm.CMRRequest || '')} onChange={(e) => updateAdHocField('CMRRequest', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
+                    <MobileAutoExpandTextarea required minRows={2} value={String(adHocForm.CMRRequest || '')} onChange={(e) => updateAdHocField('CMRRequest', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ghi chú gọi MRI</label>
-                    <textarea rows={2} value={String(adHocForm.CMRCallStatusNote || '')} onChange={(e) => updateAdHocField('CMRCallStatusNote', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none" />
+                    <MobileAutoExpandTextarea minRows={2} value={String(adHocForm.CMRCallStatusNote || '')} onChange={(e) => updateAdHocField('CMRCallStatusNote', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none" />
                   </div>
                 </div>
               </div>

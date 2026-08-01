@@ -1520,8 +1520,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     ) : (
                       <div className="pb-0.5">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                        <input
-                          type="text"
+                        <MobileAutoExpandTextarea
+                          minRows={2}
                           required
                           value={consultMembers}
                           onChange={(e) => setConsultMembers(e.target.value)}
@@ -1628,8 +1628,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Dự trù kinh phí (VNĐ)</label>
-                      <input
-                        type="text"
+                      <MobileAutoExpandTextarea
+                        minRows={2}
                         placeholder="vd: 45,000,000..."
                         value={plannedPrice}
                         onChange={(e) => setPlannedPrice(e.target.value)}

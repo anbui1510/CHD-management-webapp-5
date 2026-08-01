@@ -466,8 +466,8 @@ export default function ResultStaffDrawer({
 
                                 <div className="pb-2">
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Thành viên duyệt hội chẩn <span className="text-red-500">*</span></label>
-                                  <input
-                                    type="text"
+                                  <MobileAutoExpandTextarea
+                                    minRows={2}
                                     required
                                     value={formData.ConsultMember || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, ConsultMember: e.target.value }))}
@@ -622,8 +622,8 @@ export default function ResultStaffDrawer({
 
                                 <div>
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Số tiền dự kiến (VND / text)</label>
-                                  <input
-                                    type="text"
+                                  <MobileAutoExpandTextarea
+                                    minRows={2}
                                     placeholder="vd: 45.000.000đ"
                                     value={formData.PlannedPrice}
                                     onChange={(e) => setFormData(prev => ({ ...prev, PlannedPrice: e.target.value }))}

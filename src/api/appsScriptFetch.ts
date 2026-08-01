@@ -382,6 +382,45 @@ const getScriptUrl = () =>
 
 const isLocalHost = () => ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
 
+/** Client-side Sheets pull health (used when Express /api/sync/status is unavailable on Cloudflare). */
+let clientSheetsPullState = {
+  lastPullAt: 0,
+  lastPullOk: true,
+  lastPullMessage: '',
+  lastPushAt: 0,
+  lastPushOk: true,
+  lastPushMessage: ''
+};
+
+const markClientPullOk = (message = 'Đã kéo dữ liệu mới từ Google Sheets.') => {
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPullAt: Date.now(),
+    lastPullOk: true,
+    lastPullMessage: message
+  };
+};
+
+const markClientPullFailed = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error || 'Không đồng bộ được Google Sheets.');
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPullAt: Date.now(),
+    lastPullOk: false,
+    lastPullMessage: message
+  };
+};
+
+export const getClientSheetsSyncStatus = () => ({
+  configured: !!getScriptUrl(),
+  lastPullAt: clientSheetsPullState.lastPullAt,
+  lastPullOk: clientSheetsPullState.lastPullOk,
+  lastPullMessage: clientSheetsPullState.lastPullMessage,
+  lastPushAt: clientSheetsPullState.lastPushAt,
+  lastPushOk: clientSheetsPullState.lastPushOk,
+  lastPushMessage: clientSheetsPullState.lastPushMessage
+});
+
 const setScriptUrl = (scriptUrl: string) => {
   const trimmed = scriptUrl.trim();
   if (trimmed) {
@@ -547,6 +586,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
           ...localData,
           staff: Array.isArray(cache.staff) ? cache.staff.map(stripBridgePassword) : []
         });
+        markClientPullOk('Đã tải dữ liệu từ máy chủ local.');
         return cache;
       })().finally(() => {
         pendingLoad = null;
@@ -588,9 +628,18 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
       if (Array.isArray(cache.staff)) {
         void setPersistedData('staff_data', cache.staff.map(stripBridgePassword));
       }
+      markClientPullOk();
       return cache;
     })
     .catch(async err => {
+      markClientPullFailed(err);
+
+      // Force pulls must surface failure so the UI banner matches reality.
+      // Soft polls may keep serving stale cache.
+      if (force) {
+        throw err;
+      }
+
       if (cache) return cache;
 
       const cachedAll = await getPersistedData('all_data');
@@ -663,6 +712,34 @@ const hydrateCacheFromPersisted = async (): Promise<SheetData | null> => {
     return cache;
   }
   return null;
+};
+
+/** Memory/IndexedDB snapshot only — no network, no background refresh. */
+export const peekPersistedAllData = async (): Promise<SheetData | null> => {
+  const hasClinical = (data: SheetData | null | undefined) =>
+    !!data && (
+      (Array.isArray(data.patients) && data.patients.length > 0) ||
+      (Array.isArray(data.consults) && data.consults.length > 0)
+    );
+
+  if (cache && hasClinical(cache)) {
+    return sanitizeDataBundle(cache);
+  }
+
+  const persisted = await hydrateCacheFromPersisted();
+  if (persisted && hasClinical(persisted)) {
+    return sanitizeDataBundle(persisted);
+  }
+  return null;
+};
+
+/** Current in-memory cache after a bridge update (sync, no IDB round-trip). */
+export const getInMemoryAllData = (): SheetData | null => {
+  if (!cache) return null;
+  const hasClinical =
+    (Array.isArray(cache.patients) && cache.patients.length > 0) ||
+    (Array.isArray(cache.consults) && cache.consults.length > 0);
+  return hasClinical ? sanitizeDataBundle(cache) : null;
 };
 
 const loadAllData = async (force = false): Promise<SheetData> => {
@@ -1072,6 +1149,14 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return jsonResponse(getAppVersionPayload());
   }
 
+  if (endpoint === 'sync' && parts[1] === 'status' && method === 'GET') {
+    // Local Express owns authoritative pull/push flags; bridge owns them on Cloudflare.
+    if (isLocalHost()) return null;
+    const authErr = requireAuthBridge(init);
+    if (authErr) return authErr;
+    return jsonResponse(getClientSheetsSyncStatus());
+  }
+
   if (endpoint === 'sync-config') {
     if (parts[1] === 'sync' && method === 'POST') {
       cache = null;
@@ -1229,7 +1314,10 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     const force = parsed.searchParams.get('force') === 'true' || parsed.searchParams.get('refresh') === 'true';
     const allData = await loadAllData(force);
     // Always strip passwords before sending to client
-    return jsonResponse(sanitizeDataBundle(allData));
+    return jsonResponse({
+      ...sanitizeDataBundle(allData),
+      _syncStatus: getClientSheetsSyncStatus()
+    });
   }
 
   if (endpoint === 'proxy' && parts[1] === 'drive-export') {

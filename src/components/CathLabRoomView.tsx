@@ -6,6 +6,7 @@ import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normali
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
 import { SortColumnIcon } from './SortColumnIcon';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { classifyDiagnosisText } from '../utils/diagnosisClassifier';
 import { resolveStaffByNameOrKey } from '../utils/staffNameMatch';
 import {
@@ -2423,20 +2424,20 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
                            <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Chẩn đoán chi tiết sau TT <span className="text-[9px] font-normal italic lowercase opacity-80">[Điền Nếu có khác biệt lớn]</span></label>
-                           <textarea 
-                             rows={2}
-                             value={formData.PostDiagnosis} 
+                           <MobileAutoExpandTextarea
+                             minRows={2}
+                             value={formData.PostDiagnosis}
                              onChange={e => setFormData({...formData, PostDiagnosis: e.target.value})}
-                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                            />
                          </div>
                          <div>
                            <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1">Ghi chú</label>
-                           <textarea 
-                             rows={2}
-                             value={formData.CathNote} 
+                           <MobileAutoExpandTextarea
+                             minRows={2}
+                             value={formData.CathNote}
                              onChange={e => setFormData({...formData, CathNote: e.target.value})}
-                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                            />
                          </div>
                        </div>

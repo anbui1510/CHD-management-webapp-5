@@ -19,6 +19,7 @@ import {
   removeDiacritics,
 } from '../types';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { VNDateInput } from './VNDateInput';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import {
@@ -315,10 +316,10 @@ export default function TransplantRegisterModal({
                 <div key={field}><label className="text-[9px] font-bold uppercase text-slate-500">{field === 'Gens' ? 'XN gen' : field} *</label><select value={form[field] || 'Không'} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1">{TRANSPLANT_YES_NO_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
               ))}
               <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Mã chẩn đoán *</label><SearchableEnumSelect value={form.TransDiagID || ''} onChange={v => setForm(f => ({ ...f, TransDiagID: v }))} options={diagnosisOptions} placeholder="Chọn mã ICD..." /></div>
-              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Chẩn đoán chi tiết *</label><textarea value={form.DetailTransDiag || ''} onChange={e => setForm(f => ({ ...f, DetailTransDiag: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
-              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Siêu âm tim *</label><textarea value={form.TTE || ''} onChange={e => setForm(f => ({ ...f, TTE: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
-              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Điều trị hiện tại *</label><textarea value={form.Treatment || ''} onChange={e => setForm(f => ({ ...f, Treatment: e.target.value }))} rows={3} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
-              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Ghi chú</label><textarea value={form.TransNote || ''} onChange={e => setForm(f => ({ ...f, TransNote: e.target.value }))} rows={2} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
+              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Chẩn đoán chi tiết *</label><MobileAutoExpandTextarea minRows={3} value={form.DetailTransDiag || ''} onChange={e => setForm(f => ({ ...f, DetailTransDiag: e.target.value }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
+              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Siêu âm tim *</label><MobileAutoExpandTextarea minRows={3} value={form.TTE || ''} onChange={e => setForm(f => ({ ...f, TTE: e.target.value }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
+              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Điều trị hiện tại *</label><MobileAutoExpandTextarea minRows={3} value={form.Treatment || ''} onChange={e => setForm(f => ({ ...f, Treatment: e.target.value }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
+              <div className="col-span-2"><label className="text-[9px] font-bold uppercase text-slate-500">Ghi chú</label><MobileAutoExpandTextarea minRows={2} value={form.TransNote || ''} onChange={e => setForm(f => ({ ...f, TransNote: e.target.value }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
               <div><label className="text-[9px] font-bold uppercase text-slate-500">Ngày ghép tim</label><VNDateInput value={form.TransDate || ''} onChange={v => setForm(f => ({ ...f, TransDate: v }))} className="w-full border rounded-xl px-3 py-2 text-sm mt-1" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3 bg-white border rounded-2xl p-3">
