@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type TextareaHTMLAttributes } from 'react';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
-type MobileAutoExpandTextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+type MobileAutoExpandTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  /** Minimum visible rows on mobile (default 2). */
   minRows?: number;
+  /** Minimum visible rows on desktop (default 1). */
+  desktopMinRows?: number;
 };
 
 export function MobileAutoExpandTextarea({
   minRows = 2,
+  desktopMinRows = 1,
   className = '',
   value,
   onChange,
@@ -15,38 +19,35 @@ export function MobileAutoExpandTextarea({
 }: MobileAutoExpandTextareaProps) {
   const isMobile = useIsMobile();
   const ref = useRef<HTMLTextAreaElement>(null);
+  const effectiveMinRows = isMobile ? minRows : desktopMinRows;
 
   const adjustHeight = useCallback(() => {
     const el = ref.current;
-    if (!el || !isMobile) return;
+    if (!el) return;
 
     el.style.height = 'auto';
     const styles = window.getComputedStyle(el);
     const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
     const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
     const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
-    const minHeight = lineHeight * minRows + paddingTop + paddingBottom;
+    const minHeight = lineHeight * effectiveMinRows + paddingTop + paddingBottom;
     el.style.height = `${Math.max(el.scrollHeight, minHeight)}px`;
-  }, [isMobile, minRows]);
+  }, [effectiveMinRows]);
 
   useEffect(() => {
     adjustHeight();
-  }, [adjustHeight, value]);
-
-  const mobileClassName = isMobile ? 'resize-none overflow-hidden' : 'resize-y';
+  }, [adjustHeight, value, isMobile]);
 
   return (
     <textarea
       ref={ref}
-      rows={rows ?? minRows}
+      rows={rows ?? effectiveMinRows}
       value={value}
       onChange={(event) => {
         onChange?.(event);
-        if (isMobile) {
-          requestAnimationFrame(adjustHeight);
-        }
+        requestAnimationFrame(adjustHeight);
       }}
-      className={`${className} ${mobileClassName}`.trim()}
+      className={`${className} resize-none overflow-hidden`.trim()}
       {...rest}
     />
   );

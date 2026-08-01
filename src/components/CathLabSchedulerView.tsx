@@ -4013,8 +4013,8 @@ Xin cảm ơn!`;
                     {/* Planned Price */}
                     <div>
                       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Số tiền dự kiến (VNĐ)</label>
-                      <input
-                        type="text"
+                      <MobileAutoExpandTextarea
+                        minRows={2}
                         placeholder="ví dụ: 45,000,000..."
                         value={plannedPrice}
                         onChange={(e) => setPlannedPrice(e.target.value)}
@@ -5857,7 +5857,7 @@ Xin cảm ơn!`;
                           />
                         ), { alignTop: true })}
                         {renderAdHocRow('Dự trù kinh phí', (
-                          <input type="text" placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-sans font-bold`} />
+                          <MobileAutoExpandTextarea minRows={2} placeholder="45,000,000" value={adHocPlannedPrice} onChange={(e) => setAdHocPlannedPrice(e.target.value)} className={`${adHocInputCls} font-sans font-bold`} />
                         ))}
                         {renderAdHocRow('Kiểm tra dụng cụ', (
                           <select value={adHocCheckDevice} onChange={(e) => setAdHocCheckDevice(e.target.value as any)} className={adHocSelectCls}>

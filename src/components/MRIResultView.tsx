@@ -18,6 +18,7 @@ import {
 } from '../types';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { VNDateInput } from './VNDateInput';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { formatFetchErrorMessage } from '../utils/patientFormValidation';
@@ -451,39 +452,39 @@ export default function MRIResultView({
 
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kết quả CMR *</label>
-                          <textarea
+                          <MobileAutoExpandTextarea
                             required
-                            rows={3}
+                            minRows={3}
                             value={String(form.CMRResult || '')}
                             onChange={(e) => setForm(prev => ({ ...prev, CMRResult: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                           />
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kết luận MRI</label>
-                          <textarea
-                            rows={2}
+                          <MobileAutoExpandTextarea
+                            minRows={2}
                             value={String(form.ConcludedResult || '')}
                             onChange={(e) => setForm(prev => ({ ...prev, ConcludedResult: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                           />
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ghi chú CMR</label>
-                          <textarea
-                            rows={2}
+                          <MobileAutoExpandTextarea
+                            minRows={2}
                             value={String(form.CMRNote || '')}
                             onChange={(e) => setForm(prev => ({ ...prev, CMRNote: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                           />
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kế hoạch tiếp theo</label>
-                          <textarea
-                            rows={2}
+                          <MobileAutoExpandTextarea
+                            minRows={2}
                             value={String(form.NextPlan || '')}
                             onChange={(e) => setForm(prev => ({ ...prev, NextPlan: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                           />
                         </div>
                       </>

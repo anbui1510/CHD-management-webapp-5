@@ -1,5 +1,10 @@
 import type { CathLab, CMR, Consult, DeviceTemplate, DoctorPerformanceMark, Notification, Operation, Patient, RolePreset, Source, Staff, Transplant } from '../types';
-import { ensureSyncConfigHydrated } from './appsScriptFetch';
+import {
+  ensureSyncConfigHydrated,
+  getInMemoryAllData,
+  peekPersistedAllData
+} from './appsScriptFetch';
+import type { SheetsSyncStatus } from '../utils/sheetsSyncFeedback';
 
 export class AuthRequiredError extends Error {
   constructor(message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') {
@@ -21,6 +26,7 @@ export type MedicalDataBundle = {
   rolePresets: RolePreset[];
   notifications: Notification[];
   doctorPerformanceMarks: DoctorPerformanceMark[];
+  _syncStatus?: SheetsSyncStatus;
 };
 
 export type RefreshScope = 'full' | 'clinical' | 'consult' | 'staff' | 'mri' | 'transplant';
@@ -51,7 +57,7 @@ const isLikelyMobileDevice = (): boolean => {
     || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
 };
 
-const getMedicalDataFetchTimeout = (force: boolean): number => {
+export const getMedicalDataFetchTimeout = (force: boolean): number => {
   const desktopTimeout = force ? 60000 : 20000;
   if (!isLikelyMobileDevice()) return desktopTimeout;
   return force ? 90000 : 45000;
@@ -61,6 +67,64 @@ const getMedicalDataFetchTimeout = (force: boolean): number => {
 function authHeaders(token?: string): HeadersInit {
   const t = token || getAuthToken();
   return t ? { 'Authorization': `Bearer ${t}` } : {};
+}
+
+function sheetDataToBundle(data: {
+  patients?: unknown;
+  consults?: unknown;
+  staff?: unknown;
+  cathlabs?: unknown;
+  operations?: unknown;
+  cmrs?: unknown;
+  transplants?: unknown;
+  sources?: unknown;
+  deviceTemplates?: unknown;
+  rolePresets?: unknown;
+  notifications?: unknown;
+  doctorPerformanceMarks?: unknown;
+}): MedicalDataBundle {
+  return {
+    patients: Array.isArray(data.patients) ? data.patients as Patient[] : EMPTY_BUNDLE.patients,
+    consults: Array.isArray(data.consults) ? data.consults as Consult[] : EMPTY_BUNDLE.consults,
+    staff: Array.isArray(data.staff) ? data.staff as Staff[] : EMPTY_BUNDLE.staff,
+    cathlabs: Array.isArray(data.cathlabs) ? data.cathlabs as CathLab[] : EMPTY_BUNDLE.cathlabs,
+    operations: Array.isArray(data.operations) ? data.operations as Operation[] : EMPTY_BUNDLE.operations,
+    cmrs: Array.isArray(data.cmrs) ? data.cmrs as CMR[] : EMPTY_BUNDLE.cmrs,
+    transplants: Array.isArray(data.transplants) ? data.transplants as Transplant[] : EMPTY_BUNDLE.transplants,
+    sources: Array.isArray(data.sources) ? data.sources as Source[] : EMPTY_BUNDLE.sources,
+    deviceTemplates: Array.isArray(data.deviceTemplates) ? data.deviceTemplates as DeviceTemplate[] : EMPTY_BUNDLE.deviceTemplates,
+    rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets as RolePreset[] : EMPTY_BUNDLE.rolePresets,
+    notifications: Array.isArray(data.notifications) ? data.notifications as Notification[] : EMPTY_BUNDLE.notifications,
+    doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks)
+      ? data.doctorPerformanceMarks as DoctorPerformanceMark[]
+      : EMPTY_BUNDLE.doctorPerformanceMarks
+  };
+}
+
+/** Fast local hydrate — IndexedDB/memory only. */
+export async function peekCachedMedicalDataBundle(): Promise<MedicalDataBundle | null> {
+  try {
+    const data = await peekPersistedAllData();
+    if (!data) return null;
+    const bundle = sheetDataToBundle(data);
+    if (bundle.patients.length === 0 && bundle.consults.length === 0) return null;
+    return bundle;
+  } catch {
+    return null;
+  }
+}
+
+/** Apply bridge in-memory cache after background refresh event (no network). */
+export function peekInMemoryMedicalDataBundle(): MedicalDataBundle | null {
+  try {
+    const data = getInMemoryAllData();
+    if (!data) return null;
+    const bundle = sheetDataToBundle(data);
+    if (bundle.patients.length === 0 && bundle.consults.length === 0) return null;
+    return bundle;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchMedicalDataBundle(force = false): Promise<MedicalDataBundle> {
@@ -110,23 +174,13 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
     const err = await res.json().catch(() => ({})) as { error?: string; _syncWarning?: string };
     throw new Error(err._syncWarning || err.error || `Không thể tải dữ liệu (HTTP ${res.status})`);
   }
-  const data = await res.json() as MedicalDataBundle & { _syncWarning?: string };
+  const data = await res.json() as MedicalDataBundle & { _syncWarning?: string; _syncStatus?: SheetsSyncStatus };
   if (data._syncWarning) {
     throw new Error(data._syncWarning);
   }
   return {
-    patients: Array.isArray(data.patients) ? data.patients : EMPTY_BUNDLE.patients,
-    consults: Array.isArray(data.consults) ? data.consults : EMPTY_BUNDLE.consults,
-    staff: Array.isArray(data.staff) ? data.staff : EMPTY_BUNDLE.staff,
-    cathlabs: Array.isArray(data.cathlabs) ? data.cathlabs : EMPTY_BUNDLE.cathlabs,
-    operations: Array.isArray(data.operations) ? data.operations : EMPTY_BUNDLE.operations,
-    cmrs: Array.isArray(data.cmrs) ? data.cmrs : EMPTY_BUNDLE.cmrs,
-    transplants: Array.isArray(data.transplants) ? data.transplants : EMPTY_BUNDLE.transplants,
-    sources: Array.isArray(data.sources) ? data.sources : EMPTY_BUNDLE.sources,
-    deviceTemplates: Array.isArray(data.deviceTemplates) ? data.deviceTemplates : EMPTY_BUNDLE.deviceTemplates,
-    rolePresets: Array.isArray(data.rolePresets) ? data.rolePresets : EMPTY_BUNDLE.rolePresets,
-    notifications: Array.isArray(data.notifications) ? data.notifications : EMPTY_BUNDLE.notifications,
-    doctorPerformanceMarks: Array.isArray(data.doctorPerformanceMarks) ? data.doctorPerformanceMarks : EMPTY_BUNDLE.doctorPerformanceMarks
+    ...sheetDataToBundle(data),
+    _syncStatus: data._syncStatus
   };
 }
 

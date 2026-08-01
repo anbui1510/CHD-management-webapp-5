@@ -62,7 +62,7 @@ import { formatSheetsSyncStatusLabel } from './utils/sheetsSyncFeedback';
 import { buildSyncContext, withSyncContext } from './utils/sheetsSyncMutation';
 import { SheetsSyncFeedbackProvider } from './context/SheetsSyncFeedbackContext';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
-import { AuthRequiredError } from './api/medicalDataRefresh';
+import { AuthRequiredError, getMedicalDataFetchTimeout, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
 import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
@@ -82,6 +82,7 @@ import {
 import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
+import { MobileAutoExpandTextarea } from './components/MobileAutoExpandTextarea';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, getSourceProvinceOptions } from './data/source';
 import { AppModule, canAccessModule, canManageStaff, setRuntimeRolePresets } from './auth/permissions';
 import MobileBottomNav from './components/layout/MobileBottomNav';
@@ -444,11 +445,11 @@ export default function App() {
     []
   );
 
-  const { refreshMedicalData, syncMedicalDataInBackground, loadMedicalDataAfterAuth } = useRefreshMedicalData(
+  const { refreshMedicalData, syncMedicalDataInBackground, loadMedicalDataAfterAuth, wasRecentlyForceSynced } = useRefreshMedicalData(
     medicalDataSetters,
     setMedicalDataLoadState
   );
-  const { status: sheetsSyncStatus, refreshStatus: refreshSheetsSyncStatus } = useSheetsSyncStatus(!!currentStaff?.StaffKey);
+  const { status: sheetsSyncStatus, refreshStatus: refreshSheetsSyncStatus, reportPullResult } = useSheetsSyncStatus(!!currentStaff?.StaffKey);
   const sheetsSyncBadge = formatSheetsSyncStatusLabel(sheetsSyncStatus);
 
   const patchConsult = useCallback((consultKey: string, patch: Partial<Consult>) => {
@@ -677,13 +678,19 @@ export default function App() {
 
   const refreshFullData = useCallback((force = false) => {
     if (force) {
-      void syncMedicalDataInBackground('full')?.finally(() => {
+      void syncMedicalDataInBackground('full', {
+        onSyncStatus: (status) => {
+          reportPullResult(status);
+          void refreshSheetsSyncStatus();
+        }
+      })?.finally(() => {
+        reportPullResult();
         void refreshSheetsSyncStatus();
       });
       return;
     }
     void refreshMedicalData('full', false, { silent: true });
-  }, [refreshMedicalData, syncMedicalDataInBackground, refreshSheetsSyncStatus]);
+  }, [refreshMedicalData, syncMedicalDataInBackground, refreshSheetsSyncStatus, reportPullResult]);
 
   const markNotificationRead = useCallback((notificationKey: string) => {
     setNotifications(prev =>
@@ -724,6 +731,8 @@ export default function App() {
     const tick = () => setMedicalLoadElapsedSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
+    // Match force-fetch abort (+ small buffer). Do not trip earlier than the real request timeout.
+    const safetyMs = getMedicalDataFetchTimeout(true) + 5000;
     const safetyTimer = setTimeout(() => {
       setMedicalDataLoadState(prev => {
         if (prev.phase !== 'loading' && prev.phase !== 'syncing') return prev;
@@ -733,7 +742,7 @@ export default function App() {
           message: 'Đồng bộ quá lâu — dữ liệu có thể chưa cập nhật. Bấm nút Đồng bộ trên header để thử lại.'
         };
       });
-    }, 25000);
+    }, safetyMs);
     return () => {
       clearInterval(interval);
       clearTimeout(safetyTimer);
@@ -800,7 +809,12 @@ export default function App() {
           setCurrentStaff(staffData);
           await hydrateSyncConfigFromServer();
           void migrateLocalSyncConfigToServer();
-          void loadMedicalDataAfterAuth('full').catch(handleAuthDataFailure);
+          void loadMedicalDataAfterAuth('full', {
+            onSyncStatus: (status) => reportPullResult(status)
+          }).then(() => {
+            reportPullResult();
+            void refreshSheetsSyncStatus();
+          }).catch(handleAuthDataFailure);
         })
         .catch(() => {
           localStorage.removeItem('CHD_AUTH_TOKEN');
@@ -813,7 +827,7 @@ export default function App() {
     } else {
       loadPublicStaffForLogin();
     }
-  }, [handleAuthDataFailure, loadMedicalDataAfterAuth, loadPublicStaffForLogin]);
+  }, [handleAuthDataFailure, loadMedicalDataAfterAuth, loadPublicStaffForLogin, reportPullResult, refreshSheetsSyncStatus]);
 
   // Detect new Cloudflare deploy while app is open → reload once for new bundle
   useEffect(() => {
@@ -862,13 +876,26 @@ export default function App() {
   useEffect(() => {
     if (!currentStaff?.StaffKey) return;
     const onBridgeDataUpdated = () => {
-      void refreshMedicalData('full', true, { silent: true }).catch(err => {
+      // Avoid a third force-pull right after auth/manual sync; just apply bridge memory cache.
+      if (wasRecentlyForceSynced()) {
+        const cached = peekInMemoryMedicalDataBundle();
+        if (cached) {
+          applyMedicalDataBundle(cached, 'full', medicalDataSetters);
+        }
+        return;
+      }
+      const cached = peekInMemoryMedicalDataBundle();
+      if (cached) {
+        applyMedicalDataBundle(cached, 'full', medicalDataSetters);
+        return;
+      }
+      void refreshMedicalData('full', false, { silent: true }).catch(err => {
         console.warn('Bridge cache refresh apply failed:', err);
       });
     };
     window.addEventListener('chd-bridge-data-updated', onBridgeDataUpdated);
     return () => window.removeEventListener('chd-bridge-data-updated', onBridgeDataUpdated);
-  }, [currentStaff?.StaffKey, refreshMedicalData]);
+  }, [currentStaff?.StaffKey, refreshMedicalData, wasRecentlyForceSynced, medicalDataSetters]);
 
   useEffect(() => {
     if (!currentStaff?.StaffKey || staffList.length === 0) return;
@@ -1028,11 +1055,18 @@ export default function App() {
 
       await hydrateSyncConfigFromServer();
       void migrateLocalSyncConfigToServer();
-      void loadMedicalDataAfterAuth('full').catch(err => {
+      void loadMedicalDataAfterAuth('full', {
+        onSyncStatus: (status) => reportPullResult(status)
+      }).then(() => {
+        reportPullResult();
+        void refreshSheetsSyncStatus();
+      }).catch(err => {
         if (err instanceof AuthRequiredError) {
           handleAuthDataFailure(err);
           return;
         }
+        reportPullResult();
+        void refreshSheetsSyncStatus();
         const msg = err instanceof Error ? err.message : String(err);
         setLoginError(msg || 'Không tải được dữ liệu từ Google Sheets.');
       });
@@ -2216,7 +2250,7 @@ export default function App() {
             </button>
 
             <span
-              className={`hidden sm:inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide border ${
+              className={`inline-flex max-w-[7.5rem] sm:max-w-none truncate px-1.5 sm:px-2 py-1 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-wide border ${
                 sheetsSyncBadge.tone === 'ok'
                   ? 'bg-emerald-500/20 border-emerald-200/40 text-emerald-50'
                   : sheetsSyncBadge.tone === 'error'
@@ -2298,9 +2332,16 @@ export default function App() {
       )}
 
       {medicalDataLoadState.phase === 'error' && medicalDataLoadState.message && (
-        <div className="bg-red-600 text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2">
+        <div className="bg-red-600 text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2 flex-wrap">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{medicalDataLoadState.message}</span>
+          <button
+            type="button"
+            onClick={() => refreshFullData(true)}
+            className="underline underline-offset-2 hover:text-white/90 font-extrabold shrink-0"
+          >
+            Đồng bộ lại
+          </button>
         </div>
       )}
 
@@ -2924,8 +2965,8 @@ export default function App() {
 
                     <div>
                       <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Chẩn đoán chi tiết *</label>
-                      <textarea
-                        rows={2}
+                      <MobileAutoExpandTextarea
+                        minRows={2}
                         required
                         placeholder="Điền kết luận siêu âm tim hoặc chẩn đoán chi tiết trong hồ sơ"
                         value={newConsultData.DetailDiagnosis}
@@ -3901,8 +3942,8 @@ export default function App() {
                           {/* Chẩn đoán Chi tiết (DetailDiagnosis) */}
                           <div>
                             <label className="block text-slate-500 font-black uppercase text-[10px] mb-1">Chẩn đoán Chi tiết *</label>
-                            <textarea
-                              rows={2}
+                            <MobileAutoExpandTextarea
+                              minRows={2}
                               required
                               placeholder="Nhập chẩn đoán chi tiết..."
                               value={editConsultData.DetailDiagnosis}

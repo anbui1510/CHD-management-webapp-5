@@ -83,6 +83,13 @@ export function formatSheetsSyncStatusLabel(status: SheetsSyncStatus | null): {
       title: 'Chưa cấu hình URL Apps Script — dữ liệu chỉ lưu trên app'
     };
   }
+  if (!status.lastPullAt && !status.lastPushAt) {
+    return {
+      label: 'Sheets: …',
+      tone: 'muted',
+      title: 'Chưa có lần đồng bộ nào trong phiên này'
+    };
+  }
   if (!status.lastPushOk || !status.lastPullOk) {
     const detail = !status.lastPushOk ? status.lastPushMessage : status.lastPullMessage;
     return {

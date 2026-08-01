@@ -25,6 +25,7 @@ import {
 } from '../types';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { VNDateInput } from './VNDateInput';
+import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { getSourceDiagnosisOptions, normalizeDiagnosisID } from '../data/source';
 import {
@@ -980,22 +981,22 @@ export default function MRIRegisterView({
 
                   <div>
                     <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI *</label>
-                    <textarea
+                    <MobileAutoExpandTextarea
                       required
-                      rows={2}
+                      minRows={2}
                       value={cmrDiagnosis}
                       onChange={(e) => setCmrDiagnosis(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI *</label>
-                    <textarea
+                    <MobileAutoExpandTextarea
                       required
-                      rows={2}
+                      minRows={2}
                       value={cmrRequest}
                       onChange={(e) => setCmrRequest(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                     />
                   </div>
                 </div>
@@ -1183,8 +1184,8 @@ export default function MRIRegisterView({
                           </div>
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Phương thức chụp</label>
-                            <input
-                              type="text"
+                            <MobileAutoExpandTextarea
+                              minRows={2}
                               value={String(editForm.CMRMethod || '')}
                               onChange={(e) => setEditForm(prev => ({ ...prev, CMRMethod: e.target.value }))}
                               className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs"
@@ -1192,8 +1193,8 @@ export default function MRIRegisterView({
                           </div>
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Dự trù dụng cụ</label>
-                            <input
-                              type="text"
+                            <MobileAutoExpandTextarea
+                              minRows={2}
                               value={String(editForm.CMRDevice || '')}
                               onChange={(e) => setEditForm(prev => ({ ...prev, CMRDevice: e.target.value }))}
                               className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold focus:outline-none text-xs"
@@ -1202,22 +1203,22 @@ export default function MRIRegisterView({
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chẩn đoán MRI *</label>
-                          <textarea
+                          <MobileAutoExpandTextarea
                             required
-                            rows={2}
+                            minRows={2}
                             value={String(editForm.CMRDiagnosis || '')}
                             onChange={(e) => setEditForm(prev => ({ ...prev, CMRDiagnosis: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                           />
                         </div>
                         <div>
                           <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Yêu cầu MRI *</label>
-                          <textarea
+                          <MobileAutoExpandTextarea
                             required
-                            rows={2}
+                            minRows={2}
                             value={String(editForm.CMRRequest || '')}
                             onChange={(e) => setEditForm(prev => ({ ...prev, CMRRequest: e.target.value }))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none resize-none"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
                           />
                         </div>
                       </div>

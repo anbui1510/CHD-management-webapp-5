@@ -3,12 +3,15 @@ import {
   applyMedicalDataBundle,
   AuthRequiredError,
   fetchMedicalDataBundle,
+  peekCachedMedicalDataBundle,
   type MedicalDataSetters,
   type RefreshScope
 } from '../api/medicalDataRefresh';
+import type { SheetsSyncStatus } from '../utils/sheetsSyncFeedback';
 
 const REFRESH_COOLDOWN_MS = 2500;
-const SYNC_TIMEOUT_MS = 20000;
+/** Ignore bridge force-apply storms right after an intentional force sync. */
+const FORCE_SYNC_SETTLE_MS = 5000;
 
 export type MedicalDataLoadPhase = 'idle' | 'loading' | 'syncing' | 'ready' | 'error';
 
@@ -23,20 +26,11 @@ export type RefreshMedicalDataOptions = {
   silent?: boolean;
 };
 
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise
-      .then(value => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch(err => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-}
+export type ForceSyncOptions = {
+  /** Prefer "Đang đồng bộ…" even when UI already has cached rows. */
+  preferSyncingBanner?: boolean;
+  onSyncStatus?: (status: SheetsSyncStatus | undefined) => void;
+};
 
 export function useRefreshMedicalData(
   setters: MedicalDataSetters,
@@ -44,8 +38,9 @@ export function useRefreshMedicalData(
 ) {
   const metaRef = useRef({
     pending: null as Promise<void> | null,
-    syncPending: null as Promise<void> | null,
+    forcePending: null as Promise<void> | null,
     lastAt: 0,
+    lastForceAt: 0,
     phase: 'idle' as MedicalDataLoadPhase,
     startedAt: null as number | null
   });
@@ -70,23 +65,26 @@ export function useRefreshMedicalData(
     const now = Date.now();
     const silent = options?.silent ?? false;
 
-    if (meta.pending) return meta.pending;
+    if (force && meta.forcePending) return meta.forcePending;
+    if (meta.forcePending) return; // soft refresh waits — force pull is source of truth
+    if (!force && meta.pending) return meta.pending;
     if (!force && now - meta.lastAt < REFRESH_COOLDOWN_MS) return;
 
-    const shouldShowBanner = !silent && !meta.syncPending;
-    if (shouldShowBanner && (meta.phase === 'idle' || meta.phase === 'error')) {
+    const shouldShowBanner = !silent && !meta.forcePending;
+    if (shouldShowBanner && (meta.phase === 'idle' || meta.phase === 'error' || meta.phase === 'ready')) {
       emitState({
-        phase: 'loading',
-        startedAt: now,
-        message: 'Đang tải dữ liệu...'
+        phase: force ? 'syncing' : 'loading',
+        startedAt: meta.startedAt ?? now,
+        message: force ? 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...' : 'Đang tải dữ liệu...'
       });
     }
 
-    meta.pending = fetchMedicalDataBundle(force)
+    const work = fetchMedicalDataBundle(force)
       .then(bundle => {
         applyMedicalDataBundle(bundle, scope, setters);
         meta.lastAt = Date.now();
-        if (shouldShowBanner && !meta.syncPending) {
+        if (force) meta.lastForceAt = meta.lastAt;
+        if (shouldShowBanner) {
           emitState({ phase: 'ready', startedAt: null });
         }
       })
@@ -99,7 +97,7 @@ export function useRefreshMedicalData(
           });
           throw err;
         }
-        if (shouldShowBanner && !meta.syncPending) {
+        if (shouldShowBanner) {
           emitState({
             phase: 'error',
             startedAt: null,
@@ -107,58 +105,110 @@ export function useRefreshMedicalData(
           });
         }
         throw err;
-      })
-      .finally(() => {
-        meta.pending = null;
       });
 
+    if (force) {
+      meta.forcePending = work.finally(() => {
+        meta.forcePending = null;
+      });
+      return meta.forcePending;
+    }
+
+    meta.pending = work.finally(() => {
+      meta.pending = null;
+    });
     return meta.pending;
   }, [setters, emitState]);
 
-  const syncMedicalDataInBackground = useCallback((scope: RefreshScope = 'full') => {
+  const runSingleForcePull = useCallback(async (
+    scope: RefreshScope,
+    bannerPhase: 'loading' | 'syncing',
+    options?: ForceSyncOptions
+  ) => {
     const meta = metaRef.current;
-    if (meta.syncPending) return meta.syncPending;
+    if (meta.forcePending) return meta.forcePending;
 
-    const startedAt = Date.now();
+    const startedAt = meta.startedAt ?? Date.now();
     emitState({
-      phase: 'syncing',
+      phase: bannerPhase,
       startedAt,
-      message: 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...'
+      message: bannerPhase === 'loading'
+        ? 'Đang tải dữ liệu vào app...'
+        : 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...'
     });
 
-    meta.syncPending = withTimeout(
-      fetchMedicalDataBundle(true),
-      SYNC_TIMEOUT_MS,
-      'Không đồng bộ được Google Sheets sau 20 giây. Kiểm tra mạng hoặc cấu hình Apps Script rồi bấm Đồng bộ lại.'
-    )
+    meta.forcePending = fetchMedicalDataBundle(true)
       .then(bundle => {
         applyMedicalDataBundle(bundle, scope, setters);
         meta.lastAt = Date.now();
+        meta.lastForceAt = meta.lastAt;
+        options?.onSyncStatus?.(bundle._syncStatus);
         emitState({ phase: 'ready', startedAt: null });
       })
       .catch(err => {
-        console.warn('Background medical data sync failed:', err);
+        console.warn('Force medical data sync failed:', err);
+        options?.onSyncStatus?.(undefined);
+        if (err instanceof AuthRequiredError) {
+          emitState({
+            phase: 'error',
+            startedAt: null,
+            message: err.message
+          });
+          throw err;
+        }
         emitState({
           phase: 'error',
           startedAt: null,
-          message: err instanceof Error ? err.message : 'Không đồng bộ được Google Sheets.'
+          message: err instanceof Error ? err.message : 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
         });
+        throw err;
       })
       .finally(() => {
-        meta.syncPending = null;
+        meta.forcePending = null;
       });
 
-    return meta.syncPending;
+    return meta.forcePending;
   }, [setters, emitState]);
 
-  const loadMedicalDataAfterAuth = useCallback(async (scope: RefreshScope = 'full') => {
+  const syncMedicalDataInBackground = useCallback((
+    scope: RefreshScope = 'full',
+    options?: ForceSyncOptions
+  ) => {
+    return runSingleForcePull(scope, 'syncing', {
+      preferSyncingBanner: true,
+      ...options
+    });
+  }, [runSingleForcePull]);
+
+  const loadMedicalDataAfterAuth = useCallback(async (
+    scope: RefreshScope = 'full',
+    options?: ForceSyncOptions
+  ) => {
+    const cached = await peekCachedMedicalDataBundle();
+    const hasCache = !!cached && (cached.patients.length > 0 || cached.consults.length > 0);
+    if (hasCache && cached) {
+      applyMedicalDataBundle(cached, scope, setters);
+    }
+
     try {
-      await refreshMedicalData(scope, true);
+      await runSingleForcePull(scope, hasCache ? 'syncing' : 'loading', options);
     } catch (err) {
       if (err instanceof AuthRequiredError) throw err;
+      // Cached rows already on screen; keep error banner for the failed pull.
     }
-    void syncMedicalDataInBackground(scope);
-  }, [refreshMedicalData, syncMedicalDataInBackground]);
+  }, [runSingleForcePull, setters]);
 
-  return { refreshMedicalData, syncMedicalDataInBackground, loadMedicalDataAfterAuth };
+  const wasRecentlyForceSynced = useCallback(() => {
+    const meta = metaRef.current;
+    if (meta.forcePending) return true;
+    if (meta.phase === 'loading' || meta.phase === 'syncing') return true;
+    return Date.now() - meta.lastForceAt < FORCE_SYNC_SETTLE_MS;
+  }, []);
+
+  return {
+    refreshMedicalData,
+    syncMedicalDataInBackground,
+    loadMedicalDataAfterAuth,
+    wasRecentlyForceSynced
+  };
 }

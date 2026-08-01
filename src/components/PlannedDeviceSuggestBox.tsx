@@ -78,7 +78,7 @@ export function PlannedDeviceSuggestBox({
   placeholder = 'Nhập chi tiết dụng cụ dự kiến đầy đủ...',
   rows = 2,
   required = false,
-  textareaClassName = 'w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800 leading-normal resize-y',
+  textareaClassName = 'w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800 leading-normal',
   autoExpandOnMobile = true
 }: PlannedDeviceSuggestBoxProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
