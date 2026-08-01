@@ -104,6 +104,9 @@ const CATH_INTERVENTIONIST_DOCTORS = [
   'BS. Tĩnh',
 ];
 
+const SCHEDULED_1ST_PTV_OPTIONS = ['BS. Phụng', 'BS. Lợi', 'BS. Thịnh'];
+const SCHEDULED_3RD_PTV_OPTIONS = ['BS. Ân', 'BS. Tài', 'BS. Hiếu', 'BS. Hùng', 'BS. Tĩnh', 'BS. Thịnh'];
+
 const getAutoScheduled2nd = (requestBy: string) => {
   if (!requestBy) return '';
   const norm = requestBy.trim();
@@ -309,13 +312,13 @@ const DEPARTMENTS_LIST = [
 ];
 
 const CALL_STATUS_OPTIONS = [
+  "Đồng ý",
+  "Chờ tài trợ",
   "Sai số điện thoại",
   "Chưa liên lạc được",
   "Gia đình chưa đồng ý làm",
   "Đã làm nơi khác",
   "Muốn theo dõi nơi khác",
-  "Chờ tài trợ",
-  "Đồng ý",
   "Loại"
 ];
 
@@ -679,6 +682,18 @@ export default function CathLabSchedulerView({
     const lastName = parts[parts.length - 1];
     return `BS. ${lastName}`;
   };
+
+  const requestByDoctorOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return staffList
+      .filter(s => !s.FireDate)
+      .map(st => formatShortDoctorName(st.StaffName))
+      .filter(name => {
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      });
+  }, [staffList]);
 
   // Utility to parse Year of date string
   const getYear = (dateStr: string | undefined): number => {
@@ -3890,22 +3905,16 @@ Xin cảm ơn!`;
                           </div>
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Người đăng ký</label>
-                            <select
+                            <SearchableEnumSelect
+                              options={requestByDoctorOptions}
                               value={schedRequestBy}
-                              onChange={(e) => {
-                                const val = e.target.value;
+                              onChange={(val) => {
                                 setSchedRequestBy(val);
                                 setScheduled2nd(getAutoScheduled2nd(val));
                               }}
-                              className={`${schedInputCls} font-bold`}
-                            >
-                              <option value="">— Chọn BS —</option>
-                              {staffList.filter(s => !s.FireDate).map(st => (
-                                <option key={st.StaffKey} value={formatShortDoctorName(st.StaffName)}>
-                                  {formatShortDoctorName(st.StaffName)}
-                                </option>
-                              ))}
-                            </select>
+                              placeholder="— Chọn BS —"
+                              searchPlaceholder="Gõ tên BS..."
+                            />
                           </div>
                           <div className="grid grid-cols-2 gap-1.5 sm:col-span-2">
                             <div>
@@ -4173,16 +4182,13 @@ Xin cảm ơn!`;
                           {/* Post Cath Department */}
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nằm sau thông tim</label>
-                            <select
+                            <SearchableEnumSelect
+                              options={DEPARTMENTS_LIST}
                               value={postCathDepart}
-                              onChange={(e) => setPostCathDepart(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800"
-                            >
-                              <option value="">— Hãy chọn khoa —</option>
-                              {DEPARTMENTS_LIST.map(dept => (
-                                <option key={dept} value={dept}>{dept}</option>
-                              ))}
-                            </select>
+                              onChange={setPostCathDepart}
+                              placeholder="— Hãy chọn khoa —"
+                              searchPlaceholder="Gõ tên khoa..."
+                            />
                           </div>
 
                           {/* Cath Methods */}
@@ -4204,47 +4210,35 @@ Xin cảm ơn!`;
                           {/* Scheduled Interventionists (1, 2, 3) */}
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">PTV chính</label>
-                            <select
+                            <SearchableEnumSelect
+                              options={SCHEDULED_1ST_PTV_OPTIONS}
                               value={scheduled1st}
-                              onChange={(e) => setScheduled1st(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none text-xs text-slate-850 font-extrabold"
-                            >
-                              <option value="">— Chọn PTV chính —</option>
-                              <option value="BS. Phụng">BS. Phụng</option>
-                              <option value="BS. Lợi">BS. Lợi</option>
-                              <option value="BS. Thịnh">BS. Thịnh</option>
-                            </select>
+                              onChange={setScheduled1st}
+                              placeholder="— Chọn PTV chính —"
+                              searchPlaceholder="Gõ tên PTV..."
+                            />
                           </div>
 
                           <div>
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">PTV phụ 1</label>
-                            <select
+                            <SearchableEnumSelect
+                              options={CATH_INTERVENTIONIST_DOCTORS}
                               value={scheduled2nd}
-                              onChange={(e) => setScheduled2nd(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none text-xs text-indigo-900 font-extrabold"
-                            >
-                              <option value="">— Chọn PTV phụ 1 —</option>
-                              {CATH_INTERVENTIONIST_DOCTORS.map((doc) => (
-                                <option key={doc} value={doc}>{doc}</option>
-                              ))}
-                            </select>
+                              onChange={setScheduled2nd}
+                              placeholder="— Chọn PTV phụ 1 —"
+                              searchPlaceholder="Gõ tên PTV..."
+                            />
                           </div>
 
                           <div className="md:col-span-2">
                             <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">PTV phụ 2</label>
-                            <select
+                            <SearchableEnumSelect
+                              options={SCHEDULED_3RD_PTV_OPTIONS}
                               value={scheduled3rd}
-                              onChange={(e) => setScheduled3rd(e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none text-xs text-slate-800 font-bold"
-                            >
-                              <option value="">— Chọn PTV phụ 2 —</option>
-                              <option value="BS. Ân">BS. Ân</option>
-                              <option value="BS. Tài">BS. Tài</option>
-                              <option value="BS. Hiếu">BS. Hiếu</option>
-                              <option value="BS. Hùng">BS. Hùng</option>
-                              <option value="BS. Tĩnh">BS. Tĩnh</option>
-                              <option value="BS. Thịnh">BS. Thịnh</option>
-                            </select>
+                              onChange={setScheduled3rd}
+                              placeholder="— Chọn PTV phụ 2 —"
+                              searchPlaceholder="Gõ tên PTV..."
+                            />
                           </div>
                         </>
                       )}
@@ -5813,12 +5807,17 @@ Xin cảm ơn!`;
                           <input type="text" placeholder="95" value={adHocPatientHeight} onChange={(e) => setAdHocPatientHeight(e.target.value)} className={adHocInputCls} />
                         ))}
                         {renderAdHocRow(`BS đăng ký *${adHocErrors.includes('RequestBy') ? ' !' : ''}`, (
-                          <select required value={adHocRequestBy} onChange={(e) => { const val = e.target.value; setAdHocRequestBy(val); setAdHocScheduled2nd(getAutoScheduled2nd(val)); }} className={adHocSelectCls}>
-                            <option value="">— Chọn BS —</option>
-                            {staffList.filter(s => !s.FireDate).map((st) => (
-                              <option key={st.StaffKey} value={formatShortDoctorName(st.StaffName)}>{formatShortDoctorName(st.StaffName)}</option>
-                            ))}
-                          </select>
+                          <SearchableEnumSelect
+                            required
+                            options={requestByDoctorOptions}
+                            value={adHocRequestBy}
+                            onChange={(val) => {
+                              setAdHocRequestBy(val);
+                              setAdHocScheduled2nd(getAutoScheduled2nd(val));
+                            }}
+                            placeholder="— Chọn BS —"
+                            searchPlaceholder="Gõ tên BS..."
+                          />
                         ))}
                         {renderAdHocRow('Khoa nội trú *', (
                           <select value={adHocDepartment} onChange={(e) => setAdHocDepartment(e.target.value)} className={adHocSelectCls}>
@@ -5906,34 +5905,40 @@ Xin cảm ơn!`;
                           <SearchableEnumSelect multiple options={METHOD_OPTIONS} values={adHocCathMethod} onMultiChange={setAdHocCathMethod} placeholder="Chọn phương pháp..." searchPlaceholder="Gõ tìm..." direction="up" />
                         ))}
                         {renderAdHocRow('Khoa sau thủ thuật', (
-                          <select value={adHocPostCathDepart} onChange={(e) => setAdHocPostCathDepart(e.target.value)} className={adHocSelectCls}>
-                            {DEPARTMENTS_LIST.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
-                          </select>
+                          <SearchableEnumSelect
+                            options={DEPARTMENTS_LIST}
+                            value={adHocPostCathDepart}
+                            onChange={setAdHocPostCathDepart}
+                            placeholder="— Hãy chọn khoa —"
+                            searchPlaceholder="Gõ tên khoa..."
+                          />
                         ))}
                         {renderAdHocRow('PTV chính', (
-                          <select value={adHocScheduled1st} onChange={(e) => setAdHocScheduled1st(e.target.value)} className={adHocSelectCls}>
-                            <option value="">— Chọn PTV —</option>
-                            <option value="BS. Phụng">BS. Phụng</option>
-                            <option value="BS. Lợi">BS. Lợi</option>
-                            <option value="BS. Thịnh">BS. Thịnh</option>
-                          </select>
+                          <SearchableEnumSelect
+                            options={SCHEDULED_1ST_PTV_OPTIONS}
+                            value={adHocScheduled1st}
+                            onChange={setAdHocScheduled1st}
+                            placeholder="— Chọn PTV —"
+                            searchPlaceholder="Gõ tên PTV..."
+                          />
                         ))}
                         {renderAdHocRow('PTV phụ 1', (
-                          <select value={adHocScheduled2nd} onChange={(e) => setAdHocScheduled2nd(e.target.value)} className={`${adHocSelectCls} text-indigo-950`}>
-                            <option value="">— Chọn PTV phụ 1 —</option>
-                            {CATH_INTERVENTIONIST_DOCTORS.map((doc) => <option key={doc} value={doc}>{doc}</option>)}
-                          </select>
+                          <SearchableEnumSelect
+                            options={CATH_INTERVENTIONIST_DOCTORS}
+                            value={adHocScheduled2nd}
+                            onChange={setAdHocScheduled2nd}
+                            placeholder="— Chọn PTV phụ 1 —"
+                            searchPlaceholder="Gõ tên PTV..."
+                          />
                         ))}
                         {renderAdHocRow('PTV phụ 2', (
-                          <select value={adHocScheduled3rd} onChange={(e) => setAdHocScheduled3rd(e.target.value)} className={adHocSelectCls}>
-                            <option value="">— Chọn PTV phụ 2 —</option>
-                            <option value="BS. Ân">BS. Ân</option>
-                            <option value="BS. Tài">BS. Tài</option>
-                            <option value="BS. Hiếu">BS. Hiếu</option>
-                            <option value="BS. Hùng">BS. Hùng</option>
-                            <option value="BS. Tĩnh">BS. Tĩnh</option>
-                            <option value="BS. Thịnh">BS. Thịnh</option>
-                          </select>
+                          <SearchableEnumSelect
+                            options={SCHEDULED_3RD_PTV_OPTIONS}
+                            value={adHocScheduled3rd}
+                            onChange={setAdHocScheduled3rd}
+                            placeholder="— Chọn PTV phụ 2 —"
+                            searchPlaceholder="Gõ tên PTV..."
+                          />
                         ))}
                         {renderAdHocRow('Người xếp lịch', (
                           <input type="text" disabled value={staffList.find(s => s.StaffKey === currentStaff?.StaffKey)?.StaffName || currentStaff?.StaffKey || '01378'} className={`${adHocInputCls} text-slate-400`} />
