@@ -225,3 +225,27 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `IsSystem` | Preset hệ thống | Boolean | true/false | | `admin-khoa`, `tuy-chinh` không được xóa qua UI. |
 
 * Sửa ma trận trên tab **Ma trận vai trò mẫu** (Module 6) hoặc sheet **RolePreset** — không cần deploy code.
+
+---
+
+## Cursor Cloud specific instructions
+
+This is a React 19 + Vite single-page app with an Express backend in `server.ts` (run together via `tsx`). The "database" in local dev is the set of JSON files under `data/` (seeded/committed). No external services are required to run and test core functionality; Google Sheets sync (`scriptUrl` in `data/sync_config.json`) and Gemini AI (`GEMINI_API_KEY`) are optional and only needed for those specific features.
+
+### Running the dev server (important caveat)
+- Standard scripts live in `package.json` (`dev`, `build`, `start`, `lint`). Dev command is `npm run dev` (which runs `tsx server.ts`, serving Vite in middleware mode + the API on port `5173`).
+- ALWAYS start dev with a fixed build id: `BUILD_ID=dev npm run dev`. Both `server.ts` and `vite.config.ts` compute a build id from `process.env.BUILD_ID || String(Date.now())` independently at startup, so with `BUILD_ID` unset they differ. The app's deploy-detection then calls `window.location.reload()` on the mismatch, which resets the login form right after it loads and makes the UI look "stuck on login". Setting `BUILD_ID=dev` makes `/api/version` match the client and stops the spurious reload. (This is a run-time env var only — do not add it to the update script or start services there.)
+
+### Logging in (local seed accounts)
+- On the login screen you must FIRST pick a staff from the "TÊN NHÂN VIÊN" dropdown (this enables the password field and clears it), THEN type the password, THEN submit. Re-selecting the dropdown clears the password.
+- Admin seed account: StaffKey `11111`, password `1111` (from `data/staff.json`). On first login the plaintext password is upgraded to a SHA-256 hash in `data/staff.json` — expected; don't treat that data mutation as a code change to commit.
+- Auth on localhost is owned by the Express server (`server.ts`), which issues the `CHD_AUTH_TOKEN` session cookie that all other authenticated `/api/*` endpoints require. The client fetch bridge in `src/api/appsScriptFetch.ts` passes `/api/*` through to Express on localhost.
+
+### Lint / test / build
+- `npm run lint` is `tsc --noEmit` and currently reports many pre-existing type errors across the checked-in code (e.g. `server.ts`, `src/App.tsx`, several components). A clean pass is NOT expected; don't try to fix all of them as part of unrelated work.
+- There is no automated test runner configured; the root `test-*.cjs`/`test-*.js` files are ad-hoc scripts, not a suite. Validate changes by running the app.
+- `npm run build` runs `vite build` + bundles the server and also runs Cloudflare push/sync setup scripts (`prebuild`/`postbuild`); for local development prefer `dev`, not `build`.
+
+### Other notes
+- Vite file-watching ignores `data/**`, so writing to the JSON DB does not trigger a full page reload. Editing `data/` by hand won't hot-reload the frontend.
+- The seed JSON files under `data/` are the dev database and get mutated at runtime (new patients, notifications, hashed passwords). Restore them with `git checkout -- data/` if you don't want to commit test data.
