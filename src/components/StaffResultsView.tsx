@@ -10,7 +10,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import ResultStaffDrawer from './ResultStaffDrawer';
 import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
-import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
+import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import {
   findDuplicatePatientById1,
   PATIENT_VALIDATION_MSG,
@@ -376,14 +376,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       // 2. Add the consult
       const chosenDept = department;
       const chosenDoc = requestBy;
-
-      // For "Staff thông": auto-fill Scheduled1stInterventionist & Scheduled2ndInterventionist
       const isCathStaff = consultType === 'Staff thông';
-      if (isCathStaff && !scheduled1st) {
-        setSubmitLoading(false);
-        setErrorMsg('Vui lòng chọn PTV chính (Hội chẩn PTV chính)!');
-        return;
-      }
 
       const consultPayload: Consult = {
         ConsultKey: `con_${Date.now()}`,
@@ -393,7 +386,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         PatientHeight: patHeight || '',
         ConsultDate: consultDate,
         RequestBy: chosenDoc || 'BS Hội đồng',
-        ConsultMember: isCathStaff ? '' : consultMembers,
+        ConsultMember: isCathStaff ? scheduled1st : consultMembers,
         DiagnosisID: diagnosisID,
         DetailDiagnosis: detailDiagnosis,
         Department: chosenDept || '',
@@ -410,28 +403,26 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
         ConsultResultUpdatedTime: new Date().toISOString(),
         PDFTrigger: false,
-        ...(isCathStaff && {
+        ...(isCathStaff && scheduled1st && {
           Scheduled1stInterventionist: scheduled1st,
           Scheduled2ndInterventionist: chosenDoc || '',
         }),
       };
 
       onAddConsult?.(consultPayload);
-      setSuccessMsg('Đã đăng ký và nhập thành công kết quả staff bổ sung!');
-      setShowCombinedForm(false);
-      resetForm();
-      setSubmitLoading(false);
 
-      const persist = async () => {
-        const syncContext = buildSyncContext('results-staff', {
-          patientName: newPatName || patients.find(p => p.PatientKey === finalPatientKey)?.PatientName,
-          patientKey: finalPatientKey
-        });
-        if (patientMode === 'create') {
-          const patRes = await fetch('/api/patients', {
+      const syncContext = buildSyncContext('results-staff', {
+        patientName: newPatName || patients.find(p => p.PatientKey === finalPatientKey)?.PatientName,
+        patientKey: finalPatientKey
+      });
+
+      if (patientMode === 'create') {
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          '/api/patients',
+          {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(withSyncContext({
+            body: JSON.stringify({
               PatientKey: finalPatientKey,
               PatientID1: String(newPatID1 || '').trim(),
               PatientID2: String(newPatID2 || '').trim(),
@@ -445,36 +436,43 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               PatientCreateBy: currentStaff?.StaffKey || '01378',
               PatientCreateTime: new Date().toISOString(),
               Outcome: automaticOutcome
-            }, syncContext))
-          });
-          if (!patRes.ok) throw new Error('Không thể đăng ký bệnh nhi mới');
-          reportMutationResponse(await patRes.json(), { baseMessage: 'Đã đăng ký bệnh nhi mới' });
-        } else if (automaticOutcome) {
-          const patRes = await fetch(`/api/patients/${finalPatientKey}`, {
+            })
+          },
+          syncContext,
+          { baseMessage: 'Đã đăng ký bệnh nhi mới' }
+        );
+      } else if (automaticOutcome) {
+        await persistWithSheetsSync(
+          reportMutationResponse,
+          `/api/patients/${finalPatientKey}`,
+          {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(withSyncContext({ Outcome: automaticOutcome }, syncContext))
-          });
-          if (!patRes.ok) throw new Error('Không thể cập nhật trạng thái bệnh nhi');
-          reportMutationResponse(await patRes.json(), { baseMessage: 'Đã cập nhật trạng thái bệnh nhi' });
-        }
-        const conRes = await fetch('/api/consults', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(withSyncContext(consultPayload, syncContext))
-        });
-        if (!conRes.ok) throw new Error('Không thể đăng ký kết quả hội chẩn');
-        reportMutationResponse(await conRes.json(), { baseMessage: 'Đã đăng ký kết quả staff bổ sung' });
-        onRefreshData?.();
-      };
+            body: JSON.stringify({ Outcome: automaticOutcome })
+          },
+          syncContext,
+          { baseMessage: 'Đã cập nhật trạng thái bệnh nhi' }
+        );
+      }
 
-      persist().catch((err: any) => {
-        setErrorMsg(`Đã xảy ra lỗi: ${err.message || err}`);
-        onRefreshData?.();
-      });
+      await persistWithSheetsSync(
+        reportMutationResponse,
+        '/api/consults',
+        {
+          method: 'POST',
+          body: JSON.stringify(consultPayload)
+        },
+        syncContext,
+        { baseMessage: 'Đã đăng ký kết quả staff bổ sung' }
+      );
+
+      onRefreshData?.();
+      onSaveSuccess?.('Đã đăng ký và nhập thành công kết quả staff bổ sung!');
+      setShowCombinedForm(false);
+      resetForm();
 
     } catch (err: any) {
       setErrorMsg(`Đã xảy ra lỗi: ${err.message || err}`);
+      onRefreshData?.();
     } finally {
       setSubmitLoading(false);
     }
@@ -1178,6 +1176,14 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                 </div>
               )}
 
+              {/* Saving banner while persisting to Google Sheets */}
+              {submitLoading && (
+                <div className="bg-sky-50 border-b border-sky-200 text-sky-800 py-2.5 px-6 text-[11px] font-semibold flex items-center gap-2 shrink-0">
+                  <div className="w-4 h-4 border-2 border-sky-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Đang lưu vào Google Sheets, vui lòng chờ...</span>
+                </div>
+              )}
+
               {/* Error Message Banner if validation fails */}
               {errorMsg && (
                 <div className="bg-rose-50 border-r-4 border-rose-500 text-rose-800 py-2.5 px-6 text-[11px] font-semibold animate-in slide-in-from-top flex items-center gap-2 shrink-0">
@@ -1544,17 +1550,16 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                     {consultType === 'Staff thông' ? (
                       <div className="pb-0.5">
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Hội chẩn PTV chính <span className="text-red-500">*</span></label>
+                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên hội chẩn</label>
                         <SearchableEnumSelect
-                          required
                           options={[
                             'BS. Phụng', 'BS. Lợi', 'BS. Thịnh', 'BS. Ân', 'BS. Hiếu', 'BS. Tài', 'BS. Hùng', 'BS. Tĩnh',
                             ...Array.from(new Set(consults.map(c => String(c.Scheduled1stInterventionist || '')).filter(Boolean)))
                           ]}
                           value={scheduled1st}
                           onChange={setScheduled1st}
-                          placeholder="-- Chọn PTV chính --"
-                          searchPlaceholder="Gõ tìm PTV chính..."
+                          placeholder="-- Chọn thành viên --"
+                          searchPlaceholder="Gõ tên thành viên..."
                           direction="up"
                         />
                       </div>
@@ -1729,7 +1734,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   {submitLoading ? (
                     <>
                       <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Đang xử lý...
+                      Đang lưu vào Google Sheets...
                     </>
                   ) : (
                     'Lưu kết quả Staff'
