@@ -19,6 +19,12 @@ function readCurrentKvId() {
 }
 
 function patchWranglerKvId(kvId) {
+  const currentId = readCurrentKvId();
+  if (currentId === kvId) {
+    console.log(`[cloudflare-push-setup] PUSH_KV id already set (${kvId}) — skipped patch.`);
+    return;
+  }
+
   const content = fs.readFileSync(wranglerPath, 'utf8');
   const updated = content.replace(
     /(\[\[kv_namespaces\]\][\s\S]*?id\s*=\s*)"[^"]+"/,
