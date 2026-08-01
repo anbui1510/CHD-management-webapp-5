@@ -81,7 +81,7 @@ function parseWranglerJson(output) {
 
 function ensureKvNamespaceViaWrangler() {
   try {
-    const listOutput = execSync('npx wrangler kv namespace list --json', {
+    const listOutput = execSync('npx wrangler kv namespace list', {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -94,7 +94,7 @@ function ensureKvNamespaceViaWrangler() {
       }
     }
 
-    const createOutput = execSync(`npx wrangler kv namespace create "${namespaceTitle}" --json`, {
+    const createOutput = execSync(`npx wrangler kv namespace create "${namespaceTitle}"`, {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
