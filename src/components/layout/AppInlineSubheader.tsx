@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { ClipboardList, Download, Heart, LayoutDashboard, Plus, UserCog } from 'lucide-react';
-import type { ActiveMenuId } from '../config/navigation';
-import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
-import { useViewSubheaderContext } from '../context/ViewSubheaderContext';
+import type { ActiveMenuId } from '../../config/navigation';
+import { getViewSubheaderTitle } from '../../config/viewSubheaderTitles';
+import { useViewSubheaderContext } from '../../context/ViewSubheaderContext';
 
 const INLINE_SUBHEADER_MENUS: ActiveMenuId[] = [
   'home',
