@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Copy,
   Search,
@@ -34,6 +34,7 @@ import {
   parsePermissions,
   serializePermissions,
 } from '../auth/permissions';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { MODAL_TITLE } from '../utils/modalTitles';
@@ -342,9 +343,20 @@ export default function StaffManagementView({
     );
   }
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  useModuleSubheader('staff-mgmt', {
+    icon: <UserCog className="w-4 h-4" />,
+    searchValue: searchQuery,
+    onSearchChange: handleSubheaderSearch,
+    searchPlaceholder: 'Tìm mã NV, tên, khoa...',
+  });
+
   return (
     <div className="h-full flex flex-col min-h-0 animate-in fade-in duration-300 p-6 md:p-8 bg-slate-50 overflow-hidden">
-      <div className="shrink-0 mb-4 flex flex-col lg:flex-row lg:items-end justify-between gap-3">
+      <div className="shrink-0 mb-4 md:hidden flex flex-col gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-[#d2145a] mb-1 flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5" /> Module 6 · Quản lý nhân sự
@@ -728,7 +740,7 @@ export default function StaffManagementView({
           {/* Staff list */}
           <div className="xl:col-span-4 flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl overflow-hidden">
             <div className="p-4 border-b border-slate-100 space-y-3 shrink-0">
-              <div className="relative">
+              <div className="relative md:hidden">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   value={searchQuery}

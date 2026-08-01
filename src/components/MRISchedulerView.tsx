@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -34,6 +34,7 @@ import {
   getFormattedDateKey,
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface MRISchedulerViewProps {
   patients: Patient[];
@@ -948,6 +949,35 @@ export default function MRISchedulerView({
     </div>
   );
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  const openAdHocModal = useCallback(() => {
+    resetAdHoc();
+    setShowAdHoc(true);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <button
+        type="button"
+        onClick={openAdHocModal}
+        className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+      >
+        <Plus className="w-3.5 h-3.5" /> Xếp bổ sung
+      </button>
+    ),
+    [openAdHocModal]
+  );
+
+  useModuleSubheader('mri-scheduler', {
+    icon: <Activity className="w-4 h-4" />,
+    searchValue: searchQuery,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   return (
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans">
       <div className="flex-1 overflow-hidden p-3 lg:p-4 flex h-full min-h-0 gap-4">
@@ -1047,7 +1077,7 @@ export default function MRISchedulerView({
               </button>
             </div>
 
-            <div className="p-3 border-b border-slate-150 relative shrink-0">
+            <div className="p-3 border-b border-slate-150 relative shrink-0 md:hidden">
               <Search className="w-4 h-4 text-slate-400 absolute left-6 top-5.5" />
               <input
                 type="text"

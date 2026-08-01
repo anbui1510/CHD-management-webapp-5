@@ -7,6 +7,7 @@ import {
   X
 } from 'lucide-react';
 import { CMR, Consult, Patient, formatVNTime } from '../types';
+import { useModuleSubheaderTitleOnly } from '../hooks/useModuleSubheader';
 import { resolveCMRDevice, resolveCMRMethod } from '../data/cmrDefaults';
 
 interface MRICalendarViewProps {
@@ -50,6 +51,8 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
   const [currentMonth, setCurrentMonth] = useState(5);
   const [currentYear, setCurrentYear] = useState(2026);
   const [selectedItem, setSelectedItem] = useState<MRICalendarItem | null>(null);
+
+  useModuleSubheaderTitleOnly('mri-calendar', <Activity className="w-4 h-4" />);
 
   const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();

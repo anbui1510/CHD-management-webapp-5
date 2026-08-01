@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { Search, ArrowUpDown, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Search, ArrowUpDown, Undo2, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import { findPatientByKey, formatVNTime, removeDiacritics } from '../types';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 type ArchiveTab = 'transferred' | 'archive';
 
@@ -125,6 +126,33 @@ export default function ArchiveView({
     }, 'Hoàn tác Lưu trữ');
   };
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <button
+        type="button"
+        onClick={() => setSortOldest(prev => !prev)}
+        className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm shrink-0"
+        title="Sắp xếp theo ngày"
+      >
+        <ArrowUpDown className="w-3.5 h-3.5" />
+        {sortOldest ? 'Cũ nhất' : 'Mới nhất'}
+      </button>
+    ),
+    [sortOldest]
+  );
+
+  useModuleSubheader('archive', {
+    icon: <Archive className="w-4 h-4" />,
+    searchValue: searchQuery,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   return (
     <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-6">
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
@@ -152,7 +180,7 @@ export default function ArchiveView({
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center md:hidden">
             <div className="relative w-full sm:w-1/2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input

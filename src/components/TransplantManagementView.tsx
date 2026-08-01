@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Download,
@@ -56,6 +56,8 @@ import { exportTransplantExcel } from './transplant/transplantExcelExport';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
+import { Heart } from 'lucide-react';
 
 interface TransplantManagementViewProps {
   patients: Patient[];
@@ -264,6 +266,30 @@ export default function TransplantManagementView({
     }
   };
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <button
+        type="button"
+        onClick={() => setShowRegister(true)}
+        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1"
+      >
+        <Plus className="w-3.5 h-3.5" /> Thêm BN
+      </button>
+    ),
+    []
+  );
+
+  useModuleSubheader('heart-transplant', {
+    icon: <Heart className="w-4 h-4" />,
+    searchValue: searchQuery,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="shrink-0 flex flex-wrap items-center gap-2 mb-3">
@@ -273,11 +299,11 @@ export default function TransplantManagementView({
         <button type="button" onClick={() => setActiveTab('ready')} className={`px-4 py-2 rounded-full text-xs font-black uppercase ${activeTab === 'ready' ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
           Đủ tiêu chuẩn ({tabItems.ready.length})
         </button>
-        <div className="flex-1 min-w-[200px] relative">
+        <div className="flex-1 min-w-[200px] relative md:hidden">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Tìm họ tên, mã người bệnh..." className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm bg-white" />
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Tìm tên, mã NB, chẩn đoán..." className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm bg-white" />
         </div>
-        <button type="button" onClick={() => setShowRegister(true)} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center gap-1">
+        <button type="button" onClick={() => setShowRegister(true)} className="md:hidden px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center gap-1">
           <Plus className="w-4 h-4" /> Thêm BN
         </button>
       </div>

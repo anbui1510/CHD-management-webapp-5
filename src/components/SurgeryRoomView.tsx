@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   Activity,
   ArrowUpDown,
@@ -9,6 +9,7 @@ import {
   User
 } from 'lucide-react';
 import { Operation, Patient, findPatientByKey, formatVNTime, removeDiacritics } from '../types';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface SurgeryRoomViewProps {
   patients: Patient[];
@@ -59,6 +60,16 @@ export default function SurgeryRoomView({
     return list;
   }, [operations, patients, searchTerm, sortAsc]);
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchTerm(value);
+  }, []);
+
+  useModuleSubheader('surgery-room', {
+    icon: <Activity className="w-4 h-4" />,
+    searchValue: searchTerm,
+    onSearchChange: handleSubheaderSearch,
+  });
+
   const closeModal = () => setSelectedDone(null);
 
   const openDoneDetail = (operation: Operation) => {
@@ -91,7 +102,7 @@ export default function SurgeryRoomView({
         </button>
       </div>
 
-      <div className="mb-4 shrink-0">
+      <div className="mb-4 shrink-0 md:hidden">
         <div className="flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-2.5 max-w-xl">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input

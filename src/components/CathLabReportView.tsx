@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { CathLab, Patient, Staff, Source, formatVNTime, findPatientByKey, removeDiacritics } from '../types';
 import { VNDateInput } from './VNDateInput';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -16,6 +16,7 @@ import {
   Users
 } from 'lucide-react';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface CathLabReportViewProps {
   patients: Patient[];
@@ -294,11 +295,36 @@ function CathLabReportViewInner({
     setCurrentPage(1);
   };
 
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <button
+        type="button"
+        onClick={handleExportCSV}
+        className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition uppercase tracking-wider cursor-pointer"
+      >
+        <Download className="w-3.5 h-3.5 text-white" /> Xuất Excel
+      </button>
+    ),
+    [handleExportCSV]
+  );
+
+  useModuleSubheader('cathlab-report', {
+    icon: <FileText className="w-4 h-4" />,
+    searchValue: searchQuery,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   return (
     <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50 overflow-y-auto">
       
-      {/* Title Header */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 border border-slate-200 rounded-3xl shadow-sm">
+      {/* Title Header — mobile only */}
+      <div className="shrink-0 md:hidden flex flex-col gap-3 bg-white p-5 border border-slate-200 rounded-3xl shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-pink-50 flex items-center justify-center text-[#d2145a] shadow-sm">
             <FileText className="w-6 h-6" />
@@ -308,13 +334,6 @@ function CathLabReportViewInner({
             <p className="text-xs text-slate-500 font-medium">Truy xuất, thống kê số liệu và xuất báo cáo ca can thiệp tim mạch</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleExportCSV}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition duration-200 uppercase tracking-wider cursor-pointer"
-        >
-          <Download className="w-4 h-4 text-white" /> Xuất báo cáo Excel
-        </button>
       </div>
 
       {/* Stats Cards */}
@@ -465,8 +484,8 @@ function CathLabReportViewInner({
               </div>
             )}
 
-            {/* General Text Search */}
-            <div className="relative">
+            {/* General Text Search — mobile; desktop dùng subheader */}
+            <div className="relative md:hidden">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                 <Search className="h-4 w-4 text-slate-400" />
               </span>

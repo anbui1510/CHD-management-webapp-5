@@ -61,6 +61,10 @@ import { useSheetsSyncStatus } from './hooks/useSheetsSyncStatus';
 import { formatSheetsSyncStatusLabel } from './utils/sheetsSyncFeedback';
 import { buildSyncContext, withSyncContext } from './utils/sheetsSyncMutation';
 import { SheetsSyncFeedbackProvider } from './context/SheetsSyncFeedbackContext';
+import { ViewSubheaderProvider } from './context/ViewSubheaderContext';
+import { SubheaderRenderer } from './components/layout/DesktopViewSubheader';
+import AppInlineSubheader from './components/layout/AppInlineSubheader';
+import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError, getMedicalDataFetchTimeout, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
 import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
@@ -1960,7 +1964,7 @@ export default function App() {
             <h1 className="text-lg md:text-xl font-black text-white uppercase tracking-tight leading-none pt-1">CHD Management 5.0</h1>
             <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1.5 leading-relaxed">
               HỆ THỐNG QUẢN LÝ TIM BẨM SINH<br />
-              KHOA TIM MẠCH - BVNĐTP
+              KHOA TIM MẠCH - BỆNH VIỆN NHI ĐỒNG THÀNH PHỐ
             </p>
             <p className="text-[9px] text-neutral-600 font-semibold mt-1 tracking-wide">Mobile UI · build 2026-07-17</p>
           </div>
@@ -2057,144 +2061,55 @@ export default function App() {
 
 
 
-  const getHeaderContent = () => {
-    switch (activeMenu) {
-      case 'home':
-        return {
-          title: "HỆ THỐNG QUẢN LÝ TIM BẨM SINH - KHOA TIM MẠCH - BVNĐTP",
-          subtitle: "",
-          icon: <Heart className="w-5 h-5 text-pink-200 animate-pulse fill-pink-500/20" />
-        };
-      case 'profile':
-        return {
-          title: "HỒ SƠ CÁ NHÂN",
-          subtitle: currentStaff?.StaffName || '',
-          icon: <UserCog className="w-5 h-5 text-pink-200" />
-        };
-      case 'patients':
-        return {
-          title: "HỒ SƠ BỆNH ÁN",
-          subtitle: "",
-          icon: <Heart className="w-5 h-5 text-pink-200" />
-        };
-      case 'consult-list':
-        return {
-          title: isMobile ? "Đăng ký hội chẩn" : "ĐĂNG KÝ HỘI CHẨN NỘI - NGOẠI KHOA",
-          subtitle: "",
-          icon: <ClipboardList className="w-5 h-5 text-pink-200" />
-        };
-      case 'results-staff':
-        return {
-          title: isMobile ? "NHẬP KẾT QUẢ HỘI CHẨN" : "NHẬP KẾT QUẢ HỘI CHẨN NỘI - NGOẠI KHOA",
-          subtitle: "",
-          icon: <FileText className="w-5 h-5 text-pink-200" />
-        };
-      case 'schedule-tt':
-        return {
-          title: "XẾP LỊCH & DỤNG CỤ",
-          subtitle: "",
-          icon: <CalendarDays className="w-5 h-5 text-pink-200 animate-pulse" />
-        };
-      case 'heart-transplant':
-        return {
-          title: "QUẢN LÝ GHÉP TIM",
-          subtitle: "Danh sách chờ ghép tim",
-          icon: <Heart className="w-5 h-5 text-pink-200 animate-pulse" />
-        };
-      case 'schedule-view':
-        return {
-          title: "LỊCH THÔNG TIM DỰ KIẾN",
-          subtitle: "",
-          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
-        };
-      case 'mri-scheduler':
-        return {
-          title: "XẾP LỊCH MRI",
-          subtitle: "Quản lý MRI tim",
-          icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
-        };
-      case 'mri-register':
-        return {
-          title: "ĐĂNG KÝ MRI TIM",
-          subtitle: "Danh sách đăng ký chụp MRI",
-          icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
-        };
-      case 'mri-result':
-        return {
-          title: "ĐIỀN KẾT QUẢ MRI TIM",
-          subtitle: "Danh sách chờ điền kết quả MRI tim",
-          icon: <Activity className="w-5 h-5 text-pink-200 animate-pulse" />
-        };
-      case 'mri-calendar':
-        return {
-          title: "LỊCH CHỤP MRI TIM",
-          subtitle: "Lịch các ca dự kiến chụp MRI",
-          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
-        };
-      case 'cathlab-room':
-        return {
-          title: "PHÒNG THÔNG TIM",
-          subtitle: "",
-          icon: <Activity className="w-5 h-5 text-pink-200" />
-        };
-      case 'surgery-room':
-        return {
-          title: "PHÒNG PHẪU THUẬT",
-          subtitle: "Quản lý ca mổ tim",
-          icon: <Activity className="w-5 h-5 text-pink-200" />
-        };
-      case 'surgery-scheduler':
-        return {
-          title: "XẾP LỊCH PHẪU THUẬT",
-          subtitle: "",
-          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
-        };
-      case 'surgery-schedule-view':
-        return {
-          title: "LỊCH PHẪU THUẬT DỰ KIẾN",
-          subtitle: "",
-          icon: <CalendarDays className="w-5 h-5 text-pink-200" />
-        };
-      case 'archive':
-        return {
-          title: "LƯU TRỮ",
-          subtitle: "Danh sách đã chuyển phòng TT & ca lưu trữ",
-          icon: <Archive className="w-5 h-5 text-pink-200" />
-        };
-      case 'google-sheets':
-        return {
-          title: "HỆ THỐNG CƠ SỞ DỮ LIỆU VIRTUAL GOOGLE SHEETS",
-          subtitle: "",
-          icon: <Database className="w-5 h-5 text-pink-200" />
-        };
-      case 'excel-export':
-        return {
-          title: "BẢNG FILTER & CONTAINER XUẤT DIRECT BIÊN BẢN",
-          subtitle: "",
-          icon: <Download className="w-5 h-5 text-pink-200" />
-        };
-      case 'staff-mgmt':
-        return {
-          title: "QUẢN LÝ NHÂN SỰ & PHÂN QUYỀN",
-          subtitle: "Module 6 · Gán vai trò và quyền truy cập",
-          icon: <UserCog className="w-5 h-5 text-pink-200" />
-        };
-      case 'chd-daily-brief':
-        return {
-          title: "CHD DAILY BRIEF",
-          subtitle: "Bản tin y văn tim mạch nhi mỗi sáng 7h",
-          icon: <FileText className="w-5 h-5 text-pink-200" />
-        };
-      default:
-        return {
-          title: "HỆ THỐNG QUẢN LÝ TIM BẨM SINH - KHOA TIM MẠCH - BVNĐTP",
-          subtitle: "",
-          icon: <Heart className="w-5 h-5 text-pink-200" />
-        };
-    }
-  };
+  const openAddPatientForm = useCallback(() => {
+    setEditingPatientKey(null);
+    setNewPatientData({
+      PatientID1: '',
+      PatientID2: '',
+      PatientName: '',
+      OtherPatientName: '',
+      PatientDOB: '',
+      PatientSex: 'Nam',
+      PatientAddress: 'Hà Nội',
+      PatientPhone1: '',
+      PatientPhone2: '',
+      Outcome: ''
+    });
+    setShowAddPatient(true);
+  }, []);
 
-  const headerInfo = getHeaderContent();
+  const openAddConsultForm = useCallback(() => {
+    setNewConsultData({
+      PatientKey: '',
+      ConsultType: 'Staff mổ',
+      PatientWeight: '',
+      PatientHeight: '',
+      ConsultDate: new Date().toISOString().split('T')[0],
+      RequestBy: '',
+      DiagnosisID: '',
+      DetailDiagnosis: '',
+      Department: 'Tim Mạch',
+      PriorityOrder: 'Chương trình',
+      RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
+      CheckDevice: '',
+      ConsultNote: '',
+      PlannedDevice: '',
+      PlannedPrice: ''
+    });
+    setPendingConsultsCount(0);
+    setShowAddConsult(true);
+  }, []);
+
+  const handlePatientSubheaderSearch = useCallback((value: string) => {
+    setPatientSearch(value);
+    setPatientCurrentPage(1);
+    setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
+  }, []);
+
+  const handleConsultSubheaderSearch = useCallback((value: string) => {
+    setConsultListSearch(value);
+    setConsultCurrentPage(1);
+  }, []);
 
   return (
     <SheetsSyncFeedbackProvider
@@ -2204,6 +2119,7 @@ export default function App() {
       }}
       onRefreshSheetsStatus={refreshSheetsSyncStatus}
     >
+    <ViewSubheaderProvider>
     <div className="min-h-dvh h-dvh bg-slate-50 text-slate-800 flex flex-col font-sans overflow-hidden">
       
       {/* Top Application Header Bar styled beautifully like the secondary custom red banner in screenshot */}
@@ -2221,17 +2137,12 @@ export default function App() {
             </button>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="shrink-0 hidden sm:block">
-                {headerInfo.icon}
+                <Heart className="w-5 h-5 text-pink-200 animate-pulse fill-pink-500/20" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm md:text-base font-extrabold tracking-wide uppercase truncate leading-tight flex items-center gap-2 text-white">
-                  {headerInfo.title}
+                <h1 className="text-xs md:text-sm font-extrabold tracking-wide uppercase truncate leading-tight text-white">
+                  {MAIN_HEADER_TITLE}
                 </h1>
-                {headerInfo.subtitle && (
-                  <p className="text-[10px] text-pink-100/90 font-medium truncate normal-case leading-none mt-0.5">
-                    {headerInfo.subtitle}
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -2312,6 +2223,18 @@ export default function App() {
 
         </div>
       </header>
+
+      <SubheaderRenderer />
+      <AppInlineSubheader
+        activeMenu={activeMenu}
+        patientSearch={patientSearch}
+        onPatientSearchChange={handlePatientSubheaderSearch}
+        onAddPatient={openAddPatientForm}
+        consultListSearch={consultListSearch}
+        onConsultListSearchChange={handleConsultSubheaderSearch}
+        onAddConsult={openAddConsultForm}
+        profileName={currentStaff?.StaffName}
+      />
 
       {/* Hero success/error notifications */}
       {formSuccessMessage && (
@@ -2482,18 +2405,17 @@ export default function App() {
           {activeMenu === 'patients' && (
             <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-2 sm:p-6 gap-2 sm:gap-4 overflow-hidden">
               
-              <div className="flex flex-col gap-2 shrink-0">
-                <h2 className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase pt-0.5">
-                  <Heart className="w-5 h-5 text-pink-600 fill-pink-50" /> DANH SÁCH BỆNH NHI
+              <div className="flex flex-col gap-2 shrink-0 md:hidden">
+                <h2 className="text-sm font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase pt-0.5">
+                  <Heart className="w-5 h-5 text-pink-600 fill-pink-50" /> Hồ sơ bệnh án
                 </h2>
-                <p className="hidden sm:block text-xs text-slate-500 -mt-1">Quản lý hồ sơ hành chính, lịch sử hội chẩn, can thiệp, phẫu thuật</p>
                 
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1 min-w-0">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
-                      placeholder="Tìm tên, mã ID1 bệnh nhi..."
+                      placeholder="Tìm tên, mã NB, chẩn đoán..."
                       value={patientSearch}
                       onChange={(e) => {
                         setPatientSearch(e.target.value);
@@ -2517,49 +2439,12 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => {
-                      setEditingPatientKey(null);
-                      setNewPatientData({
-                        PatientID1: '',
-                        PatientID2: '',
-                        PatientName: '',
-                        OtherPatientName: '',
-                        PatientDOB: '',
-                        PatientSex: 'Nam',
-                        PatientAddress: 'Hà Nội',
-                        PatientPhone1: '',
-                        PatientPhone2: '',
-                        Outcome: ''
-                      });
-                      setShowAddPatient(true);
-                    }}
-                    className="md:hidden w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm transition cursor-pointer flex items-center justify-center"
+                    onClick={openAddPatientForm}
+                    className="w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm transition cursor-pointer flex items-center justify-center"
                     title="Thêm bệnh nhi mới"
                     aria-label="Thêm bệnh nhi mới"
                   >
                     <Plus className="w-5 h-5" />
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setEditingPatientKey(null);
-                      setNewPatientData({
-                        PatientID1: '',
-                        PatientID2: '',
-                        PatientName: '',
-                        OtherPatientName: '',
-                        PatientDOB: '',
-                        PatientSex: 'Nam',
-                        PatientAddress: 'Hà Nội',
-                        PatientPhone1: '',
-                        PatientPhone2: '',
-                        Outcome: ''
-                      });
-                      setShowAddPatient(true);
-                    }}
-                    className="hidden md:flex bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2.5 rounded-2xl text-xs items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-4 h-4" /> Thêm bệnh nhi mới
                   </button>
                 </div>
               </div>
@@ -3036,15 +2921,15 @@ export default function App() {
               <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-3xl p-3 sm:p-4 lg:p-5 shadow-sm min-w-0">
                 
                 <div className="shrink-0 flex flex-col gap-2 border-b border-slate-150 pb-2.5 mb-2">
-                  <div className="hidden md:block">
+                  <div className="md:hidden">
                     <h3 className="font-extrabold text-neutral-900 uppercase flex items-center gap-1.5 text-sm">
                       <ClipboardCheck className="w-5 h-5 text-teal-600" />
-                      Danh sách chờ hội chẩn
+                      Đăng ký hội chẩn
                     </h3>
                     <p className="text-[10px] text-slate-400 mt-0.5">Đăng ký + báo cáo danh sách hội chẩn thông tim - mổ tim</p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 md:hidden">
                     <div className="relative flex-1 min-w-0">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                       <input
@@ -3091,54 +2976,8 @@ export default function App() {
                       <Filter className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        setNewConsultData({
-                          PatientKey: '',
-                          ConsultType: 'Staff mổ',
-                          PatientWeight: '',
-                          PatientHeight: '',
-                          ConsultDate: new Date().toISOString().split('T')[0],
-                          RequestBy: '',
-                          DiagnosisID: '',
-                          DetailDiagnosis: '',
-                          Department: 'Tim Mạch',
-                          PriorityOrder: 'Chương trình',
-                          RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
-                          CheckDevice: '',
-                          ConsultNote: '',
-                          PlannedDevice: '',
-                          PlannedPrice: ''
-                        });
-                        setPendingConsultsCount(0);
-                        setShowAddConsult(true);
-                      }}
-                      className="hidden sm:flex bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3.5 py-2 rounded-2xl text-xs items-center justify-center gap-1.5 shadow-sm transition shrink-0 cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" /> Đăng kí staff
-                    </button>
-                    <button
-                      onClick={() => {
-                        setNewConsultData({
-                          PatientKey: '',
-                          ConsultType: 'Staff mổ',
-                          PatientWeight: '',
-                          PatientHeight: '',
-                          ConsultDate: new Date().toISOString().split('T')[0],
-                          RequestBy: '',
-                          DiagnosisID: '',
-                          DetailDiagnosis: '',
-                          Department: 'Tim Mạch',
-                          PriorityOrder: 'Chương trình',
-                          RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
-                          CheckDevice: '',
-                          ConsultNote: '',
-                          PlannedDevice: '',
-                          PlannedPrice: ''
-                        });
-                        setPendingConsultsCount(0);
-                        setShowAddConsult(true);
-                      }}
-                      className="sm:hidden w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm flex items-center justify-center"
+                      onClick={openAddConsultForm}
+                      className="w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm flex items-center justify-center"
                       title="Đăng kí staff"
                       aria-label="Đăng kí staff"
                     >
@@ -4513,6 +4352,7 @@ export default function App() {
       />
 
     </div>
+    </ViewSubheaderProvider>
     </SheetsSyncFeedbackProvider>
   );
 }

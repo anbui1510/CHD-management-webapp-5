@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -44,6 +44,7 @@ import {
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface MRIRegisterViewProps {
   patients: Patient[];
@@ -489,27 +490,55 @@ export default function MRIRegisterView({
       });
   };
 
+  const openRegisterForm = useCallback(() => {
+    resetForm();
+    setShowForm(true);
+  }, []);
+
+  const handleSubheaderSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  const subheaderActions = useMemo(
+    () => (
+      <>
+        <button
+          type="button"
+          onClick={() => setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'))}
+          className="bg-white border border-slate-200 text-slate-600 p-2 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+          title="Sắp xếp theo ngày dự kiến chụp"
+        >
+          <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+        </button>
+        <button
+          type="button"
+          onClick={openRegisterForm}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer uppercase tracking-wider"
+        >
+          <Plus className="w-3.5 h-3.5 text-white" /> Đăng ký chụp MRI
+        </button>
+      </>
+    ),
+    [sortOrder, openRegisterForm]
+  );
+
+  useModuleSubheader('mri-register', {
+    icon: <Activity className="w-4 h-4" />,
+    searchValue: searchQuery,
+    onSearchChange: handleSubheaderSearch,
+    actions: subheaderActions,
+  });
+
   return (
     <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50">
 
-      {/* Title + action */}
-      <div className="shrink-0 hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 border border-slate-200 rounded-3xl shadow-sm">
+      {/* Title + action — mobile only */}
+      <div className="shrink-0 md:hidden flex flex-col gap-3 bg-white p-4 border border-slate-200 rounded-3xl shadow-sm">
         <div>
           <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
-            <Activity className="w-5 h-5 text-[#d2145a]" /> Danh sách đăng ký chụp MRI
+            <Activity className="w-5 h-5 text-[#d2145a]" /> Đăng ký MRI tim
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5 font-medium">Đăng ký chỉ định và theo dõi tiến trình chụp MRI tim.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition duration-200 shrink-0 cursor-pointer uppercase tracking-wider"
-        >
-          <Plus className="w-4 h-4 text-white" /> Đăng ký chụp MRI
-        </button>
       </div>
 
       {/* Tabs + search */}
@@ -544,7 +573,7 @@ export default function MRIRegisterView({
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 md:hidden">
           <div className="relative flex-1">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />
