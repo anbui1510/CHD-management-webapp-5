@@ -127,10 +127,13 @@ export function VNDateInput({ value, onChange, className, ...props }: Props) {
     setOpen(false);
   };
 
-  const inputClass = `${(className || '').replace(/\bfont-mono\b/g, 'font-sans')} pr-10 font-sans`.trim();
+  const widthClasses = ((className || '').match(/\b(?:w-|max-w-|min-w-)[^\s]*/g) || ['w-full']).join(' ');
+  const inputClass = `${(className || '')
+    .replace(/\b(?:w-|max-w-|min-w-)[^\s]*/g, '')
+    .replace(/\bfont-mono\b/g, 'font-sans')} w-full pr-10 font-sans`.trim();
 
   return (
-    <div ref={rootRef} className="relative flex items-center w-full font-sans">
+    <div ref={rootRef} className={`relative flex items-center font-sans ${widthClasses}`}>
       <input
         {...props}
         type="text"

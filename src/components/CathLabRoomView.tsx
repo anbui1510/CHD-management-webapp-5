@@ -1688,14 +1688,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      };
 
      const closeOnSuccess = options?.closeOnSuccess !== false;
-     if (closeOnSuccess) {
-       if (isEdit && formData.CathKey) {
-         onPatchCathlab?.(formData.CathKey, payload);
-       } else {
-         onAddCathlab?.(payload as CathLab);
-       }
-       forceCloseModal();
-     }
 
      setSaving(true);
      try {
@@ -1736,16 +1728,29 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            onSaveSuccess,
            onAddConsult,
          });
+       }
+
+       if (isEdit && formData.CathKey) {
+         onPatchCathlab?.(formData.CathKey, payload);
        } else {
+         onAddCathlab?.(payload as CathLab);
+       }
+
+       onRefreshData(true);
+
+       if (closeOnSuccess) {
+         forceCloseModal();
+       }
+
+       if (!needsRepeatWorkflow) {
          onSaveSuccess?.('Đã lưu kết quả thông tim thành công!');
        }
 
-       onRefreshData();
        return true;
      } catch (e) {
        console.error(e);
        triggerAlert(e instanceof Error ? e.message : 'Không thể lưu kết quả thông tim', MODAL_TITLE.saveError);
-       onRefreshData();
+       onRefreshData(true);
        return false;
      } finally {
        setSaving(false);
@@ -2112,6 +2117,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                 </h3>
                 <button onClick={closeModal} className="p-2 hover:bg-slate-700 rounded-lg transition"><Undo2 className="w-4 h-4"/></button>
               </div>
+
+              {saving && (
+                <div className="bg-sky-50 border-b border-sky-200 text-sky-800 px-5 py-2.5 text-[11px] font-semibold flex items-center gap-2 shrink-0">
+                  <div className="w-4 h-4 border-2 border-sky-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Đang lưu vào Google Sheets, vui lòng chờ...</span>
+                </div>
+              )}
 
               <div className="flex-1 p-3 bg-slate-50/50 space-y-3 overflow-y-auto custom-scrollbar">
                 
@@ -2557,7 +2569,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                         onClick={() => saveCathLab(!!selectedDone)}
                         disabled={saving}
                         className="px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-black text-xs transition flex items-center gap-2 disabled:opacity-50"
-                      ><Save className="w-4 h-4"/> {saving ? 'Đang lưu...' : 'Lưu'}</button>
+                      ><Save className="w-4 h-4"/> {saving ? 'Đang lưu vào Google Sheets...' : 'Lưu'}</button>
                     </>
                  )}
               </div>
@@ -2604,7 +2616,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                  disabled={saving}
                  className="px-4 py-2 font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer"
                >
-                 {saving ? 'Đang lưu...' : 'Lưu'}
+                 {saving ? 'Đang lưu vào Google Sheets...' : 'Lưu'}
                </button>
              </div>
            </div>
