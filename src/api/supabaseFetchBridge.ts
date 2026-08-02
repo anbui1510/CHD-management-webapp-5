@@ -1,5 +1,5 @@
 import { handleChdBriefRequest } from './chdBriefBridge';
-import { supabase } from './supabaseClient';
+import { getSupabase } from './supabaseClient';
 import type { Staff } from '../types';
 
 type SheetData = {
@@ -324,6 +324,7 @@ const loadStaffOnly = async (forceRefresh = false): Promise<any[]> => {
 
   const promise = (async () => {
     try {
+      const supabase = await getSupabase();
       const { data, error } = await supabase.from('Staff').select('*');
       if (error) throw error;
       const parsed = (data || []).map((item: any) => toFrontendRecord('staff', item));
@@ -367,6 +368,7 @@ const loadAllData = async (forceRefresh = false): Promise<SheetData> => {
         { name: 'DoctorPerformanceMark', key: 'doctorPerformanceMarks' }
       ];
       
+      const supabase = await getSupabase();
       const results = await Promise.all(
         tables.map(async t => {
           const { data, error } = await supabase.from(t.name).select('*');
@@ -430,6 +432,7 @@ const upsertRecord = async (endpoint: string, key: string | undefined, method: '
     const dbRecord = toSupabaseRecord(endpoint, body);
     
     // Convert undefined to null for Supabase if needed, but upsert usually handles it
+    const supabase = await getSupabase();
     const { data, error } = await supabase.from(config.table).upsert(dbRecord).select().single();
     if (error) throw error;
     
@@ -464,6 +467,7 @@ const deleteRecord = async (endpoint: string, key: string, init: RequestInit) =>
   }
 
   try {
+    const supabase = await getSupabase();
     const { error } = await supabase.from(config.table).delete().eq(config.keyField, key);
     if (error) throw error;
 

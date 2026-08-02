@@ -30,9 +30,19 @@ app.use(express.json({ limit: '5mb' }));
 // ─────────────────────────────────────────────────────────────────
 // SUPABASE CLIENT & IN-MEMORY CACHE
 // ─────────────────────────────────────────────────────────────────
-const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  '';
+
+function getServerSupabase() {
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Thiếu cấu hình Supabase trên server.');
+  }
+  return createClient(supabaseUrl, supabaseKey);
+}
 // Initial Staff Data
 const defaultStaff: Staff[] = [
   {
@@ -252,6 +262,7 @@ const CACHE_TTL_MS = 10000; // 10 seconds
 async function ensureTableCache(table: string, defaults: any[] = []): Promise<any[]> {
   try {
     if (Date.now() - lastCacheFetch > CACHE_TTL_MS) {
+      const supabase = getServerSupabase();
       const { data, error } = await supabase.from(table).select('*');
       if (!error && data && data.length > 0) {
         memoryDb[table] = data;
@@ -274,6 +285,7 @@ async function mutateTableRecord(table: string, action: 'insert' | 'update', key
       list.push(record);
     }
     memoryDb[table] = list;
+    const supabase = getServerSupabase();
     if (action === 'insert') {
       await supabase.from(table).insert(record);
     } else {
@@ -458,6 +470,17 @@ app.get('/api/staff/public', async (_req, res) => {
   res.json(publicList);
 });
 const BUILD_TIMESTAMP = String(Date.now());
+app.get('/api/config', (_req, res) => {
+  if (!supabaseUrl || !supabaseKey) {
+    res.status(503).json({ error: 'Supabase chưa được cấu hình trên server.' });
+    return;
+  }
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    supabaseUrl,
+    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || supabaseKey,
+  });
+});
 app.get('/api/version', (_req, res) => {
   res.json({ version: '5.0.0', buildTime: BUILD_TIMESTAMP });
 });
@@ -1130,6 +1153,7 @@ app.delete('/api/role-presets/:key', requireAdmin, async (req, res) => {
     }
     presets.splice(index, 1);
     memoryDb['RolePreset'] = presets;
+    const supabase = getServerSupabase();
     await supabase.from('RolePreset').delete().eq('RolePresetID', key);
     res.json({ success: true, RolePresetID: key });
   } catch (err) {
