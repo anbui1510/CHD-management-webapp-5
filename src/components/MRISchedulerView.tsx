@@ -129,7 +129,11 @@ export default function MRISchedulerView({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<MRISchedulerItem | null>(null);
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-  const [exportStartDate, setExportStartDate] = useState('');
+  const [filterDateType, setFilterDateType] = useState<'all' | 'custom' | 'group'>('custom');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterGroupType, setFilterGroupType] = useState<'month' | 'quarter'>('month');
+  const [filterGroupValue, setFilterGroupValue] = useState('1');
   const [currentMonth, setCurrentMonth] = useState(5);
   const [currentYear, setCurrentYear] = useState(2026);
   const [saving, setSaving] = useState(false);
@@ -312,39 +316,74 @@ export default function MRISchedulerView({
     return cells;
   }, [currentMonth, currentYear]);
 
-  const exportEndDate = useMemo(() => {
-    if (!exportStartDate) return '';
-    const date = new Date(exportStartDate);
-    date.setDate(date.getDate() + 7);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  }, [exportStartDate]);
+  const filterDateRange = useMemo(() => {
+    let start = '';
+    let end = '';
+    if (filterDateType === 'all') {
+      return { start: '', end: '' };
+    }
+    if (filterDateType === 'custom') {
+      return { start: filterStartDate, end: filterEndDate };
+    }
+    if (filterGroupType === 'month') {
+      const m = parseInt(filterGroupValue, 10);
+      start = `${currentYear}-${String(m).padStart(2, '0')}-01`;
+      const lastDay = new Date(currentYear, m, 0).getDate();
+      end = `${currentYear}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    } else {
+      const q = parseInt(filterGroupValue, 10);
+      const startMonth = (q - 1) * 3 + 1;
+      const endMonth = startMonth + 2;
+      start = `${currentYear}-${String(startMonth).padStart(2, '0')}-01`;
+      const lastDay = new Date(currentYear, endMonth, 0).getDate();
+      end = `${currentYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    }
+    return { start, end };
+  }, [filterDateType, filterStartDate, filterEndDate, filterGroupType, filterGroupValue, currentYear]);
 
   const filteredScheduleItems = useMemo(() => {
-    if (!exportStartDate || !exportEndDate) return [];
+    const { start, end } = filterDateRange;
     return segmentedItems.scheduled.filter(item => {
       const date = getFormattedDateKey(item.CMRScheduledDate);
-      return date >= exportStartDate && date <= exportEndDate;
+      if (!date) return false;
+      if (!start || !end) return true;
+      return date >= start && date <= end;
     });
-  }, [exportStartDate, exportEndDate, segmentedItems.scheduled]);
+  }, [filterDateRange, segmentedItems.scheduled]);
 
   const handleExportExcel = async () => {
     try {
-      if (!exportStartDate || filteredScheduleItems.length === 0) {
+      const { start, end } = filterDateRange;
+      if (filterDateType === 'custom' && (!start || !end)) {
+        setExportMsg('Vui lòng chọn ngày bắt đầu và ngày kết thúc!');
+        return;
+      }
+      if (filteredScheduleItems.length === 0) {
         setExportMsg('Không có ca bệnh nào trong khoảng thời gian này!');
         return;
       }
 
       const vnDays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-      const startFormatted = exportStartDate.split('-').reverse().join('/');
-      const endFormatted = exportEndDate.split('-').reverse().join('/');
-
-      const startMonth = Number(exportStartDate.split('-')[1]);
-      const endMonth = Number(exportEndDate.split('-')[1]);
-      const startYear = exportStartDate.split('-')[0];
-      const endYear = exportEndDate.split('-')[0];
-      const titleStr = startMonth === endMonth && startYear === endYear
-        ? `LỊCH CHỤP MRI TIM THÁNG ${startMonth} NĂM ${startYear}`
-        : `LỊCH CHỤP MRI TIM TỪ THÁNG ${startMonth} ĐẾN THÁNG ${endMonth} NĂM ${endYear}`;
+      let titleStr = 'LỊCH CHỤP MRI TIM';
+      let startFormatted = '';
+      let endFormatted = '';
+      if (filterDateType === 'all') {
+        titleStr = 'LỊCH CHỤP MRI TIM - TẤT CẢ';
+      } else if (filterDateType === 'custom') {
+        startFormatted = start.split('-').reverse().join('/');
+        endFormatted = end.split('-').reverse().join('/');
+        titleStr = `LỊCH CHỤP MRI TIM TỪ NGÀY ${startFormatted} ĐẾN NGÀY ${endFormatted}`;
+      } else if (filterGroupType === 'month') {
+        const m = parseInt(filterGroupValue, 10);
+        titleStr = `LỊCH CHỤP MRI TIM THÁNG ${m} NĂM ${currentYear}`;
+        startFormatted = start.split('-').reverse().join('/');
+        endFormatted = end.split('-').reverse().join('/');
+      } else {
+        const q = parseInt(filterGroupValue, 10);
+        titleStr = `LỊCH CHỤP MRI TIM QUÝ ${q} NĂM ${currentYear}`;
+        startFormatted = start.split('-').reverse().join('/');
+        endFormatted = end.split('-').reverse().join('/');
+      }
 
       const exportItems = [...filteredScheduleItems].sort((a, b) =>
         getFormattedDateKey(a.CMRScheduledDate).localeCompare(getFormattedDateKey(b.CMRScheduledDate))
@@ -537,7 +576,10 @@ export default function MRISchedulerView({
       document.body.appendChild(a);
       a.style.display = 'none';
       a.href = url;
-      a.download = `Lịch chụp MRI tim_Tuần ${startFormatted.replace(/\//g, '-')}_${endFormatted.replace(/\//g, '-')}.xlsx`;
+      const fileSuffix = startFormatted && endFormatted
+        ? `${startFormatted.replace(/\//g, '-')}_${endFormatted.replace(/\//g, '-')}`
+        : 'Tat_ca';
+      a.download = `Lịch chụp MRI tim_${fileSuffix}.xlsx`;
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
@@ -1411,18 +1453,80 @@ export default function MRISchedulerView({
 
                 <div className="p-5 overflow-y-auto space-y-6 flex-1">
                   <div>
-                    <label className="block text-slate-500 font-bold text-[10px] uppercase mb-2 flex items-center gap-1.5">
-                      <CalendarDays className="w-4 h-4" /> Chọn ngày đầu tuần
+                    <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1.5 flex items-center gap-1.5">
+                      <CalendarDays className="w-4 h-4" /> Lọc theo ngày chụp MRI
                     </label>
-                    <VNDateInput
-                      value={exportStartDate}
-                      onChange={setExportStartDate}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 font-sans shadow-sm focus:outline-none"
-                    />
-                    {exportEndDate && (
+                    <div className="flex bg-slate-100 p-1 rounded-xl mb-2.5">
+                      <button
+                        type="button"
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition ${filterDateType === 'all' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setFilterDateType('all')}
+                      >
+                        Tất cả
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition ${filterDateType === 'custom' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setFilterDateType('custom')}
+                      >
+                        Tùy chọn
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition ${filterDateType === 'group' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setFilterDateType('group')}
+                      >
+                        Theo nhóm
+                      </button>
+                    </div>
+
+                    {filterDateType === 'all' ? null : filterDateType === 'custom' ? (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-slate-400 font-bold text-[9px] uppercase mb-1">Từ</label>
+                          <VNDateInput
+                            value={filterStartDate}
+                            onChange={setFilterStartDate}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-extrabold text-xs text-slate-800 font-sans shadow-sm focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-400 font-bold text-[9px] uppercase mb-1">Đến</label>
+                          <VNDateInput
+                            value={filterEndDate}
+                            onChange={setFilterEndDate}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-extrabold text-xs text-slate-800 font-sans shadow-sm focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <select
+                          value={filterGroupType}
+                          onChange={(e) => { setFilterGroupType(e.target.value as 'month' | 'quarter'); setFilterGroupValue('1'); }}
+                          className="w-1/3 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[10px] font-bold"
+                        >
+                          <option value="month">Tháng</option>
+                          <option value="quarter">Quý</option>
+                        </select>
+                        <select
+                          value={filterGroupValue}
+                          onChange={e => setFilterGroupValue(e.target.value)}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[10px] font-bold"
+                        >
+                          {filterGroupType === 'month' ? (
+                            [...Array(12)].map((_, i) => <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>)
+                          ) : (
+                            [...Array(4)].map((_, i) => <option key={i + 1} value={i + 1}>Quý {i + 1}</option>)
+                          )}
+                        </select>
+                      </div>
+                    )}
+
+                    {filterDateType !== 'all' && filterDateRange.start && filterDateRange.end && (
                       <p className="mt-2 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 p-2 rounded-lg">
-                        Lọc từ ngày: <strong>{exportStartDate.split('-').reverse().join('/')}</strong><br />
-                        Đến ngày: <strong>{exportEndDate.split('-').reverse().join('/')}</strong> (+7 ngày)
+                        Lọc từ ngày: <strong>{filterDateRange.start.split('-').reverse().join('/')}</strong><br />
+                        Đến ngày: <strong>{filterDateRange.end.split('-').reverse().join('/')}</strong>
                       </p>
                     )}
                   </div>

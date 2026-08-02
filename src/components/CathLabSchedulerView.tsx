@@ -2962,7 +2962,7 @@ Xin cảm ơn!`;
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex-1 lg:flex-initial flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-0 ${pureCalendarMode ? 'hidden' : isDeviceFilterExpanded ? 'hidden' : 'lg:col-span-6'} ${mobileTab === 'waitlist' && !isDeviceFilterExpanded ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex-1 lg:flex-initial flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-0 ${pureCalendarMode ? 'hidden' : 'lg:col-span-6'} ${mobileTab === 'waitlist' && !isDeviceFilterExpanded ? 'flex' : 'hidden lg:flex'} ${isDeviceFilterExpanded ? 'max-lg:hidden' : ''}`}>
           
           <div className="hidden lg:flex p-4 border-b border-slate-100 bg-slate-50 shrink-0 items-center justify-between gap-2">
             <div>
@@ -3558,7 +3558,7 @@ Xin cảm ơn!`;
         </div>
 
         {/* RIGHT COLUMN: Selection Detailed Form Editor OR Preview List */}
-        <div className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm overflow-y-auto lg:overflow-hidden min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : isDeviceFilterExpanded ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor' || isDeviceFilterExpanded) ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex-1 flex flex-col rounded-3xl shadow-sm min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${isAnyFilterExpanded ? 'h-full overflow-hidden' : 'overflow-y-auto lg:overflow-hidden'} ${(mobileTab === 'calendar' || mobileTab === 'editor' || isDeviceFilterExpanded) ? 'flex' : 'hidden lg:flex'}`}>
           {!isAnyFilterExpanded ? (
             <>
               {(!selectedConsult || pureCalendarMode || mobileTab !== 'editor') ? (
@@ -4464,7 +4464,7 @@ Xin cảm ơn!`;
           )}
             </>
           ) : (
-            <div className="flex flex-col flex-1 min-h-0 p-4 relative bg-white lg:h-full">
+            <div className="flex flex-col flex-1 min-h-0 h-full p-4 relative bg-white">
               <h3 className="font-extrabold text-[13px] uppercase tracking-wide text-slate-800 mb-4 flex items-center gap-2 shrink-0">
                 <Filter className={`w-5 h-5 ${isDeviceFilterExpanded ? 'text-teal-600' : 'text-emerald-600'}`}/> {isDeviceFilterExpanded ? `DANH SÁCH DỰ TRÙ DỤNG CỤ (${deviceFilteredConsults.length} ca)` : `DANH SÁCH BỆNH NHÂN DỰ KIẾN THÔNG TIM (${exportFilteredConsults.length} ca)`}
               </h3>
