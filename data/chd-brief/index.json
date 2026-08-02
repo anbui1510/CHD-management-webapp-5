@@ -1,6 +1,13 @@
 {
   "entries": [
     {
+      "date": "2026-06-29",
+      "topic": "3D/4D Echocardiography & Advanced Imaging in CHD",
+      "createdAt": "2026-06-29T11:12:48.082Z",
+      "status": "error",
+      "error": "GEMINI_API_KEY chưa được cấu hình"
+    },
+    {
       "date": "2026-06-21",
       "topic": "Fetal Cardiology & Adult Congenital Heart Disease (ACHD)",
       "createdAt": "2026-06-21T00:00:27.854Z",

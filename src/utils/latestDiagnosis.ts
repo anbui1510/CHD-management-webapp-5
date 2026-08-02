@@ -51,7 +51,7 @@ const hasDiagnosisContent = (code?: string, detail?: string) =>
 function buildConsultByKey(consults: Consult[]): Map<string, Consult> {
   const map = new Map<string, Consult>();
   for (const consult of consults) {
-    const key = normalizeRecordKey(consult.ConsultKey);
+    const key = normalizeRecordKey(consult.id);
     if (key) map.set(key, consult);
   }
   return map;
@@ -162,14 +162,14 @@ export function filterPatientOperations(operations: Operation[], patientKey: str
 }
 
 function pushUniqueCath(list: CathLab[], cath: CathLab) {
-  const key = normalizeRecordKey(cath.CathKey);
-  if (!key || list.some(item => normalizeRecordKey(item.CathKey) === key)) return;
+  const key = normalizeRecordKey(cath.id);
+  if (!key || list.some(item => normalizeRecordKey(item.id) === key)) return;
   list.push(cath);
 }
 
 function pushUniqueOperation(list: Operation[], op: Operation) {
-  const key = normalizeRecordKey(op.SurgKey);
-  if (!key || list.some(item => normalizeRecordKey(item.SurgKey) === key)) return;
+  const key = normalizeRecordKey(op.id);
+  if (!key || list.some(item => normalizeRecordKey(item.id) === key)) return;
   list.push(op);
 }
 
@@ -184,7 +184,7 @@ export function createLatestDiagnosisResolver(
 
   for (const consult of consults) {
     const patientKey = normalizeRecordKey(consult.PatientKey);
-    const consultKey = normalizeRecordKey(consult.ConsultKey);
+    const consultKey = normalizeRecordKey(consult.id);
     if (patientKey) {
       const list = consultsByPatient.get(patientKey) || [];
       list.push(consult);

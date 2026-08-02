@@ -76,7 +76,7 @@ export function StaffMultiSelect({ staffList = [], selectedMembers = [], onChang
     const stdOptions = staffList.map(s => {
       const shortName = getShortStaffName(s.StaffName, staffList);
       return {
-        key: s.StaffKey,
+        key: s.id,
         fullName: s.StaffName,
         shortName: shortName,
       };

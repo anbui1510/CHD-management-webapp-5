@@ -54,7 +54,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
   const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();
     patients.forEach(patient => {
-      if (patient.PatientKey) map.set(String(patient.PatientKey).trim().toLowerCase(), patient);
+      if (patient.id) map.set(String(patient.id).trim().toLowerCase(), patient);
       if (patient.PatientID1) map.set(String(patient.PatientID1).trim().toLowerCase(), patient);
     });
     return map;
@@ -64,7 +64,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
   const scheduledItems = useMemo<MRICalendarItem[]>(() => {
     return cmrs
       .map((cmr, index) => {
-        const key = cmr.CMRKey || cmr.CMRkey || `cmr_no_key_${index}`;
+        const key = cmr.id || cmr.id || `cmr_no_key_${index}`;
         const patient =
           patientsByKey.get(String(cmr.PatientKey || '').trim().toLowerCase()) ||
           patientsByKey.get(String(cmr.MBN || '').trim().toLowerCase());
@@ -182,7 +182,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
                       const name = getPatientDisplayName(item.__patient?.PatientName || item['Họ và tên']);
                       return (
                         <button
-                          key={item.CMRKey || item.CMRkey}
+                          key={item.id || item.id}
                           onClick={() => setSelectedItem(item)}
                           className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight px-1.5 py-0.5 rounded-lg truncate transition uppercase text-center"
                           title={item.__patient?.PatientName || item['Họ và tên']}

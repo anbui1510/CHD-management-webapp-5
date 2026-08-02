@@ -156,7 +156,7 @@ export default function SurgeryRoomView({
                   if (!patient) return null;
                   return (
                     <tr
-                      key={op.SurgKey || `${op.PatientKey}_${index}`}
+                      key={op.id || `${op.PatientKey}_${index}`}
                       onClick={() => openDoneDetail(op)}
                       className="hover:bg-slate-50 cursor-pointer transition"
                     >

@@ -220,7 +220,7 @@ export default function StaffProfileView({
   const [showPassword, setShowPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [sessionTimeout, setSessionTimeout] = useState<string>(() => {
-    return localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || '30';
+    return localStorage.getItem(`SessionTimeout_${staff.id}`) || '30';
   });
 
   useEffect(() => {
@@ -229,7 +229,7 @@ export default function StaffProfileView({
     setIsEditingAdmin(false);
     setShowPassword(false);
     setShowEditPassword(false);
-    setSessionTimeout(localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || '30');
+    setSessionTimeout(localStorage.getItem(`SessionTimeout_${staff.id}`) || '30');
   }, [staff]);
 
   const activeFilter = useMemo<ActivityDateFilter>(
@@ -250,20 +250,20 @@ export default function StaffProfileView({
   const filteredMarks = useMemo(() => {
     const range = resolveActivityRange(activeFilter);
     return doctorPerformanceMarks
-      .filter(mark => String(mark.StaffKey || '') === String(profileStaff.StaffKey || ''))
+      .filter(mark => String(mark.StaffKey || '') === String(profileStaff.id || ''))
       .filter(mark => dateInRange(parseDateKey(mark.CreatedTime), range.from, range.to))
       .sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || '')));
-  }, [doctorPerformanceMarks, profileStaff.StaffKey, activeFilter]);
+  }, [doctorPerformanceMarks, profileStaff.id, activeFilter]);
 
   const totalMarkScore = filteredMarks.reduce((sum, mark) => sum + Number(mark.Score || 1), 0);
 
   const getMarkPatientContext = (mark: DoctorPerformanceMark) => {
     const relatedConsult = consults.find(consult =>
-      String(consult.ConsultKey || '') === String(mark.RelatedEntityKey || '') ||
+      String(consult.id || '') === String(mark.RelatedEntityKey || '') ||
       String(consult.PatientKey || '') === String(mark.PatientKey || '')
     );
     const patient = patients.find(item =>
-      String(item.PatientKey || '') === String(mark.PatientKey || '') ||
+      String(item.id || '') === String(mark.PatientKey || '') ||
       String(item.PatientID1 || '') === String(mark.PatientID || '') ||
       String(item.PatientID2 || '') === String(mark.PatientID || '')
     );
@@ -317,7 +317,7 @@ export default function StaffProfileView({
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`, {
+      const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -340,7 +340,7 @@ export default function StaffProfileView({
       }
 
       // Save session timeout
-      localStorage.setItem(`SessionTimeout_${profileStaff.StaffKey}`, sessionTimeout);
+      localStorage.setItem(`SessionTimeout_${profileStaff.id}`, sessionTimeout);
       window.dispatchEvent(new Event('storage'));
 
       const updated = (await response.json()) as Staff;
@@ -377,7 +377,7 @@ export default function StaffProfileView({
 
       setSaving(true);
       try {
-        const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.StaffKey)}`, {
+        const response = await fetch(`/api/staff/${encodeURIComponent(profileStaff.id)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ Avatar: dataUrl }),
@@ -557,7 +557,7 @@ export default function StaffProfileView({
                     </thead>
                     <tbody className="divide-y divide-red-50">
                       {filteredMarks.map(mark => (
-                        <tr key={mark.MarkKey} className="bg-red-50/30 hover:bg-red-50/70 transition">
+                        <tr key={mark.id} className="bg-red-50/30 hover:bg-red-50/70 transition">
                           <td className="px-3 py-2 align-top">
                             <div className="flex items-start gap-1.5">
                               <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
@@ -661,7 +661,7 @@ export default function StaffProfileView({
 
               {!isEditingAdmin ? (
                 <>
-                  <AdminInfoRow icon={<User className="w-4 h-4" />} label="Mã nhân viên" value={profileStaff.StaffKey} mono />
+                  <AdminInfoRow icon={<User className="w-4 h-4" />} label="Mã nhân viên" value={profileStaff.id} mono />
                   <AdminInfoRow icon={<Shield className="w-4 h-4" />} label="Khoa / Phòng ban" value={profileStaff.Department || '—'} />
                   <AdminInfoRow icon={<Activity className="w-4 h-4" />} label="Chức danh" value={profileStaff.Career || '—'} />
                   <AdminInfoRow icon={<CalendarDays className="w-4 h-4" />} label="Ngày sinh" value={profileStaff.StaffDOB ? formatVNTime(profileStaff.StaffDOB) : '—'} />

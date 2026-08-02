@@ -13,4 +13,4 @@ export type OptimisticMedicalHandlers = {
 };
 
 export const getCmrRecordKey = (cmr: Partial<CMR>) =>
-  String(cmr.CMRKey || cmr.CMRkey || '').trim();
+  String(cmr.id || cmr.id || '').trim();

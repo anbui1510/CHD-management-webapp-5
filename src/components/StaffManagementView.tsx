@@ -47,7 +47,7 @@ interface StaffManagementViewProps {
 type StaffDraft = Partial<Staff> & { moduleSet: Set<AppModule> };
 
 const emptyDraft = (): StaffDraft => ({
-  StaffKey: '',
+  id: '',
   StaffName: '',
   Name: '',
   Department: '',
@@ -98,7 +98,7 @@ export default function StaffManagementView({
       const q = removeDiacritics(searchQuery).toLowerCase().trim();
       list = list.filter(staff => {
         const haystack = [
-          staff.StaffKey,
+          staff.id,
           staff.StaffName,
           staff.Name,
           staff.Department,
@@ -116,12 +116,12 @@ export default function StaffManagementView({
   }, [staffList, searchQuery, showInactive]);
 
   const selectedStaff = useMemo(
-    () => staffList.find(staff => staff.StaffKey === selectedKey) || null,
+    () => staffList.find(staff => staff.id === selectedKey) || null,
     [staffList, selectedKey]
   );
 
   const markStats = useMemo(() => {
-    const staffMap = new Map(staffList.map(staff => [String(staff.StaffKey || ''), staff]));
+    const staffMap = new Map(staffList.map(staff => [String(staff.id || ''), staff]));
     const grouped = new Map<string, {
       staff: Staff | null;
       totalScore: number;
@@ -177,7 +177,7 @@ export default function StaffManagementView({
     const presetId = staff.StaffRolePreset || inferPresetFromPermissions([...modules], rolePresets);
 
     setDraft({
-      StaffKey: staff.StaffKey,
+      StaffKey: staff.id,
       StaffName: staff.StaffName || '',
       Name: staff.Name || '',
       Department: staff.Department || '',
@@ -194,7 +194,7 @@ export default function StaffManagementView({
   };
 
   const handleSelectStaff = (staff: Staff) => {
-    setSelectedKey(staff.StaffKey);
+    setSelectedKey(staff.id);
     loadDraftFromStaff(staff);
     setActiveTab('edit');
   };
@@ -212,8 +212,8 @@ export default function StaffManagementView({
   };
 
   const handleCopyPermissions = () => {
-    if (!copyFromKey || !draft.StaffKey) return;
-    const source = staffList.find(staff => staff.StaffKey === copyFromKey);
+    if (!copyFromKey || !draft.id) return;
+    const source = staffList.find(staff => staff.id === copyFromKey);
     if (!source) {
       triggerAlert?.('Không tìm thấy nhân viên nguồn.', 'Lỗi');
       return;
@@ -248,7 +248,7 @@ export default function StaffManagementView({
   };
 
   const handleSave = async () => {
-    if (!selectedStaff || !draft.StaffKey) return;
+    if (!selectedStaff || !draft.id) return;
     if (!draft.StaffName?.trim()) {
       triggerAlert?.('Vui lòng nhập Họ tên hiển thị (StaffName)!', 'Thiếu thông tin');
       return;
@@ -275,10 +275,10 @@ export default function StaffManagementView({
       payload.Password = draft.Password.trim();
     }
 
-    onPatchStaff?.(draft.StaffKey, payload);
+    onPatchStaff?.(draft.id, payload);
     triggerAlert?.('Đã cập nhật nhân sự và phân quyền thành công!', 'Lưu thành công');
 
-    fetch(`/api/staff/${encodeURIComponent(draft.StaffKey)}`, {
+    fetch(`/api/staff/${encodeURIComponent(draft.id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -473,7 +473,7 @@ export default function StaffManagementView({
                   <div className="p-8 text-center text-xs font-bold text-slate-400">Chưa có sự kiện để hiển thị.</div>
                 ) : (
                   markStats.recentMarks.map(mark => (
-                    <div key={mark.MarkKey} className="p-3.5 hover:bg-slate-50 transition">
+                    <div key={mark.id} className="p-3.5 hover:bg-slate-50 transition">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-extrabold text-xs text-slate-850">{mark.StaffName || mark.StaffKey} · {mark.Label}</p>
@@ -524,10 +524,10 @@ export default function StaffManagementView({
                 filteredStaff.map(staff => {
                   const inactive = Boolean(String(staff.FireDate || '').trim());
                   const permCount = getStaffPermissions(staff).size;
-                  const isSelected = staff.StaffKey === selectedKey;
+                  const isSelected = staff.id === selectedKey;
                   return (
                     <button
-                      key={staff.StaffKey}
+                      key={staff.id}
                       type="button"
                       onClick={() => handleSelectStaff(staff)}
                       className={`w-full text-left p-3.5 transition flex items-center gap-3 ${
@@ -542,7 +542,7 @@ export default function StaffManagementView({
                       <div className="min-w-0 flex-1">
                         <p className="font-extrabold text-xs text-slate-800 truncate">{staff.StaffName}</p>
                         <p className="text-[10px] text-slate-400 font-mono truncate">
-                          {staff.StaffKey} · {staff.Role || 'User'}
+                          {staff.id} · {staff.Role || 'User'}
                           {inactive ? ' · Đã nghỉ' : ''}
                         </p>
                       </div>
@@ -569,7 +569,7 @@ export default function StaffManagementView({
                 <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
                   <div>
                     <h3 className="font-extrabold text-base text-slate-900">{draft.StaffName}</h3>
-                    <p className="text-[11px] text-slate-500 font-mono">StaffKey: {draft.StaffKey}</p>
+                    <p className="text-[11px] text-slate-500 font-mono">StaffKey: {draft.id}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -616,10 +616,10 @@ export default function StaffManagementView({
                       >
                         <option value="">Chọn nhân viên nguồn...</option>
                         {staffList
-                          .filter(staff => staff.StaffKey !== draft.StaffKey && !String(staff.FireDate || '').trim())
+                          .filter(staff => staff.id !== draft.id && !String(staff.FireDate || '').trim())
                           .map(staff => (
-                            <option key={staff.StaffKey} value={staff.StaffKey}>
-                              {staff.StaffName} ({staff.StaffKey}) — {getStaffPermissions(staff).size} module
+                            <option key={staff.id} value={staff.id}>
+                              {staff.StaffName} ({staff.id}) — {getStaffPermissions(staff).size} module
                             </option>
                           ))}
                       </select>

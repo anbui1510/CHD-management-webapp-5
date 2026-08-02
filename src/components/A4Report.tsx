@@ -71,7 +71,7 @@ export default function A4Report({ consult, patient, onClose }: A4ReportProps) {
                 <p className="text-[10px] text-gray-400 font-mono">Độc lập - Tự do - Hạnh phúc</p>
               </div>
               <div className="text-right">
-                <p className="text-[11px] text-gray-500 font-mono">Mã BBHC: <span className="font-bold text-gray-900">{consult.ConsultKey}</span></p>
+                <p className="text-[11px] text-gray-500 font-mono">Mã BBHC: <span className="font-bold text-gray-900">{consult.id}</span></p>
                 <p className="text-[10px] text-gray-400 font-mono">Ngày in: {new Date().toLocaleDateString('vi-VN')}</p>
               </div>
             </div>
@@ -258,7 +258,7 @@ export default function A4Report({ consult, patient, onClose }: A4ReportProps) {
         {/* Modal Info Footer */}
         <div className="bg-slate-50 px-6 py-4 flex items-center justify-between text-xs text-slate-500">
           <span>In tài liệu này để nộp lưu trữ hồ sơ bệnh nhi CHD.</span>
-          <span className="font-mono text-slate-400">AppSheet ID: {consult.ConsultKey}</span>
+          <span className="font-mono text-slate-400">AppSheet ID: {consult.id}</span>
         </div>
 
       </div>

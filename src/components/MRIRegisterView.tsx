@@ -161,7 +161,7 @@ export default function MRIRegisterView({
   const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();
     patients.forEach(patient => {
-      if (patient.PatientKey) map.set(String(patient.PatientKey).trim().toLowerCase(), patient);
+      if (patient.id) map.set(String(patient.id).trim().toLowerCase(), patient);
       if (patient.PatientID1) map.set(String(patient.PatientID1).trim().toLowerCase(), patient);
     });
     return map;
@@ -204,13 +204,15 @@ export default function MRIRegisterView({
   };
 
   const allItems = useMemo<MRIRegisterItem[]>(() => {
-    return cmrs.map((cmr, index) => {
-      const key = cmr.CMRKey || cmr.CMRkey || `cmr_no_key_${index}`;
-      const patient =
-        patientsByKey.get(String(cmr.PatientKey || '').trim().toLowerCase()) ||
-        patientsByKey.get(String(cmr.MBN || '').trim().toLowerCase());
-      return { ...cmr, CMRKey: key, __patient: patient };
-    });
+    return cmrs
+      .filter(cmr => Boolean(cmr.PatientKey || cmr.MBN || cmr['Họ và tên'] || cmr.CMRDiagnosisID || cmr.CMRRequest || cmr.CMRScheduledDate))
+      .map((cmr, index) => {
+        const key = cmr.id || cmr.id || `cmr_no_key_${index}`;
+        const patient =
+          patientsByKey.get(String(cmr.PatientKey || '').trim().toLowerCase()) ||
+          patientsByKey.get(String(cmr.MBN || '').trim().toLowerCase());
+        return { ...cmr, CMRKey: key, __patient: patient };
+      });
   }, [cmrs, patientsByKey]);
 
   const segmented = useMemo(() => {
@@ -310,7 +312,7 @@ export default function MRIRegisterView({
 
         finalPatientKey = `pat_${Date.now()}`;
         const patientPayload: Patient = {
-          PatientKey: finalPatientKey,
+          id: finalPatientKey,
           PatientID1: newPatID1.trim(),
           PatientID2: newPatID2.trim(),
           PatientName: newPatName,
@@ -320,7 +322,7 @@ export default function MRIRegisterView({
           PatientAddress: newPatAddress || 'TP Hà Nội',
           PatientPhone1: newPatPhone || '',
           PatientPhone2: '',
-          PatientCreateBy: currentStaff?.StaffKey || '01378',
+          PatientCreateBy: currentStaff?.id || '01378',
           PatientCreateTime: new Date().toISOString(),
           Outcome: ''
         };
@@ -383,7 +385,7 @@ export default function MRIRegisterView({
               PatientAddress: newPatAddress || 'TP Hà Nội',
               PatientPhone1: newPatPhone || '',
               PatientPhone2: '',
-              PatientCreateBy: currentStaff?.StaffKey || '01378',
+              PatientCreateBy: currentStaff?.id || '01378',
               PatientCreateTime: new Date().toISOString()
             })
           });
@@ -601,7 +603,7 @@ export default function MRIRegisterView({
                 const patient = item.__patient;
                 return (
                   <tr
-                    key={item.CMRKey || `${item.PatientKey}-${index}`}
+                    key={item.id || `${item.PatientKey}-${index}`}
                     onClick={() => openPreview(item)}
                     className="hover:bg-indigo-50/45 transition cursor-pointer"
                   >
@@ -748,9 +750,9 @@ export default function MRIRegisterView({
                             }
                             return matched.slice(0, 12).map(p => (
                               <button
-                                key={p.PatientKey}
+                                key={p.id}
                                 type="button"
-                                onClick={() => { setSelectedPatKey(p.PatientKey); setSearchPatQuery(''); }}
+                                onClick={() => { setSelectedPatKey(p.id); setSearchPatQuery(''); }}
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition flex justify-between items-center cursor-pointer"
                               >
                                 <div>
@@ -946,7 +948,7 @@ export default function MRIRegisterView({
                         <option value="">-- Chọn BS --</option>
                         {staffList.map(s => {
                           const displayName = getShortStaffName(s.StaffName, staffList);
-                          return <option key={s.StaffKey} value={displayName}>{displayName}</option>;
+                          return <option key={s.id} value={displayName}>{displayName}</option>;
                         })}
                         {extraDoctorOptions.map(d => <option key={d} value={d}>{d}</option>)}
                         <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm bác sĩ mới...</option>
@@ -1168,7 +1170,7 @@ export default function MRIRegisterView({
                               <option value="">-- Chọn BS --</option>
                               {staffList.map(s => {
                                 const displayName = getShortStaffName(s.StaffName, staffList);
-                                return <option key={s.StaffKey} value={displayName}>{displayName}</option>;
+                                return <option key={s.id} value={displayName}>{displayName}</option>;
                               })}
                               {extraDoctorOptions.map(d => <option key={d} value={d}>{d}</option>)}
                               {editForm.RequestBy && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === editForm.RequestBy) && !extraDoctorOptions.includes(String(editForm.RequestBy)) && (

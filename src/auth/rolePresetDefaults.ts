@@ -1,5 +1,5 @@
 export interface RolePresetRecord {
-  RolePresetID: string;
+  id: string;
   RolePresetLabel: string;
   RolePresetDescription?: string;
   Permissions: string;
@@ -12,7 +12,7 @@ const ALL_MODULES_CSV =
 
 export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
   {
-    RolePresetID: 'admin-khoa',
+    id: 'admin-khoa',
     RolePresetLabel: 'Admin khoa',
     RolePresetDescription: 'Toàn quyền mọi module và quản trị hệ thống',
     Permissions: ALL_MODULES_CSV,
@@ -20,56 +20,56 @@ export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
     IsSystem: true,
   },
   {
-    RolePresetID: 'dang-ky',
+    id: 'dang-ky',
     RolePresetLabel: 'Đăng ký / Lễ tân',
     RolePresetDescription: 'Tiếp nhận BN, đăng ký hội chẩn',
     Permissions: 'home,workspace,patients,consult-list,schedule-view,mri-calendar',
     SortOrder: 2,
   },
   {
-    RolePresetID: 'bs-hoi-chan',
+    id: 'bs-hoi-chan',
     RolePresetLabel: 'BS hội chẩn',
     RolePresetDescription: 'Đăng ký và nhập kết quả staff',
     Permissions: 'home,workspace,patients,consult-list,results-staff,chd-daily-brief',
     SortOrder: 3,
   },
   {
-    RolePresetID: 'dieu-phoi-tt',
+    id: 'dieu-phoi-tt',
     RolePresetLabel: 'Điều phối thông tim',
     RolePresetDescription: 'Xếp lịch, dụng cụ, gọi bệnh, lưu trữ',
     Permissions: 'home,workspace,schedule-tt,schedule-view,archive,patients',
     SortOrder: 4,
   },
   {
-    RolePresetID: 'phong-tt',
+    id: 'phong-tt',
     RolePresetLabel: 'Phòng thông tim (PTV/ĐD TT)',
     RolePresetDescription: 'Thực hiện và nhập kết quả can thiệp TT',
     Permissions: 'home,workspace,cathlab-room,schedule-view,patients',
     SortOrder: 5,
   },
   {
-    RolePresetID: 'mri-team',
+    id: 'mri-team',
     RolePresetLabel: 'Nhóm MRI tim',
     RolePresetDescription: 'Đăng ký, xếp lịch và nhập KQ MRI',
     Permissions: 'home,workspace,mri-register,mri-scheduler,mri-result,mri-calendar,patients',
     SortOrder: 6,
   },
   {
-    RolePresetID: 'phong-mo',
+    id: 'phong-mo',
     RolePresetLabel: 'Phòng phẫu thuật',
     RolePresetDescription: 'Quản lý ca mổ tim',
     Permissions: 'home,workspace,surgery-room,surgery-scheduler,surgery-schedule-view,patients',
     SortOrder: 7,
   },
   {
-    RolePresetID: 'chi-xem',
+    id: 'chi-xem',
     RolePresetLabel: 'Chỉ xem (Read-only)',
     RolePresetDescription: 'Xem hồ sơ và các lịch, không sửa dữ liệu nghiệp vụ',
     Permissions: 'home,workspace,patients,schedule-view,mri-calendar,surgery-schedule-view',
     SortOrder: 8,
   },
   {
-    RolePresetID: 'tuy-chinh',
+    id: 'tuy-chinh',
     RolePresetLabel: 'Tùy chỉnh thủ công',
     RolePresetDescription: 'Chọn từng module riêng lẻ bên dưới',
     Permissions: 'home,workspace',

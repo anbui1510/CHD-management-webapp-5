@@ -675,7 +675,7 @@ Xin cảm ơn!`;
       if (!c.PatientKey) return;
       const patientKey = normalizePatientKey(c.PatientKey);
       if (!map.has(patientKey)) {
-        map.set(patientKey, c.ConsultKey);
+        map.set(patientKey, c.id);
       }
     });
     return map;
@@ -711,7 +711,7 @@ Xin cảm ơn!`;
       const dup = patients.find(
         p => String(p.PatientID1 || '').trim().toLowerCase() === adHocPatientID1.trim().toLowerCase()
       );
-      if (dup) return getPendingConsultForPatient(dup.PatientKey);
+      if (dup) return getPendingConsultForPatient(dup.id);
     }
     return undefined;
   };
@@ -731,7 +731,7 @@ Xin cảm ơn!`;
     const result = consults.filter(c => {
       if (!c.ConsultDate) return false;
 
-      if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) { return false; }
+      if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.id) { return false; }
       if (isConsultCathCompleted(c, cathlabsByPatientKey.get(normalizePatientKey(c.PatientKey)))) { return false; }
       if (isConsultWaitlistExcludedByStatus(c.Status)) { return false; }
 
@@ -1075,8 +1075,8 @@ Xin cảm ơn!`;
         if (maNB) {
           const p = patients.find(pat => String(pat.PatientID1) === maNB);
           if (p) {
-            const cList = consults.filter(con => con.PatientKey == p.PatientKey && con.ConsultResultID && ['Can thiệp thông tim', 'Mổ tim', 'Tiền Glenn', 'Tiền Fontan'].includes(con.ConsultResultID));
-            const c = cList.length > 0 ? cList.sort((a,b) => (b.ConsultDate || '').localeCompare(a.ConsultDate || ''))[0] : consults.find(con => con.PatientKey == p.PatientKey);
+            const cList = consults.filter(con => con.PatientKey == p.id && con.ConsultResultID && ['Can thiệp thông tim', 'Mổ tim', 'Tiền Glenn', 'Tiền Fontan'].includes(con.ConsultResultID));
+            const c = cList.length > 0 ? cList.sort((a,b) => (b.ConsultDate || '').localeCompare(a.ConsultDate || ''))[0] : consults.find(con => con.PatientKey == p.id);
 
             if (c) {
               const payload: any = {};
@@ -1085,7 +1085,7 @@ Xin cảm ơn!`;
               if (supplyFeedbackCell !== '') payload.SupplyDepFeedback = supplyFeedbackCell;
 
               if (Object.keys(payload).length > 0) {
-                updates.push({ consultKey: c.ConsultKey, payload });
+                updates.push({ consultKey: c.id, payload });
               }
             }
           }
@@ -1449,7 +1449,7 @@ Xin cảm ơn!`;
   }, [patients, adHocSearchQuery]);
 
   const handleSelectPatient = (pat: Patient) => {
-    setAdHocSelectedPatientKey(String(pat.PatientKey || ''));
+    setAdHocSelectedPatientKey(String(pat.id || ''));
     setAdHocPatientID1(String(pat.PatientID1 || ''));
     setAdHocPatientID2(String(pat.PatientID2 || ''));
     setAdHocPatientName(String(pat.PatientName || ''));
@@ -1461,7 +1461,7 @@ Xin cảm ơn!`;
     setAdHocPatientPhone2(String(pat.PatientPhone2 || ''));
     setAdHocOutcome(String(pat.Outcome || ''));
     setAdHocSearchQuery('');
-    setAdHocPendingConsult(getPendingConsultForPatient(pat.PatientKey) || null);
+    setAdHocPendingConsult(getPendingConsultForPatient(pat.id) || null);
   };
 
   const handleClearSelectedPatient = () => {
@@ -1507,18 +1507,18 @@ Xin cảm ơn!`;
   };
 
   const activatePendingConsultForScheduling = async (pendingConsult: Consult) => {
-    const overrideNote = `[Kích hoạt xếp lịch bổ sung - ${currentStaff?.StaffName || currentStaff?.StaffKey || 'user'} ${new Date().toISOString()}]`;
+    const overrideNote = `[Kích hoạt xếp lịch bổ sung - ${currentStaff?.StaffName || currentStaff?.id || 'user'} ${new Date().toISOString()}]`;
     const payload = {
       ConsultResultID: 'Can thiệp thông tim',
       DetailConsultResult: String(pendingConsult.DetailConsultResult || '').trim() || 'Can thiệp thông tim',
-      ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
+      ConsultResultUpdatedBy: currentStaff?.id || '01378',
       ConsultResultUpdatedTime: new Date().toISOString(),
       ConsultNote: pendingConsult.ConsultNote
         ? `${pendingConsult.ConsultNote}\n${overrideNote}`
         : overrideNote,
     };
 
-    const response = await fetch(`/api/consults/${pendingConsult.ConsultKey}`, {
+    const response = await fetch(`/api/consults/${pendingConsult.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1657,7 +1657,7 @@ Xin cảm ơn!`;
   };
 
   const handleSelectConsult = (c: Consult) => {
-    if (selectedConsult && selectedConsult.ConsultKey !== c.ConsultKey && hasUnsavedChanges()) {
+    if (selectedConsult && selectedConsult.id !== c.id && hasUnsavedChanges()) {
       requestCloseScheduling(() => applySelectConsult(c));
       return;
     }
@@ -1686,7 +1686,7 @@ Xin cảm ơn!`;
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      const response = await fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
+      const response = await fetch(`/api/consults/${selectedConsult.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ CallStatus: callStatus })
@@ -1764,7 +1764,7 @@ Xin cảm ơn!`;
 
     const patientKey = adHocPatientMode === 'existing' ? adHocSelectedPatientKey : `pat_${Date.now()}`;
     const patientData: Patient = {
-      PatientKey: patientKey,
+      id: patientKey,
       PatientID1: String(adHocPatientID1 || '').trim(),
       PatientID2: String(adHocPatientID2 || '').trim(),
       PatientName: adHocPatientName,
@@ -1781,7 +1781,7 @@ Xin cảm ơn!`;
 
     const newConsultKey = `con_${Date.now()}`;
     const consultData: Consult = {
-      ConsultKey: newConsultKey,
+      id: newConsultKey,
       PatientKey: patientKey,
       ConsultType: adHocConsultType,
       PatientWeight: adHocPatientWeight ? `${adHocPatientWeight} kg` : '',
@@ -1812,9 +1812,9 @@ Xin cảm ơn!`;
       PostCathDepart: adHocPostCathDepart,
       FundingRequest: adHocFundingRequest,
       CheckDeviceDate: adHocCheckDevice ? new Date().toISOString() : '',
-      CheckDeviceBy: adHocCheckDevice ? (currentStaff?.StaffKey || '01378') : '',
+      CheckDeviceBy: adHocCheckDevice ? (currentStaff?.id || '01378') : '',
       CheckDeviceUpdatedTime: adHocCheckDevice ? new Date().toISOString() : '',
-      CheckDeviceUpdatedBy: adHocCheckDevice ? (currentStaff?.StaffKey || '01378') : '',
+      CheckDeviceUpdatedBy: adHocCheckDevice ? (currentStaff?.id || '01378') : '',
       CathMethod: adHocCathMethod.join(' + ')
     };
 
@@ -1929,7 +1929,7 @@ Xin cảm ơn!`;
       Scheduled1stInterventionist: scheduled1st,
       Scheduled2ndInterventionist: finalScheduled2nd,
       Scheduled3rdInterventionist: scheduled3rd,
-      CheckDeviceUpdatedBy: currentStaff?.StaffKey || '01378',
+      CheckDeviceUpdatedBy: currentStaff?.id || '01378',
       CheckDeviceUpdatedTime: new Date().toISOString()
     };
   };
@@ -1977,7 +1977,7 @@ Xin cảm ơn!`;
     const closeOnSuccess = options?.closeOnSuccess !== false;
     const merged = { ...selectedConsult, ...updatedData };
 
-    onPatchConsult?.(selectedConsult.ConsultKey, updatedData);
+    onPatchConsult?.(selectedConsult.id, updatedData);
     setSelectedConsult(merged);
     setFormSnapshot(buildSnapshotFromConsult(merged));
     setSuccessMsg('Đã lưu thông tin xếp lịch thành công!');
@@ -1995,7 +1995,7 @@ Xin cảm ơn!`;
     setSaving(false);
 
     // Run fetch in the background to be instantaneous
-    fetch(`/api/consults/${selectedConsult.ConsultKey}`, {
+    fetch(`/api/consults/${selectedConsult.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedData)
@@ -2100,15 +2100,15 @@ Xin cảm ơn!`;
     if (currentAction.type === 'undo_scheduled' && currentAction.consultToUpdate) {
       try {
         const patch = { PlannedCathLabDate: '', TransferredToCathLab: false };
-        onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
-        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
+        onPatchConsult?.(currentAction.consultToUpdate.id, patch);
+        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch)
         });
         if (response.ok) {
            onRefreshData();
-           if (selectedConsult && selectedConsult.ConsultKey === currentAction.consultToUpdate.ConsultKey) {
+           if (selectedConsult && selectedConsult.id === currentAction.consultToUpdate.id) {
               setPlannedCathLabDate('');
            }
            setSuccessMsg('Đã rút ca về danh sách Chưa xếp lịch.');
@@ -2123,8 +2123,8 @@ Xin cảm ơn!`;
     } else if (currentAction.type === 'transfer_row' && currentAction.consultToUpdate) {
       try {
         const patch = { TransferredToCathLab: true };
-        onPatchConsult?.(currentAction.consultToUpdate.ConsultKey, patch);
-        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.ConsultKey}`, {
+        onPatchConsult?.(currentAction.consultToUpdate.id, patch);
+        const response = await fetch(`/api/consults/${currentAction.consultToUpdate.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch)
@@ -2633,7 +2633,7 @@ Xin cảm ơn!`;
                 {mobileDisplayedWaitlist.map((c) => {
                   const pat = findPatientByKey(patients, c.PatientKey);
                   if (!pat) return null;
-                  const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
+                  const isSelected = selectedConsult?.id === c.id;
 
                   const missedDays = getMissScheduleDays(c.ConsultDate);
                   let warningIcon = null;
@@ -2650,7 +2650,7 @@ Xin cảm ơn!`;
 
                   return (
                     <button
-                      key={c.ConsultKey}
+                      key={c.id}
                       type="button"
                       onClick={() => handleSelectConsult(c)}
                       className={`w-full text-left p-3 transition ${
@@ -2826,7 +2826,7 @@ Xin cảm ơn!`;
                   {paginatedWaitlist.map((c) => {
                     const pat = findPatientByKey(patients, c.PatientKey);
                     if (!pat) return null;
-                    const isSelected = selectedConsult?.ConsultKey === c.ConsultKey;
+                    const isSelected = selectedConsult?.id === c.id;
                     
                     // Display value for scheduled 2nd interventionist (auto-fills if empty in storage)
                     const dispScheduled2nd = getAutoScheduled2nd(c.RequestBy || '') || c.Scheduled2ndInterventionist || '';
@@ -2846,7 +2846,7 @@ Xin cảm ơn!`;
 
                     return (
                       <tr 
-                        key={c.ConsultKey}
+                        key={c.id}
                         onClick={() => handleSelectConsult(c)}
                         className={`hover:bg-indigo-50/45 cursor-pointer transition ${
                           isSelected ? 'bg-indigo-50/90 font-bold border-l-4 border-indigo-600' : ''
@@ -3140,7 +3140,7 @@ Xin cảm ơn!`;
                                 );
                                 return (
                                   <div
-                                    key={c.ConsultKey}
+                                    key={c.id}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleSelectConsult(c);
@@ -3201,7 +3201,7 @@ Xin cảm ơn!`;
                                 const pat = findPatientByKey(patients, c.PatientKey);
                                 return (
                                   <div
-                                    key={c.ConsultKey}
+                                    key={c.id}
                                     onClick={() => { handleSelectConsult(c); if (pureCalendarMode) setShowSummaryModal(true); }}
                                     className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight p-1 rounded-lg cursor-pointer transition tracking-wide text-center uppercase border border-[#80072d]"
                                   >
@@ -3258,7 +3258,7 @@ Xin cảm ơn!`;
                           const pat = findPatientByKey(patients, c.PatientKey);
                           return (
                             <div 
-                              key={c.ConsultKey}
+                              key={c.id}
                               onClick={() => { handleSelectConsult(c); if (pureCalendarMode) setShowSummaryModal(true); }}
                               className="bg-white border border-slate-150 p-3 rounded-2xl flex justify-between items-center hover:bg-slate-100 cursor-pointer transition shadow-xs"
                             >
@@ -3318,7 +3318,7 @@ Xin cảm ơn!`;
                   </span>
                 </div>
                 <span className="hidden lg:inline text-[10px] text-slate-400 font-bold font-mono">
-                  Mã: {selectedConsult.ConsultKey}
+                  Mã: {selectedConsult.id}
                 </span>
               </div>
 
@@ -3385,7 +3385,7 @@ Xin cảm ơn!`;
                             >
                               <option value="">— Chọn BS —</option>
                               {staffList.filter(s => !s.FireDate).map(st => (
-                                <option key={st.StaffKey} value={formatShortDoctorName(st.StaffName)}>
+                                <option key={st.id} value={formatShortDoctorName(st.StaffName)}>
                                   {formatShortDoctorName(st.StaffName)}
                                 </option>
                               ))}
@@ -3738,8 +3738,8 @@ Xin cảm ơn!`;
                             type="text"
                             disabled
                             value={(() => {
-                              const editorId = currentStaff?.StaffKey;
-                              return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
+                              const editorId = currentStaff?.id;
+                              return staffList.find(s => s.id === editorId)?.StaffName || editorId || '01378';
                             })()}
                             className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-bold"
                           />
@@ -4003,7 +4003,7 @@ Xin cảm ơn!`;
                       }
 
                       return (
-                        <tr key={c.ConsultKey} className="hover:bg-rose-50/30 transition">
+                        <tr key={c.id} className="hover:bg-rose-50/30 transition">
                           <td className="p-3 text-center">{idx + 1}</td>
                           <td className="p-3 font-mono text-emerald-700">
                             <span className="block">{formatVNTime(c.PlannedCathLabDate)}</span>
@@ -5031,7 +5031,7 @@ Xin cảm ơn!`;
                                 <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-sm z-50">
                                   {filteredSearchPatients.slice(0, 15).map((pat) => (
                                     <button
-                                      key={pat.PatientKey}
+                                      key={pat.id}
                                       type="button"
                                       onClick={() => handleSelectPatient(pat)}
                                       className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"
@@ -5088,7 +5088,7 @@ Xin cảm ơn!`;
                                </div>
                               <div className="grid grid-cols-1 gap-1">
                                 {renderAdHocRow(`Mã BN *${adHocErrors.includes('PatientID1') ? ' !' : ''}`, (
-                                  <input type="text" required placeholder="ID1..." value={adHocPatientID1} onChange={(e) => { const val = e.target.value; setAdHocPatientID1(val); const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === val.trim().toLowerCase()); setAdHocPendingConsult(dup ? getPendingConsultForPatient(dup.PatientKey) || null : null); }} className={`${adHocInputCls} font-bold`} />
+                                  <input type="text" required placeholder="ID1..." value={adHocPatientID1} onChange={(e) => { const val = e.target.value; setAdHocPatientID1(val); const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === val.trim().toLowerCase()); setAdHocPendingConsult(dup ? getPendingConsultForPatient(dup.id) || null : null); }} className={`${adHocInputCls} font-bold`} />
                                 ))}
                                 {renderAdHocRow(`Họ tên *${adHocErrors.includes('PatientName') ? ' !' : ''}`, (
                                   <input type="text" required placeholder="Họ tên..." value={adHocPatientName} onChange={(e) => setAdHocPatientName(e.target.value)} className={`${adHocInputCls} font-black`} />
@@ -5156,7 +5156,7 @@ Xin cảm ơn!`;
                           <select required value={adHocRequestBy} onChange={(e) => { const val = e.target.value; setAdHocRequestBy(val); setAdHocScheduled2nd(getAutoScheduled2nd(val)); }} className={adHocSelectCls}>
                             <option value="">— Chọn BS —</option>
                             {staffList.filter(s => !s.FireDate).map((st) => (
-                              <option key={st.StaffKey} value={formatShortDoctorName(st.StaffName)}>{formatShortDoctorName(st.StaffName)}</option>
+                              <option key={st.id} value={formatShortDoctorName(st.StaffName)}>{formatShortDoctorName(st.StaffName)}</option>
                             ))}
                           </select>
                         ))}
@@ -5276,7 +5276,7 @@ Xin cảm ơn!`;
                           </select>
                         ))}
                         {renderAdHocRow('Người xếp lịch', (
-                          <input type="text" disabled value={staffList.find(s => s.StaffKey === currentStaff?.StaffKey)?.StaffName || currentStaff?.StaffKey || '01378'} className={`${adHocInputCls} text-slate-400`} />
+                          <input type="text" disabled value={staffList.find(s => s.id === currentStaff?.id)?.StaffName || currentStaff?.id || '01378'} className={`${adHocInputCls} text-slate-400`} />
                         ))}
                         {renderAdHocRow('Cập nhật lúc', (
                           <input type="text" disabled value={formatDateTime(new Date().toISOString())} className={`${adHocInputCls} font-mono text-slate-400`} />

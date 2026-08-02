@@ -77,8 +77,8 @@ export default function ArchiveView({
     if (!triggerConfirm) return;
     triggerConfirm('Bạn có chắc chắn muốn hoàn tác chuyển ca này không?', () => {
       const patch = { TransferredToCathLab: false };
-      onPatchConsult?.(c.ConsultKey, patch);
-      fetch(`/api/consults/${c.ConsultKey}`, {
+      onPatchConsult?.(c.id, patch);
+      fetch(`/api/consults/${c.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch)
@@ -105,8 +105,8 @@ export default function ArchiveView({
         TransferredToCathLab: false,
         Removed: false
       };
-      onPatchConsult?.(c.ConsultKey, patch);
-      fetch(`/api/consults/${c.ConsultKey}`, {
+      onPatchConsult?.(c.id, patch);
+      fetch(`/api/consults/${c.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch)
@@ -188,7 +188,7 @@ export default function ArchiveView({
               {paginatedData.map((c: any, index: number) => {
                 const pat: any = findPatientByKey(patients, c.PatientKey) || {};
                 return (
-                  <tr key={c.ConsultKey} className="hover:bg-cyan-50/30 transition-colors">
+                  <tr key={c.id} className="hover:bg-cyan-50/30 transition-colors">
                     <td className="p-3 text-center font-black text-slate-400">
                       {(currentPage - 1) * itemsPerPage + index + 1}
                     </td>

@@ -52,20 +52,20 @@ export default function BellNotificationMenu({
   const staffNotifications = useMemo(
     () =>
       notifications
-        .filter(item => String(item.StaffKey || '') === String(staff.StaffKey || ''))
+        .filter(item => String(item.StaffKey || '') === String(staff.id || ''))
         .sort((a, b) => String(b.CreatedTime || '').localeCompare(String(a.CreatedTime || ''))),
-    [notifications, staff.StaffKey]
+    [notifications, staff.id]
   );
 
   const unreadCount = staffNotifications.filter(item => !item.IsRead).length;
 
   const getPatientDiagnosisText = (item: Notification) => {
     const consult = consults.find(record =>
-      String(record.ConsultKey || '') === String(item.RelatedEntityKey || '') ||
+      String(record.id || '') === String(item.RelatedEntityKey || '') ||
       String(record.PatientKey || '') === String(item.PatientKey || '')
     );
     const patient = patients.find(record =>
-      String(record.PatientKey || '') === String(item.PatientKey || '') ||
+      String(record.id || '') === String(item.PatientKey || '') ||
       String(record.PatientID1 || '') === String(item.PatientID || '') ||
       String(record.PatientID2 || '') === String(item.PatientID || '')
     );

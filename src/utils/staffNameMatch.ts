@@ -49,7 +49,7 @@ export function getStaffNameVariants(staff: Staff, staffList: Staff[] = []): str
     variants.add(normalizeNameToken(trimmed));
   };
 
-  push(staff.StaffKey);
+  push(staff.id);
   push(staff.StaffName);
   push(staff.Name);
   push(getShortStaffName(staff.StaffName, staffList));
@@ -93,7 +93,7 @@ export function resolveStaffByNameOrKey(
 
   const normalizedCandidate = normalizeNameToken(raw);
   return staffList.find(staff => {
-    if (String(staff.StaffKey || '').trim() === raw) return true;
+    if (String(staff.id || '').trim() === raw) return true;
     const variants = getStaffNameVariants(staff, staffList);
     return variants.some(variant => normalizeNameToken(variant) === normalizedCandidate || raw === variant);
   });

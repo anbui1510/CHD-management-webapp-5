@@ -4,7 +4,7 @@
  */
 
 export interface Staff {
-  StaffKey: string;
+  id: string;
   StaffName: string;
   Name?: string;
   StaffSex?: string;
@@ -26,7 +26,7 @@ export interface Staff {
 export type OutcomeType = 'Tử vong' | 'Nặng xin về' | 'Đã mổ' | 'Đã thông' | '';
 
 export interface Patient {
-  PatientKey: string;
+  id: string;
   PatientID1: string;
   PatientID2: string;
   PatientName: string;
@@ -86,7 +86,7 @@ export const normalizePriorityOrder = (value?: string): PriorityOrderEnum => {
 export type CathPlanEnum = 'Tái khám thường' | 'Theo dõi sát' | 'Cần thông tim can thiệp lại' | 'Đăng ký staff nội-ngoại khoa' | 'Mổ khẩn';
 
 export interface CathLab {
-  CathKey: string;
+  id: string;
   PatientKey: string;
   ConsultKey: string;
   CathDate: string;
@@ -116,7 +116,7 @@ export type RiskFactorEnum =
   | '3 -SpO2 > 75% ổn định';
 
 export interface Consult {
-  ConsultKey: string;
+  id: string;
   PatientKey: string;
   Status?: string;
   ConsultType: ConsultTypeEnum;
@@ -168,7 +168,7 @@ export interface Consult {
 }
 
 export interface Operation {
-  SurgKey?: string;
+  id?: string;
   PatientKey?: string;
   ConsultKey?: string;
   SurgDate?: string;
@@ -188,8 +188,7 @@ export interface Operation {
 }
 
 export interface CMR {
-  CMRKey?: string;
-  CMRkey?: string;
+  id?: string;
   ConsultKey?: string;
   PatientKey?: string;
   MBN?: string;
@@ -235,7 +234,7 @@ export interface DeviceTemplate {
 }
 
 export interface RolePreset {
-  RolePresetID: string;
+  id: string;
   RolePresetLabel: string;
   RolePresetDescription?: string;
   Permissions: string;
@@ -246,7 +245,7 @@ export interface RolePreset {
 export type NotificationSeverity = 'info' | 'warning' | 'critical';
 
 export interface Notification {
-  NotificationKey: string;
+  id: string;
   StaffKey: string;
   StaffName?: string;
   Title: string;
@@ -270,7 +269,7 @@ export type DoctorPerformanceMarkType =
   | 'missing_cath_result';
 
 export interface DoctorPerformanceMark {
-  MarkKey: string;
+  id: string;
   StaffKey: string;
   StaffName?: string;
   MarkType: DoctorPerformanceMarkType;
@@ -344,7 +343,7 @@ export function findPatientByKey(patients: Patient[], patientKey: any): Patient 
   if (!patientKey) return undefined;
   const keyStr = normalizePatientKey(patientKey);
   return patients.find(p => {
-    const pk = normalizePatientKey(p.PatientKey);
+    const pk = normalizePatientKey(p.id);
     const pid1 = String(p.PatientID1 || '').trim().toLowerCase();
     return pk === keyStr || (pid1 && pid1 === keyStr);
   });

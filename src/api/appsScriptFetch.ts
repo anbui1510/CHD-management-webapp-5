@@ -778,21 +778,21 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
           console.warn('Failed to load staff list for local fallback, using DEFAULT_STAFF:', e);
           staffList = DEFAULT_STAFF;
         }
-        let localStaff = staffList.find((s: any) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
+        let localStaff = staffList.find((s: any) => String(s.id || '').trim() === String(StaffKey).trim());
         if (!localStaff && staffList !== DEFAULT_STAFF) {
-          localStaff = DEFAULT_STAFF.find((s: any) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
+          localStaff = DEFAULT_STAFF.find((s: any) => String(s.id || '').trim() === String(StaffKey).trim());
         }
         if (!localStaff) {
           return jsonResponse({ error: 'Mã nhân viên không tồn tại!' }, { status: 401 });
         }
         const expectedPassword = String(localStaff.Password || '1111').trim();
         const inputPassword = String(Password).trim();
-        const hashedInput = await bridgeHashPassword(inputPassword, String(localStaff.StaffKey));
+        const hashedInput = await bridgeHashPassword(inputPassword, String(localStaff.id));
         
         if (inputPassword !== expectedPassword && hashedInput !== expectedPassword) {
           return jsonResponse({ error: 'Mật khẩu không đúng. Vui lòng thử lại!' }, { status: 401 });
         }
-        const token = bridgeCreateSession(String(localStaff.StaffKey));
+        const token = bridgeCreateSession(String(localStaff.id));
         return jsonResponse({ token, staff: stripBridgePassword(localStaff) });
       };
 
@@ -838,7 +838,7 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
         }
         
         const staff = result.staff;
-        const token = bridgeCreateSession(String(staff.StaffKey));
+        const token = bridgeCreateSession(String(staff.id));
         return jsonResponse({ token, staff });
       } catch (err) {
         console.error('Login verification via Apps Script failed, trying fallback:', err);
@@ -873,7 +873,7 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       } catch {
         staffList = DEFAULT_STAFF;
       }
-      const staff = staffList.find((s: any) => String(s.StaffKey) === staffKey);
+      const staff = staffList.find((s: any) => String(s.id) === staffKey);
       if (!staff) return jsonResponse({ error: 'Tài khoản không còn tồn tại.' }, { status: 401 });
       return jsonResponse(staff);
     }
@@ -892,7 +892,7 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     const publicList = staffList
       .filter((s: any) => !s.FireDate || !String(s.FireDate).trim())
       .map((s: any) => ({
-        StaffKey: s.StaffKey,
+        StaffKey: s.id,
         StaffName: s.StaffName,
         Name: s.Name || '',
         Role: s.Role || '',

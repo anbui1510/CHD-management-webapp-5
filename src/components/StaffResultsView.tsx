@@ -279,7 +279,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
         finalPatientKey = `pat_${Date.now()}`;
         const patientPayload: Patient = {
-          PatientKey: finalPatientKey,
+          id: finalPatientKey,
           PatientID1: String(newPatID1 || '').trim(),
           PatientID2: String(newPatID2 || '').trim(),
           PatientName: newPatName,
@@ -289,7 +289,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           PatientAddress: newPatAddress || 'TP Hà Nội',
           PatientPhone1: newPatPhone || '',
           PatientPhone2: '',
-          PatientCreateBy: currentStaff?.StaffKey || '01378',
+          PatientCreateBy: currentStaff?.id || '01378',
           PatientCreateTime: new Date().toISOString(),
           Outcome: automaticOutcome
         };
@@ -312,7 +312,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       const chosenDoc = showAddDocInput ? customDocVal : requestBy;
 
       const consultPayload: Consult = {
-        ConsultKey: `con_${Date.now()}`,
+        id: `con_${Date.now()}`,
         PatientKey: finalPatientKey,
         ConsultType: consultType,
         PatientWeight: patWeight,
@@ -323,7 +323,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         DiagnosisID: diagnosisID,
         DetailDiagnosis: detailDiagnosis,
         Department: chosenDept || 'Tim Mạch',
-        ConsultCreateBy: currentStaff?.StaffKey || '01378',
+        ConsultCreateBy: currentStaff?.id || '01378',
         ConsultCreateTime: new Date().toISOString(),
         ConsultResultID: consultResultID,
         DetailConsultResult: detailConsultResult,
@@ -333,7 +333,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         PriorityOrder: priorityOrder,
         RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
         CheckDevice: checkDevice,
-        ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
+        ConsultResultUpdatedBy: currentStaff?.id || '01378',
         ConsultResultUpdatedTime: new Date().toISOString(),
         PDFTrigger: false
       };
@@ -350,7 +350,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              PatientKey: finalPatientKey,
+              id: finalPatientKey,
               PatientID1: String(newPatID1 || '').trim(),
               PatientID2: String(newPatID2 || '').trim(),
               PatientName: newPatName,
@@ -360,7 +360,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               PatientAddress: newPatAddress || 'TP Hà Nội',
               PatientPhone1: newPatPhone || '',
               PatientPhone2: '',
-              PatientCreateBy: currentStaff?.StaffKey || '01378',
+              PatientCreateBy: currentStaff?.id || '01378',
               PatientCreateTime: new Date().toISOString(),
               Outcome: automaticOutcome
             })
@@ -434,7 +434,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
   const isPendingStaffResult = (consult: Consult) => {
     if (!isPendingResult(consult.ConsultResultID)) return false;
-    const consultKey = normalizeRefKey(consult.ConsultKey);
+    const consultKey = normalizeRefKey(consult.id);
     return !consultKey || !cathConsultKeys.has(consultKey);
   };
 
@@ -588,7 +588,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
           return (
             <button
-              key={c.ConsultKey}
+              key={c.id}
               onClick={() => onSelectConsult(c)}
               className="w-full text-left bg-white border border-slate-200 hover:border-[#d2145a] rounded-2xl p-4 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between items-start focus:outline-none focus:ring-1 focus:ring-pink-400 cursor-pointer"
             >
@@ -758,7 +758,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   const pending = isPendingStaffResult(c);
                   return (
                     <tr
-                      key={c.ConsultKey}
+                      key={c.id}
                       onClick={() => onSelectConsult(c)}
                       className="hover:bg-pink-50/45 cursor-pointer transition duration-150 group"
                     >
@@ -1210,10 +1210,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                               return matched.slice(0, 12).map(p => (
                                 <button
-                                  key={p.PatientKey}
+                                  key={p.id}
                                   type="button"
                                   onClick={() => {
-                                    setSelectedPatKey(p.PatientKey);
+                                    setSelectedPatKey(p.id);
                                     setSearchPatQuery('');
                                   }}
                                   className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition flex justify-between items-center cursor-pointer"
@@ -1482,7 +1482,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                           {staffList.map(s => {
                             const displayName = getShortStaffName(s.StaffName, staffList);
                             return (
-                              <option key={s.StaffKey} value={displayName}>
+                              <option key={s.id} value={displayName}>
                                 {displayName}
                               </option>
                             );
@@ -1703,8 +1703,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                           type="text"
                           disabled
                           value={(() => {
-                            const editorId = currentStaff?.StaffKey;
-                            return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
+                            const editorId = currentStaff?.id;
+                            return staffList.find(s => s.id === editorId)?.StaffName || editorId || '01378';
                           })()}
                           className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold"
                         />

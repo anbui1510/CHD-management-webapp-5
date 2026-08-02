@@ -191,7 +191,7 @@ export default function App() {
   const [cmrs, setCmrs] = useState<CMR[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [deviceTemplates, setDeviceTemplates] = useState<DeviceTemplate[]>([]);
-  const [rolePresetRecords, setRolePresetRecords] = useState<RolePreset[]>([]);
+  const [rolePresetRecords, setRolePresets] = useState<RolePreset[]>([]);
   const [notifications, setNotifications] = useState<WorkflowNotification[]>([]);
   const [doctorPerformanceMarks, setDoctorPerformanceMarks] = useState<DoctorPerformanceMark[]>([]);
 
@@ -206,7 +206,7 @@ export default function App() {
     const resVal = String(consult.ConsultResultID || '').trim().toLowerCase();
     const pendingResult = !consult.ConsultResultID || resVal === '' || resVal === 'nodata' || resVal === 'no data' || resVal === '—' || resVal === '-';
     if (!pendingResult) return false;
-    const consultKey = String(consult.ConsultKey || '').trim().toLowerCase();
+    const consultKey = String(consult.id || '').trim().toLowerCase();
     return !consultKey || !cathConsultKeySet.has(consultKey);
   }, [cathConsultKeySet]);
 
@@ -226,8 +226,8 @@ export default function App() {
     if (!Array.isArray(patients)) return map;
     patients.forEach(p => {
       if (p) {
-        if (p.PatientKey) {
-          const pk = normalizePatientKey(p.PatientKey);
+        if (p.id) {
+          const pk = normalizePatientKey(p.id);
           map.set(pk, p);
         }
         if (p.PatientID1) {
@@ -244,7 +244,7 @@ export default function App() {
     const keyStr = normalizePatientKey(key);
     
     // Prioritize direct match by PatientKey to prevent collisions with PatientID1 mapping
-    const directMatch = patients.find(p => p && normalizePatientKey(p.PatientKey) === keyStr);
+    const directMatch = patients.find(p => p && normalizePatientKey(p.id) === keyStr);
     if (directMatch) return directMatch;
     
     return patientsMap.get(keyStr);
@@ -287,7 +287,7 @@ export default function App() {
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
 
   // Login Form State
-  const [loginStaffKey, setLoginStaffKey] = useState<string>('');
+  const [loginStaffId, setLoginStaffId] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoadError, setLoginLoadError] = useState<string>('');
@@ -398,8 +398,8 @@ export default function App() {
       setCmrs,
       setSources,
       setDeviceTemplates,
-      setRolePresetRecords,
-      setRuntimeRolePresets,
+      setRolePresetRecords: setRolePresets,
+        setRuntimeRolePresets,
       setNotifications,
       setDoctorPerformanceMarks
     }),
@@ -409,13 +409,13 @@ export default function App() {
   const refreshMedicalData = useRefreshMedicalData(medicalDataSetters);
 
   const patchConsult = useCallback((consultKey: string, patch: Partial<Consult>) => {
-    setConsults(prev => prev.map(c => (c.ConsultKey === consultKey ? { ...c, ...patch } : c)));
+    setConsults(prev => prev.map(c => (c.id === consultKey ? { ...c, ...patch } : c)));
   }, []);
 
   const patchPatient = useCallback((patientKey: string, patch: Partial<Patient>) => {
     setPatients(prev =>
       prev.map(p =>
-        normalizePatientKey(p.PatientKey) === normalizePatientKey(patientKey) ? { ...p, ...patch } : p
+        normalizePatientKey(p.id) === normalizePatientKey(patientKey) ? { ...p, ...patch } : p
       )
     );
   }, []);
@@ -443,7 +443,7 @@ export default function App() {
   }, []);
 
   const patchCathlab = useCallback((cathKey: string, patch: Partial<CathLab>) => {
-    setCathlabs(prev => prev.map(c => (c.CathKey === cathKey ? { ...c, ...patch } : c)));
+    setCathlabs(prev => prev.map(c => (c.id === cathKey ? { ...c, ...patch } : c)));
   }, []);
 
   const addCathlab = useCallback((cath: CathLab) => {
@@ -451,7 +451,7 @@ export default function App() {
   }, []);
 
   const patchStaffMember = useCallback((staffKey: string, patch: Partial<Staff>) => {
-    setStaffList(prev => prev.map(s => (s.StaffKey === staffKey ? { ...s, ...patch } : s)));
+    setStaffList(prev => prev.map(s => (s.id === staffKey ? { ...s, ...patch } : s)));
   }, []);
 
   // State for editing registration (Sửa Đăng ký staff)
@@ -681,7 +681,7 @@ export default function App() {
 
   // Background Clinical Data Polling (Refresh every 60 seconds when logged in)
   useEffect(() => {
-    if (!currentStaff?.StaffKey) return;
+    if (!currentStaff?.id) return;
 
     const interval = setInterval(() => {
       if (document.hidden) return; // Skip update if browser tab is minimized or in background
@@ -691,16 +691,16 @@ export default function App() {
     }, 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [currentStaff?.StaffKey, refreshMedicalData]);
+  }, [currentStaff?.id, refreshMedicalData]);
 
   useEffect(() => {
-    if (!currentStaff?.StaffKey || staffList.length === 0) return;
-    const updated = staffList.find(staff => staff.StaffKey === currentStaff.StaffKey);
+    if (!currentStaff?.id || staffList.length === 0) return;
+    const updated = staffList.find(staff => staff.id === currentStaff.id);
     if (updated && JSON.stringify(updated) !== JSON.stringify(currentStaff)) {
       setCurrentStaff(updated);
-      localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+      localStorage.setItem('CurrentStaffId', JSON.stringify(updated));
     }
-  }, [staffList, currentStaff?.StaffKey]);
+  }, [staffList, currentStaff?.id]);
 
   useEffect(() => {
     if (currentStaff || staffList.length === 0) return;
@@ -743,7 +743,7 @@ export default function App() {
       .then(data => {
         setStaffList(data);
         if (data.length > 0) {
-          setLoginStaffKey(data[0].StaffKey);
+          setLoginStaffId(data[0].id);
         }
       });
   };
@@ -752,7 +752,7 @@ export default function App() {
     fetch('/api/role-presets')
       .then(res => res.json())
       .then((data: RolePreset[]) => {
-        setRolePresetRecords(data);
+        setRolePresets(data);
         setRuntimeRolePresets(data);
       })
       .catch(err => console.error('Failed to load role presets:', err));
@@ -776,7 +776,7 @@ export default function App() {
     setLoginError('');
 
 
-    if (!loginStaffKey) {
+    if (!loginStaffId) {
       setLoginError('Vui l\u00f2ng ch\u1ecdn nh\u00e2n vi\u00ean \u0111\u1ec3 \u0111\u0103ng nh\u1eadp!');
       return;
     }
@@ -789,7 +789,7 @@ export default function App() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ StaffKey: loginStaffKey, Password: loginPassword })
+        body: JSON.stringify({ username: loginStaffId, password: loginPassword })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -800,7 +800,7 @@ export default function App() {
       // Store ONLY the token — no password, no sensitive data in localStorage
       localStorage.setItem('CHD_AUTH_TOKEN', token);
       // Remove legacy storage key if present
-      localStorage.removeItem('CurrentStaffKey');
+      localStorage.removeItem('CurrentStaffId');
       setAuthToken(token);
       setCurrentStaff(staffData);
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
@@ -832,14 +832,14 @@ export default function App() {
     }
     localStorage.removeItem('CHD_AUTH_TOKEN');
     // Also clean up legacy keys
-    localStorage.removeItem('CurrentStaffKey');
-    if (currentStaff?.StaffKey) {
-      localStorage.removeItem(`LastActivity_${currentStaff.StaffKey}`);
+    localStorage.removeItem('CurrentStaffId');
+    if (currentStaff?.id) {
+      localStorage.removeItem(`LastActivity_${currentStaff.id}`);
     }
     setAuthToken('');
     setCurrentStaff(null);
     setLoginPassword('');
-    setLoginStaffKey('');
+    setLoginStaffId('');
 
     // Reset React states of medical data to prevent data leakage
     setPatients([]);
@@ -856,9 +856,9 @@ export default function App() {
 
   // Auto logout / session timeout logic
   useEffect(() => {
-    if (!currentStaff?.StaffKey) return;
+    if (!currentStaff?.id) return;
 
-    const staffKey = currentStaff.StaffKey;
+    const staffKey = currentStaff.id;
     
     const getTimeoutMs = () => {
       const setting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
@@ -955,19 +955,19 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!currentStaff?.StaffKey) return;
-    setMobileQuickTabIds(normalizeMobileQuickTabs(currentStaff, loadMobileQuickTabs(currentStaff.StaffKey)));
-  }, [currentStaff?.StaffKey]);
+    if (!currentStaff?.id) return;
+    setMobileQuickTabIds(normalizeMobileQuickTabs(currentStaff, loadMobileQuickTabs(currentStaff.id)));
+  }, [currentStaff?.id]);
 
   const handleMobileMoreNavigate = (menuId: ActiveMenuId) => {
-    if (!currentStaff?.StaffKey) {
+    if (!currentStaff?.id) {
       navigateMenu(menuId);
       return;
     }
     setMobileQuickTabIds(prev => {
       const next = pinMobileQuickTab(prev, menuId);
       if (JSON.stringify(next) !== JSON.stringify(prev)) {
-        saveMobileQuickTabs(currentStaff.StaffKey, next);
+        saveMobileQuickTabs(currentStaff.id, next);
       }
       return next;
     });
@@ -1004,7 +1004,7 @@ export default function App() {
     
     // 1. Strict Warning — Patient ID duplicate check
     const duplicateIdPatient = patients.find(p => 
-      String(p.PatientKey) !== String(editingPatientKey || '') && (
+      String(p.id) !== String(editingPatientKey || '') && (
         String(p.PatientID1 || '').trim().toLowerCase() === cleanID1 ||
         (cleanID2 && p.PatientID2 && String(p.PatientID2).trim().toLowerCase() === cleanID2)
       )
@@ -1017,7 +1017,7 @@ export default function App() {
 
     // 2. Relative Warning — duplicate Name + DOB check
     const duplicateInfoPatient = patients.find(p =>
-      String(p.PatientKey) !== String(editingPatientKey || '') &&
+      String(p.id) !== String(editingPatientKey || '') &&
       String(p.PatientName || '').trim().toLowerCase() === cleanName &&
       p.PatientDOB === newPatientData.PatientDOB
     );
@@ -1025,7 +1025,7 @@ export default function App() {
     const proceedSave = () => {
       const patientKey = editingPatientKey || `pat_${Date.now()}`;
       const payload: Patient = {
-        PatientKey: patientKey,
+        id: patientKey,
         PatientID1: String(newPatientData.PatientID1 || '').trim(),
         PatientID2: String(newPatientData.PatientID2 || '').trim(),
         PatientName: newPatientData.PatientName,
@@ -1035,7 +1035,7 @@ export default function App() {
         PatientAddress: newPatientData.PatientAddress,
         PatientPhone1: newPatientData.PatientPhone1,
         PatientPhone2: newPatientData.PatientPhone2,
-        PatientCreateBy: currentStaff?.StaffKey || '01378',
+        PatientCreateBy: currentStaff?.id || '01378',
         PatientCreateTime: new Date().toISOString(),
         Outcome: newPatientData.Outcome
       };
@@ -1112,7 +1112,7 @@ export default function App() {
   // Reusable: open the "SỬA HỒ SƠ HÀNH CHÍNH" modal for a given patient (shared by MRI views/drawer)
   const handleEditPatientAdmin = (pat: Patient) => {
     setSelectedPatientForDetail(null);
-    setEditingPatientKey(pat.PatientKey);
+    setEditingPatientKey(pat.id);
     setNewPatientData({
       PatientID1: pat.PatientID1,
       PatientID2: pat.PatientID2 || '',
@@ -1138,7 +1138,7 @@ export default function App() {
 
     const proceedSave = () => {
       const payload: Consult = {
-        ConsultKey: `con_${Date.now()}`,
+        id: `con_${Date.now()}`,
         PatientKey: newConsultData.PatientKey,
         ConsultType: newConsultData.ConsultType,
         PatientWeight: newConsultData.PatientWeight,
@@ -1148,7 +1148,7 @@ export default function App() {
         DiagnosisID: newConsultData.DiagnosisID,
         DetailDiagnosis: newConsultData.DetailDiagnosis,
         Department: newConsultData.Department,
-        ConsultCreateBy: currentStaff?.StaffKey || '01378',
+        ConsultCreateBy: currentStaff?.id || '01378',
         ConsultCreateTime: new Date().toISOString(),
         ConsultResultID: '', // Pending result ID
         DetailConsultResult: '',
@@ -1205,7 +1205,7 @@ export default function App() {
 
   // Prepare registration edit
   const makeRegisterEdit = (c: Consult) => {
-    setEditingRegConsultKey(c.ConsultKey);
+    setEditingRegConsultKey(c.id);
     setEditConsultData({
       ConsultType: c.ConsultType || 'Staff mổ',
       PatientWeight: c.PatientWeight || '',
@@ -1250,7 +1250,7 @@ export default function App() {
   };
 
   const makeResultEdit = (c: Consult) => {
-    setEditingConsultKey(c.ConsultKey);
+    setEditingConsultKey(c.id);
   };
 
   // Emulate AppSheet Google Cloud Bot A4 PDF Generation Task
@@ -1689,13 +1689,13 @@ export default function App() {
                 Tên nhân viên
               </label>
               <select
-                value={loginStaffKey}
-                onChange={(e) => setLoginStaffKey(e.target.value)}
+                value={loginStaffId}
+                onChange={(e) => setLoginStaffId(e.target.value)}
                 className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] transition-all font-semibold"
               >
                 <option value="" disabled>-- Chọn nhân viên --</option>
                 {staffList.map((s) => (
-                  <option key={s.StaffKey} value={s.StaffKey}>
+                  <option key={s.id} value={s.id}>
                     {s.Name || s.StaffName} ({s.Role})
                   </option>
                 ))}
@@ -2068,7 +2068,7 @@ export default function App() {
                 onClose={() => setActiveMenu(profileReturnMenu)}
                 onStaffUpdated={(updated) => {
                   setCurrentStaff(updated);
-                  localStorage.setItem('CurrentStaffKey', JSON.stringify(updated));
+                  localStorage.setItem('CurrentStaffId', JSON.stringify(updated));
                   refreshStaffData();
                 }}
                 triggerAlert={triggerAlert}
@@ -2206,10 +2206,10 @@ export default function App() {
                       ) : (
                         <>
                         {displayedPatients.map((pat) => {
-                          const latestDiagnosis = getLatestDiagnosisForPatient(pat.PatientKey);
+                          const latestDiagnosis = getLatestDiagnosisForPatient(pat.id);
                           return (
                             <tr 
-                              key={pat.PatientKey} 
+                              key={pat.id} 
                               onClick={() => setSelectedPatientForDetail(pat)}
                               className="hover:bg-pink-50/50 cursor-pointer transition duration-150 group"
                             >
@@ -2410,10 +2410,10 @@ export default function App() {
                             // Slice to 15 items maximum to run lightning fast and lag-free!
                             return matched.slice(0, 15).map(p => (
                               <button
-                                key={p.PatientKey}
+                                key={p.id}
                                 type="button"
                                 onClick={() => {
-                                  handlePatientSelectChange(p.PatientKey);
+                                  handlePatientSelectChange(p.id);
                                   setSearchPatientQuery(''); // Clear search input
                                 }}
                                 className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"
@@ -2569,7 +2569,7 @@ export default function App() {
                           {staffList.map(s => {
                             const displayName = getShortStaffName(s.StaffName, staffList);
                             return (
-                              <option key={s.StaffKey} value={displayName}>
+                              <option key={s.id} value={displayName}>
                                 {displayName}
                               </option>
                             );
@@ -2683,8 +2683,8 @@ export default function App() {
                           type="text"
                           disabled
                           value={(() => {
-                            const creatorId = currentStaff?.StaffKey;
-                            return staffList.find(s => s.StaffKey === creatorId)?.StaffName || creatorId || '01378';
+                            const creatorId = currentStaff?.id;
+                            return staffList.find(s => s.id === creatorId)?.StaffName || creatorId || '01378';
                           })()}
                           className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans text-[11px]"
                         />
@@ -2886,7 +2886,7 @@ export default function App() {
 
                           return (
                             <tr 
-                              key={item.ConsultKey} 
+                              key={item.id} 
                               onClick={() => makeRegisterEdit(item)}
                               className="hover:bg-pink-50/45 cursor-pointer transition duration-150 group"
                             >
@@ -2915,12 +2915,12 @@ export default function App() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        triggerPDFBotBuild(item.ConsultKey);
+                                        triggerPDFBotBuild(item.id);
                                       }}
-                                      disabled={pdfBotRunning === item.ConsultKey}
+                                      disabled={pdfBotRunning === item.id}
                                       className="bg-slate-800 hover:bg-slate-700 text-white font-extrabold px-2 py-1 rounded text-[10px] transition disabled:opacity-50 cursor-pointer"
                                     >
-                                      {pdfBotRunning === item.ConsultKey ? 'Bot compiling...' : 'Tạo Biên bản'}
+                                      {pdfBotRunning === item.id ? 'Bot compiling...' : 'Tạo Biên bản'}
                                     </button>
                                   )}
 
@@ -3448,9 +3448,9 @@ export default function App() {
               setSelectedPatientForDetail(null);
               setNewConsultData(prev => ({
                 ...prev,
-                PatientKey: pat.PatientKey
+                PatientKey: pat.id
               }));
-              setPendingConsultsCount(consults.filter(c => c.PatientKey === pat.PatientKey && isPendingStaffConsult(c)).length);
+              setPendingConsultsCount(consults.filter(c => c.PatientKey === pat.id && isPendingStaffConsult(c)).length);
               setActiveMenu('consult-form');
             }}
           />
@@ -3497,7 +3497,7 @@ export default function App() {
               <form onSubmit={submitConsultRegistrationUpdate} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-semibold">
                 
                 {(() => {
-                  const edc = consults.find(c => c.ConsultKey === editingRegConsultKey);
+                  const edc = consults.find(c => c.id === editingRegConsultKey);
                   const edp = edc ? getPatientByKey(edc.PatientKey) : null;
                   if (!edp || !edc) return null;
 
@@ -3516,7 +3516,7 @@ export default function App() {
                             {/* Sửa hành chính button */}
                             <PatientAdminEditButton
                               onClick={() => {
-                                setEditingPatientKey(edp.PatientKey);
+                                setEditingPatientKey(edp.id);
                                 setNewPatientData({
                                   PatientID1: edp.PatientID1,
                                   PatientID2: edp.PatientID2 || '',
@@ -3666,7 +3666,7 @@ export default function App() {
                                 {staffList.map(s => {
                                   const displayName = getShortStaffName(s.StaffName, staffList);
                                   return (
-                                    <option key={s.StaffKey} value={displayName}>
+                                    <option key={s.id} value={displayName}>
                                       {displayName}
                                     </option>
                                   );
@@ -3934,8 +3934,8 @@ export default function App() {
                       type="text"
                       disabled
                       value={(() => {
-                        const creatorId = editingPatientKey ? getPatientByKey(editingPatientKey)?.PatientCreateBy : currentStaff?.StaffKey;
-                        return staffList.find(s => s.StaffKey === creatorId)?.StaffName || creatorId || '01378';
+                        const creatorId = editingPatientKey ? getPatientByKey(editingPatientKey)?.PatientCreateBy : currentStaff?.id;
+                        return staffList.find(s => s.id === creatorId)?.StaffName || creatorId || '01378';
                       })()}
                       className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl px-3 py-2 font-bold font-sans"
                     />

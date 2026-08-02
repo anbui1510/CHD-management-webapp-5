@@ -65,7 +65,7 @@ const resolvePatient = (cath: CathLab, patients: Patient[]) => {
   const cathPatientKey = normalizePatientKey(cath.PatientKey);
   if (!cathPatientKey) return undefined;
   return patients.find(patient => {
-    const patientKey = normalizePatientKey(patient.PatientKey);
+    const patientKey = normalizePatientKey(patient.id);
     const id1 = normalizeRefKey(patient.PatientID1);
     const id2s = String(patient.PatientID2 || '')
       .split('-')
@@ -91,7 +91,7 @@ export function buildCathlabReconciliation(
   consults: Consult[],
   cathlabs: CathLab[]
 ): ReconciliationItem[] {
-  const consultByKey = new Map(consults.map(consult => [normalizeRefKey(consult.ConsultKey), consult]));
+  const consultByKey = new Map(consults.map(consult => [normalizeRefKey(consult.id), consult]));
   const cathConsultKeys = new Set(
     cathlabs
       .map(cath => normalizeRefKey(cath.ConsultKey))
@@ -113,11 +113,11 @@ export function buildCathlabReconciliation(
     }
 
     const patient = resolvePatient(cath, patients);
-    const normalizedPatientKey = normalizePatientKey(patient?.PatientKey || cath.PatientKey);
+    const normalizedPatientKey = normalizePatientKey(patient?.id || cath.PatientKey);
     const patientConsults = consults.filter(consult =>
       normalizePatientKey(consult.PatientKey) === normalizedPatientKey &&
-      normalizeRefKey(consult.ConsultKey) !== cathConsultKey &&
-      !cathConsultKeys.has(normalizeRefKey(consult.ConsultKey))
+      normalizeRefKey(consult.id) !== cathConsultKey &&
+      !cathConsultKeys.has(normalizeRefKey(consult.id))
     );
 
     const candidates = patientConsults
@@ -185,15 +185,15 @@ export function buildReconciliationPatchOperations(items: ReconciliationItem[]) 
     .flatMap(item => {
       const cathNote = String(item.cath.CathNote || '').trim();
       const consultNote = String(item.matchedConsult?.ConsultNote || '').trim();
-      const logLine = `[Đối soát CathLab lịch sử ${now}] Tự gắn ConsultKey=${item.matchedConsult?.ConsultKey} cho CathKey=${item.cath.CathKey}.`;
+      const logLine = `[Đối soát CathLab lịch sử ${now}] Tự gắn id=${item.matchedConsult?.id} cho id=${item.cath.id}.`;
       const hasResult = String(item.matchedConsult?.ConsultResultID || '').trim();
       return [
         {
           endpoint: 'cathlabs',
           method: 'PUT' as const,
-          key: item.cath.CathKey,
+          key: item.cath.id,
           data: {
-            ConsultKey: item.matchedConsult?.ConsultKey || '',
+            id: item.matchedConsult?.id || '',
             CathNote: cathNote ? `${cathNote}\n${logLine}` : logLine,
             CathUpdatedBy: 'RECONCILE',
             CathUpdatedTime: now
@@ -202,7 +202,7 @@ export function buildReconciliationPatchOperations(items: ReconciliationItem[]) 
         {
           endpoint: 'consults',
           method: 'PUT' as const,
-          key: item.matchedConsult?.ConsultKey || '',
+          key: item.matchedConsult?.id || '',
           data: {
             TransferredToCathLab: true,
             CallStatus: 'Đã can thiệp/mổ',

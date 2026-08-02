@@ -60,7 +60,7 @@ const buildLatestConsultsMap = (consults: Consult[]) => {
   sorted.forEach(c => {
     if (!c.PatientKey) return;
     const patientKey = normalizePatientKey(c.PatientKey);
-    if (!map.has(patientKey)) map.set(patientKey, c.ConsultKey);
+    if (!map.has(patientKey)) map.set(patientKey, c.id);
   });
   return map;
 };
@@ -71,7 +71,7 @@ const isConsultInSchedulingWaitlist = (
   patients: Patient[]
 ) => {
   const normalized = normalizePatientKey(c.PatientKey);
-  if (!normalized || latestMap.get(normalized) !== c.ConsultKey) return false;
+  if (!normalized || latestMap.get(normalized) !== c.id) return false;
   if (!c.ConsultDate) return false;
 
   const isRemoved = c.Removed === true
@@ -119,7 +119,7 @@ const getSchedulingWaitlistConsult = (
   if (!normalized) return undefined;
   const latestKey = latestMap.get(normalized);
   if (!latestKey) return undefined;
-  const consult = consults.find(c => String(c.ConsultKey || '').trim().toLowerCase() === String(latestKey || '').trim().toLowerCase());
+  const consult = consults.find(c => String(c.id || '').trim().toLowerCase() === String(latestKey || '').trim().toLowerCase());
   if (!consult || !isConsultInSchedulingWaitlist(consult, latestMap, patients)) return undefined;
   return consult;
 };
@@ -148,7 +148,7 @@ const getPatientPendingCathLabConsult = (
       || String(c.Removed).toLowerCase() === 'yes';
     if (isRemoved) return false;
     // Only counts if no cath result has been recorded yet
-    if (cathLabHasConsultKey(cathlabs, c.ConsultKey)) return false;
+    if (cathLabHasConsultKey(cathlabs, c.id)) return false;
     return true;
   });
 };
@@ -337,7 +337,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const pendingConsults = useMemo(() => {
      let list = consults.filter(c => {
        const transferred = c.TransferredToCathLab === true || String(c.TransferredToCathLab).trim().toLowerCase() === 'true';
-       return transferred && !c.Removed && !cathLabHasConsultKey(cathlabs, c.ConsultKey);
+       return transferred && !c.Removed && !cathLabHasConsultKey(cathlabs, c.id);
      });
      
      if (searchTerm.trim() !== '') {
@@ -404,7 +404,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [adHocPatientPhone2, setAdHocPatientPhone2] = useState('');
 
   const loggedInStaffId = localStorage.getItem('CurrentStaffKey') || '';
-  const loggedInStaff = staffList.find(s => s.StaffKey === loggedInStaffId);
+  const loggedInStaff = staffList.find(s => s.id === loggedInStaffId);
   const loggedInStaffNameShort = loggedInStaff ? (['bs', 'bs.', 'pgs', 'gs', 'th.s', 'ths', 'pgs.ts', 'gs.ts'].includes(loggedInStaff.StaffName.split(' ')[0].toLowerCase()) ? loggedInStaff.StaffName : `BS. ${loggedInStaff.StaffName.split(' ').pop()}`) : '';
   
   const openPendingForm = (c: Consult, p: Patient) => {
@@ -488,7 +488,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
     const scored = consults
       .filter(consult => normalizePatientKey(consult.PatientKey) === normalizedPatient)
-      .filter(consult => !cathConsultKeys.has(normalizeRefKey(consult.ConsultKey)))
+      .filter(consult => !cathConsultKeys.has(normalizeRefKey(consult.id)))
       .map(consult => {
         const consultTime = consult.ConsultDate ? new Date(`${parseHisDateOnly(consult.ConsultDate)}T00:00:00`).getTime() : 0;
         const plannedDistance = consult.PlannedCathLabDate ? getDateDistanceDays(consult.PlannedCathLabDate, cathDate) : Number.POSITIVE_INFINITY;
@@ -572,10 +572,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     const responsible = resolveResponsibleStaffForHisStage(consult, stage, cathPayload);
     const adminStaff = staffList.filter(staff => String(staff.Role || '').toLowerCase() === 'admin');
     const recipients = new Map<string, Staff>();
-    if (responsible) recipients.set(responsible.StaffKey, responsible);
-    adminStaff.forEach(staff => recipients.set(staff.StaffKey, staff));
+    if (responsible) recipients.set(responsible.id, responsible);
+    adminStaff.forEach(staff => recipients.set(staff.id, staff));
 
-    const baseDedup = `his-auto-close:${consult.ConsultKey}:${cathPayload.CathDate}:${stage}`;
+    const baseDedup = `his-auto-close:${consult.id}:${cathPayload.CathDate}:${stage}`;
     const title = 'HIS import tự hoàn tất ca treo';
     const message = `${patient.PatientName || patient.PatientID1} đã có kết quả thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)} từ HIS. Workflow treo "${getHisStageLabel(stage)}" đã được tự động đóng.`;
     const operations: BatchWriteOperation[] = [];
@@ -585,18 +585,18 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         endpoint: 'notifications',
         method: 'POST',
         data: {
-          NotificationKey: `notif_${baseDedup}:${staff.StaffKey}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
-          StaffKey: staff.StaffKey,
+          NotificationKey: `notif_${baseDedup}:${staff.id}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
+          StaffKey: staff.id,
           StaffName: staff.StaffName,
           Title: title,
           Message: message,
           Severity: stage === 'missing_cath_result' ? 'critical' : 'warning',
           RelatedEntityType: 'Consult',
-          RelatedEntityKey: consult.ConsultKey,
-          PatientKey: patient.PatientKey,
+          RelatedEntityKey: consult.id,
+          PatientKey: patient.id,
           PatientID: patient.PatientID1,
           PatientName: patient.PatientName,
-          DedupKey: `${baseDedup}:notify:${staff.StaffKey}`,
+          DedupKey: `${baseDedup}:notify:${staff.id}`,
           IsRead: false,
           CreatedTime: new Date().toISOString(),
           ReadTime: ''
@@ -609,19 +609,19 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         endpoint: 'doctor-performance-marks',
         method: 'POST',
         data: {
-          MarkKey: `mark_${baseDedup}:${responsible.StaffKey}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
-          StaffKey: responsible.StaffKey,
+          MarkKey: `mark_${baseDedup}:${responsible.id}`.replace(/[^a-zA-Z0-9_-]/g, '_'),
+          id: responsible.id,
           StaffName: responsible.StaffName,
           MarkType: stage,
           Score: stage === 'missing_cath_result' ? 2 : 1,
           Label: getHisStageLabel(stage),
           Reason: message,
           RelatedEntityType: 'Consult',
-          RelatedEntityKey: consult.ConsultKey,
-          PatientKey: patient.PatientKey,
+          RelatedEntityKey: consult.id,
+          PatientKey: patient.id,
           PatientID: patient.PatientID1,
           PatientName: patient.PatientName,
-          DedupKey: `${baseDedup}:mark:${responsible.StaffKey}`,
+          DedupKey: `${baseDedup}:mark:${responsible.id}`,
           CreatedBy: loggedInStaffId || 'HIS_IMPORT',
           CreatedTime: new Date().toISOString()
         }
@@ -632,7 +632,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const buildHisAutoCloseConsultPatch = (consult: Consult, cathPayload: CathLab, stage: HisWorkflowStage): Partial<Consult> => {
-    const logLine = `[HIS import ${new Date().toISOString()}] Đã tự hoàn tất workflow "${getHisStageLabel(stage)}" vì HIS ghi nhận ca thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)}. CathKey=${cathPayload.CathKey}`;
+    const logLine = `[HIS import ${new Date().toISOString()}] Đã tự hoàn tất workflow "${getHisStageLabel(stage)}" vì HIS ghi nhận ca thông tim thực tế ngày ${formatVNTime(cathPayload.CathDate)}. id=${cathPayload.id}`;
     const resultPatch = hasConsultResult(consult)
       ? {}
       : {
@@ -706,13 +706,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       let skippedInvalid = 0;
 
       const upsertCathInMemory = (cath: CathLab) => {
-        const idx = currentCathlabs.findIndex(item => item.CathKey === cath.CathKey);
+        const idx = currentCathlabs.findIndex(item => item.id === cath.id);
         if (idx >= 0) currentCathlabs[idx] = cath;
         else currentCathlabs.push(cath);
       };
 
       const queueCathUpdate = (cath: CathLab) => {
-        const idx = cathlabsToUpdate.findIndex(item => item.CathKey === cath.CathKey);
+        const idx = cathlabsToUpdate.findIndex(item => item.id === cath.id);
         if (idx >= 0) cathlabsToUpdate[idx] = cath;
         else cathlabsToUpdate.push(cath);
       };
@@ -739,7 +739,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
         let patient = findPatientByHisId(patientId, currentPatients);
         const existingCath = patient
-          ? findExistingCathForHisMerge(patient.PatientKey, cathDate, currentCathlabs)
+          ? findExistingCathForHisMerge(patient.id, cathDate, currentCathlabs)
           : undefined;
 
         if (existingCath && shouldSkipDuplicateHisImport(existingCath, cathMethod)) {
@@ -758,7 +758,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
         if (!patient) {
           patient = {
-            PatientKey: `pat_his_${Date.now()}_${index}`,
+            id: `pat_his_${Date.now()}_${index}`,
             PatientID1: patientId,
             PatientID2: '',
             PatientName: patientName || patientId,
@@ -777,14 +777,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           patientsToCreate.push(patient);
         }
 
-        const matchedConsult = findBestConsultForHisCath(patient.PatientKey, cathDate);
+        const matchedConsult = findBestConsultForHisCath(patient.id, cathDate);
         const autoDiagnosisID = normalizeDiagnosisID(
           matchedConsult?.DiagnosisID || classifyDiagnosisText(postDiagnosis, preDiagnosis)
         );
         const cathPayload: CathLab = {
-          CathKey: `cath_his_${Date.now()}_${index}`,
-          PatientKey: patient.PatientKey,
-          ConsultKey: matchedConsult?.ConsultKey || '',
+          id: `cath_his_${Date.now()}_${index}`,
+          PatientKey: patient.id,
+          ConsultKey: matchedConsult?.id || '',
           CathDate: cathDate,
           DiagnosisID: autoDiagnosisID,
           PostDiagnosisID: autoDiagnosisID,
@@ -793,7 +793,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           CathMethod: cathMethod as any,
           CathPlan: 'Tái khám thường',
           CathNote: matchedConsult
-            ? `Import từ file thủ thuật HIS; đối soát ConsultKey=${matchedConsult.ConsultKey}`
+            ? `Import từ file thủ thuật HIS; đối soát id=${matchedConsult.id}`
             : 'Import từ file thủ thuật HIS; chưa tìm thấy hội chẩn phù hợp để đối soát',
           _1stInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptvchinh'])),
           _2ndInterventionist: normalizeHisDoctor(getHisCell(row, headerMap, ['ptv1'])),
@@ -808,7 +808,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
           const merged = mergeHisIntoExistingCath(
             existingCath,
             cathPayload,
-            matchedConsult?.ConsultKey
+            matchedConsult?.id
           );
           upsertCathInMemory(merged);
           queueCathUpdate(merged);
@@ -827,7 +827,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
             });
           }
           importedSummaries.push(
-            `${patient.PatientName || patientName || patientId} - ${autoDiagnosisID || 'Chưa mã hóa ICD'} - gộp HIS vào ca ${existingCath.CathKey} - ${cathMethod} - ${formatVNTime(cathDate)}`
+            `${patient.PatientName || patientName || patientId} - ${autoDiagnosisID || 'Chưa mã hóa ICD'} - gộp HIS vào ca ${existingCath.id} - ${cathMethod} - ${formatVNTime(cathDate)}`
           );
           return;
         }
@@ -878,11 +878,11 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         await postBatchWrite(cathChunk.map(cath => ({
           endpoint: 'cathlabs',
           method: 'PUT',
-          key: cath.CathKey,
+          key: cath.id,
           data: cath as unknown as Record<string, any>
         })));
         updatedCathCount += cathChunk.length;
-        cathChunk.forEach(cath => onPatchCathlab?.(cath.CathKey, cath));
+        cathChunk.forEach(cath => onPatchCathlab?.(cath.id, cath));
       }
 
       for (const cathChunk of chunkArray(cathlabsToCreate, HIS_IMPORT_BATCH_SIZE)) {
@@ -903,11 +903,11 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         await postBatchWrite(consultChunk.map(item => ({
           endpoint: 'consults',
           method: 'PUT',
-          key: item.consult.ConsultKey,
+          key: item.consult.id,
           data: item.patch as Record<string, any>
         })));
         consultChunk.forEach(item => {
-          onPatchConsult?.(item.consult.ConsultKey, item.patch);
+          onPatchConsult?.(item.consult.id, item.patch);
           workflowNotificationOps.push(...buildHisWorkflowNotificationAndMarkOperations(item.consult, item.patient, item.cath, item.stage));
         });
         autoClosedCount += consultChunk.length;
@@ -956,7 +956,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       CheckDeviceUpdatedTime: new Date().toISOString()
     };
 
-    onPatchConsult?.(consult.ConsultKey, payload);
+    onPatchConsult?.(consult.id, payload);
 
     const mergedConsult: Consult = { ...consult, ...payload };
     setIsAdHocModalOpen(false);
@@ -965,7 +965,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     setActiveTab('pending');
     openPendingForm(mergedConsult, patient);
 
-    fetch(`/api/consults/${consult.ConsultKey}`, {
+    fetch(`/api/consults/${consult.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -983,7 +983,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
   const handleAdHocPatientSelect = (patient: Patient) => {
     // TH(2) — Check 1: BN đang chờ trong Danh sách chờ TT (đã chuyển phòng, chưa có kết quả)
-    const pendingCathConsult = getPatientPendingCathLabConsult(patient.PatientKey, consults, cathlabs);
+    const pendingCathConsult = getPatientPendingCathLabConsult(patient.id, consults, cathlabs);
     if (pendingCathConsult) {
       triggerConfirm(
         `BN "${patient.PatientName}" đang có trong danh sách chờ thông tim phòng cathlab. Bạn có muốn mở phiếu kết quả của BN này thay vì tạo mới?`,
@@ -1000,7 +1000,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     }
 
     // TH(1)/(2) — Check 2: BN đang chờ trong view Xếp lịch (chưa chuyển phòng)
-    const waitlistConsult = getSchedulingWaitlistConsult(patient.PatientKey, consults, patients);
+    const waitlistConsult = getSchedulingWaitlistConsult(patient.id, consults, patients);
     if (waitlistConsult) {
       triggerConfirm(
         'BN này đang chờ trong view Xếp lịch. Bạn có muốn tiếp tục chuyển phòng thông tim?',
@@ -1015,7 +1015,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       return;
     }
 
-    setAdHocSelectedPatientKey(patient.PatientKey);
+    setAdHocSelectedPatientKey(patient.id);
     setAdHocPatientName(patient.PatientName);
     setAdHocSearchQuery('');
   };
@@ -1086,14 +1086,14 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
      const cathPayload: CathLab = {
        ...formData,
-       CathKey: cathKey,
+       id: cathKey,
        ConsultKey: consultKey,
        PatientKey: patientKey,
        CathMethod: safeCathMethod.join(' + ')
      } as CathLab;
 
      const consultPayload: Consult = {
-       ConsultKey: consultKey,
+       id: consultKey,
        PatientKey: patientKey,
        ConsultType: 'Staff thông',
        ConsultDate: formData.CathDate,
@@ -1114,7 +1114,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
      if (adHocPatientMode === 'new') {
        onAddPatient?.({
-         PatientKey: patientKey,
+         id: patientKey,
          PatientID1: adHocPatientID1,
          PatientID2: adHocPatientID2,
          PatientName: adHocPatientName,
@@ -1206,10 +1206,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
      }
 
      const method = isEdit ? 'PUT' : 'POST';
-     const url = isEdit ? `/api/cathlabs/${formData.CathKey}` : '/api/cathlabs';
+     const url = isEdit ? `/api/cathlabs/${formData.id}` : '/api/cathlabs';
      
-     const consultKey = isEdit ? selectedDone?.cath.ConsultKey : selectedPending?.c.ConsultKey;
-     const patientKey = isEdit ? selectedDone?.p.PatientKey : selectedPending?.p.PatientKey;
+     const consultKey = isEdit ? selectedDone?.cath.ConsultKey : selectedPending?.c.id;
+     const patientKey = isEdit ? selectedDone?.p.id : selectedPending?.p.id;
 
      const payload = {
        ...formData,
@@ -1218,8 +1218,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        CathMethod: safeCathMethod.join(' + ')
      };
 
-     if (isEdit && formData.CathKey) {
-       onPatchCathlab?.(formData.CathKey, payload);
+     if (isEdit && formData.id) {
+       onPatchCathlab?.(formData.id, payload);
      } else {
        onAddCathlab?.(payload as CathLab);
      }
@@ -1269,10 +1269,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
              CheckDevice: '' as Consult['CheckDevice']
            };
 
-       onPatchConsult?.(selectedPending.c.ConsultKey, payload);
+       onPatchConsult?.(selectedPending.c.id, payload);
        closeModal();
 
-       fetch(`/api/consults/${selectedPending.c.ConsultKey}`, {
+       fetch(`/api/consults/${selectedPending.c.id}`, {
          method: 'PUT',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify(payload)
@@ -1386,7 +1386,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                       const p = findPatientByKey(patients, c.PatientKey);
                       if (!p) return null;
                       return (
-                        <tr key={c.ConsultKey} onClick={() => openPendingForm(c, p)} className="hover:bg-slate-50 cursor-pointer transition">
+                        <tr key={c.id} onClick={() => openPendingForm(c, p)} className="hover:bg-slate-50 cursor-pointer transition">
                           <td className="py-4 px-4 text-center text-slate-400 font-bold">{i+1}</td>
                           <td className="py-4 px-4 text-slate-800 font-extrabold uppercase">{p.PatientName}</td>
                           <td className="py-4 px-4 text-slate-600 text-center font-medium">{formatVNTime(p.PatientDOB) || '-'}</td>
@@ -1436,7 +1436,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                       const p = findPatientByKey(patients, cath.PatientKey);
                       if (!p) return null;
                       return (
-                        <tr key={cath.CathKey} onClick={() => openDoneForm(cath)} className="hover:bg-slate-50 cursor-pointer transition">
+                        <tr key={cath.id} onClick={() => openDoneForm(cath)} className="hover:bg-slate-50 cursor-pointer transition">
                           <td className="py-4 px-4 text-center text-slate-400 font-bold">{i+1}</td>
                           <td className="py-4 px-4 text-slate-800 font-extrabold uppercase">{p.PatientName}</td>
                           <td className="py-4 px-4 text-slate-600 text-center font-medium">{formatVNTime(p.PatientDOB) || '-'}</td>
@@ -1522,7 +1522,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
                                 return matched.slice(0, 15).map(p => (
                                   <button
-                                    key={p.PatientKey}
+                                    key={p.id}
                                     type="button"
                                     onClick={() => handleAdHocPatientSelect(p)}
                                     className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"

@@ -80,7 +80,7 @@ export default function MRIResultView({
   const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();
     patients.forEach(patient => {
-      if (patient.PatientKey) map.set(String(patient.PatientKey).trim().toLowerCase(), patient);
+      if (patient.id) map.set(String(patient.id).trim().toLowerCase(), patient);
       if (patient.PatientID1) map.set(String(patient.PatientID1).trim().toLowerCase(), patient);
     });
     return map;
@@ -90,7 +90,7 @@ export default function MRIResultView({
   const allItems = useMemo<MRIResultItem[]>(() => {
     return cmrs
       .map((cmr, index) => {
-        const key = cmr.CMRKey || cmr.CMRkey || `cmr_no_key_${index}`;
+        const key = cmr.id || cmr.id || `cmr_no_key_${index}`;
         const patient =
           patientsByKey.get(String(cmr.PatientKey || '').trim().toLowerCase()) ||
           patientsByKey.get(String(cmr.MBN || '').trim().toLowerCase());
@@ -179,7 +179,7 @@ export default function MRIResultView({
       setMessage('Vui lòng nhập Kết quả CMR!');
       return;
     }
-    const key = selectedItem.CMRKey || selectedItem.CMRkey;
+    const key = selectedItem.id || selectedItem.id;
     if (!key) {
       setMessage('Không xác định được mã CMR để cập nhật!');
       return;
@@ -302,7 +302,7 @@ export default function MRIResultView({
                 const patient = item.__patient;
                 return (
                   <tr
-                    key={item.CMRKey || `${item.PatientKey}-${index}`}
+                    key={item.id || `${item.PatientKey}-${index}`}
                     onClick={() => openItem(item)}
                     className="hover:bg-indigo-50/45 transition cursor-pointer"
                   >

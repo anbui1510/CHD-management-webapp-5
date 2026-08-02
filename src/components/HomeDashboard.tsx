@@ -264,7 +264,7 @@ export default function HomeDashboard({
       if (!c.PatientKey) return;
       const patientKey = normalizePatientKey(c.PatientKey);
       if (!map.has(patientKey)) {
-        map.set(patientKey, c.ConsultKey);
+        map.set(patientKey, c.id);
       }
     });
     return map;
@@ -286,7 +286,7 @@ export default function HomeDashboard({
     return (consults || []).filter(c => {
       if (!c.ConsultDate) return false;
 
-      if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.ConsultKey) return false;
+      if (latestConsultsMap.get(normalizePatientKey(c.PatientKey)) !== c.id) return false;
       if (isConsultCathCompleted(c, cathlabsByPatientKey.get(normalizePatientKey(c.PatientKey)))) return false;
       if (isConsultWaitlistExcludedByStatus(c.Status)) return false;
 
@@ -1123,7 +1123,7 @@ export default function HomeDashboard({
                               
                               return (
                                 <div 
-                                  key={c.ConsultKey}
+                                  key={c.id}
                                   className="flex items-center justify-between gap-1.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-150/70 p-2 rounded-lg transition"
                                 >
                                   <span className="text-[11px] font-black text-slate-800 uppercase truncate">

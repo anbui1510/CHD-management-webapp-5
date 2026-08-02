@@ -33,7 +33,7 @@ export function parseCathMethods(methodStr: unknown): string[] {
 export function isHisImportedCath(cath: CathLab): boolean {
   return (
     String(cath.CathNote || '').includes('Import từ file thủ thuật HIS') ||
-    String(cath.CathKey || '').startsWith('cath_his_')
+    String(cath.id || '').startsWith('cath_his_')
   );
 }
 

@@ -21,7 +21,7 @@ interface RolePresetMatrixPanelProps {
 }
 
 type PresetDraft = {
-  RolePresetID: string;
+  id: string;
   RolePresetLabel: string;
   RolePresetDescription: string;
   moduleSet: Set<AppModule>;
@@ -30,7 +30,7 @@ type PresetDraft = {
 };
 
 const emptyDraft = (): PresetDraft => ({
-  RolePresetID: '',
+  id: '',
   RolePresetLabel: '',
   RolePresetDescription: '',
   moduleSet: new Set<AppModule>(['home', 'workspace']),
@@ -57,9 +57,9 @@ export default function RolePresetMatrixPanel({
   };
 
   const startEdit = (record: RolePreset) => {
-    setEditingId(record.RolePresetID);
+    setEditingId(record.id);
     setDraft({
-      RolePresetID: record.RolePresetID,
+      id: record.id,
       RolePresetLabel: record.RolePresetLabel,
       RolePresetDescription: record.RolePresetDescription || '',
       moduleSet: new Set(parsePermissions(record.Permissions)),
@@ -98,11 +98,11 @@ export default function RolePresetMatrixPanel({
     setSaving(true);
     try {
       const payload = {
-        RolePresetID: draft.RolePresetID || undefined,
+        id: draft.id || undefined,
         RolePresetLabel: draft.RolePresetLabel.trim(),
         RolePresetDescription: draft.RolePresetDescription.trim(),
         Permissions:
-          draft.RolePresetID === 'admin-khoa'
+          draft.id === 'admin-khoa'
             ? serializePermissions(ALL_APP_MODULES)
             : serializePermissions(draft.moduleSet),
         SortOrder: draft.SortOrder,
@@ -110,7 +110,7 @@ export default function RolePresetMatrixPanel({
 
       const url = draft.isNew
         ? '/api/role-presets'
-        : `/api/role-presets/${encodeURIComponent(draft.RolePresetID)}`;
+        : `/api/role-presets/${encodeURIComponent(draft.id)}`;
       const method = draft.isNew ? 'POST' : 'PUT';
 
       const response = await fetch(url, {
@@ -135,13 +135,13 @@ export default function RolePresetMatrixPanel({
   };
 
   const handleDelete = (record: RolePreset) => {
-    if (isSystemRolePresetId(record.RolePresetID)) {
+    if (isSystemRolePresetId(record.id)) {
       triggerAlert?.('Không thể xóa preset hệ thống.', 'Từ chối');
       return;
     }
 
     const proceed = async () => {
-      const response = await fetch(`/api/role-presets/${encodeURIComponent(record.RolePresetID)}`, {
+      const response = await fetch(`/api/role-presets/${encodeURIComponent(record.id)}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -150,7 +150,7 @@ export default function RolePresetMatrixPanel({
         return;
       }
       triggerAlert?.('Đã xóa vai trò mẫu.', 'Xóa thành công');
-      if (editingId === record.RolePresetID) cancelEdit();
+      if (editingId === record.id) cancelEdit();
       onRefresh();
     };
 
@@ -184,19 +184,19 @@ export default function RolePresetMatrixPanel({
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {rolePresetRecords.map(record => {
-              const preset = runtimePresets.find(item => item.id === record.RolePresetID);
-              const active = editingId === record.RolePresetID;
+              const preset = runtimePresets.find(item => item.id === record.id);
+              const active = editingId === record.id;
               return (
                 <div
-                  key={record.RolePresetID}
+                  key={record.id}
                   className={`p-3 flex items-start gap-2 ${active ? 'bg-pink-50' : 'hover:bg-slate-50'}`}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-extrabold text-xs text-[#d2145a] truncate">{record.RolePresetLabel}</p>
                     <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{record.RolePresetDescription}</p>
                     <p className="text-[9px] font-mono text-slate-400 mt-1">
-                      {record.RolePresetID} · {preset?.modules.length ?? 0} module
-                      {isSystemRolePresetId(record.RolePresetID) ? ' · hệ thống' : ''}
+                      {record.id} · {preset?.modules.length ?? 0} module
+                      {isSystemRolePresetId(record.id) ? ' · hệ thống' : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -208,7 +208,7 @@ export default function RolePresetMatrixPanel({
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    {!isSystemRolePresetId(record.RolePresetID) && (
+                    {!isSystemRolePresetId(record.id) && (
                       <button
                         type="button"
                         onClick={() => handleDelete(record)}
@@ -280,9 +280,9 @@ export default function RolePresetMatrixPanel({
                   </label>
                   {!draft.isNew && (
                     <label className="block">
-                      <span className="text-[10px] font-bold uppercase text-slate-400">Mã (RolePresetID)</span>
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Mã (id)</span>
                       <input
-                        value={draft.RolePresetID}
+                        value={draft.id}
                         readOnly
                         className="mt-1 w-full border border-slate-100 bg-slate-50 rounded-xl px-3 py-2 text-xs font-mono text-slate-500"
                       />
@@ -290,7 +290,7 @@ export default function RolePresetMatrixPanel({
                   )}
                 </div>
 
-                {draft.RolePresetID === 'admin-khoa' ? (
+                {draft.id === 'admin-khoa' ? (
                   <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3 font-semibold">
                     Admin khoa luôn có toàn bộ module — không chỉnh danh sách module tại đây.
                   </p>
@@ -333,7 +333,7 @@ export default function RolePresetMatrixPanel({
                 <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3">
                   <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Permissions (lưu DB / Sheet)</p>
                   <code className="text-[10px] text-slate-600 break-all font-mono">
-                    {draft.RolePresetID === 'admin-khoa'
+                    {draft.id === 'admin-khoa'
                       ? serializePermissions(ALL_APP_MODULES)
                       : serializePermissions(draft.moduleSet)}
                   </code>

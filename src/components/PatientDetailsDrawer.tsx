@@ -59,15 +59,15 @@ export default function PatientDetailsDrawer({
   onRegisterNewConsult
 }: PatientDetailsDrawerProps) {
 
-  const patientKey = normalizeRecordKey(patient.PatientKey);
+  const patientKey = normalizeRecordKey(patient.id);
   const patientId1 = normalizeRecordKey(patient.PatientID1);
 
-  const patientConsults = filterPatientConsults(consults, patient.PatientKey)
+  const patientConsults = filterPatientConsults(consults, patient.id)
     .sort((a, b) => parseMedicalDateTime(b.ConsultDate) - parseMedicalDateTime(a.ConsultDate));
 
-  const patientConsultKeys = new Set(patientConsults.map(c => normalizeRecordKey(c.ConsultKey)).filter(Boolean));
+  const patientConsultKeys = new Set(patientConsults.map(c => normalizeRecordKey(c.id)).filter(Boolean));
 
-  const patientCathlabs = filterPatientCathlabs(cathlabs, patient.PatientKey, patientConsultKeys)
+  const patientCathlabs = filterPatientCathlabs(cathlabs, patient.id, patientConsultKeys)
     .sort((a, b) => parseMedicalDateTime(b.CathDate) - parseMedicalDateTime(a.CathDate));
 
   const patientCmrs = cmrs
@@ -81,7 +81,7 @@ export default function PatientDetailsDrawer({
       parseMedicalDateTime(a.CMRDate || a.CMRScheduledDate || a.UpdateTime)
     );
 
-  const patientOperations = filterPatientOperations(operations, patient.PatientKey, patientConsultKeys)
+  const patientOperations = filterPatientOperations(operations, patient.id, patientConsultKeys)
     .sort((a, b) => parseMedicalDateTime(b.SurgDate) - parseMedicalDateTime(a.SurgDate));
 
   const joinSurgeons = (op: Operation) => joinPeople([
@@ -101,7 +101,7 @@ export default function PatientDetailsDrawer({
     const isCathLabIndication = INTERVENTION_RESULTS.has(String(c.ConsultResultID || '').trim().toLowerCase());
     if (!isCathLabIndication) return false;
 
-    const cKey = normalizeRecordKey(c.ConsultKey);
+    const cKey = normalizeRecordKey(c.id);
     if (!cKey) return false;
 
     // Kiểm tra xem đã có bản ghi thông tim tương ứng nào chưa
@@ -257,7 +257,7 @@ export default function PatientDetailsDrawer({
 
               <div className="space-y-3">
                 {patientConsults.map((c) => (
-                  <div key={c.ConsultKey} className="bg-white border text-xs border-slate-200 hover:border-pink-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
+                  <div key={c.id} className="bg-white border text-xs border-slate-200 hover:border-pink-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-extrabold text-slate-900 uppercase">Ngày staff: {formatVNTime(c.ConsultDate)}</p>
                       <p className="text-[10px] text-slate-500 font-bold text-right">Staff bởi: {c.RequestBy || '—'}</p>
@@ -302,7 +302,7 @@ export default function PatientDetailsDrawer({
                     (cath as any).Scheduled3rdInterventionist || cath._3rdInterventionist
                   ]);
                   return (
-                    <div key={cath.CathKey} className="bg-white border text-xs border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
+                    <div key={cath.id} className="bg-white border text-xs border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-extrabold text-slate-900 uppercase">Ngày TT: {formatVNTime(cath.CathDate)}</p>
                         <p className="text-[10px] text-slate-500 font-bold text-right">PTV: {ptv || '—'}</p>
@@ -337,7 +337,7 @@ export default function PatientDetailsDrawer({
               </div>
               <div className="space-y-3">
                 {patientCmrs.map((cmr) => (
-                  <div key={cmr.CMRKey || cmr.CMRkey} className="bg-white border text-xs border-slate-200 hover:border-emerald-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
+                  <div key={cmr.id || cmr.id} className="bg-white border text-xs border-slate-200 hover:border-emerald-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-extrabold text-slate-900 uppercase">Ngày chụp: {formatVNTime(cmr.CMRDate) || '—'}</p>
                       <p className="text-[10px] text-slate-500 font-bold text-right">{cmr.CMRCallStatus || '—'}</p>
@@ -360,7 +360,7 @@ export default function PatientDetailsDrawer({
               </div>
               <div className="space-y-3">
                 {patientOperations.map((op) => (
-                  <div key={op.SurgKey || `${op.PatientKey}_${op.SurgDate}`} className="bg-white border text-xs border-slate-200 hover:border-rose-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
+                  <div key={op.id || `${op.PatientKey}_${op.SurgDate}`} className="bg-white border text-xs border-slate-200 hover:border-rose-300 rounded-2xl p-4 shadow-sm hover:shadow transition space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-extrabold text-slate-900 uppercase">Ngày PT: {formatVNTime(op.SurgDate) || '—'}</p>
                       <p className="text-[10px] text-slate-500 font-bold text-right">PTV: {joinSurgeons(op) || '—'}</p>

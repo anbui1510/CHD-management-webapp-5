@@ -56,7 +56,7 @@ export function buildCathlabsByPatientKey(cathlabs: CathLab[]): Map<string, Cath
 export function isConsultCathCompleted(consult: Consult, patientCathlabs: CathLab[] | undefined): boolean {
   if (!patientCathlabs?.length) return false;
 
-  const consultKey = normalizeRefKey(consult.ConsultKey);
+  const consultKey = normalizeRefKey(consult.id);
   const plannedDate = getConsultDateKey(consult.PlannedCathLabDate);
   const consultDate = getConsultDateKey(consult.ConsultDate);
 

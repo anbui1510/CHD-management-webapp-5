@@ -116,7 +116,7 @@ export default function ResultStaffDrawer({
   const [formData, setFormData] = useState<ResultFormState | null>(null);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
 
-  const consult = consultKey ? consults.find(c => c.ConsultKey === consultKey) : undefined;
+  const consult = consultKey ? consults.find(c => c.id === consultKey) : undefined;
   const patient = consult ? findPatientByKey(patients, consult.PatientKey) : undefined;
 
   useEffect(() => {
@@ -127,7 +127,7 @@ export default function ResultStaffDrawer({
     }
     setFormData(buildFormState(consult));
     setIsEditing(false);
-  }, [consultKey, consult?.ConsultKey]);
+  }, [consultKey, consult?.id]);
 
   const handleClose = () => {
     setIsEditing(false);
@@ -153,7 +153,7 @@ export default function ResultStaffDrawer({
 
     const finalData = {
       ...formData,
-      ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
+      ConsultResultUpdatedBy: currentStaff?.id || '01378',
       ConsultResultUpdatedTime: new Date().toISOString()
     };
 
@@ -383,7 +383,7 @@ export default function ResultStaffDrawer({
                                     {staffList.map(s => {
                                       const displayName = getShortStaffName(s.StaffName, staffList);
                                       return (
-                                        <option key={s.StaffKey} value={displayName}>
+                                        <option key={s.id} value={displayName}>
                                           {displayName}
                                         </option>
                                       );
@@ -570,8 +570,8 @@ export default function ResultStaffDrawer({
                                       type="text"
                                       disabled
                                       value={(() => {
-                                        const editorId = currentStaff?.StaffKey;
-                                        return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
+                                        const editorId = currentStaff?.id;
+                                        return staffList.find(s => s.id === editorId)?.StaffName || editorId || '01378';
                                       })()}
                                       className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold"
                                     />

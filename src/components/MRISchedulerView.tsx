@@ -159,7 +159,7 @@ export default function MRISchedulerView({
   const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();
     patients.forEach(patient => {
-      if (patient.PatientKey) map.set(String(patient.PatientKey).trim().toLowerCase(), patient);
+      if (patient.id) map.set(String(patient.id).trim().toLowerCase(), patient);
       if (patient.PatientID1) map.set(String(patient.PatientID1).trim().toLowerCase(), patient);
     });
     return map;
@@ -199,21 +199,23 @@ export default function MRISchedulerView({
   }, [sources, consults, cmrs]);
 
   const allMriItems = useMemo<MRISchedulerItem[]>(() => {
-    const normalizedCmrs = cmrs.map((cmr, index) => {
-      const key = cmr.CMRKey || cmr.CMRkey || `cmr_no_key_${index}`;
-      const patient =
-        patientsByKey.get(String(cmr.PatientKey || '').trim().toLowerCase()) ||
-        patientsByKey.get(String(cmr.MBN || '').trim().toLowerCase());
-      const consult = consults.find(c => c.ConsultKey && c.ConsultKey === cmr.ConsultKey);
+    const normalizedCmrs = cmrs
+      .filter(cmr => Boolean(cmr.PatientKey || cmr.MBN || cmr['Họ và tên'] || cmr.CMRDiagnosisID || cmr.CMRRequest || cmr.CMRScheduledDate))
+      .map((cmr, index) => {
+        const key = cmr.id || cmr.id || `cmr_no_key_${index}`;
+        const patient =
+          patientsByKey.get(String(cmr.PatientKey || '').trim().toLowerCase()) ||
+          patientsByKey.get(String(cmr.MBN || '').trim().toLowerCase());
+        const consult = consults.find(c => c.id && c.id === cmr.ConsultKey);
 
-      return {
-        ...cmr,
-        CMRKey: key,
-        PatientKey: cmr.PatientKey || patient?.PatientKey || '',
-        __patient: patient,
-        __consult: consult
-      };
-    });
+        return {
+          ...cmr,
+          CMRKey: key,
+          PatientKey: cmr.PatientKey || patient?.PatientKey || '',
+          __patient: patient,
+          __consult: consult
+        };
+      });
 
     const existingConsultKeys = new Set(normalizedCmrs.map(cmr => String(cmr.ConsultKey || '').trim()).filter(Boolean));
     const existingPatientKeys = new Set(normalizedCmrs.map(cmr => String(cmr.PatientKey || '').trim()).filter(Boolean));
@@ -221,7 +223,7 @@ export default function MRISchedulerView({
     const syntheticFromConsults = consults
       .filter(consult => String(consult.ConsultResultID || '').trim().toLowerCase() === 'chụp mri')
       .filter(consult => {
-        if (consult.ConsultKey && existingConsultKeys.has(String(consult.ConsultKey).trim())) return false;
+        if (consult.id && existingConsultKeys.has(String(consult.id).trim())) return false;
         if (consult.PatientKey && existingPatientKeys.has(String(consult.PatientKey).trim())) return false;
         const patient = patientsByKey.get(String(consult.PatientKey || '').trim().toLowerCase());
         const outcome = String(patient?.Outcome || '').trim().toLowerCase();
@@ -230,8 +232,8 @@ export default function MRISchedulerView({
       .map((consult): MRISchedulerItem => {
         const patient = patientsByKey.get(String(consult.PatientKey || '').trim().toLowerCase());
         return {
-          CMRKey: `pending_${consult.ConsultKey}`,
-          ConsultKey: consult.ConsultKey,
+          CMRKey: `pending_${consult.id}`,
+          ConsultKey: consult.id,
           PatientKey: consult.PatientKey,
           MBN: patient?.PatientID1 || '',
           'Họ và tên': patient?.PatientName || '',
@@ -566,8 +568,8 @@ export default function MRISchedulerView({
   const handleSelectItem = (item: MRISchedulerItem) => {
     setSelectedItem(item);
     const nextForm: Partial<CMR> = {
-      CMRKey: item.CMRKey,
-      CMRkey: item.CMRkey,
+      CMRKey: item.id,
+      CMRkey: item.id,
       ConsultKey: item.ConsultKey,
       PatientKey: item.PatientKey,
       MBN: item.MBN || item.__patient?.PatientID1 || '',
@@ -592,7 +594,7 @@ export default function MRISchedulerView({
 
   useEffect(() => {
     if (!selectedItem) return;
-    const fresh = allMriItems.find(item => item.CMRKey === selectedItem.CMRKey);
+    const fresh = allMriItems.find(item => item.id === selectedItem.id);
     if (fresh) handleSelectItem(fresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cmrs]);
@@ -626,7 +628,7 @@ export default function MRISchedulerView({
     const payload: CMR = {
       ...selectedItem,
       ...formData,
-      CMRKey: selectedItem.__isSynthetic ? `cmr_${Date.now()}` : (selectedItem.CMRKey || selectedItem.CMRkey || `cmr_${Date.now()}`),
+      CMRKey: selectedItem.__isSynthetic ? `cmr_${Date.now()}` : (selectedItem.id || selectedItem.id || `cmr_${Date.now()}`),
       PatientKey: String(formData.PatientKey || selectedItem.PatientKey || patient?.PatientKey || ''),
       MBN: String(formData.MBN || patient?.PatientID1 || ''),
       'Họ và tên': String(formData['Họ và tên'] || patient?.PatientName || ''),
@@ -653,7 +655,7 @@ export default function MRISchedulerView({
       const method = selectedItem.__isSynthetic ? 'POST' : 'PUT';
       const url = selectedItem.__isSynthetic
         ? '/api/cmrs'
-        : `/api/cmrs/${encodeURIComponent(selectedItem.CMRKey || selectedItem.CMRkey || '')}`;
+        : `/api/cmrs/${encodeURIComponent(selectedItem.id || selectedItem.id || '')}`;
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -795,7 +797,7 @@ export default function MRISchedulerView({
         }
         finalPatientKey = `pat_${Date.now()}`;
         const patientPayload: Patient = {
-          PatientKey: finalPatientKey,
+          id: finalPatientKey,
           PatientID1: adHocNewPatID1.trim(),
           PatientID2: adHocNewPatID2.trim(),
           PatientName: adHocNewPatName,
@@ -805,7 +807,7 @@ export default function MRISchedulerView({
           PatientAddress: adHocNewPatAddress || 'TP Hà Nội',
           PatientPhone1: adHocNewPatPhone || '',
           PatientPhone2: '',
-          PatientCreateBy: currentStaff?.StaffKey || '01378',
+          PatientCreateBy: currentStaff?.id || '01378',
           PatientCreateTime: new Date().toISOString(),
           Outcome: ''
         };
@@ -867,7 +869,7 @@ export default function MRISchedulerView({
               PatientAddress: adHocNewPatAddress || 'TP Hà Nội',
               PatientPhone1: adHocNewPatPhone || '',
               PatientPhone2: '',
-              PatientCreateBy: currentStaff?.StaffKey || '01378',
+              PatientCreateBy: currentStaff?.id || '01378',
               PatientCreateTime: new Date().toISOString()
             })
           });
@@ -1074,10 +1076,10 @@ export default function MRISchedulerView({
                 <tbody className="divide-y divide-slate-150">
                   {displayItems.map((item, index) => {
                     const patient = item.__patient;
-                    const isSelected = selectedItem?.CMRKey === item.CMRKey;
+                    const isSelected = selectedItem?.CMRKey === item.id;
                     return (
                       <tr
-                        key={item.CMRKey || item.CMRkey || `${item.PatientKey}-${index}`}
+                        key={item.id || item.id || `${item.PatientKey}-${index}`}
                         onClick={() => handleSelectItem(item)}
                         className={`hover:bg-indigo-50/45 cursor-pointer transition ${isSelected ? 'bg-indigo-50/90 font-bold' : ''}`}
                       >
@@ -1172,7 +1174,7 @@ export default function MRISchedulerView({
                               const name = getPatientDisplayName(item.__patient?.PatientName || item['Họ và tên']);
                               return (
                                 <button
-                                  key={item.CMRKey || item.CMRkey}
+                                  key={item.id || item.id}
                                   onClick={() => handleSelectItem(item)}
                                   className="bg-[#b31448] hover:bg-[#d61d56] text-white text-[8px] font-black leading-tight px-1.5 py-0.5 rounded-lg truncate transition uppercase text-center"
                                   title={item.__patient?.PatientName || item['Họ và tên']}
@@ -1203,7 +1205,7 @@ export default function MRISchedulerView({
                       Xếp lịch
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-bold font-mono">Mã: {selectedItem.CMRKey}</span>
+                  <span className="text-[10px] text-slate-400 font-bold font-mono">Mã: {selectedItem.id}</span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1406,7 +1408,7 @@ export default function MRISchedulerView({
                   <div className="space-y-2">
                     {filteredScheduleItems.map((item, index) => (
                       <button
-                        key={item.CMRKey || item.CMRkey || index}
+                        key={item.id || item.id || index}
                         onClick={() => handleSelectItem(item)}
                         className="w-full text-left bg-slate-50 hover:bg-pink-50 border border-slate-150 rounded-xl p-3 transition"
                       >
@@ -1547,9 +1549,9 @@ export default function MRISchedulerView({
                             }
                             return matched.slice(0, 12).map(p => (
                               <button
-                                key={p.PatientKey}
+                                key={p.id}
                                 type="button"
-                                onClick={() => { setAdHocSelectedPatKey(p.PatientKey); setAdHocSearchPat(''); }}
+                                onClick={() => { setAdHocSelectedPatKey(p.id); setAdHocSearchPat(''); }}
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition flex justify-between items-center cursor-pointer"
                               >
                                 <div>
@@ -1688,7 +1690,7 @@ export default function MRISchedulerView({
                         <option value="">-- Chọn BS --</option>
                         {staffList.map(s => {
                           const displayName = getShortStaffName(s.StaffName, staffList);
-                          return <option key={s.StaffKey} value={displayName}>{displayName}</option>;
+                          return <option key={s.id} value={displayName}>{displayName}</option>;
                         })}
                         {extraDoctorOptions.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>

@@ -92,7 +92,7 @@ export function rolePresetRecordsToPresets(records: RolePresetRecord[]): StaffRo
   return [...records]
     .sort((a, b) => Number(a.SortOrder ?? 999) - Number(b.SortOrder ?? 999))
     .flatMap(record => {
-      const id = String(record.RolePresetID || '').trim();
+      const id = String(record.id || '').trim();
       if (!id) return [];
 
       const modules =
@@ -123,13 +123,13 @@ export function resolveRolePresetRecords(records: RolePresetRecord[]): RolePrese
 
   const map = new Map<string, RolePresetRecord>();
   records.forEach(record => {
-    const id = String(record.RolePresetID || '').trim();
-    if (id) map.set(id, { ...record, RolePresetID: id });
+    const id = String(record.id || '').trim();
+    if (id) map.set(id, { ...record, id: id });
   });
 
   DEFAULT_ROLE_PRESET_RECORDS.forEach(defaultRecord => {
-    if (!map.has(defaultRecord.RolePresetID)) {
-      map.set(defaultRecord.RolePresetID, { ...defaultRecord });
+    if (!map.has(defaultRecord.id)) {
+      map.set(defaultRecord.id, { ...defaultRecord });
     }
   });
 
@@ -175,7 +175,7 @@ export function getModuleLabel(module: AppModule): string {
 }
 
 export function isAdminStaff(staff: Staff | null | undefined): boolean {
-  return String(staff?.Role || '').trim().toLowerCase() === 'admin' || String(staff?.StaffKey || '').trim() === '11111';
+  return String(staff?.Role || '').trim().toLowerCase() === 'admin' || String(staff?.id || '').trim() === '11111';
 }
 
 export function parsePermissions(raw: unknown): AppModule[] {
