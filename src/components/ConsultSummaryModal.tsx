@@ -3,6 +3,7 @@ import { Check, Clipboard, X } from 'lucide-react';
 import { Consult, Patient, formatVNTime, normalizePriorityOrder, removeDiacritics, restoreWeightFromDate } from '../types';
 import { ConsultSummaryReadOnly } from './ConsultSummaryReadOnly';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { copyElementAsImage, CopyImageResultType } from '../utils/copySummaryImage';
 
@@ -146,6 +147,7 @@ export interface ConsultSummaryModalProps {
 
 export function ConsultSummaryModal({ patient, consult, onClose, onError }: ConsultSummaryModalProps) {
   const isMobile = useIsMobile();
+  useLockBodyScroll(true);
   const [copied, setCopied] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [copiedImageType, setCopiedImageType] = useState<CopyImageResultType | null>(null);
@@ -189,14 +191,22 @@ export function ConsultSummaryModal({ patient, consult, onClose, onError }: Cons
 
   return (
     <div
-      className={`fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[70] flex animate-in fade-in duration-200 ${isMobile ? 'items-stretch p-0' : 'items-center justify-center p-4'}`}
+      className={`fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[80] flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
+        isMobile
+          ? 'items-end justify-center pb-[calc(4rem+env(safe-area-inset-bottom,0px))]'
+          : 'items-center justify-center p-4'
+      }`}
       onClick={onClose}
     >
       <div
-        className={`bg-slate-50/95 backdrop-blur-md w-full shadow-2xl border border-slate-250 flex flex-col font-sans text-xs animate-in zoom-in-95 duration-200 ${isMobile ? 'max-h-[100dvh] rounded-none max-w-none' : 'max-w-3xl max-h-[95vh] rounded-3xl'}`}
+        className={`bg-slate-50/95 backdrop-blur-md w-full shadow-2xl border border-slate-250 flex flex-col min-h-0 overflow-hidden font-sans text-xs animate-in zoom-in-95 duration-200 ${
+          isMobile
+            ? 'max-h-[min(calc(100dvh-4rem-env(safe-area-inset-bottom,0px)),92dvh)] rounded-t-3xl rounded-b-none max-w-none'
+            : 'max-w-3xl max-h-[95vh] rounded-3xl'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`border-b border-slate-200 bg-white flex items-center justify-between text-[#d2145a] shrink-0 ${isMobile ? 'p-3 rounded-none' : 'p-4 rounded-t-3xl'}`}>
+        <div className={`border-b border-slate-200 bg-white flex items-center justify-between text-[#d2145a] shrink-0 ${isMobile ? 'p-3 rounded-t-3xl' : 'p-4 rounded-t-3xl'}`}>
           <div className="flex items-center gap-2">
             <div className="bg-emerald-50 text-emerald-600 rounded-xl p-2">
               <Clipboard className="w-5 h-5" />
@@ -219,7 +229,10 @@ export function ConsultSummaryModal({ patient, consult, onClose, onError }: Cons
           </button>
         </div>
 
-        <div className={`overflow-y-auto shrink min-h-0 ${isMobile ? 'p-2' : 'p-4 shrink-0'}`}>
+        <div
+          className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${isMobile ? 'p-2' : 'p-4'}`}
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           <div
             id={SCREENSHOT_CARD_ID}
             className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full select-text ${isMobile ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-5 space-y-3.5 shrink-0'}`}
@@ -254,18 +267,18 @@ export function ConsultSummaryModal({ patient, consult, onClose, onError }: Cons
           </div>
         </div>
 
-        <div className={`border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 ${isMobile ? 'p-3 rounded-none' : 'p-4 rounded-b-3xl'}`}>
-          <span className="text-[9.5px] text-slate-400 font-semibold italic text-center sm:text-left leading-normal">
+        <div className={`border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] ${isMobile ? 'p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]' : 'p-4 rounded-b-3xl'}`}>
+          <span className="text-[9.5px] text-slate-400 font-semibold italic text-center sm:text-left leading-normal hidden sm:block">
             {isMobile
               ? 'Bấm Lưu ảnh để mở menu chia sẻ và chọn Lưu vào Ảnh, hoặc chụp màn hình trực tiếp trên khung tóm tắt.'
               : 'Mẹo: Bấm Sao chép hình ảnh rồi dùng Ctrl+V dán trực tiếp gửi nhóm Zalo vô cùng nhanh chóng!'}
           </span>
 
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0 justify-end">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0 justify-stretch sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-200 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+              className={`border border-slate-200 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer ${isMobile ? 'flex-1 min-w-[5rem] py-2.5' : 'px-4 py-2'}`}
             >
               Đóng
             </button>
@@ -273,9 +286,9 @@ export function ConsultSummaryModal({ patient, consult, onClose, onError }: Cons
               type="button"
               disabled={isCopyingImage}
               onClick={handleCopyImage}
-              className={`px-4 py-2 rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none disabled:opacity-50 ${
+              className={`rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none disabled:opacity-50 ${
                 copiedImage ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-800 hover:bg-slate-900'
-              }`}
+              } ${isMobile ? 'flex-1 min-w-[5rem] py-2.5 px-3' : 'px-4 py-2'}`}
             >
               {isCopyingImage ? (
                 <>
@@ -298,9 +311,9 @@ export function ConsultSummaryModal({ patient, consult, onClose, onError }: Cons
             <button
               type="button"
               onClick={handleCopy}
-              className={`px-4 py-2 rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none ${
+              className={`rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none ${
                 copied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#d2145a] hover:bg-pink-700'
-              }`}
+              } ${isMobile ? 'flex-1 min-w-[5rem] py-2.5 px-3' : 'px-4 py-2'}`}
             >
               <Check className="w-3.5 h-3.5 shrink-0" />
               {copied ? 'Đã Copy text!' : 'Sao chép Tin nhắn'}
