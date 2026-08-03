@@ -1,5 +1,6 @@
-import { deserializeVapidKeys, sendPushNotification } from 'web-push-browser';
+import { sendPushNotification } from 'web-push-browser';
 import type { WebPushPayload } from './pushPayload';
+import { loadVapidKeys } from './loadVapidKeys';
 
 export interface PushSubscriptionRecord {
   PushSubKey: string;
@@ -55,10 +56,15 @@ async function loadVapidKeys(env: CloudflarePushEnv): Promise<CryptoKeyPair | nu
     return cachedVapidKeys;
   }
 
-  const keyPair = await deserializeVapidKeys({ publicKey, privateKey });
-  cachedVapidKeys = keyPair;
-  cachedVapidFingerprint = fingerprint;
-  return keyPair;
+  try {
+    const keyPair = await loadVapidKeys(publicKey, privateKey);
+    cachedVapidKeys = keyPair;
+    cachedVapidFingerprint = fingerprint;
+    return keyPair;
+  } catch (error) {
+    console.error('[push] Failed to load VAPID keys:', error);
+    return null;
+  }
 }
 
 async function readSubscriptions(kv: PushKvStore): Promise<PushSubscriptionRecord[]> {
