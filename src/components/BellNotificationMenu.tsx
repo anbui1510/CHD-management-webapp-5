@@ -20,6 +20,11 @@ interface BellNotificationMenuProps {
   onMarkRead: (notificationKey: string) => void;
 }
 
+const getNotificationTitleClass = (severity?: Notification['Severity']): string => {
+  if (severity === 'critical') return 'text-red-700';
+  return 'text-[#d2145a]';
+};
+
 export default function BellNotificationMenu({
   staff,
   notifications,
@@ -127,8 +132,8 @@ export default function BellNotificationMenu({
         <div
           className={
             isMobile
-              ? 'fixed inset-x-3 top-[calc(3.25rem+env(safe-area-inset-top))] z-[125] max-h-[min(72dvh,520px)] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 flex flex-col'
-              : 'absolute right-0 top-[calc(100%+8px)] z-[125] w-[330px] max-w-[calc(100vw-24px)] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150'
+              ? 'fixed inset-x-3 top-[calc(3.25rem+env(safe-area-inset-top))] z-[125] max-h-[min(72dvh,520px)] rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 flex flex-col'
+              : 'absolute right-0 top-[calc(100%+8px)] z-[125] w-[330px] max-w-[calc(100vw-24px)] rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150'
           }
         >
           <div className="px-3 py-2.5 border-b border-slate-100 flex items-center justify-between gap-2">
@@ -163,7 +168,9 @@ export default function BellNotificationMenu({
                         <AlertTriangle className="w-3.5 h-3.5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-black text-slate-850 leading-snug">{item.Title}</p>
+                        <p className={`text-xs font-black leading-snug ${getNotificationTitleClass(item.Severity)}`}>
+                          {item.Title}
+                        </p>
                         <p className="text-[11px] font-semibold text-slate-600 leading-snug mt-1">{formatNotificationMessage(item)}</p>
                         <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">
                           {formatVNTime(item.CreatedTime)}
