@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,10 +38,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(node scripts/compute-chd-version.mjs)
+          UTC_TODAY=$(date -u +%Y-%m-%d)
+          RUNS_TODAY=$(gh run list --workflow=cloudflare-deploy.yml --branch=main --created="${UTC_TODAY}" --limit=200 --json databaseId | jq 'length')
+          if [ -z "$RUNS_TODAY" ] || [ "$RUNS_TODAY" -lt 1 ]; then RUNS_TODAY=1; fi
+          VERSION=$(node scripts/compute-chd-version.mjs --seq "$RUNS_TODAY")
           echo "BUILD_ID=$VERSION" >> "$GITHUB_ENV"
           echo "label=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Computed CHD5 version: $VERSION"
+          echo "Computed CHD5 version: $VERSION (runs today UTC: $RUNS_TODAY)"
 
       - name: Build frontend + server bundle
         env:

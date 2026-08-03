@@ -304,6 +304,34 @@ function getKeyColumnNameForType(type) {
   return keyColumnName;
 }
 
+function normalizeSheetKey(val) {
+  if (val === null || val === undefined) return "";
+  var s = String(val).trim();
+  if (s.charAt(0) === "'") {
+    s = s.substring(1).trim();
+  }
+  return s;
+}
+
+function sheetKeysMatch(cellValue, targetKey) {
+  var left = normalizeSheetKey(cellValue).toLowerCase();
+  var right = normalizeSheetKey(targetKey).toLowerCase();
+  return left !== "" && right !== "" && left === right;
+}
+
+function findRowIndexBySheetKey(sheet, keyColIndex, key) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  var numRows = lastRow - 1;
+  var keyValues = sheet.getRange(2, keyColIndex, numRows, 1).getValues();
+  for (var i = 0; i < keyValues.length; i++) {
+    if (sheetKeysMatch(keyValues[i][0], key)) {
+      return i + 2;
+    }
+  }
+  return -1;
+}
+
 function writeRecordToSheet(type, action, key, record) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
   if (!sheet) {
@@ -319,17 +347,7 @@ function writeRecordToSheet(type, action, key, record) {
   }
 
   var lastRow = sheet.getLastRow();
-  var foundRowIndex = -1;
-  
-  if (lastRow > 1) {
-    var keyValues = sheet.getRange(2, keyColIndex, lastRow - 1, 1).getValues();
-    for (var i = 0; i < keyValues.length; i++) {
-      if (keyValues[i][0] == key) {
-        foundRowIndex = i + 2;
-        break;
-      }
-    }
-  }
+  var foundRowIndex = findRowIndexBySheetKey(sheet, keyColIndex, key);
 
   var rowValues = [];
   for (var col = 0; col < headers.length; col++) {
@@ -383,17 +401,7 @@ function deleteRecordFromSheet(type, key) {
   }
 
   var lastRow = sheet.getLastRow();
-  var foundRowIndex = -1;
-  
-  if (lastRow > 1) {
-    var keyValues = sheet.getRange(2, keyColIndex, lastRow - 1, 1).getValues();
-    for (var i = 0; i < keyValues.length; i++) {
-      if (keyValues[i][0] == key) {
-        foundRowIndex = i + 2;
-        break;
-      }
-    }
-  }
+  var foundRowIndex = findRowIndexBySheetKey(sheet, keyColIndex, key);
 
   if (foundRowIndex !== -1) {
     sheet.deleteRow(foundRowIndex);

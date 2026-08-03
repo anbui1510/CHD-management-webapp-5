@@ -504,6 +504,23 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     });
   }, []);
 
+  const isRemovedConsultRow = (consult: Consult) =>
+    consult.Removed === true
+    || String(consult.Removed).toUpperCase() === 'TRUE'
+    || String(consult.Removed).toLowerCase() === 'có'
+    || String(consult.Removed).toLowerCase() === 'yes';
+
+  const parseDeleteErrorMessage = (raw: string, status: number): string => {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return `HTTP ${status}`;
+    try {
+      const parsed = JSON.parse(trimmed) as { error?: string; message?: string };
+      return parsed.error || parsed.message || trimmed;
+    } catch {
+      return trimmed;
+    }
+  };
+
   const executeDeleteConsults = useCallback(async (keys: string[]) => {
     const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
     if (uniqueKeys.length === 0) return;
@@ -530,7 +547,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         });
         if (!res.ok) {
           const errText = await res.text();
-          throw new Error(errText || `HTTP ${res.status}`);
+          throw new Error(parseDeleteErrorMessage(errText, res.status));
         }
         reportMutationResponse(await res.json(), { baseMessage: 'Đã xóa đăng ký staff' });
         return key;
@@ -566,9 +583,14 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       return next;
     });
 
+    const failedMessages = results
+      .map((result, index) => (result.status === 'rejected' ? `${uniqueKeys[index]}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}` : null))
+      .filter((msg): msg is string => !!msg);
+
     if (failedCount > 0) {
       onRefreshData?.();
-      triggerAlert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.`, MODAL_TITLE.warning);
+      const detail = failedMessages[0] ? `\n${failedMessages[0]}` : '';
+      triggerAlert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.${detail}`, MODAL_TITLE.warning);
     }
   }, [consults, mobileDrawerKey, onRemoveConsult, onRemoveConsults, onRefreshData, patients, reportMutationResponse, selectedConsultKey, triggerAlert]);
 
@@ -583,6 +605,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     if (!Array.isArray(consults)) return [];
     const seen = new Set<string>();
     return consults.filter(c => {
+      if (isRemovedConsultRow(c)) return false;
       if (!c.ConsultKey) return true;
       const k = String(c.ConsultKey).trim().toLowerCase();
       if (seen.has(k)) return false;

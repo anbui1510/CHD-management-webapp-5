@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Compute deploy label: CHD5.yyyy.mm.dd.NNN
- * NNN = số lần deploy trong ngày (giờ VN), ưu tiên đếm GitHub Actions runs, fallback git commits.
+ * NNN = số lần deploy trong ngày (giờ VN), ưu tiên GitHub Actions runs (UTC date), fallback git commits.
  */
 import { execSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -9,9 +9,9 @@ import { appendFileSync } from 'node:fs';
 const WORKFLOW_FILE = 'cloudflare-deploy.yml';
 const TZ = 'Asia/Ho_Chi_Minh';
 
-function getVnDateLabel() {
+function getDateLabel(timeZone) {
   const parts = new Intl.DateTimeFormat('en', {
-    timeZone: TZ,
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -40,13 +40,13 @@ function gitCommitCountSince(isoDate) {
   }
 }
 
-function githubDeployRunsToday(isoDate) {
+function githubDeployRunsToday(utcIsoDate) {
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   if (!token) return null;
 
   try {
     const out = execSync(
-      `gh run list --workflow=${WORKFLOW_FILE} --branch=main --created=${isoDate} --limit=200 --json databaseId`,
+      `gh run list --workflow=${WORKFLOW_FILE} --branch=main --created=${utcIsoDate} --limit=200 --json databaseId`,
       {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
@@ -61,12 +61,23 @@ function githubDeployRunsToday(isoDate) {
   }
 }
 
+function parseSeqArg() {
+  const idx = process.argv.indexOf('--seq');
+  if (idx < 0) return null;
+  const raw = String(process.argv[idx + 1] || '').trim();
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function computeVersionLabel() {
-  const { dotted, iso } = getVnDateLabel();
-  const gitSeq = gitCommitCountSince(iso);
-  const runSeq = githubDeployRunsToday(iso);
-  const seq = runSeq != null ? Math.max(gitSeq, runSeq) : gitSeq;
-  return `CHD5.${dotted}.${String(seq).padStart(3, '0')}`;
+  const vn = getDateLabel(TZ);
+  const utc = getDateLabel('UTC');
+  const gitSeq = gitCommitCountSince(vn.iso);
+  const runSeqFromArg = parseSeqArg();
+  const runSeqFromGh = githubDeployRunsToday(utc.iso);
+  const runSeq = runSeqFromArg ?? runSeqFromGh;
+  const seq = Math.max(gitSeq, runSeq ?? 0, 1);
+  return `CHD5.${vn.dotted}.${String(seq).padStart(3, '0')}`;
 }
 
 const version = computeVersionLabel();

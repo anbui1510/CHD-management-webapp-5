@@ -71,7 +71,7 @@ export function upsertPushSubscription(
   subscriptionsFile: string,
   staffKey: string,
   body: any
-): PushSubscriptionRecord | null {
+): { record: PushSubscriptionRecord; isNew: boolean } | null {
   const normalized = normalizeSubscriptionInput({ ...body, StaffKey: staffKey });
   if (!normalized) return null;
 
@@ -86,7 +86,7 @@ export function upsertPushSubscription(
       UpdatedTime: now,
     };
     db.writeDB(subscriptionsFile, subscriptions);
-    return subscriptions[existingIndex];
+    return { record: subscriptions[existingIndex], isNew: false };
   }
 
   const record: PushSubscriptionRecord = {
@@ -97,7 +97,7 @@ export function upsertPushSubscription(
   };
   subscriptions.push(record);
   db.writeDB(subscriptionsFile, subscriptions);
-  return record;
+  return { record, isNew: true };
 }
 
 export function removePushSubscription(

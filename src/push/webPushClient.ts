@@ -240,6 +240,8 @@ export async function syncExistingPushSubscription(staffKey: string): Promise<bo
       endpoint: json.endpoint,
       keys: json.keys,
       UserAgent: navigator.userAgent,
+      silent: true,
+      syncOnly: true,
     }),
   });
   return res.ok;
