@@ -72,6 +72,7 @@ import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
   CHD_DEPLOY_LOGOUT_MSG_KEY,
+  CHD_VERSION_LABEL,
   activateWaitingServiceWorker,
   fetchRemoteAppBuildId,
   isAppBuildIdMismatch,
@@ -2035,7 +2036,9 @@ export default function App() {
               HỆ THỐNG QUẢN LÝ TIM BẨM SINH<br />
               KHOA TIM MẠCH - BỆNH VIỆN NHI ĐỒNG THÀNH PHỐ
             </p>
-            <p className="text-[9px] text-neutral-600 font-semibold mt-1 tracking-wide">Mobile UI · build {APP_BUILD_ID}</p>
+            <p className="text-[10px] text-neutral-500 font-mono font-semibold mt-2 tracking-wide">
+              Phiên bản {CHD_VERSION_LABEL}
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
@@ -2351,6 +2354,17 @@ export default function App() {
                 </button>
               </div>
             )}
+
+            <div className={`pt-3 border-t border-slate-150 ${isSidebarExpanded ? '' : 'px-0.5'}`}>
+              <p
+                className="text-[9px] text-slate-400 font-mono font-semibold text-center leading-snug break-all"
+                title={CHD_VERSION_LABEL}
+              >
+                {isSidebarExpanded
+                  ? CHD_VERSION_LABEL
+                  : CHD_VERSION_LABEL.replace(/^CHD5\./, '5.')}
+              </p>
+            </div>
 
           </div>
         </aside>

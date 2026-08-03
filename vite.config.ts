@@ -5,12 +5,25 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import { APP_VERSION } from './src/appVersion';
 
+function localDevVersionLabel(): string {
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year')?.value ?? '2026';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
+  return `CHD5.${year}.${month}.${day}.dev`;
+}
+
 export default defineConfig(() => {
   const appBuildId =
+    process.env.BUILD_ID ||
     process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) ||
     process.env.GITHUB_SHA?.slice(0, 12) ||
-    process.env.BUILD_ID ||
-    'gsheets-v5';
+    localDevVersionLabel();
 
   return {
     define: {

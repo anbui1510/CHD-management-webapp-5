@@ -31,10 +31,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/ensure-cloudflare-push-setup.mjs
 
+      - name: Compute CHD5 version label
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/compute-chd-version.mjs --github-env
+
       - name: Build frontend + server bundle
         env:
           GITHUB_SHA: ${{ github.sha }}
-          BUILD_ID: ${{ github.sha }}
+          BUILD_ID: ${{ env.BUILD_ID }}
           VITE_GOOGLE_SCRIPT_URL: ${{ secrets.GOOGLE_SCRIPT_URL }}
           VITE_GOOGLE_SCRIPT_SECRET: ${{ secrets.GOOGLE_SCRIPT_SECRET }}
         run: npm run build
