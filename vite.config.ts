@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { execSync } from 'node:child_process';
 import {defineConfig} from 'vite';
 import { APP_VERSION } from './src/appVersion';
 
@@ -15,15 +16,21 @@ function localDevVersionLabel(): string {
   const year = parts.find((p) => p.type === 'year')?.value ?? '2026';
   const month = parts.find((p) => p.type === 'month')?.value ?? '01';
   const day = parts.find((p) => p.type === 'day')?.value ?? '01';
-  return `CHD5.${year}.${month}.${day}.dev`;
+  return `CHD5.${year}.${month}.${day}.001`;
+}
+
+function resolveAppBuildId(): string {
+  const fromEnv = String(process.env.BUILD_ID || '').trim();
+  if (fromEnv) return fromEnv;
+  try {
+    return execSync('node scripts/compute-chd-version.mjs', { encoding: 'utf8' }).trim();
+  } catch {
+    return localDevVersionLabel();
+  }
 }
 
 export default defineConfig(() => {
-  const appBuildId =
-    process.env.BUILD_ID ||
-    process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) ||
-    process.env.GITHUB_SHA?.slice(0, 12) ||
-    localDevVersionLabel();
+  const appBuildId = resolveAppBuildId();
 
   return {
     define: {

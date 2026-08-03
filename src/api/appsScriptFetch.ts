@@ -1086,11 +1086,34 @@ const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) =
   if (!keyFromPath) return jsonResponse({ error: 'Missing record key' }, { status: 400 });
 
   const key = decodeURIComponent(keyFromPath);
+
   if (!cache) {
-    await loadAllData();
+    try {
+      await loadAllData();
+    } catch {
+      // fall through — hydrate from persisted below
+    }
+  }
+  if (!cache) {
+    const persisted = await hydrateCacheFromPersisted();
+    if (persisted) cache = persisted;
+  }
+  if (!cache) {
+    const rawCached = await getPersistedData('all_data');
+    if (rawCached) {
+      cache = normalizeData(rawCached);
+    }
   }
 
-  const existing = findCachedRecord(endpoint, key, config);
+  let existing = findCachedRecord(endpoint, key, config);
+  if (!existing && cache) {
+    const collection = cache[config.collection] as any[];
+    existing = collection.find(item => {
+      const recordKey = String(getRecordKey(item, config) || '').trim();
+      const target = String(key).trim();
+      return recordKey === target || recordKey.toLowerCase() === target.toLowerCase();
+    });
+  }
   if (!existing) {
     return jsonResponse({ error: 'Record not found' }, { status: 404 });
   }

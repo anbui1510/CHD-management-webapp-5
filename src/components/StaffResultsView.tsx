@@ -508,17 +508,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
     if (uniqueKeys.length === 0) return;
 
-    onRemoveConsults?.(uniqueKeys);
-    if (!onRemoveConsults) {
-      uniqueKeys.forEach(key => onRemoveConsult?.(key));
-    }
-    setSelectedDeleteKeys(prev => {
-      const next = new Set(prev);
-      uniqueKeys.forEach(key => next.delete(key));
-      return next;
-    });
     setConfirmDeleteKeys(null);
     setDeletingKeys(prev => new Set([...prev, ...uniqueKeys]));
+
+    const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('CHD_AUTH_TOKEN') || '' : '';
 
     const results = await Promise.allSettled(
       uniqueKeys.map(async (key) => {
@@ -526,7 +519,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         const patient = consult ? findPatientByKey(patients, consult.PatientKey) : undefined;
         const res = await fetch(`/api/consults/${encodeURIComponent(key)}`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
           body: JSON.stringify(withSyncContext({}, buildSyncContext('results-staff', {
             patientName: patient?.PatientName,
             patientKey: consult?.PatientKey
@@ -537,8 +533,32 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           throw new Error(errText || `HTTP ${res.status}`);
         }
         reportMutationResponse(await res.json(), { baseMessage: 'Đã xóa đăng ký staff' });
+        return key;
       })
     );
+
+    const succeededKeys = results
+      .map((result, index) => (result.status === 'fulfilled' ? uniqueKeys[index] : null))
+      .filter((key): key is string => !!key);
+    const failedCount = uniqueKeys.length - succeededKeys.length;
+
+    if (succeededKeys.length > 0) {
+      onRemoveConsults?.(succeededKeys);
+      if (!onRemoveConsults) {
+        succeededKeys.forEach(key => onRemoveConsult?.(key));
+      }
+      setSelectedDeleteKeys(prev => {
+        const next = new Set(prev);
+        succeededKeys.forEach(key => next.delete(key));
+        return next;
+      });
+      if (selectedConsultKey && succeededKeys.includes(selectedConsultKey)) {
+        setSelectedConsultKey(null);
+      }
+      if (mobileDrawerKey && succeededKeys.includes(mobileDrawerKey)) {
+        setMobileDrawerKey(null);
+      }
+    }
 
     setDeletingKeys(prev => {
       const next = new Set(prev);
@@ -546,12 +566,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       return next;
     });
 
-    const failedCount = results.filter(r => r.status === 'rejected').length;
     if (failedCount > 0) {
       onRefreshData?.();
       triggerAlert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.`, MODAL_TITLE.warning);
     }
-  }, [consults, onRemoveConsult, onRemoveConsults, onRefreshData, patients, reportMutationResponse, triggerAlert]);
+  }, [consults, mobileDrawerKey, onRemoveConsult, onRemoveConsults, onRefreshData, patients, reportMutationResponse, selectedConsultKey, triggerAlert]);
 
   useEffect(() => {
     setSelectedDeleteKeys(new Set());

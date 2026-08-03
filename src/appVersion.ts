@@ -8,7 +8,7 @@ declare const __APP_BUILD_ID__: string | undefined;
 
 /** Build id baked into the current frontend bundle at compile time (CHD5.yyyy.mm.dd.NNN). */
 export const APP_BUILD_ID: string =
-  typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'CHD5.dev';
+  typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'CHD5.0000.00.00.001';
 
 /** Human-readable deploy label shown on login and sidebar. */
 export const CHD_VERSION_LABEL = APP_BUILD_ID;
