@@ -32,17 +32,24 @@ jobs:
         run: node scripts/ensure-cloudflare-push-setup.mjs
 
       - name: Compute CHD5 version label
+        id: chd_version
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/compute-chd-version.mjs --github-env
+        run: |
+          VERSION=$(node scripts/compute-chd-version.mjs)
+          echo "BUILD_ID=$VERSION" >> "$GITHUB_ENV"
+          echo "label=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Computed CHD5 version: $VERSION"
 
       - name: Build frontend + server bundle
         env:
           GITHUB_SHA: ${{ github.sha }}
-          BUILD_ID: ${{ env.BUILD_ID }}
+          BUILD_ID: ${{ steps.chd_version.outputs.label }}
           VITE_GOOGLE_SCRIPT_URL: ${{ secrets.GOOGLE_SCRIPT_URL }}
           VITE_GOOGLE_SCRIPT_SECRET: ${{ secrets.GOOGLE_SCRIPT_SECRET }}
-        run: npm run build
+        run: |
+          echo "Building with BUILD_ID=$BUILD_ID"
+          npm run build
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
