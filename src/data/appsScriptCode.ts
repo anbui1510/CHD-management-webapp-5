@@ -319,6 +319,35 @@ function sheetKeysMatch(cellValue, targetKey) {
   return left !== "" && right !== "" && left === right;
 }
 
+function resolveKeyColumnIndex(headers, type) {
+  var keyColumnName = getKeyColumnNameForType(type);
+  var idx = headers.indexOf(keyColumnName);
+  if (idx >= 0) return idx + 1;
+  var target = String(keyColumnName).trim().toLowerCase();
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i]).trim().toLowerCase() === target) {
+      return i + 1;
+    }
+  }
+  return 1;
+}
+
+function findRowIndexByKeyScanAllColumns(sheet, key) {
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return -1;
+  var numDataRows = lastRow - 1;
+  var rows = sheet.getRange(2, 1, numDataRows, lastCol).getValues();
+  for (var r = 0; r < rows.length; r++) {
+    for (var c = 0; c < rows[r].length; c++) {
+      if (sheetKeysMatch(rows[r][c], key)) {
+        return r + 2;
+      }
+    }
+  }
+  return -1;
+}
+
 function findRowIndexBySheetKey(sheet, keyColIndex, key) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return -1;
@@ -339,15 +368,12 @@ function writeRecordToSheet(type, action, key, record) {
   }
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var keyColumnName = getKeyColumnNameForType(type);
-  var keyColIndex = headers.indexOf(keyColumnName) + 1;
+  var keyColIndex = resolveKeyColumnIndex(headers, type);
 
-  if (keyColIndex === 0) {
-    keyColIndex = 1;
-  }
-
-  var lastRow = sheet.getLastRow();
   var foundRowIndex = findRowIndexBySheetKey(sheet, keyColIndex, key);
+  if (foundRowIndex === -1) {
+    foundRowIndex = findRowIndexByKeyScanAllColumns(sheet, key);
+  }
 
   var rowValues = [];
   for (var col = 0; col < headers.length; col++) {
@@ -393,21 +419,18 @@ function deleteRecordFromSheet(type, key) {
   }
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var keyColumnName = getKeyColumnNameForType(type);
-  var keyColIndex = headers.indexOf(keyColumnName) + 1;
+  var keyColIndex = resolveKeyColumnIndex(headers, type);
 
-  if (keyColIndex === 0) {
-    keyColIndex = 1;
-  }
-
-  var lastRow = sheet.getLastRow();
   var foundRowIndex = findRowIndexBySheetKey(sheet, keyColIndex, key);
+  if (foundRowIndex === -1) {
+    foundRowIndex = findRowIndexByKeyScanAllColumns(sheet, key);
+  }
 
   if (foundRowIndex !== -1) {
     sheet.deleteRow(foundRowIndex);
     return { status: "success", action: "deleted", key: key, rowIndex: foundRowIndex };
   }
-  return { status: "error", message: "Record not found to delete" };
+  return { status: "error", message: "Record not found to delete: " + type + " key=" + key };
 }
 
 // POST Requests - Inserts or Updates records
