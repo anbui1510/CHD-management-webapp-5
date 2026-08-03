@@ -504,12 +504,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     });
   }, []);
 
-  const isRemovedConsultRow = (consult: Consult) =>
-    consult.Removed === true
-    || String(consult.Removed).toUpperCase() === 'TRUE'
-    || String(consult.Removed).toLowerCase() === 'có'
-    || String(consult.Removed).toLowerCase() === 'yes';
-
   const parseDeleteErrorMessage = (raw: string, status: number): string => {
     const trimmed = String(raw || '').trim();
     if (!trimmed) return `HTTP ${status}`;
@@ -605,7 +599,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     if (!Array.isArray(consults)) return [];
     const seen = new Set<string>();
     return consults.filter(c => {
-      if (isRemovedConsultRow(c)) return false;
       if (!c.ConsultKey) return true;
       const k = String(c.ConsultKey).trim().toLowerCase();
       if (seen.has(k)) return false;

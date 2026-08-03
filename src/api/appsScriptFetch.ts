@@ -972,7 +972,9 @@ const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
   try {
     result = JSON.parse(text);
   } catch {
-    throw new Error('Apps Script trả về phản hồi không hợp lệ khi xóa');
+    throw new Error(
+      'Apps Script trả về phản hồi không hợp lệ khi xóa. Kiểm tra URL Web app và deploy lại Apps Script.'
+    );
   }
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể xóa dữ liệu');
@@ -980,23 +982,25 @@ const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
   return result;
 };
 
-const archiveConsultInScript = async (
-  config: (typeof endpointMap)['consults'],
-  existing: Record<string, unknown>,
-  finalKey: string
-) => {
-  const archived = {
-    ...existing,
-    Removed: true,
-    ConsultResultUpdatedTime: new Date().toISOString(),
-  };
-  await postToScript(
-    { type: 'Consult', action: 'update', key: finalKey, data: archived },
-    config,
-    archived,
-    false
-  );
-  return archived;
+const formatDeleteSheetError = (type: SheetType, key: string, message: string): string => {
+  const lower = message.toLowerCase();
+  if (lower.includes('not found')) {
+    return (
+      `Không tìm thấy ${type}Key "${key}" trên Google Sheets. ` +
+      'Dòng vẫn còn trên Sheet — kiểm tra cột khóa (vd. ConsultKey) khớp với app, ' +
+      'rồi deploy lại Apps Script (Extensions → Deploy → Web app mới).'
+    );
+  }
+  if (lower.includes('unknown action')) {
+    return 'Apps Script chưa có action delete — cần copy code mới từ app CHD và deploy lại Web app.';
+  }
+  if (lower.includes('unauthorized') || lower.includes('invalid or missing api key')) {
+    return 'API Key Google Sheets không khớp — kiểm tra GOOGLE_SCRIPT_SECRET trên Cloudflare và Script Properties.';
+  }
+  if (lower.includes('sheet not found')) {
+    return `Không tìm thấy tab "${type}" trên Google Sheets.`;
+  }
+  return message;
 };
 
 const appendNotificationIfMissingBridge = async (input: Notification): Promise<Notification | null> => {
@@ -1243,28 +1247,19 @@ const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) =
   const finalKey = String(getRecordKey(existing, config) || key);
 
   const scriptUrl = getScriptUrl();
-  if (scriptUrl) {
-    try {
-      await deleteFromScript({ type: config.type, key: finalKey });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Không thể xóa trên Google Sheets';
-      const canArchiveConsult = endpoint === 'consults' && existing;
-      if (canArchiveConsult) {
-        try {
-          await archiveConsultInScript(config, existing as Record<string, unknown>, finalKey);
-          deleteCachedRecord(config, finalKey);
-          return jsonResponse({
-            success: true,
-            archived: true,
-            [config.keyField]: finalKey,
-            message: 'Đã ẩn ca khỏi app (Removed=true) vì không xóa được dòng trên Google Sheets. Cập nhật Apps Script nếu cần xóa hẳn.',
-          });
-        } catch {
-          // fall through to hard error below
-        }
-      }
-      return jsonResponse({ error: message }, { status: 502 });
-    }
+  if (!scriptUrl) {
+    return jsonResponse(
+      { error: 'Chưa cấu hình Google Apps Script URL — không thể xóa trên Google Sheets.' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    await deleteFromScript({ type: config.type, key: finalKey });
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : 'Không thể xóa trên Google Sheets';
+    const message = formatDeleteSheetError(config.type, finalKey, raw);
+    return jsonResponse({ error: message, key: finalKey, type: config.type }, { status: 502 });
   }
 
   deleteCachedRecord(config, finalKey);
