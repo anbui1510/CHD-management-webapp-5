@@ -2012,7 +2012,7 @@ app.get('/api/push/status', requireAuth, (req, res) => {
   });
 });
 
-app.post('/api/push/subscribe', requireAuth, (req, res) => {
+app.post('/api/push/subscribe', requireAuth, async (req, res) => {
   const staffKey = String((req as any).staffKey || '').trim();
   const record = upsertPushSubscription(
     { readDB, writeDB, createUniqueKey, newTimestamp },
@@ -2024,7 +2024,73 @@ app.post('/api/push/subscribe', requireAuth, (req, res) => {
     res.status(400).json({ error: 'Thiếu endpoint hoặc keys push subscription' });
     return;
   }
-  res.status(201).json(record);
+
+  const testPayload = {
+    title: 'CHD Management',
+    body: 'Đã bật thông báo điện thoại thành công.',
+    url: '/?view=home',
+    notificationKey: `push_test_${Date.now()}`,
+  };
+  const testPush = await sendWebPushToStaff(
+    { readDB, writeDB, createUniqueKey, newTimestamp },
+    PUSH_SUBSCRIPTIONS_FILE,
+    staffKey,
+    testPayload
+  );
+
+  res.status(201).json({ ...record, testPush, subscribed: true });
+});
+
+app.post('/api/push/deliver', requireAuth, async (req, res) => {
+  const staffKey = String(req.body?.StaffKey || (req as any).staffKey || '').trim();
+  if (!staffKey) {
+    res.status(400).json({ error: 'Thiếu StaffKey' });
+    return;
+  }
+  const payload = {
+    title: String(req.body?.title || 'CHD Management'),
+    body: String(req.body?.body || 'Bạn có thông báo mới'),
+    url: String(req.body?.url || '/?view=home'),
+    notificationKey: String(req.body?.notificationKey || ''),
+  };
+  const result = await sendWebPushToStaff(
+    { readDB, writeDB, createUniqueKey, newTimestamp },
+    PUSH_SUBSCRIPTIONS_FILE,
+    staffKey,
+    payload
+  );
+  res.json({
+    ...result,
+    attempted: result.skipped ? 0 : undefined,
+    needsResubscribe: !result.skipped && result.sent === 0,
+  });
+});
+
+app.post('/api/push/test', requireAuth, async (req, res) => {
+  const staffKey = String(req.body?.StaffKey || (req as any).staffKey || '').trim();
+  if (!staffKey) {
+    res.status(400).json({ error: 'Thiếu StaffKey' });
+    return;
+  }
+  const payload = {
+    title: 'CHD Management — thử push',
+    body: 'Nếu bạn thấy thông báo này, push điện thoại đang hoạt động.',
+    url: '/?view=home',
+    notificationKey: `push_manual_test_${Date.now()}`,
+  };
+  const subscriptions = readDB<any[]>(PUSH_SUBSCRIPTIONS_FILE, [])
+    .filter(item => String(item.StaffKey) === staffKey);
+  const result = await sendWebPushToStaff(
+    { readDB, writeDB, createUniqueKey, newTimestamp },
+    PUSH_SUBSCRIPTIONS_FILE,
+    staffKey,
+    payload
+  );
+  res.json({
+    ...result,
+    attempted: subscriptions.length,
+    needsResubscribe: !result.skipped && subscriptions.length > 0 && result.sent === 0,
+  });
 });
 
 app.delete('/api/push/unsubscribe', requireAuth, (req, res) => {

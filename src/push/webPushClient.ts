@@ -73,6 +73,20 @@ export async function registerAppServiceWorker(): Promise<ServiceWorkerRegistrat
   return navigator.serviceWorker.register('/sw.js', { scope: '/' });
 }
 
+export async function getBrowserPushSubscription(): Promise<PushSubscription | null> {
+  if (!isPushSupported() || Notification.permission !== 'granted') return null;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    return registration.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+}
+
+export async function hasBrowserPushSubscription(): Promise<boolean> {
+  return !!(await getBrowserPushSubscription());
+}
+
 export async function getPushPermission(): Promise<NotificationPermission> {
   if (!isPushSupported()) return 'denied';
   return Notification.permission;
@@ -186,21 +200,25 @@ export async function unsubscribeFromWebPush(staffKey: string): Promise<void> {
   await subscription.unsubscribe();
 }
 
-export async function repairPushRegistration(staffKey: string): Promise<boolean> {
-  if (!isPushSupported() || Notification.permission !== 'granted') return false;
+export async function repairPushRegistration(staffKey: string): Promise<SubscribeWebPushResult> {
+  if (!isPushSupported() || Notification.permission !== 'granted') {
+    throw new Error('Chưa được phép gửi thông báo trên thiết bị này');
+  }
 
-  const registration = await navigator.serviceWorker.ready;
-  const existing = await registration.pushManager.getSubscription();
+  const existing = await getBrowserPushSubscription();
   if (existing) {
-    return syncExistingPushSubscription(staffKey);
+    const synced = await syncExistingPushSubscription(staffKey);
+    if (synced) {
+      return { subscription: existing };
+    }
   }
 
-  try {
-    const result = await subscribeToWebPush(staffKey);
-    return !!result.subscription;
-  } catch {
-    return false;
-  }
+  return subscribeToWebPush(staffKey);
+}
+
+export async function reregisterPushDevice(staffKey: string): Promise<SubscribeWebPushResult> {
+  await unsubscribeFromWebPush(staffKey).catch(() => undefined);
+  return subscribeToWebPush(staffKey);
 }
 
 export async function syncExistingPushSubscription(staffKey: string): Promise<boolean> {
@@ -227,20 +245,43 @@ export async function syncExistingPushSubscription(staffKey: string): Promise<bo
   return res.ok;
 }
 
-export async function fetchPushStatus(staffKey?: string): Promise<{ configured: boolean; subscribed: boolean; permission: NotificationPermission }> {
+export type PushStatusSnapshot = {
+  configured: boolean;
+  serverSubscribed: boolean;
+  browserSubscribed: boolean;
+  subscribed: boolean;
+  needsReregister: boolean;
+  permission: NotificationPermission;
+};
+
+export async function fetchPushStatus(staffKey?: string): Promise<PushStatusSnapshot> {
   const permission = isPushSupported() ? Notification.permission : 'denied';
+  const browserSubscribed = await hasBrowserPushSubscription();
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
   const staffQuery = staffKey ? `?staffKey=${encodeURIComponent(staffKey)}` : '';
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await pushNativeFetch(`/api/push/status${staffQuery}`, { headers });
   if (!res.ok) {
-    return { configured: false, subscribed: false, permission };
+    return {
+      configured: false,
+      serverSubscribed: false,
+      browserSubscribed,
+      subscribed: false,
+      needsReregister: false,
+      permission,
+    };
   }
   const data = await res.json() as { configured?: boolean; subscribed?: boolean };
+  const serverSubscribed = !!data.subscribed;
+  const subscribed = serverSubscribed && browserSubscribed;
+  const needsReregister = permission === 'granted' && serverSubscribed && !browserSubscribed;
   return {
     configured: !!data.configured,
-    subscribed: !!data.subscribed,
+    serverSubscribed,
+    browserSubscribed,
+    subscribed,
+    needsReregister,
     permission,
   };
 }
