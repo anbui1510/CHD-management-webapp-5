@@ -838,11 +838,20 @@ export default function App() {
       void applyAppUpdate();
     };
 
+    const onVisible = () => {
+      if (document.hidden) return;
+      void checkVersion();
+    };
+
     void checkVersion();
     const interval = setInterval(() => { void checkVersion(); }, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, [applyAppUpdate]);
 
@@ -2026,7 +2035,7 @@ export default function App() {
               HỆ THỐNG QUẢN LÝ TIM BẨM SINH<br />
               KHOA TIM MẠCH - BỆNH VIỆN NHI ĐỒNG THÀNH PHỐ
             </p>
-            <p className="text-[9px] text-neutral-600 font-semibold mt-1 tracking-wide">Mobile UI · build 2026-07-17</p>
+            <p className="text-[9px] text-neutral-600 font-semibold mt-1 tracking-wide">Mobile UI · build {APP_BUILD_ID}</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">

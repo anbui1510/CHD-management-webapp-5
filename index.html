@@ -51,6 +51,32 @@
           location.replace(clean);
           return;
         }
+
+        // Detect Cloudflare deploy while PWA still serves cached HTML/JS (build id was stuck as gsheets-v5).
+        var localBuildId = window.__CHD_APP_BUILD_ID;
+        if (localBuildId && localBuildId !== '__CHD_BUILD_ID__' && !sessionStorage.getItem('CHD_DEPLOY_RELOAD_AT')) {
+          fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+              var remoteBuildId = data && (data.buildId || data.buildTime);
+              if (!remoteBuildId || remoteBuildId === localBuildId) return;
+              if (sessionStorage.getItem('CHD_BUILD_MISMATCH_RELOAD')) return;
+              sessionStorage.setItem('CHD_BUILD_MISMATCH_RELOAD', '1');
+              sessionStorage.setItem('CHD_DEPLOY_RELOAD_AT', String(Date.now()));
+              if ('caches' in window) {
+                caches.keys().then(function (keys) {
+                  keys.forEach(function (key) { caches.delete(key); });
+                });
+              }
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                  regs.forEach(function (reg) { reg.unregister(); });
+                });
+              }
+              location.reload();
+            })
+            .catch(function () {});
+        }
       })();
       window.__CHD_showBootFallback = function (title, message) {
         var el = document.getElementById('boot-fallback');

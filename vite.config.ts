@@ -58,7 +58,9 @@ export default defineConfig(() => {
           type: 'module',
         },
         injectManifest: {
-          globPatterns: ['**/*.{js,css,html,svg,webmanifest,woff2}'],
+          // Do not precache index.html — always fetch fresh HTML so new JS bundle hashes load after deploy.
+          globPatterns: ['**/*.{js,css,svg,webmanifest,woff2}'],
+          globIgnores: ['**/index.html'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
       }),

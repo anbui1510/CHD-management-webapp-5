@@ -28,4 +28,11 @@ export async function setupServiceWorkerUpdates(): Promise<void> {
   });
 
   await registration.update().catch(() => undefined);
+
+  const refreshServiceWorker = () => {
+    if (document.hidden) return;
+    void registration.update().catch(() => undefined);
+  };
+  document.addEventListener('visibilitychange', refreshServiceWorker);
+  window.addEventListener('focus', refreshServiceWorker);
 }
