@@ -6,6 +6,7 @@ interface PushNotificationPromptProps {
   loading: boolean;
   configured?: boolean;
   error?: string;
+  warning?: string;
   isIosStandaloneHint?: boolean;
   onEnable: () => void;
   onDismiss: () => void;
@@ -16,6 +17,7 @@ export default function PushNotificationPrompt({
   loading,
   configured = true,
   error,
+  warning,
   isIosStandaloneHint,
   onEnable,
   onDismiss,
@@ -44,6 +46,9 @@ export default function PushNotificationPrompt({
             )}
             {error && (
               <p className="text-[11px] text-rose-700 mt-2 font-semibold">{error}</p>
+            )}
+            {!error && warning && (
+              <p className="text-[11px] text-amber-800 mt-2 font-semibold">{warning}</p>
             )}
             <div className="flex flex-wrap gap-2 mt-3">
               <button

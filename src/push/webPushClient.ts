@@ -72,14 +72,32 @@ export async function getPushPermission(): Promise<NotificationPermission> {
   return Notification.permission;
 }
 
-export async function subscribeToWebPush(staffKey: string): Promise<PushSubscription | null> {
-  if (!isPushSupported()) return null;
+export type SubscribeWebPushResult = {
+  subscription: PushSubscription | null;
+  testPushWarning?: string;
+};
+
+function formatSubscribeTestWarning(testPush?: PushDeliverResult): string {
+  if (!testPush) return '';
+  if (testPush.skipped) {
+    return 'Đã đăng ký thiết bị. Server chưa cấu hình VAPID — liên hệ quản trị.';
+  }
+  if ((testPush.sent || 0) > 0) return '';
+  const detail = testPush.errors?.[0];
+  if (detail) {
+    return `Đã đăng ký thiết bị. Push thử chưa tới (${detail}). Thu nhỏ app hoặc khóa màn hình rồi bấm "Gửi thử push" trong Hồ sơ.`;
+  }
+  return 'Đã đăng ký thiết bị. Push thử chưa tới — thu nhỏ app hoặc khóa màn hình rồi bấm "Gửi thử push" trong Hồ sơ.';
+}
+
+export async function subscribeToWebPush(staffKey: string): Promise<SubscribeWebPushResult> {
+  if (!isPushSupported()) return { subscription: null };
 
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return null;
+  if (permission !== 'granted') return { subscription: null };
 
   const registration = await registerAppServiceWorker();
-  if (!registration) return null;
+  if (!registration) return { subscription: null };
 
   await navigator.serviceWorker.ready;
 
@@ -88,53 +106,49 @@ export async function subscribeToWebPush(staffKey: string): Promise<PushSubscrip
     publicKey = await fetchVapidPublicKey();
   } catch (error) {
     console.warn('[web-push]', error);
-    return null;
+    return { subscription: null };
   }
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    let subscription = await registration.pushManager.getSubscription();
-    if (subscription) {
-      await subscription.unsubscribe().catch(() => undefined);
-    }
-
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
-
-    const json = subscription.toJSON();
-    const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-    const res = await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        StaffKey: staffKey,
-        endpoint: json.endpoint,
-        keys: json.keys,
-        UserAgent: navigator.userAgent,
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error('Không thể đăng ký thiết bị nhận thông báo');
-    }
-
-    const subscribeData = await res.json().catch(() => ({})) as {
-      testPush?: { sent?: number; needsResubscribe?: boolean; errors?: string[] };
-    };
-    if (subscribeData.testPush?.needsResubscribe) {
-      await subscription.unsubscribe().catch(() => undefined);
-      if (attempt === 0) continue;
-      throw new Error('Thiết bị chưa nhận được push thử. Hãy tắt/bật lại thông báo sau khi deploy server mới.');
-    }
-
-    return subscription;
+  let subscription = await registration.pushManager.getSubscription();
+  if (subscription) {
+    await subscription.unsubscribe().catch(() => undefined);
   }
 
-  return null;
+  subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
+
+  const json = subscription.toJSON();
+  const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
+  const res = await fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      StaffKey: staffKey,
+      endpoint: json.endpoint,
+      keys: json.keys,
+      UserAgent: navigator.userAgent,
+    }),
+  });
+
+  if (!res.ok) {
+    await subscription.unsubscribe().catch(() => undefined);
+    throw new Error('Không thể đăng ký thiết bị nhận thông báo');
+  }
+
+  const subscribeData = await res.json().catch(() => ({})) as {
+    subscribed?: boolean;
+    testPush?: PushDeliverResult;
+  };
+
+  return {
+    subscription,
+    testPushWarning: formatSubscribeTestWarning(subscribeData.testPush),
+  };
 }
 
 export async function unsubscribeFromWebPush(staffKey: string): Promise<void> {
@@ -233,7 +247,7 @@ export function formatPushDeliverIssue(result: PushDeliverResult): string {
     return 'Chưa đăng ký thiết bị nào. Hãy bấm Bật thông báo lại.';
   }
   if (result.needsResubscribe) {
-    return 'Thiết bị đăng ký cũ đã hết hạn (thường do cập nhật server). Hãy Tắt rồi Bật lại thông báo.';
+    return 'Đăng ký push đã hết hạn (thường sau deploy server mới). Hãy Tắt rồi Bật lại thông báo trong Hồ sơ.';
   }
   if ((result.sent || 0) === 0) {
     return result.errors?.[0] || 'Không gửi được push tới thiết bị.';

@@ -20,6 +20,7 @@ export function useWebPush(staffKey?: string) {
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
 
   const refreshStatus = useCallback(async () => {
@@ -71,9 +72,10 @@ export function useWebPush(staffKey?: string) {
     if (!staffKey) return false;
     setLoading(true);
     setError('');
+    setWarning('');
     try {
-      const subscription = await subscribeToWebPush(staffKey);
-      if (!subscription) {
+      const result = await subscribeToWebPush(staffKey);
+      if (!result.subscription) {
         setPermission(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
         if (Notification.permission === 'denied') {
           setError('Trình duyệt đã chặn thông báo. Hãy bật lại trong Cài đặt.');
@@ -82,6 +84,9 @@ export function useWebPush(staffKey?: string) {
       }
       setPermission('granted');
       await refreshStatus();
+      if (result.testPushWarning) {
+        setWarning(result.testPushWarning);
+      }
       setShowPrompt(false);
       return true;
     } catch (err) {
@@ -96,6 +101,7 @@ export function useWebPush(staffKey?: string) {
     if (!staffKey) return;
     setLoading(true);
     setError('');
+    setWarning('');
     try {
       await unsubscribeFromWebPush(staffKey);
       await refreshStatus();
@@ -110,6 +116,7 @@ export function useWebPush(staffKey?: string) {
     if (!staffKey) return false;
     setLoading(true);
     setError('');
+    setWarning('');
     try {
       const result = await sendTestPush(staffKey);
       const issue = formatPushDeliverIssue(result);
@@ -121,6 +128,7 @@ export function useWebPush(staffKey?: string) {
         return false;
       }
       setError('');
+      setWarning('');
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không gửi được push thử');
@@ -150,6 +158,7 @@ export function useWebPush(staffKey?: string) {
     permission,
     loading,
     error,
+    warning,
     showPrompt,
     enablePush,
     disablePush,
