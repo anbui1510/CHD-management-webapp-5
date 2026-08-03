@@ -1,6 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import html2canvas from 'html2canvas';
-import { toBlob as htmlToImageBlob } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder, restoreWeightFromDate } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
@@ -16,7 +14,7 @@ import {
   type ScheduleDelayWarningInfo,
 } from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
-import { VNDateInput } from './VNDateInput';
+import { ConsultSummaryModal } from './ConsultSummaryModal';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceConsultResultOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
@@ -29,10 +27,8 @@ import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMuta
 import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
 import {
   WORKFLOW_INFO_NOTIFY_TITLE,
-  SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER,
   buildOverrideSchedulingConsultNote,
   buildOverrideSchedulingScar,
-  buildSchedulingSummaryHeader,
 } from '../utils/workflowMessages';
 import { 
   ClipboardList, 
@@ -667,10 +663,6 @@ export default function CathLabSchedulerView({
 
   // Summary copyable modal states
   const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [copiedImage, setCopiedImage] = useState(false);
-  const [copiedImageType, setCopiedImageType] = useState<'clipboard' | 'download' | 'share'>('clipboard');
-  const [isCopyingImage, setIsCopyingImage] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [smsMessage, setSmsMessage] = useState('');
   const [smsCopied, setSmsCopied] = useState(false);
@@ -5026,503 +5018,41 @@ Xin cảm ơn!`;
       )}
 
       {/* TÓM TẮT DIALOG MODAL */}
-      {showSummaryModal && selectedConsult && (
-        <div className={`fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex animate-in fade-in duration-200 ${isMobile ? 'items-stretch p-0' : 'items-center justify-center p-4'}`}>
-          {(() => {
-            const pat = findPatientByKey(patients, selectedConsult.PatientKey);
-            if (!pat) return null;
-            
-            const ptvPhu1Display = resolvePtvPhu1Display(
-              selectedConsult.RequestBy || '',
-              selectedConsult.Scheduled2ndInterventionist,
-              scheduled2nd
-            );
-
-            const summaryDetailConsultResult = (schedDetailConsultResult || selectedConsult.DetailConsultResult || '').trim() || '—';
-            const formatSummaryWeight = (value?: string) =>
-              value ? restoreWeightFromDate(value) + (String(value).includes('kg') ? '' : ' kg') : '—';
-            const formatSummaryHeight = (value?: string) =>
-              value ? restoreWeightFromDate(value) + (String(value).includes('cm') ? '' : ' cm') : '—';
-
-            const generateTextSummary = (pObj: Patient, cObj: Consult) => {
-              const weightDisplay = formatSummaryWeight(selectedConsult?.PatientWeight);
-              const heightDisplay = formatSummaryHeight(selectedConsult?.PatientHeight);
-              const ageDesc = getPatientAgeDescription(pObj.PatientDOB) || '—';
-              const addressDisplay = pObj.PatientAddress || (pObj as any).PatientAddress || '';
-              const phoneList = [pObj.PatientPhone1, pObj.PatientPhone2].filter(Boolean).join(' | ');
-              const ptvList = [scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean);
-              const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : 'Chưa gán';
-
-              return `${buildSchedulingSummaryHeader(formatPatientWithPtvPhu(pObj.PatientName.toUpperCase(), ptvPhu1Display).toUpperCase())}\n` +
-                `-----------------------------------\n` +
-                `👤 *HÀNH CHÍNH BỆNH NHÂN:*\n` +
-                `- Họ và tên bệnh nhân: ${pObj.PatientName.toUpperCase()} (${pObj.PatientSex}, ${ageDesc})\n` +
-                (pObj.OtherPatientName && String(pObj.OtherPatientName).trim() !== '' && pObj.OtherPatientName !== '-' ? `- Họ và tên khác: ${pObj.OtherPatientName.toUpperCase()}\n` : '') +
-                `- Mã bệnh nhân (ID1): ${pObj.PatientID1}\n` +
-                (pObj.PatientID2 && String(pObj.PatientID2).trim() !== '' && pObj.PatientID2 !== '-' ? `- Mã NB khác (ID2): ${pObj.PatientID2}\n` : '') +
-                `- Số điện thoại liên hệ: ${phoneList || '—'}\n` +
-                `- Địa chỉ thường trú: ${addressDisplay}\n` +
-                `- Chỉ số bé: ${weightDisplay} / ${heightDisplay}\n\n` +
-                `🩺 *ĐĂNG KÝ HỘI CHẨN & CHẨN ĐOÁN:*\n` +
-                `- Ngày staff hội chẩn: ${formatVNTime(cObj.ConsultDate)}\n` +
-                `- Người đăng ký hội chẩn: ${cObj.RequestBy || '—'}\n` +
-                `- Chẩn đoán chi tiết: ${cObj.DetailDiagnosis || cObj.DiagnosisID || '—'}\n` +
-                `- Kết quả staff chi tiết: ${summaryDetailConsultResult}\n\n` +
-                `🛠 *CHUẨN BỊ DỤNG CỤ:*\n` +
-                `- Kiểm dụng cụ: ${checkDevice || 'Chưa kiểm'}\n` +
-                `- Dụng cụ dự kiến: ${plannedDevice || '—'}\n` +
-                `- Số tiền dự kiến: ${plannedPrice ? `${plannedPrice} VNĐ` : '—'}\n` +
-                `- Ghi chú từ Phòng Vật tư: ${supplyDepFeedback || 'Không'}\n` +
-                `- Ghi chú từ Phòng Mổ: ${operationFeedback || 'Không'}\n\n` +
-                `${SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER}\n` +
-                `- Lịch thông tim chính thức: ${plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}\n` +
-                `- Trạng thái gọi bệnh nhân: ${callStatus || 'Chưa liên hệ'}\n` +
-                `- Mức độ ưu tiên gọi bệnh: ${priorityOrder}\n` +
-                `- PTV: ${ptvString}\n` +
-                `- Lưu ý/ghi chú gọi bệnh: ${callNote || 'Không'}\n`;
-            };
-
-            const handleCopy = () => {
-              const text = generateTextSummary(pat, selectedConsult);
-              navigator.clipboard.writeText(text);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            };
-
-            const buildSummaryImageFileName = (pObj: Patient) => {
-              const patientId = String(pObj.PatientID1 || 'Unknown').trim();
-              const nameSlug = removeDiacritics(String(pObj.PatientName || '')).replace(/\s+/g, '');
-              return `${patientId}_${nameSlug}.png`;
-            };
-
-            const handleCopyImage = async () => {
-              const el = document.getElementById('screenshot-summary-card');
-              if (!el) return;
-              setIsCopyingImage(true);
-
-              const handleBlobResult = async (blob: Blob, sourceCanvas?: HTMLCanvasElement) => {
-                const fileName = isMobile
-                  ? buildSummaryImageFileName(pat)
-                  : `TomTatXepLich_${pat.PatientID1 || pat.PatientName}.png`;
-
-                if (isMobile && typeof navigator.share === 'function') {
-                  try {
-                    const file = new File([blob], fileName, { type: blob.type || 'image/png' });
-                    if (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] })) {
-                      await navigator.share({
-                        files: [file],
-                        title: 'Tóm tắt xếp lịch',
-                      });
-                      setCopiedImageType('share');
-                      setCopiedImage(true);
-                      setTimeout(() => setCopiedImage(false), 2550);
-                      return true;
-                    }
-                  } catch (shareErr: any) {
-                    if (shareErr?.name === 'AbortError') return true;
-                    console.warn('Web Share failed:', shareErr);
-                  }
-                }
-
-                try {
-                  if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') {
-                    throw new Error('Trình duyệt không hỗ trợ sao chép ảnh trực tiếp.');
-                  }
-                  await navigator.clipboard.write([
-                    new ClipboardItem({
-                      [blob.type]: blob
-                    })
-                  ]);
-                  setCopiedImageType('clipboard');
-                  setCopiedImage(true);
-                  setTimeout(() => setCopiedImage(false), 2550);
-                  return true;
-                } catch (clipboardErr) {
-                  console.warn('Clipboard write failed, falling back to download:', clipboardErr);
-                  if (isMobile) {
-                    throw new Error('Không thể chia sẻ ảnh. Hãy chụp màn hình trực tiếp trên khung tóm tắt bên trên.');
-                  }
-                  const link = document.createElement('a');
-                  link.download = fileName;
-                  
-                  if (sourceCanvas) {
-                    link.href = sourceCanvas.toDataURL('image/png');
-                  } else {
-                    link.href = URL.createObjectURL(blob);
-                  }
-                  
-                  link.click();
-                  if (!sourceCanvas) {
-                    setTimeout(() => URL.revokeObjectURL(link.href), 100);
-                  }
-
-                  setCopiedImageType('download');
-                  setCopiedImage(true);
-                  setTimeout(() => setCopiedImage(false), 2550);
-                  return true;
-                }
-              };
-
-              try {
-                // Try html-to-image first
-                try {
-                  console.log('Attempting to render using html-to-image...');
-                  const blob = await htmlToImageBlob(el, {
-                    backgroundColor: '#ffffff',
-                    style: {
-                      transform: 'scale(1)',
-                      transformOrigin: 'top left',
-                    },
-                    pixelRatio: 2,
-                    cacheBust: true,
-                  });
-                  if (blob) {
-                    await handleBlobResult(blob);
-                    return;
-                  }
-                  throw new Error('html-to-image returned empty blob');
-                } catch (htmlToImageErr) {
-                  console.warn('html-to-image failed, falling back to html2canvas:', htmlToImageErr);
-                  
-                  // Fallback to html2canvas
-                  const html2canvasFn = typeof html2canvas === 'function' ? html2canvas : (html2canvas as any).default;
-                  if (typeof html2canvasFn !== 'function') {
-                    throw new Error('Thư viện chụp ảnh (html2canvas) chưa được tải đúng cách.');
-                  }
-                  const canvas = await html2canvasFn(el, {
-                    backgroundColor: '#ffffff',
-                    scale: 2,
-                    logging: false,
-                    useCORS: true
-                  });
-                  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-                  if (blob) {
-                    await handleBlobResult(blob, canvas);
-                    return;
-                  }
-                  throw new Error('html2canvas returned empty blob');
-                }
-              } catch (err: any) {
-                console.error('Error copying image: ', err);
-                setActionAlert(`Không thể tạo ảnh: ${err.message || String(err)}`);
-              } finally {
-                setIsCopyingImage(false);
-              }
-            };
-
-            return (
-              <div className={`bg-slate-50/95 backdrop-blur-md w-full shadow-2xl border border-slate-250 flex flex-col font-sans text-xs animate-in zoom-in-95 duration-200 ${isMobile ? 'max-h-[100dvh] rounded-none max-w-none' : 'max-w-3xl max-h-[95vh] rounded-3xl'}`}>
-                {/* Header block of Modal */}
-                <div className={`border-b border-slate-200 bg-white flex items-center justify-between text-[#d2145a] shrink-0 ${isMobile ? 'p-3 rounded-none' : 'p-4 rounded-t-3xl'}`}>
-                  <div className="flex items-center gap-2">
-                    <div className="bg-emerald-50 text-emerald-600 rounded-xl p-2">
-                      <Clipboard className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-xs uppercase tracking-wider leading-tight">
-                        Tóm tắt thông tin xếp lịch
-                      </h3>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">Dành cho copy / chụp ảnh màn hình gửi nhóm zalo</p>
-                    </div>
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={() => setShowSummaryModal(false)}
-                    className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1.5 hover:bg-slate-100 rounded-xl outline-none"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Content printable/screenshot card with solid rigid constraints */}
-                <div className={`overflow-y-auto shrink min-h-0 ${isMobile ? 'p-2' : 'p-4 shrink-0'}`}>
-                  <div id="screenshot-summary-card" className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full select-text ${isMobile ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-5 space-y-3.5 shrink-0'}`}>
-
-                    {isMobile && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-start gap-2 text-[9px] font-semibold text-slate-600 leading-tight">
-                          <span>Khoa Tim Mạch</span>
-                          <span className="text-right">Bệnh viện Nhi Đồng Thành Phố</span>
-                        </div>
-                        <h2 className="text-center font-black text-[13px] uppercase tracking-wide text-slate-900">
-                          HỒ SƠ CAN THIỆP
-                        </h2>
-                        <div className="h-1" />
-                      </div>
-                    )}
-                    
-                    {/* Header of summary */}
-                    <div className={isMobile ? '' : 'border-b-2 border-slate-800 flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}>
-                      <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
-                        {formatPatientWithPtvPhu(pat.PatientName, ptvPhu1Display)}
-                      </div>
-                    </div>
-
-                    {/* Box 1: THÔNG TIN HÀNH CHÍNH */}
-                    <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${isMobile ? 'p-2' : 'p-3.5'}`}>
-                      <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1">
-                        THÔNG TIN HÀNH CHÍNH
-                      </span>
-                      {renderPatientAdminInfo(pat, 'print')}
-                    </div>
-
-                    {/* Box 2: THÔNG TIN ĐÃ ĐĂNG KÝ HỘI CHẨN */}
-                    <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${isMobile ? 'p-2' : 'p-3.5'}`}>
-                      <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider block border-b border-slate-200 pb-1">
-                        THÔNG TIN ĐĂNG KÝ HỘI CHẨN
-                      </span>
-                      {isMobile ? (
-                        <div className="grid grid-cols-4 gap-x-1 gap-y-1 pb-1 text-[9px]">
-                          <div className="min-w-0">
-                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">Ngày staff:</span>
-                            <span className="font-bold text-slate-800 font-mono text-[10px] leading-tight">{formatVNTime(selectedConsult.ConsultDate)}</span>
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">BS đăng ký:</span>
-                            <span className="font-extrabold text-slate-800 text-[10px] leading-tight break-words">{selectedConsult.RequestBy || '—'}</span>
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">Cân nặng:</span>
-                            <span className="font-extrabold text-slate-800 font-mono text-[10px] leading-tight">{formatSummaryWeight(selectedConsult.PatientWeight)}</span>
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-slate-400 block font-bold text-[7.5px] uppercase tracking-wider leading-tight">Chiều cao:</span>
-                            <span className="font-semibold text-slate-700 font-mono text-[10px] leading-tight">{formatSummaryHeight(selectedConsult.PatientHeight)}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 pb-1 text-[12px]">
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Ngày staff:</span>
-                            <span className="font-bold text-slate-800 font-mono text-[12.5px]">{formatVNTime(selectedConsult.ConsultDate)}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Người đăng ký:</span>
-                            <span className="font-extrabold text-slate-800 text-[12.5px]">{selectedConsult.RequestBy || '—'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Cân nặng:</span>
-                            <span className="font-extrabold text-slate-800 font-mono text-[12.5px]">{formatSummaryWeight(selectedConsult.PatientWeight)}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider">Chiều cao:</span>
-                            <span className="font-semibold text-slate-700 font-mono text-[12.5px]">{formatSummaryHeight(selectedConsult.PatientHeight)}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 pt-1.5 border-t border-slate-100 ${isMobile ? 'gap-2' : ''}`}>
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider mb-1">Chẩn đoán chi tiết:</span>
-                          <div className={`border border-slate-200 rounded-xl px-2.5 py-1.5 bg-slate-50 font-bold text-slate-800 leading-relaxed shadow-3xs flex items-center ${isMobile ? 'text-[10px] min-h-[30px]' : 'text-[11.5px] min-h-[38px]'}`}>
-                            {selectedConsult.DetailDiagnosis || selectedConsult.DiagnosisID || '—'}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block font-bold text-[9px] uppercase tracking-wider mb-1">Kết quả staff chi tiết:</span>
-                          <div className={`border border-slate-200 rounded-xl px-2.5 py-1.5 bg-indigo-50/30 text-indigo-950 font-bold leading-relaxed shadow-3xs flex items-center ${isMobile ? 'text-[10px] min-h-[30px]' : 'text-[11.5px] min-h-[38px]'}`}>
-                            {summaryDetailConsultResult}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Box 3 & 4 Grid: Left column Chuẩn bị dụng cụ / Right column Kết quả xếp lịch - Side by Side to save massive vertical space! */}
-                    <div className={`grid grid-cols-1 sm:grid-cols-2 ${isMobile ? 'gap-2' : 'gap-3.5'}`}>
-                      
-                      {/* Box 3: CHUẨN BỊ DỤNG CỤ */}
-                      <div className={`bg-white border border-slate-700 rounded-xl space-y-2.5 flex flex-col justify-between ${isMobile ? 'p-2' : 'p-3.5'}`}>
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-rose-600 tracking-wider block border-b border-slate-200 pb-1 mb-1">
-                            CHUẨN BỊ DỤNG CỤ VẬT TƯ
-                          </span>
-                          
-                          <div className="space-y-1.5 text-[12.5px]">
-                            {isMobile ? (
-                              <div className="flex justify-between items-center gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-1 min-w-0 flex-1">
-                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider shrink-0 leading-tight">Kiểm dụng cụ:</span>
-                                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase leading-tight ${
-                                    checkDevice === 'Đủ'
-                                      ? 'bg-emerald-100 text-emerald-850 border border-emerald-200'
-                                      : checkDevice === 'Thiếu'
-                                        ? 'bg-rose-100 text-rose-850 border border-rose-200'
-                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                  }`}>
-                                    {checkDevice || 'Chưa kiểm'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1 min-w-0 flex-1 justify-end text-right">
-                                  <span className="text-slate-400 font-bold text-[7.5px] uppercase tracking-wider shrink-0 leading-tight">Số tiền dự kiến:</span>
-                                  <span className="font-black text-rose-650 font-mono text-[10px] leading-tight">{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex justify-between items-center bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                                  <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Kiểm dụng cụ:</span>
-                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                                    checkDevice === 'Đủ'
-                                      ? 'bg-emerald-100 text-emerald-850 border border-emerald-200'
-                                      : checkDevice === 'Thiếu'
-                                        ? 'bg-rose-100 text-rose-850 border border-rose-200'
-                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                  }`}>
-                                    {checkDevice || 'Chưa kiểm'}
-                                  </span>
-                                </div>
-                              </>
-                            )}
-                            
-                            <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
-                              <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0">Dụng cụ dự kiến:</span>
-                              <span className="font-extrabold text-slate-800 text-[12.5px] text-right break-words max-w-[70%]">{plannedDevice || '—'}</span>
-                            </div>
-
-                            {!isMobile && (
-                              <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
-                                <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider">Số tiền dự kiến:</span>
-                                <span className="font-black text-rose-650 font-mono text-[12.5px]">{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
-                              </div>
-                            )}
-
-                            {(supplyDepFeedback || operationFeedback) && (
-                              <div className={`bg-amber-50/20 border border-amber-200 p-1.5 rounded-lg text-[10px] text-amber-900 font-semibold leading-normal mt-1 ${isMobile ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
-                                <span className="block font-black text-[8px] uppercase tracking-wider text-amber-800">Liên khoa phản hồi:</span>
-                                {[supplyDepFeedback, operationFeedback].filter(Boolean).join(' | ')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Box 4: KẾT QUẢ XẾP LỊCH CAN THIỆP */}
-                      <div className={`bg-white border border-slate-700 rounded-xl space-y-2.5 flex flex-col justify-between ${isMobile ? 'p-2' : 'p-3.5'}`}>
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block border-b border-slate-200 pb-1 mb-1">
-                            KẾT QUẢ XẾP LỊCH CAN THIỆP
-                          </span>
-                          
-                          <div className="space-y-1.5 text-[12.5px]">
-                            {isMobile ? (
-                              <div className="flex justify-between items-center gap-1.5 bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-1 min-w-0 flex-1">
-                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase shrink-0 leading-tight">Lịch can thiệp dự kiến:</span>
-                                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black border uppercase leading-tight ${
-                                    plannedCathLabDate
-                                      ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
-                                      : 'bg-rose-100 border-rose-300 text-rose-850'
-                                  }`}>
-                                    {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1 min-w-0 flex-1 justify-end text-right">
-                                  <span className="text-slate-400 font-bold text-[7.5px] tracking-wider uppercase shrink-0 leading-tight">Trạng thái gọi:</span>
-                                  <span className="font-bold text-slate-800 text-[10px] leading-tight">{callStatus || '—'}</span>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex justify-between items-center bg-slate-50 p-1 px-2 rounded-lg border border-slate-100">
-                                  <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Lịch can thiệp:</span>
-                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border uppercase ${
-                                    plannedCathLabDate
-                                      ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
-                                      : 'bg-rose-100 border-rose-300 text-rose-850'
-                                  }`}>
-                                    {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
-                                  </span>
-                                </div>
-
-                                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 pt-0.5 px-1">
-                                  <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase">Trạng thái gọi:</span>
-                                  <span className="font-bold text-slate-800 text-[12.5px]">{callStatus || '—'}</span>
-                                </div>
-                              </>
-                            )}
-
-                            <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
-                              <span className="text-[#d2145a] font-black text-[9px] tracking-wider uppercase shrink-0">PTV:</span>
-                              <span className="font-extrabold text-slate-850 uppercase text-[12.5px] text-right break-words max-w-[75%]">
-                                {[scheduled1st, scheduled2nd, scheduled3rd].filter(Boolean).join(' - ') || 'Chưa gán'}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-start gap-2 pt-0.5 px-1">
-                              <span className="text-slate-400 font-bold text-[9px] tracking-wider uppercase shrink-0">Lưu ý / Ưu tiên:</span>
-                              <span className="font-bold text-slate-800 text-[11.5px] text-right break-words max-w-[70%]" title={callNote ? `${priorityOrder} (${callNote})` : priorityOrder}>
-                                {callNote ? `${priorityOrder} (${callNote})` : priorityOrder}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-
-                  </div>
-                </div>
-
-                {/* Footer block of Modal */}
-                <div className={`border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 ${isMobile ? 'p-3 rounded-none' : 'p-4 rounded-b-3xl'}`}>
-                  <span className="text-[9.5px] text-slate-400 font-semibold italic text-center sm:text-left leading-normal">
-                    {isMobile
-                      ? 'Bấm Lưu ảnh để mở menu chia sẻ và chọn Lưu vào Ảnh, hoặc chụp màn hình trực tiếp trên khung tóm tắt.'
-                      : 'Mẹo: Bấm Sao chép hình ảnh rồi dùng Ctrl+V dán trực tiếp gửi nhóm Zalo vô cùng nhanh chóng!'}
-                  </span>
-                  
-                  <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setShowSummaryModal(false)}
-                      className="px-4 py-2 border border-slate-200 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer"
-                    >
-                      Đóng
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isCopyingImage}
-                      onClick={handleCopyImage}
-                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none disabled:opacity-50 ${
-                        copiedImage ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-800 hover:bg-slate-900'
-                      }`}
-                    >
-                      {isCopyingImage ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></div>
-                          <span>Đang tạo ảnh...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-3.5 h-3.5 shrink-0" />
-                          <span>{copiedImage
-                            ? (copiedImageType === 'share'
-                              ? 'Đã mở menu lưu!'
-                              : copiedImageType === 'download'
-                                ? 'Đã tải ảnh về!'
-                                : 'Đã copy ảnh!')
-                            : (isMobile ? 'Lưu ảnh' : 'Sao chép Hình ảnh')}</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCopy}
-                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none ${
-                        copied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#d2145a] hover:bg-pink-700'
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5 shrink-0" />
-                      {copied ? 'Đã Copy text!' : 'Sao chép Tin nhắn'}
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            );
-          })()}
-        </div>
-      )}
+      {showSummaryModal && selectedConsult && (() => {
+        const pat = findPatientByKey(patients, selectedConsult.PatientKey);
+        if (!pat) return null;
+        return (
+          <ConsultSummaryModal
+            patient={pat}
+            consult={selectedConsult}
+            consultOverride={{
+              ConsultDate: schedConsultDate || selectedConsult.ConsultDate,
+              RequestBy: schedRequestBy || selectedConsult.RequestBy,
+              PatientWeight: schedPatientWeight || selectedConsult.PatientWeight,
+              PatientHeight: schedPatientHeight || selectedConsult.PatientHeight,
+              DiagnosisID: schedDiagnosisID || selectedConsult.DiagnosisID,
+              DetailDiagnosis: schedDetailDiagnosis || selectedConsult.DetailDiagnosis,
+              ConsultResultID: schedConsultResultID || selectedConsult.ConsultResultID,
+              DetailConsultResult: schedDetailConsultResult || selectedConsult.DetailConsultResult,
+              PlannedDevice: plannedDevice,
+              PlannedPrice: plannedPrice,
+              CheckDevice: checkDevice,
+              OperationFeedback: operationFeedback,
+              SupplyDepFeedback: supplyDepFeedback,
+              CallStatus: callStatus,
+              CallNote: callNote,
+              PriorityOrder: priorityOrder,
+              PlannedCathLabDate: plannedCathLabDate,
+              Scheduled1stInterventionist: scheduled1st,
+              Scheduled2ndInterventionist: scheduled2nd,
+              Scheduled3rdInterventionist: scheduled3rd,
+            }}
+            onClose={() => setShowSummaryModal(false)}
+            onError={(msg) => setActionAlert(msg)}
+            zIndexClass="z-[60]"
+          />
+        );
+      })()}
 
       {/* SMS MESSAGE MODAL */}
       {showSmsModal && selectedConsult && (

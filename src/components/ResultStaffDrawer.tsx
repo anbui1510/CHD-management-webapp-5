@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { AnimatePresence } from 'motion/react';
-import { AlertTriangle, ClipboardList, Stethoscope } from 'lucide-react';
+import { AlertTriangle, Clipboard, ClipboardList, Stethoscope, X } from 'lucide-react';
 import {
   Consult,
   ConsultResultEnum,
@@ -29,6 +29,7 @@ import { MODAL_TITLE } from '../utils/modalTitles';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
 import { useMobileKeyboardInset } from '../hooks/useMobileKeyboardInset';
+import { ConsultSummaryModal } from './ConsultSummaryModal';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -143,6 +144,7 @@ export default function ResultStaffDrawer({
   const [exitConfirmError, setExitConfirmError] = useState('');
   const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
   const conclusionOptions = useMemo(() => getSourceConsultResultOptions(sources), [sources]);
 
@@ -315,8 +317,25 @@ export default function ResultStaffDrawer({
 
   if (!consultKey || !consult || !patient || !formData) return null;
 
+  const summaryConsultOverride: Partial<Consult> = {
+    ConsultResultID: (formData.ConsultResultID || consult.ConsultResultID) as Consult['ConsultResultID'],
+    DetailConsultResult: formData.DetailConsultResult,
+    PlannedDevice: formData.PlannedDevice,
+    PlannedPrice: formData.PlannedPrice,
+    CheckDevice: formData.CheckDevice,
+    PatientWeight: formData.PatientWeight,
+    PatientHeight: formData.PatientHeight,
+    ConsultType: formData.ConsultType,
+    ConsultDate: formData.ConsultDate,
+    RequestBy: formData.RequestBy,
+    DiagnosisID: formData.DiagnosisID,
+    DetailDiagnosis: formData.DetailDiagnosis,
+    ConsultMember: formData.ConsultMember,
+    PriorityOrder: formData.PriorityOrder,
+  };
+
   const drawerHeader = (
-    <div className="bg-[#d2145a] text-white px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between shadow-sm shrink-0">
+    <div className="bg-[#d2145a] text-white px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
       <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
         <Stethoscope className="w-5 h-5 text-white shrink-0" />
         <span className="truncate">Điền kết quả staff</span>
@@ -324,9 +343,10 @@ export default function ResultStaffDrawer({
       <button
         type="button"
         onClick={requestClose}
-        className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors font-bold text-lg leading-none shrink-0"
+        className="text-white hover:bg-white/10 p-2 rounded-full transition-colors shrink-0"
+        aria-label="Đóng"
       >
-        ✕
+        <X className="w-5 h-5" />
       </button>
     </div>
   );
@@ -700,7 +720,15 @@ export default function ResultStaffDrawer({
                 </div>
 
                       {/* Action buttons area — sticky footer */}
-                      <div className="pt-2 border-t border-slate-100 flex justify-end gap-3 shrink-0 px-4 md:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white">
+                      <div className="pt-2 border-t border-slate-100 flex flex-col gap-2 shrink-0 px-4 md:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => setShowSummaryModal(true)}
+                          className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-2.5 px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-2 text-[11px]"
+                        >
+                          <Clipboard className="w-4 h-4 shrink-0" />
+                          Tóm tắt &amp; copy ảnh
+                        </button>
                         {!autoEdit && !isFormEditing ? (
                           <div className="w-full flex justify-end">
                             <button
@@ -803,23 +831,34 @@ export default function ResultStaffDrawer({
           {drawerForm}
         </div>
         {exitConfirmDialog}
+        {showSummaryModal && (
+          <ConsultSummaryModal
+            patient={patient}
+            consult={consult}
+            consultOverride={summaryConsultOverride}
+            onClose={() => setShowSummaryModal(false)}
+            onError={(msg) => triggerAlert(msg, MODAL_TITLE.warning)}
+            zIndexClass="z-[90]"
+          />
+        )}
       </>
     );
   }
 
-  const modalOverlayStyle: React.CSSProperties | undefined = isMobile
-    ? {
-        paddingBottom: keyboardOpen
-          ? `${keyboardInset}px`
-          : 'calc(4rem + env(safe-area-inset-bottom, 0px))'
-      }
-    : undefined;
+  const modalOverlayStyle: React.CSSProperties | undefined = isMobile && keyboardOpen
+    ? { paddingBottom: `${keyboardInset}px` }
+    : isMobile
+      ? { paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }
+      : undefined;
 
   const modalPanelStyle: React.CSSProperties | undefined = isMobile
     ? {
+        height: keyboardOpen
+          ? `${Math.max(viewportHeight - 8, 320)}px`
+          : 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))',
         maxHeight: keyboardOpen
-          ? `${Math.max(viewportHeight - 8, 240)}px`
-          : 'min(88dvh, calc(100dvh - 4.5rem - env(safe-area-inset-bottom, 0px)))'
+          ? `${Math.max(viewportHeight - 8, 320)}px`
+          : 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))',
       }
     : undefined;
 
@@ -827,8 +866,8 @@ export default function ResultStaffDrawer({
     <AnimatePresence>
       {consultKey && (
           <div
-            className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex p-3 md:p-4 md:pb-4 overflow-hidden overscroll-none animate-in fade-in duration-200 ${
-              isMobile ? 'items-end justify-center' : 'items-center justify-center pb-[calc(4rem+env(safe-area-inset-bottom))]'
+            className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
+              isMobile ? 'items-end justify-center p-0' : 'items-center justify-center p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4'
             }`}
             style={modalOverlayStyle}
           >
@@ -837,13 +876,25 @@ export default function ResultStaffDrawer({
               onClick={requestClose}
             ></div>
             <div
-              className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden min-h-0 md:max-h-[96vh]"
+              className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden min-h-0 ${
+                isMobile ? 'rounded-t-3xl rounded-b-none' : 'rounded-3xl max-h-[96vh]'
+              }`}
               style={modalPanelStyle}
             >
               {drawerHeader}
               {drawerForm}
             </div>
             {exitConfirmDialog}
+            {showSummaryModal && (
+              <ConsultSummaryModal
+                patient={patient}
+                consult={consult}
+                consultOverride={summaryConsultOverride}
+                onClose={() => setShowSummaryModal(false)}
+                onError={(msg) => triggerAlert(msg, MODAL_TITLE.warning)}
+                zIndexClass="z-[90]"
+              />
+            )}
           </div>
         )}
     </AnimatePresence>
