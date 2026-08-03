@@ -1,4 +1,4 @@
-import webpush from 'web-push';
+import { deserializeVapidKeys, sendPushNotification } from 'web-push-browser';
 import type { WebPushPayload } from './pushPayload';
 
 export interface PushSubscriptionRecord {
@@ -37,13 +37,28 @@ function isConfigured(env: CloudflarePushEnv): boolean {
   return !!(String(env.VAPID_PUBLIC_KEY || '').trim() && String(env.VAPID_PRIVATE_KEY || '').trim());
 }
 
-function configureWebPush(env: CloudflarePushEnv): boolean {
+let cachedVapidKeys: CryptoKeyPair | null = null;
+let cachedVapidFingerprint = '';
+
+function resolveVapidContact(env: CloudflarePushEnv): string {
+  const subject = String(env.VAPID_SUBJECT || 'mailto:chd-admin@hospital.vn').trim();
+  return subject.replace(/^mailto:/i, '') || 'chd-admin@hospital.vn';
+}
+
+async function loadVapidKeys(env: CloudflarePushEnv): Promise<CryptoKeyPair | null> {
   const publicKey = String(env.VAPID_PUBLIC_KEY || '').trim();
   const privateKey = String(env.VAPID_PRIVATE_KEY || '').trim();
-  const subject = String(env.VAPID_SUBJECT || 'mailto:chd-admin@hospital.vn').trim();
-  if (!publicKey || !privateKey) return false;
-  webpush.setVapidDetails(subject, publicKey, privateKey);
-  return true;
+  if (!publicKey || !privateKey) return null;
+
+  const fingerprint = `${publicKey}:${privateKey}`;
+  if (cachedVapidKeys && cachedVapidFingerprint === fingerprint) {
+    return cachedVapidKeys;
+  }
+
+  const keyPair = await deserializeVapidKeys({ publicKey, privateKey });
+  cachedVapidKeys = keyPair;
+  cachedVapidFingerprint = fingerprint;
+  return keyPair;
 }
 
 async function readSubscriptions(kv: PushKvStore): Promise<PushSubscriptionRecord[]> {
@@ -122,11 +137,34 @@ async function removeSubscription(kv: PushKvStore, staffKey: string, endpoint: s
   return true;
 }
 
-async function sendToStaff(kv: PushKvStore, env: CloudflarePushEnv, staffKey: string, payload: WebPushPayload) {
-  if (!configureWebPush(env)) {
+const RETRYABLE_PUSH_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const STALE_PUSH_STATUS = new Set([400, 401, 403, 404, 410]);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+interface SendToStaffOptions {
+  removeStale?: boolean;
+  retries?: number;
+}
+
+async function sendToStaff(
+  kv: PushKvStore,
+  env: CloudflarePushEnv,
+  staffKey: string,
+  payload: WebPushPayload,
+  options: SendToStaffOptions = {}
+) {
+  const removeStale = options.removeStale !== false;
+  const retries = Math.max(0, options.retries ?? 0);
+
+  const vapidKeys = await loadVapidKeys(env);
+  if (!vapidKeys) {
     return { sent: 0, removed: 0, skipped: true, attempted: 0, needsResubscribe: false, errors: [] as string[] };
   }
 
+  const vapidContact = resolveVapidContact(env);
   const subscriptions = (await readSubscriptions(kv)).filter(item => String(item.StaffKey) === String(staffKey));
   if (subscriptions.length === 0) {
     return { sent: 0, removed: 0, skipped: false, attempted: 0, needsResubscribe: false, errors: [] as string[] };
@@ -138,39 +176,69 @@ async function sendToStaff(kv: PushKvStore, env: CloudflarePushEnv, staffKey: st
   const body = JSON.stringify(payload);
 
   for (const subscription of subscriptions) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          keys: {
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
+    let delivered = false;
+    let lastError = '';
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      try {
+        const response = await sendPushNotification(
+          vapidKeys,
+          {
+            endpoint: subscription.endpoint,
+            keys: {
+              p256dh: subscription.p256dh,
+              auth: subscription.auth,
+            },
           },
-        },
-        body
-      );
-      sent += 1;
-    } catch (error: any) {
-      const statusCode = error?.statusCode || error?.status;
-      const message = String(error?.body || error?.message || 'Push delivery failed').slice(0, 180);
-      errors.push(statusCode ? `HTTP ${statusCode}: ${message}` : message);
-      if ([400, 401, 403, 404, 410].includes(Number(statusCode))) {
+          vapidContact,
+          body
+        );
+
+        if (response.ok || response.status === 201) {
+          delivered = true;
+          sent += 1;
+          break;
+        }
+
+        const statusCode = response.status;
+        const message = String(await response.text().catch(() => response.statusText || 'Push delivery failed')).slice(0, 180);
+        lastError = `HTTP ${statusCode}: ${message}`;
+
+        if (STALE_PUSH_STATUS.has(statusCode)) {
+          break;
+        }
+        if (attempt < retries && RETRYABLE_PUSH_STATUS.has(statusCode)) {
+          await sleep(800 * (attempt + 1));
+          continue;
+        }
+        break;
+      } catch (error: any) {
+        const message = String(error?.message || 'Push delivery failed').slice(0, 180);
+        lastError = message;
+        break;
+      }
+    }
+
+    if (!delivered) {
+      errors.push(lastError || 'Push delivery failed');
+      const statusCode = Number(lastError.match(/^HTTP (\d+)/)?.[1] || 0);
+      if (STALE_PUSH_STATUS.has(statusCode)) {
         staleEndpoints.push(subscription.endpoint);
       }
     }
   }
 
-  if (staleEndpoints.length > 0) {
+  if (removeStale && staleEndpoints.length > 0) {
     const next = (await readSubscriptions(kv)).filter(item => !staleEndpoints.includes(item.endpoint));
     await writeSubscriptions(kv, next);
   }
 
   return {
     sent,
-    removed: staleEndpoints.length,
+    removed: removeStale ? staleEndpoints.length : 0,
     skipped: false,
     attempted: subscriptions.length,
-    needsResubscribe: subscriptions.length > 0 && sent === 0,
+    needsResubscribe: removeStale && subscriptions.length > 0 && sent === 0,
     errors,
   };
 }
@@ -227,9 +295,13 @@ export async function handleCloudflarePushRequest(request: Request, env: Cloudfl
       url: '/?view=home',
       notificationKey: `push_test_${Date.now()}`,
     };
-    const testResult = await sendToStaff(env.PUSH_KV, env, record.StaffKey, testPayload);
+    // Do not purge brand-new subscriptions when the welcome push fails (common on iOS right after subscribe).
+    const testResult = await sendToStaff(env.PUSH_KV, env, record.StaffKey, testPayload, {
+      removeStale: false,
+      retries: 2,
+    });
 
-    return json({ ...record, testPush: testResult }, 201);
+    return json({ ...record, testPush: testResult, subscribed: true }, 201);
   }
 
   if (action === 'unsubscribe' && method === 'DELETE') {
@@ -255,7 +327,7 @@ export async function handleCloudflarePushRequest(request: Request, env: Cloudfl
       url: String(body?.url || '/?view=home'),
       notificationKey: String(body?.notificationKey || ''),
     };
-    const result = await sendToStaff(env.PUSH_KV, env, staffKey, payload);
+    const result = await sendToStaff(env.PUSH_KV, env, staffKey, payload, { retries: 2 });
     return json(result);
   }
 
@@ -271,7 +343,7 @@ export async function handleCloudflarePushRequest(request: Request, env: Cloudfl
       url: '/?view=home',
       notificationKey: `push_manual_test_${Date.now()}`,
     };
-    const result = await sendToStaff(env.PUSH_KV, env, staffKey, payload);
+    const result = await sendToStaff(env.PUSH_KV, env, staffKey, payload, { retries: 2 });
     return json(result);
   }
 

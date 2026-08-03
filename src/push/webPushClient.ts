@@ -54,8 +54,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+async function pushNativeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const nativeFetch = (typeof window !== 'undefined' && (window as Window & { __CHD_NATIVE_FETCH__?: typeof fetch }).__CHD_NATIVE_FETCH__)
+    || fetch;
+  return nativeFetch(input, init);
+}
+
 async function fetchVapidPublicKey(): Promise<string> {
-  const res = await fetch('/api/push/vapid-public-key');
+  const res = await pushNativeFetch('/api/push/vapid-public-key');
   if (!res.ok) throw new Error('Không lấy được khóa push của hệ thống');
   const data = await res.json() as { publicKey?: string };
   if (!data.publicKey) throw new Error('Khóa push chưa được cấu hình trên server');
@@ -72,69 +78,92 @@ export async function getPushPermission(): Promise<NotificationPermission> {
   return Notification.permission;
 }
 
-export async function subscribeToWebPush(staffKey: string): Promise<PushSubscription | null> {
-  if (!isPushSupported()) return null;
+export type SubscribeWebPushResult = {
+  subscription: PushSubscription | null;
+  testPushWarning?: string;
+};
+
+function formatSubscribeTestWarning(testPush?: PushDeliverResult): string {
+  if (!testPush) return '';
+  if (testPush.skipped) {
+    return 'Đã đăng ký thiết bị. Server chưa cấu hình VAPID — liên hệ quản trị.';
+  }
+  if ((testPush.sent || 0) > 0) return '';
+  const detail = testPush.errors?.[0];
+  if (detail) {
+    return `Đã đăng ký thiết bị. Push thử chưa tới (${detail}). Thu nhỏ app hoặc khóa màn hình rồi bấm "Gửi thử push" trong Hồ sơ.`;
+  }
+  return 'Đã đăng ký thiết bị. Push thử chưa tới — thu nhỏ app hoặc khóa màn hình rồi bấm "Gửi thử push" trong Hồ sơ.';
+}
+
+export async function subscribeToWebPush(staffKey: string): Promise<SubscribeWebPushResult> {
+  if (!isPushSupported()) {
+    throw new Error('Thiết bị hoặc trình duyệt không hỗ trợ push');
+  }
+  if (isIosDevice() && !isStandaloneDisplayMode()) {
+    throw new Error('Trên iPhone, hãy Thêm vào Màn hình chính trước khi bật push');
+  }
 
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return null;
+  if (permission !== 'granted') {
+    return { subscription: null };
+  }
 
   const registration = await registerAppServiceWorker();
-  if (!registration) return null;
+  if (!registration) {
+    throw new Error('Không đăng ký được service worker — thử tải lại app');
+  }
 
   await navigator.serviceWorker.ready;
 
-  let publicKey: string;
-  try {
-    publicKey = await fetchVapidPublicKey();
-  } catch (error) {
-    console.warn('[web-push]', error);
-    return null;
+  const publicKey = await fetchVapidPublicKey();
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (subscription) {
+    await subscription.unsubscribe().catch(() => undefined);
   }
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    let subscription = await registration.pushManager.getSubscription();
-    if (subscription) {
-      await subscription.unsubscribe().catch(() => undefined);
-    }
-
+  try {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey),
     });
-
-    const json = subscription.toJSON();
-    const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-    const res = await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        StaffKey: staffKey,
-        endpoint: json.endpoint,
-        keys: json.keys,
-        UserAgent: navigator.userAgent,
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error('Không thể đăng ký thiết bị nhận thông báo');
-    }
-
-    const subscribeData = await res.json().catch(() => ({})) as {
-      testPush?: { sent?: number; needsResubscribe?: boolean; errors?: string[] };
-    };
-    if (subscribeData.testPush?.needsResubscribe) {
-      await subscription.unsubscribe().catch(() => undefined);
-      if (attempt === 0) continue;
-      throw new Error('Thiết bị chưa nhận được push thử. Hãy tắt/bật lại thông báo sau khi deploy server mới.');
-    }
-
-    return subscription;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Không tạo được push subscription';
+    throw new Error(message.includes('not allowed') ? 'iOS chưa cho phép push — kiểm tra Cài đặt → Thông báo' : message);
   }
 
-  return null;
+  const json = subscription.toJSON();
+  const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
+  const res = await pushNativeFetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      StaffKey: staffKey,
+      endpoint: json.endpoint,
+      keys: json.keys,
+      UserAgent: navigator.userAgent,
+    }),
+  });
+
+  if (!res.ok) {
+    await subscription.unsubscribe().catch(() => undefined);
+    const errBody = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(errBody.error || 'Không thể đăng ký thiết bị nhận thông báo');
+  }
+
+  const subscribeData = await res.json().catch(() => ({})) as {
+    subscribed?: boolean;
+    testPush?: PushDeliverResult;
+  };
+
+  return {
+    subscription,
+    testPushWarning: formatSubscribeTestWarning(subscribeData.testPush),
+  };
 }
 
 export async function unsubscribeFromWebPush(staffKey: string): Promise<void> {
@@ -145,7 +174,7 @@ export async function unsubscribeFromWebPush(staffKey: string): Promise<void> {
 
   const endpoint = subscription.endpoint;
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  await fetch('/api/push/unsubscribe', {
+  await pushNativeFetch('/api/push/unsubscribe', {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
@@ -157,6 +186,23 @@ export async function unsubscribeFromWebPush(staffKey: string): Promise<void> {
   await subscription.unsubscribe();
 }
 
+export async function repairPushRegistration(staffKey: string): Promise<boolean> {
+  if (!isPushSupported() || Notification.permission !== 'granted') return false;
+
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  if (existing) {
+    return syncExistingPushSubscription(staffKey);
+  }
+
+  try {
+    const result = await subscribeToWebPush(staffKey);
+    return !!result.subscription;
+  } catch {
+    return false;
+  }
+}
+
 export async function syncExistingPushSubscription(staffKey: string): Promise<boolean> {
   if (!isPushSupported() || Notification.permission !== 'granted') return false;
   const registration = await navigator.serviceWorker.ready;
@@ -165,7 +211,7 @@ export async function syncExistingPushSubscription(staffKey: string): Promise<bo
 
   const json = subscription.toJSON();
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  const res = await fetch('/api/push/subscribe', {
+  const res = await pushNativeFetch('/api/push/subscribe', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -187,7 +233,7 @@ export async function fetchPushStatus(staffKey?: string): Promise<{ configured: 
   const staffQuery = staffKey ? `?staffKey=${encodeURIComponent(staffKey)}` : '';
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`/api/push/status${staffQuery}`, { headers });
+  const res = await pushNativeFetch(`/api/push/status${staffQuery}`, { headers });
   if (!res.ok) {
     return { configured: false, subscribed: false, permission };
   }
@@ -210,7 +256,7 @@ export type PushDeliverResult = {
 
 export async function sendTestPush(staffKey: string): Promise<PushDeliverResult> {
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  const res = await fetch('/api/push/test', {
+  const res = await pushNativeFetch('/api/push/test', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -233,7 +279,7 @@ export function formatPushDeliverIssue(result: PushDeliverResult): string {
     return 'Chưa đăng ký thiết bị nào. Hãy bấm Bật thông báo lại.';
   }
   if (result.needsResubscribe) {
-    return 'Thiết bị đăng ký cũ đã hết hạn (thường do cập nhật server). Hãy Tắt rồi Bật lại thông báo.';
+    return 'Đăng ký push đã hết hạn (thường sau deploy server mới). Hãy Tắt rồi Bật lại thông báo trong Hồ sơ.';
   }
   if ((result.sent || 0) === 0) {
     return result.errors?.[0] || 'Không gửi được push tới thiết bị.';

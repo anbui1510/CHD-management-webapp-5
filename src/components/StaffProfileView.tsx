@@ -57,6 +57,7 @@ interface StaffProfileViewProps {
     permission: NotificationPermission;
     loading: boolean;
     error: string;
+    warning?: string;
     enablePush: () => Promise<boolean>;
     disablePush: () => Promise<void>;
     testPush: () => Promise<boolean>;
@@ -752,6 +753,9 @@ export default function StaffProfileView({
                           {webPush.error && (
                             <p className="text-[10px] font-bold text-rose-700 mt-1">{webPush.error}</p>
                           )}
+                          {!webPush.error && webPush.warning && (
+                            <p className="text-[10px] font-bold text-amber-800 mt-1">{webPush.warning}</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -761,7 +765,12 @@ export default function StaffProfileView({
                             disabled={webPush.loading}
                             onClick={() => {
                               void webPush.enablePush().then(ok => {
-                                if (ok) triggerAlert?.('Đã bật thông báo điện thoại', MODAL_TITLE.notify);
+                                if (ok) {
+                                  triggerAlert?.(
+                                    webPush.warning || 'Đã bật thông báo điện thoại',
+                                    MODAL_TITLE.notify
+                                  );
+                                }
                               });
                             }}
                             className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black disabled:opacity-60"

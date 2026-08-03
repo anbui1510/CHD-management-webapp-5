@@ -2365,6 +2365,7 @@ export default function App() {
                   permission: webPush.permission,
                   loading: webPush.loading,
                   error: webPush.error,
+                  warning: webPush.warning,
                   enablePush: webPush.enablePush,
                   disablePush: webPush.disablePush,
                   testPush: webPush.testPush,
@@ -4319,6 +4320,7 @@ export default function App() {
             loading={webPush.loading}
             configured={webPush.configured}
             error={webPush.error}
+            warning={webPush.warning}
             isIosStandaloneHint={shouldShowIosInstallHint()}
             onEnable={() => { void webPush.enablePush(); }}
             onDismiss={webPush.dismissPrompt}
