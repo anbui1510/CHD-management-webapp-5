@@ -14,6 +14,7 @@ import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
 import { resolveStaffByNameOrKey } from './src/utils/staffNameMatch';
+import { resolveSchedulerConsultNotification } from './src/utils/consultSchedulerNotification';
 import {
   buildScheduleDelayReminderDedupKey,
   buildScheduleDelayReminderMessage,
@@ -1713,6 +1714,25 @@ function isRemovedConsult(consult: Consult): boolean {
   return consult.Removed === true || String(consult.Removed || '').trim().toLowerCase() === 'true';
 }
 
+function notifySchedulerIfEligibleConsult(
+  previous: Consult | undefined,
+  updated: Consult,
+  staffList: Staff[],
+  patients: Patient[]
+): void {
+  const notification = resolveSchedulerConsultNotification({
+    previous,
+    updated,
+    staffList,
+    patients,
+  });
+  if (!notification) return;
+
+  void appendNotificationIfMissing(notification).catch(err => {
+    console.error('Error pushing scheduler new consult notification:', err);
+  });
+}
+
 function notifyStaffAboutConsult(staff: Staff | undefined, consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, title: string, message: string, dedupPrefix: string, severity: Notification['Severity'] = 'warning') {
   if (!staff) return;
   void appendNotificationIfMissing({
@@ -3145,6 +3165,14 @@ app.post('/api/consults', requireAuth, async (req, res) => {
     newConsult,
     getSheetsPushOptions(req, syncContext, 'Consult', newConsult.ConsultKey)
   );
+
+  try {
+    const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
+    notifySchedulerIfEligibleConsult(undefined, newConsult, staffList, patients);
+  } catch (err) {
+    console.error('Error evaluating scheduler notification for new consult:', err);
+  }
   
   res.status(201).json(withSheetsSync(newConsult, sheetsSync));
 });
@@ -3181,6 +3209,7 @@ app.put('/api/consults/:key', requireAuth, async (req, res) => {
       const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
       const patients = readDB<Patient>(PATIENTS_FILE, defaultPatients);
       handleConsultWorkflowMutation(previousConsult, consults[index], updateData, staffList, patients);
+      notifySchedulerIfEligibleConsult(previousConsult, consults[index], staffList, patients);
     } catch (err) {
       console.error('Error evaluating consult workflow mutation:', err);
     }
