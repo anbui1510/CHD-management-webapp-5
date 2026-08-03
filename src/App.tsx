@@ -738,14 +738,17 @@ export default function App() {
     const tick = () => setMedicalLoadElapsedSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
-    // Match force-fetch abort (+ small buffer). Do not trip earlier than the real request timeout.
     const safetyMs = getMedicalDataFetchTimeout(true) + 5000;
     const safetyTimer = setTimeout(() => {
       setMedicalDataLoadState(prev => {
         if (prev.phase !== 'loading' && prev.phase !== 'syncing') return prev;
+        if (prev.backgroundSync && (patients.length > 0 || consults.length > 0)) {
+          return { phase: 'ready', startedAt: null, backgroundSync: false };
+        }
         return {
           phase: 'error',
           startedAt: null,
+          backgroundSync: false,
           message: 'Đồng bộ quá lâu — dữ liệu có thể chưa cập nhật. Bấm nút Đồng bộ trên header để thử lại.'
         };
       });
@@ -754,7 +757,7 @@ export default function App() {
       clearInterval(interval);
       clearTimeout(safetyTimer);
     };
-  }, [medicalDataLoadState.phase, medicalDataLoadState.startedAt]);
+  }, [medicalDataLoadState.phase, medicalDataLoadState.startedAt, medicalDataLoadState.backgroundSync, patients.length, consults.length]);
 
   const loadPublicStaffForLogin = useCallback(() => {
     setLoginLoadError('');
@@ -806,14 +809,14 @@ export default function App() {
           localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
-          await hydrateSyncConfigFromServer();
-          await migrateLocalSyncConfigToServer();
           void loadMedicalDataAfterAuth('full', {
             onSyncStatus: (status) => reportPullResult(status)
           }).then(() => {
             reportPullResult();
             void refreshSheetsSyncStatus();
           }).catch(handleAuthDataFailure);
+          await hydrateSyncConfigFromServer();
+          await migrateLocalSyncConfigToServer();
         })
         .catch(() => {
           localStorage.removeItem('CHD_AUTH_TOKEN');
@@ -1064,8 +1067,6 @@ export default function App() {
       setCurrentStaff(staffData);
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
 
-      await hydrateSyncConfigFromServer();
-      await migrateLocalSyncConfigToServer();
       void loadMedicalDataAfterAuth('full', {
         onSyncStatus: (status) => reportPullResult(status)
       }).then(() => {
@@ -1081,6 +1082,10 @@ export default function App() {
         const msg = err instanceof Error ? err.message : String(err);
         setLoginError(msg || 'Không tải được dữ liệu từ Google Sheets.');
       });
+
+      void hydrateSyncConfigFromServer()
+        .then(() => migrateLocalSyncConfigToServer())
+        .catch(err => console.warn('Sync config hydrate failed after login:', err));
     } catch (err) {
       setLoginError('L\u1ed7i k\u1ebft n\u1ed1i. Vui l\u00f2ng ki\u1ec3m tra m\u1ea1ng v\u00e0 th\u1eed l\u1ea1i.');
     }
@@ -2267,16 +2272,22 @@ export default function App() {
       )}
 
       {(medicalDataLoadState.phase === 'loading' || medicalDataLoadState.phase === 'syncing') && (
-        <div className="bg-amber-500 text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2">
+        <div className={`text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2 ${
+          medicalDataLoadState.backgroundSync ? 'bg-sky-600' : 'bg-amber-500'
+        }`}>
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           <span>
-            {medicalDataLoadState.phase === 'loading'
+            {medicalDataLoadState.backgroundSync
               ? (medicalLoadElapsedSec > 0
-                ? `Đang tải dữ liệu vào app... ${medicalLoadElapsedSec}s`
-                : 'Đang tải dữ liệu vào app...')
-              : (medicalLoadElapsedSec > 0
-                ? `Đang đồng bộ Google Sheets... ${medicalLoadElapsedSec}s`
-                : 'Đang đồng bộ Google Sheets...')}
+                ? `Đang đồng bộ ngầm Google Sheets... ${medicalLoadElapsedSec}s`
+                : 'Đang đồng bộ ngầm Google Sheets...')
+              : medicalDataLoadState.phase === 'loading'
+                ? (medicalLoadElapsedSec > 0
+                  ? `Đang tải dữ liệu vào app... ${medicalLoadElapsedSec}s`
+                  : 'Đang tải dữ liệu vào app...')
+                : (medicalLoadElapsedSec > 0
+                  ? `Đang đồng bộ Google Sheets... ${medicalLoadElapsedSec}s`
+                  : 'Đang đồng bộ Google Sheets...')}
           </span>
         </div>
       )}

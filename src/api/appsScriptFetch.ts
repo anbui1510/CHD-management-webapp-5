@@ -763,6 +763,11 @@ export const peekPersistedAllData = async (): Promise<SheetData | null> => {
   if (persisted && hasClinical(persisted)) {
     return sanitizeDataBundle(persisted);
   }
+
+  const rawCached = await getPersistedData('all_data');
+  if (rawCached && hasClinical(rawCached)) {
+    return sanitizeDataBundle(normalizeData(rawCached));
+  }
   return null;
 };
 

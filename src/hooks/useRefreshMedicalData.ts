@@ -19,6 +19,8 @@ export type MedicalDataLoadState = {
   phase: MedicalDataLoadPhase;
   startedAt: number | null;
   message?: string;
+  /** True when UI already shows cached data and Sheets pull runs in background. */
+  backgroundSync?: boolean;
 };
 
 export type RefreshMedicalDataOptions = {
@@ -29,8 +31,10 @@ export type RefreshMedicalDataOptions = {
 export type ForceSyncOptions = {
   /** Prefer "Đang đồng bộ…" even when UI already has cached rows. */
   preferSyncingBanner?: boolean;
-  /** Không hiện banner — dùng khi đã hydrate cache và sync nền sau login/F5. */
+  /** Không hiện banner — dùng khi app đã sẵn sàng và sync nền hoàn toàn im lặng. */
   silent?: boolean;
+  /** Cache đã hiển thị — banner nhẹ, lỗi sync không xóa dữ liệu đang xem. */
+  backgroundSync?: boolean;
   onSyncStatus?: (status: SheetsSyncStatus | undefined) => void;
 };
 
@@ -54,7 +58,8 @@ export function useRefreshMedicalData(
     onLoadStateChange?.({
       phase: meta.phase,
       startedAt: meta.startedAt,
-      message: patch.message
+      message: patch.message,
+      backgroundSync: patch.backgroundSync
     });
   }, [onLoadStateChange]);
 
@@ -131,14 +136,18 @@ export function useRefreshMedicalData(
     if (meta.forcePending) return meta.forcePending;
 
     const silent = options?.silent ?? false;
+    const backgroundSync = options?.backgroundSync ?? false;
     const startedAt = Date.now();
     if (!silent) {
       emitState({
         phase: bannerPhase,
         startedAt,
-        message: bannerPhase === 'loading'
-          ? 'Đang tải dữ liệu vào app...'
-          : 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...'
+        backgroundSync,
+        message: backgroundSync
+          ? 'Đang đồng bộ ngầm Google Sheets...'
+          : bannerPhase === 'loading'
+            ? 'Đang tải dữ liệu vào app...'
+            : 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...'
       });
     }
 
@@ -149,16 +158,17 @@ export function useRefreshMedicalData(
         meta.lastForceAt = meta.lastAt;
         options?.onSyncStatus?.(bundle._syncStatus);
         const pullFailed = bundle._syncStatus?.configured && bundle._syncStatus.lastPullOk === false;
-        if (silent) {
-          if (pullFailed) {
+        if (silent || backgroundSync) {
+          if (pullFailed && !backgroundSync) {
             emitState({
               phase: 'error',
               startedAt: null,
+              backgroundSync: false,
               message: bundle._syncStatus?.lastPullMessage
                 || 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
             });
           } else if (meta.phase === 'loading' || meta.phase === 'syncing') {
-            emitState({ phase: 'ready', startedAt: null });
+            emitState({ phase: 'ready', startedAt: null, backgroundSync: false });
           }
           return;
         }
@@ -171,7 +181,7 @@ export function useRefreshMedicalData(
           });
           return;
         }
-        emitState({ phase: 'ready', startedAt: null });
+        emitState({ phase: 'ready', startedAt: null, backgroundSync: false });
       })
       .catch(async err => {
         console.warn('Force medical data sync failed:', err);
@@ -180,6 +190,7 @@ export function useRefreshMedicalData(
           emitState({
             phase: 'error',
             startedAt: null,
+            backgroundSync: false,
             message: err.message
           });
           throw err;
@@ -189,17 +200,14 @@ export function useRefreshMedicalData(
         if (hasCache && cached) {
           applyMedicalDataBundle(cached, scope, setters);
           meta.lastAt = Date.now();
-          if (silent) {
-            emitState({
-              phase: 'error',
-              startedAt: null,
-              message: err instanceof Error ? err.message : undefined
-            });
+          if (backgroundSync || silent) {
+            emitState({ phase: 'ready', startedAt: null, backgroundSync: false });
             return;
           }
           emitState({
             phase: 'error',
             startedAt: null,
+            backgroundSync: false,
             message: err instanceof Error
               ? err.message
               : 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
@@ -209,6 +217,7 @@ export function useRefreshMedicalData(
         emitState({
           phase: 'error',
           startedAt: null,
+          backgroundSync: false,
           message: err instanceof Error ? err.message : 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
         });
         throw err;
@@ -238,11 +247,12 @@ export function useRefreshMedicalData(
     const hasCache = !!cached && (cached.patients.length > 0 || cached.consults.length > 0);
 
     if (hasCache && cached) {
-      // F5 / tab còn cache: hiện dữ liệu ngay, sync nền không banner (tránh banner chạy 10–15s trong khi UI đã có dữ liệu).
       applyMedicalDataBundle(cached, scope, setters);
-      emitState({ phase: 'ready', startedAt: null });
       try {
-        await runSingleForcePull(scope, 'syncing', { ...options, silent: true });
+        await runSingleForcePull(scope, 'syncing', {
+          ...options,
+          backgroundSync: true
+        });
       } catch (err) {
         if (err instanceof AuthRequiredError) throw err;
       }
