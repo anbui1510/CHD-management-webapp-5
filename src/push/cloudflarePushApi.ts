@@ -106,7 +106,7 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-async function upsertSubscription(kv: PushKvStore, body: any): Promise<PushSubscriptionRecord | null> {
+async function upsertSubscription(kv: PushKvStore, body: any): Promise<{ record: PushSubscriptionRecord; isNew: boolean } | null> {
   const normalized = normalizeSubscribeBody(body);
   if (!normalized) return null;
 
@@ -121,7 +121,7 @@ async function upsertSubscription(kv: PushKvStore, body: any): Promise<PushSubsc
       UpdatedTime: now,
     };
     await writeSubscriptions(kv, subscriptions);
-    return subscriptions[existingIndex];
+    return { record: subscriptions[existingIndex], isNew: false };
   }
 
   const record: PushSubscriptionRecord = {
@@ -132,7 +132,7 @@ async function upsertSubscription(kv: PushKvStore, body: any): Promise<PushSubsc
   };
   subscriptions.push(record);
   await writeSubscriptions(kv, subscriptions);
-  return record;
+  return { record, isNew: true };
 }
 
 async function removeSubscription(kv: PushKvStore, staffKey: string, endpoint: string): Promise<boolean> {
@@ -302,22 +302,27 @@ export async function handleCloudflarePushRequest(request: Request, env: Cloudfl
 
   if (action === 'subscribe' && method === 'POST') {
     const body = await request.json().catch(() => ({}));
-    const record = await upsertSubscription(env.PUSH_KV, body);
-    if (!record) {
+    const silent = body?.silent === true || body?.syncOnly === true;
+    const upserted = await upsertSubscription(env.PUSH_KV, body);
+    if (!upserted) {
       return json({ error: 'Thiếu endpoint hoặc keys push subscription' }, 400);
     }
+    const { record, isNew } = upserted;
 
-    const testPayload: WebPushPayload = {
-      title: 'CHD Management',
-      body: 'Đã bật thông báo điện thoại thành công.',
-      url: '/?view=home',
-      notificationKey: `push_test_${Date.now()}`,
-    };
-    // Do not purge brand-new subscriptions when the welcome push fails (common on iOS right after subscribe).
-    const testResult = await sendToStaff(env.PUSH_KV, env, record.StaffKey, testPayload, {
-      removeStale: false,
-      retries: 2,
-    });
+    let testResult: Awaited<ReturnType<typeof sendToStaff>> | undefined;
+    if (isNew && !silent) {
+      const testPayload: WebPushPayload = {
+        title: 'CHD Management',
+        body: 'Đã bật thông báo điện thoại thành công.',
+        url: '/?view=home',
+        notificationKey: `push_test_${Date.now()}`,
+      };
+      // Do not purge brand-new subscriptions when the welcome push fails (common on iOS right after subscribe).
+      testResult = await sendToStaff(env.PUSH_KV, env, record.StaffKey, testPayload, {
+        removeStale: false,
+        retries: 2,
+      });
+    }
 
     return json({ ...record, testPush: testResult, subscribed: true }, 201);
   }

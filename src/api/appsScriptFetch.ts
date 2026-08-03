@@ -968,11 +968,35 @@ const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
 
   const text = await response.text();
   if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
-  const result = JSON.parse(text);
+  let result: { status?: string; message?: string };
+  try {
+    result = JSON.parse(text);
+  } catch {
+    throw new Error('Apps Script trả về phản hồi không hợp lệ khi xóa');
+  }
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể xóa dữ liệu');
   }
   return result;
+};
+
+const archiveConsultInScript = async (
+  config: (typeof endpointMap)['consults'],
+  existing: Record<string, unknown>,
+  finalKey: string
+) => {
+  const archived = {
+    ...existing,
+    Removed: true,
+    ConsultResultUpdatedTime: new Date().toISOString(),
+  };
+  await postToScript(
+    { type: 'Consult', action: 'update', key: finalKey, data: archived },
+    config,
+    archived,
+    false
+  );
+  return archived;
 };
 
 const appendNotificationIfMissingBridge = async (input: Notification): Promise<Notification | null> => {
@@ -1224,6 +1248,21 @@ const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) =
       await deleteFromScript({ type: config.type, key: finalKey });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Không thể xóa trên Google Sheets';
+      const canArchiveConsult = endpoint === 'consults' && existing;
+      if (canArchiveConsult) {
+        try {
+          await archiveConsultInScript(config, existing as Record<string, unknown>, finalKey);
+          deleteCachedRecord(config, finalKey);
+          return jsonResponse({
+            success: true,
+            archived: true,
+            [config.keyField]: finalKey,
+            message: 'Đã ẩn ca khỏi app (Removed=true) vì không xóa được dòng trên Google Sheets. Cập nhật Apps Script nếu cần xóa hẳn.',
+          });
+        } catch {
+          // fall through to hard error below
+        }
+      }
       return jsonResponse({ error: message }, { status: 502 });
     }
   }

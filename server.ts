@@ -2034,29 +2034,34 @@ app.get('/api/push/status', requireAuth, (req, res) => {
 
 app.post('/api/push/subscribe', requireAuth, async (req, res) => {
   const staffKey = String((req as any).staffKey || '').trim();
-  const record = upsertPushSubscription(
+  const silent = req.body?.silent === true || req.body?.syncOnly === true;
+  const upserted = upsertPushSubscription(
     { readDB, writeDB, createUniqueKey, newTimestamp },
     PUSH_SUBSCRIPTIONS_FILE,
     staffKey,
     req.body
   );
-  if (!record) {
+  if (!upserted) {
     res.status(400).json({ error: 'Thiếu endpoint hoặc keys push subscription' });
     return;
   }
+  const { record, isNew } = upserted;
 
-  const testPayload = {
-    title: 'CHD Management',
-    body: 'Đã bật thông báo điện thoại thành công.',
-    url: '/?view=home',
-    notificationKey: `push_test_${Date.now()}`,
-  };
-  const testPush = await sendWebPushToStaff(
-    { readDB, writeDB, createUniqueKey, newTimestamp },
-    PUSH_SUBSCRIPTIONS_FILE,
-    staffKey,
-    testPayload
-  );
+  let testPush: Awaited<ReturnType<typeof sendWebPushToStaff>> | undefined;
+  if (isNew && !silent) {
+    const testPayload = {
+      title: 'CHD Management',
+      body: 'Đã bật thông báo điện thoại thành công.',
+      url: '/?view=home',
+      notificationKey: `push_test_${Date.now()}`,
+    };
+    testPush = await sendWebPushToStaff(
+      { readDB, writeDB, createUniqueKey, newTimestamp },
+      PUSH_SUBSCRIPTIONS_FILE,
+      staffKey,
+      testPayload
+    );
+  }
 
   res.status(201).json({ ...record, testPush, subscribed: true });
 });
