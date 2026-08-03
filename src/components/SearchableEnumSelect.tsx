@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { removeDiacritics } from '../types';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 interface SearchableEnumSelectProps {
   options: string[];
@@ -40,6 +41,7 @@ export function SearchableEnumSelect({
   createLabel,
   onCreateOption
 }: SearchableEnumSelectProps) {
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -99,7 +101,12 @@ export function SearchableEnumSelect({
   useEffect(() => {
     if (!isOpen) return;
     searchInputRef.current?.focus();
-  }, [isOpen]);
+    if (isMobile && triggerRef.current) {
+      window.requestAnimationFrame(() => {
+        triggerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    }
+  }, [isOpen, isMobile]);
 
   useEffect(() => {
     if (!isOpen || !listRef.current) return;
@@ -246,9 +253,11 @@ export function SearchableEnumSelect({
       </button>
 
       {isOpen && (
-        <div className={`absolute z-[80] w-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden max-h-[260px] ${
-          direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
-        }`}>
+        <div
+          className={`absolute z-[80] w-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden ${
+            isMobile ? 'max-h-[min(45dvh,320px)]' : 'max-h-[260px]'
+          } ${direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+        >
           <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
             <Search className="w-3.5 h-3.5 text-slate-400" />
             <input

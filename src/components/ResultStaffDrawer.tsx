@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { AnimatePresence } from 'motion/react';
 import { AlertTriangle, ClipboardList, Stethoscope } from 'lucide-react';
@@ -26,6 +26,9 @@ import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, withSyncContext } from '../utils/sheetsSyncMutation';
 import { MODAL_TITLE } from '../utils/modalTitles';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
+import { useMobileKeyboardInset } from '../hooks/useMobileKeyboardInset';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -124,6 +127,14 @@ export default function ResultStaffDrawer({
   layout = 'modal',
   autoEdit = false
 }: ResultStaffDrawerProps) {
+  const isMobile = useIsMobile();
+  const isModalOpen = layout === 'modal' && !!consultKey;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { keyboardInset, viewportHeight } = useMobileKeyboardInset(isModalOpen);
+  const keyboardOpen = isMobile && keyboardInset > 80;
+  useLockBodyScroll(isModalOpen);
+  usePreventBackgroundTouchScroll(scrollContainerRef, isModalOpen);
+
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ResultFormState | null>(null);
@@ -325,7 +336,11 @@ export default function ResultStaffDrawer({
                 onSubmit={submitResultUpdate} 
                 className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-sans"
               >
-                <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-4 md:p-6">
+                <div
+                  ref={scrollContainerRef}
+                  className="flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 p-4 md:p-6"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                 <div className="space-y-6">
                       
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch animate-in fade-in duration-300 min-h-0">
@@ -404,7 +419,7 @@ export default function ResultStaffDrawer({
 
                         {/* Khung 2: Thông tin hội chẩn — phía dưới */}
                         <div className="flex flex-col flex-1 min-h-0">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-y-auto custom-scrollbar">
+                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar">
                             <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
                             
                             {!isFormEditing ? (
@@ -505,7 +520,7 @@ export default function ResultStaffDrawer({
 
                         {/* Cột phải: Kết quả hội chẩn */}
                         <div className="lg:col-span-7 flex flex-col min-h-0">
-                          <div className="bg-indigo-50/20 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col min-h-0 overflow-y-auto custom-scrollbar">
+                          <div className="bg-indigo-50/20 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar">
                             <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2 shrink-0">Kết quả hội chẩn</span>
                             
                             {!isFormEditing ? (
@@ -792,15 +807,39 @@ export default function ResultStaffDrawer({
     );
   }
 
+  const modalOverlayStyle: React.CSSProperties | undefined = isMobile
+    ? {
+        paddingBottom: keyboardOpen
+          ? `${keyboardInset}px`
+          : 'calc(4rem + env(safe-area-inset-bottom, 0px))'
+      }
+    : undefined;
+
+  const modalPanelStyle: React.CSSProperties | undefined = isMobile
+    ? {
+        maxHeight: keyboardOpen
+          ? `${Math.max(viewportHeight - 8, 240)}px`
+          : 'min(88dvh, calc(100dvh - 4.5rem - env(safe-area-inset-bottom, 0px)))'
+      }
+    : undefined;
+
   return (
     <AnimatePresence>
       {consultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in duration-200">
+          <div
+            className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex p-3 md:p-4 md:pb-4 overflow-hidden overscroll-none animate-in fade-in duration-200 ${
+              isMobile ? 'items-end justify-center' : 'items-center justify-center pb-[calc(4rem+env(safe-area-inset-bottom))]'
+            }`}
+            style={modalOverlayStyle}
+          >
             <div 
               className="absolute inset-0" 
               onClick={requestClose}
             ></div>
-            <div className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[96vh]">
+            <div
+              className="relative bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden min-h-0 md:max-h-[96vh]"
+              style={modalPanelStyle}
+            >
               {drawerHeader}
               {drawerForm}
             </div>

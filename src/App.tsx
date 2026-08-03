@@ -1047,6 +1047,9 @@ export default function App() {
       localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
       // Remove legacy storage key if present
       localStorage.removeItem('CurrentStaffKey');
+      sessionStorage.removeItem('CHD_INACTIVITY_LOGOUT_MSG');
+      setCustomAlert(null);
+      setLoginError('');
       setAuthToken(token);
       setCurrentStaff(staffData);
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
@@ -1096,6 +1099,7 @@ export default function App() {
     setCurrentStaff(null);
     setLoginPassword('');
     setLoginStaffKey('');
+    setCustomAlert(null);
 
     // Reset React states of medical data to prevent data leakage
     setPatients([]);
@@ -1112,6 +1116,15 @@ export default function App() {
   }, [currentStaff]);
 
   handleLogoutRef.current = handleLogout;
+
+  // Restore inactivity-logout message on login screen (survives page refresh).
+  useEffect(() => {
+    if (currentStaff) return;
+    const msg = sessionStorage.getItem('CHD_INACTIVITY_LOGOUT_MSG');
+    if (msg) {
+      setLoginError(msg);
+    }
+  }, [currentStaff]);
 
   // Auto logout / session timeout logic
   useEffect(() => {
@@ -1164,8 +1177,11 @@ export default function App() {
         if (!isNaN(lastActivity)) {
           const elapsed = Date.now() - lastActivity;
           if (elapsed >= timeoutMs) {
+            const inactivityMsg = 'Phiên đăng nhập của bạn đã hết hạn do không hoạt động.';
+            sessionStorage.setItem('CHD_INACTIVITY_LOGOUT_MSG', inactivityMsg);
+            setCustomAlert(null);
+            setLoginError(inactivityMsg);
             handleLogout();
-            triggerAlert('Phiên đăng nhập của bạn đã hết hạn do không hoạt động.', MODAL_TITLE.notify);
           }
         }
       }
