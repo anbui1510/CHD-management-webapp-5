@@ -46,7 +46,7 @@ function resolveVapidContact(env: CloudflarePushEnv): string {
   return subject.replace(/^mailto:/i, '') || 'chd-admin@hospital.vn';
 }
 
-async function loadVapidKeys(env: CloudflarePushEnv): Promise<CryptoKeyPair | null> {
+async function loadVapidKeysFromEnv(env: CloudflarePushEnv): Promise<CryptoKeyPair | null> {
   const publicKey = String(env.VAPID_PUBLIC_KEY || '').trim();
   const privateKey = String(env.VAPID_PRIVATE_KEY || '').trim();
   if (!publicKey || !privateKey) return null;
@@ -165,9 +165,16 @@ async function sendToStaff(
   const removeStale = options.removeStale !== false;
   const retries = Math.max(0, options.retries ?? 0);
 
-  const vapidKeys = await loadVapidKeys(env);
+  const vapidKeys = await loadVapidKeysFromEnv(env);
   if (!vapidKeys) {
-    return { sent: 0, removed: 0, skipped: true, attempted: 0, needsResubscribe: false, errors: [] as string[] };
+    return {
+      sent: 0,
+      removed: 0,
+      skipped: true,
+      attempted: 0,
+      needsResubscribe: false,
+      errors: ['Không load được VAPID keys trên Worker'],
+    };
   }
 
   const vapidContact = resolveVapidContact(env);
