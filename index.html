@@ -12,11 +12,104 @@
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/icon.svg" />
     <title>CHD Management</title>
-    <!-- Triggers a new commit for automatic Cloud Build deployment -->
+    <style>
+      html, body { background: #0a0a0a; margin: 0; min-height: 100%; }
+      #boot-fallback {
+        display: none;
+        min-height: 100vh;
+        background: #0a0a0a;
+        color: #f5f5f5;
+        font-family: Inter, system-ui, sans-serif;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+      }
+    </style>
+    <script>
+      window.__CHD_APP_BUILD_ID = '__CHD_BUILD_ID__';
+      (function () {
+        if (/[?&]reset=1(?:&|$)/.test(location.search)) {
+          try {
+            var keepUrl = localStorage.getItem('chd_apps_script_url');
+            var keepSecret = localStorage.getItem('chd_apps_script_secret');
+            localStorage.clear();
+            if (keepUrl) localStorage.setItem('chd_apps_script_url', keepUrl);
+            if (keepSecret) localStorage.setItem('chd_apps_script_secret', keepSecret);
+          } catch (e) {}
+          if ('caches' in window) {
+            caches.keys().then(function (keys) {
+              keys.forEach(function (key) { caches.delete(key); });
+            });
+          }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              regs.forEach(function (reg) { reg.unregister(); });
+            });
+          }
+          var clean = location.pathname + location.hash;
+          location.replace(clean);
+          return;
+        }
+      })();
+      window.__CHD_showBootFallback = function (title, message) {
+        var el = document.getElementById('boot-fallback');
+        if (!el) return;
+        el.style.display = 'flex';
+        el.innerHTML =
+          '<div style="max-width:420px">' +
+          '<h1 style="color:#d2145a;font-size:18px;margin:0 0 12px">' + title + '</h1>' +
+          '<p style="font-size:14px;line-height:1.5;color:#d4d4d4;margin:0 0 16px">' + message + '</p>' +
+          '<button type="button" id="boot-clear-btn" style="margin-top:4px;background:#d2145a;color:#fff;border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer">Xóa cache app &amp; tải lại</button>' +
+          '</div>';
+        var btn = document.getElementById('boot-clear-btn');
+        if (btn) {
+          btn.onclick = function () {
+            try {
+              var keepUrl = localStorage.getItem('chd_apps_script_url');
+              var keepSecret = localStorage.getItem('chd_apps_script_secret');
+              localStorage.clear();
+              if (keepUrl) localStorage.setItem('chd_apps_script_url', keepUrl);
+              if (keepSecret) localStorage.setItem('chd_apps_script_secret', keepSecret);
+            } catch (e) {}
+            if ('caches' in window) {
+              caches.keys().then(function (keys) {
+                keys.forEach(function (key) { caches.delete(key); });
+              });
+            }
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function (regs) {
+                regs.forEach(function (reg) { reg.unregister(); });
+              });
+            }
+            location.reload();
+          };
+        }
+      };
+      window.addEventListener('error', function (event) {
+        var msg = (event && event.message) || '';
+        if (!msg) return;
+        if (msg.indexOf('supabaseUrl is required') !== -1 || msg.indexOf('Importing a module script failed') !== -1) {
+          window.__CHD_showBootFallback(
+            'Trình duyệt đang giữ bản app cũ',
+            'Cache trình duyệt vẫn chứa bản Supabase cũ. Bấm nút bên dưới để xóa cache và tải lại.'
+          );
+        }
+      });
+      setTimeout(function () {
+        var root = document.getElementById('root');
+        if (root && !root.innerHTML.trim()) {
+          window.__CHD_showBootFallback(
+            'App đang tải chậm hoặc bị kẹt',
+            'Nếu màn hình vẫn trắng, bấm nút bên dưới để xóa cache cũ. Hoặc mở link này kèm ?reset=1'
+          );
+        }
+      }, 8000);
+    </script>
   </head>
   <body>
+    <div id="boot-fallback"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

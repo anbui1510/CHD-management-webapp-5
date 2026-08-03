@@ -10,7 +10,7 @@ export default defineConfig(() => {
     process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) ||
     process.env.GITHUB_SHA?.slice(0, 12) ||
     process.env.BUILD_ID ||
-    String(Date.now());
+    'gsheets-v5';
 
   return {
     define: {
@@ -62,6 +62,12 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         },
       }),
+      {
+        name: 'chd-inject-html-build-id',
+        transformIndexHtml(html) {
+          return html.replaceAll('__CHD_BUILD_ID__', appBuildId);
+        },
+      },
       {
         name: 'chd-emit-version-json',
         generateBundle(_options, bundle) {

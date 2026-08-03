@@ -71,7 +71,6 @@ import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToS
 import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
-  CHD_BUILD_MISMATCH_RELOAD_KEY,
   CHD_DEPLOY_LOGOUT_MSG_KEY,
   activateWaitingServiceWorker,
   fetchRemoteAppBuildId,
@@ -773,6 +772,7 @@ export default function App() {
       'Hệ thống vừa cập nhật phiên bản mới. Trang sẽ tải lại — bạn vẫn giữ phiên đăng nhập.'
     );
     await activateWaitingServiceWorker();
+    localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
     window.location.reload();
   }, []);
 
@@ -785,15 +785,6 @@ export default function App() {
 
     const storedBuildId = localStorage.getItem(CHD_APP_BUILD_ID_KEY);
     if (isAppBuildIdMismatch(storedBuildId)) {
-      if (!sessionStorage.getItem(CHD_BUILD_MISMATCH_RELOAD_KEY)) {
-        sessionStorage.setItem(CHD_BUILD_MISMATCH_RELOAD_KEY, '1');
-        markDeployReload();
-        void activateWaitingServiceWorker().finally(() => {
-          window.location.reload();
-        });
-        return;
-      }
-      sessionStorage.removeItem(CHD_BUILD_MISMATCH_RELOAD_KEY);
       localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
     }
 
