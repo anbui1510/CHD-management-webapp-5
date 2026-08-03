@@ -1275,8 +1275,8 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       const token = extractBridgeToken(init);
       if (token) bridgeRevokeToken(token);
 
-      // Clear all local caches so the next login always pulls fresh Sheets data.
-      await clearAllPersistedCache();
+      // Clear in-memory cache only; persisted IndexedDB stays for fast re-login.
+      await clearLocalCache();
 
       return jsonResponse({ success: true });
     }

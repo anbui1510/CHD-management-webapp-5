@@ -174,6 +174,7 @@ export default function ResultStaffDrawer({
   }, [consultKey, consult?.ConsultKey, autoEdit]);
 
   const isFormEditing = autoEdit || isEditing;
+  const mobilePanelUsesFullHeight = isMobile && (keyboardOpen || isFormEditing);
 
   const formStatesEqual = (a: ResultFormState, b: ResultFormState) =>
     JSON.stringify(a) === JSON.stringify(b);
@@ -354,11 +355,11 @@ export default function ResultStaffDrawer({
   const drawerForm = (
               <form 
                 onSubmit={submitResultUpdate} 
-                className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-sans"
+                className={`flex flex-col min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-sans${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
               >
                 <div
                   ref={scrollContainerRef}
-                  className="flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 p-4 md:p-6"
+                  className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 p-4 md:p-6${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                 <div className="space-y-6">
@@ -730,16 +731,14 @@ export default function ResultStaffDrawer({
                           Tóm tắt &amp; copy ảnh
                         </button>
                         {!autoEdit && !isFormEditing ? (
-                          <div className="w-full flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => setIsEditing(true)}
-                              className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-6 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer text-xs flex items-center justify-center gap-1.5 font-sans"
-                            >
-                              <ClipboardList className="w-4 h-4" />
-                              {consult.ConsultResultID ? "Sửa kết quả hội chẩn" : "Điền kết quả hội chẩn"}
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditing(true)}
+                            className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-6 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer text-xs flex items-center justify-center gap-1.5 font-sans"
+                          >
+                            <ClipboardList className="w-4 h-4 shrink-0" />
+                            {consult.ConsultResultID ? 'Sửa kết quả hội chẩn' : 'Điền kết quả hội chẩn'}
+                          </button>
                         ) : (
                           <div className="w-full grid grid-cols-2 lg:flex lg:justify-end gap-3">
                             <button
@@ -851,14 +850,13 @@ export default function ResultStaffDrawer({
       ? { paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }
       : undefined;
 
+  const mobilePanelMaxHeight = keyboardOpen
+    ? `${Math.max(viewportHeight - 8, 320)}px`
+    : 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))';
   const modalPanelStyle: React.CSSProperties | undefined = isMobile
     ? {
-        height: keyboardOpen
-          ? `${Math.max(viewportHeight - 8, 320)}px`
-          : 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))',
-        maxHeight: keyboardOpen
-          ? `${Math.max(viewportHeight - 8, 320)}px`
-          : 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))',
+        maxHeight: mobilePanelMaxHeight,
+        ...(mobilePanelUsesFullHeight ? { height: mobilePanelMaxHeight } : {}),
       }
     : undefined;
 

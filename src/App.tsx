@@ -67,7 +67,7 @@ import AppInlineSubheader from './components/layout/AppInlineSubheader';
 import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError, getMedicalDataFetchTimeout, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
-import { clearAllPersistedCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
+import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
@@ -1121,8 +1121,8 @@ export default function App() {
     setNotifications([]);
     setDoctorPerformanceMarks([]);
 
-    // Clear IndexedDB + bridge memory cache so next login always force-pulls Sheets.
-    void clearAllPersistedCache().catch(err => console.warn('Failed to clear local cache on logout:', err));
+    // Clear in-memory bridge cache only; keep IndexedDB so re-login shows data instantly.
+    void clearLocalCache().catch(err => console.warn('Failed to clear memory cache on logout:', err));
   }, [currentStaff]);
 
   handleLogoutRef.current = handleLogout;

@@ -15,6 +15,7 @@ import {
 } from '../utils/cathlabWaitlist';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { ConsultSummaryModal } from './ConsultSummaryModal';
+import { VNDateInput } from './VNDateInput';
 import { SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceConsultResultOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
