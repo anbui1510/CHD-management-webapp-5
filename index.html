@@ -88,7 +88,7 @@
       };
       window.addEventListener('error', function (event) {
         var msg = (event && event.message) || '';
-        if (!msg) return;
+        if (!msg || msg === 'Script error.' || msg === 'Script error') return;
         if (msg.indexOf('supabaseUrl is required') !== -1 || msg.indexOf('Importing a module script failed') !== -1) {
           window.__CHD_showBootFallback(
             'Trình duyệt đang giữ bản app cũ',

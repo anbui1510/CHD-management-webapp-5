@@ -1,4 +1,5 @@
 import { markDeployReload, shouldBlockDeployReload } from '../appVersion';
+import { isStandaloneDisplayMode } from './webPushClient';
 
 let reloadScheduled = false;
 
@@ -7,6 +8,7 @@ export async function setupServiceWorkerUpdates(): Promise<void> {
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (reloadScheduled || shouldBlockDeployReload()) return;
+    if (isStandaloneDisplayMode() && !navigator.serviceWorker.controller) return;
     reloadScheduled = true;
     markDeployReload();
     window.location.reload();

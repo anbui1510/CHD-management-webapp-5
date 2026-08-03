@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { NetworkFirst } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -9,6 +11,16 @@ self.addEventListener('install', () => {
 
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
+
+// When online, prefer fresh HTML for PWA home-screen launches (avoids stale index.html → missing JS).
+registerRoute(
+  new NavigationRoute(
+    new NetworkFirst({
+      cacheName: 'chd-document',
+      networkTimeoutSeconds: 5,
+    })
+  )
+);
 
 self.addEventListener('push', (event: PushEvent) => {
   const fallback = {

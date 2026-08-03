@@ -15,3 +15,4 @@ data/sync_config.json
 
 # Cache dev
 .vite/
+.wrangler/

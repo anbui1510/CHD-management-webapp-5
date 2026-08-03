@@ -15,8 +15,7 @@ export default function BootstrapErrorScreen({
         </h1>
         <p className="text-sm text-neutral-300 leading-relaxed">{message}</p>
         <p className="text-xs text-neutral-500 leading-relaxed">
-          Nếu vừa cập nhật app, hãy bấm nút bên dưới hoặc mở link{' '}
-          <code className="text-neutral-400">?reset=1</code> để xóa cache cũ.
+          Nếu mở từ icon màn hình chính (PWA) bị lỗi, hãy bấm nút bên dưới hoặc xóa shortcut cũ rồi thêm lại từ Safari sau khi trang đã mở bình thường.
         </p>
         <button
           type="button"
