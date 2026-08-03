@@ -5,6 +5,8 @@ import {
   fetchPushStatus,
   formatPushDeliverIssue,
   isPushSupported,
+  repairPushRegistration,
+  reregisterPushDevice,
   sendTestPush,
   subscribeToWebPush,
   syncExistingPushSubscription,
@@ -18,6 +20,9 @@ export function useWebPush(staffKey?: string) {
   );
   const [configured, setConfigured] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [serverSubscribed, setServerSubscribed] = useState(false);
+  const [browserSubscribed, setBrowserSubscribed] = useState(false);
+  const [needsReregister, setNeedsReregister] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
@@ -27,11 +32,17 @@ export function useWebPush(staffKey?: string) {
     if (!staffKey) {
       setConfigured(false);
       setSubscribed(false);
+      setServerSubscribed(false);
+      setBrowserSubscribed(false);
+      setNeedsReregister(false);
       return;
     }
     const status = await fetchPushStatus(staffKey);
     setConfigured(status.configured);
     setSubscribed(status.subscribed);
+    setServerSubscribed(status.serverSubscribed);
+    setBrowserSubscribed(status.browserSubscribed);
+    setNeedsReregister(status.needsReregister);
     setPermission(status.permission);
   }, [staffKey]);
 
@@ -68,6 +79,37 @@ export function useWebPush(staffKey?: string) {
       .catch(() => undefined);
   }, [staffKey, permission, refreshStatus]);
 
+  useEffect(() => {
+    if (!staffKey || permission !== 'granted' || !needsReregister || loading) return;
+    void repairPushRegistration(staffKey)
+      .then(result => {
+        if (result.subscription) {
+          if (result.testPushWarning) {
+            setWarning(result.testPushWarning);
+          }
+          void refreshStatus();
+        }
+      })
+      .catch(() => undefined);
+  }, [staffKey, permission, needsReregister, loading, refreshStatus]);
+
+  const applySubscribeResult = useCallback(async (result: Awaited<ReturnType<typeof subscribeToWebPush>>) => {
+    if (!result.subscription) {
+      setPermission(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
+      if (Notification.permission === 'denied') {
+        setError('Trình duyệt đã chặn thông báo. Hãy bật lại trong Cài đặt.');
+      }
+      return false;
+    }
+    setPermission('granted');
+    await refreshStatus();
+    if (result.testPushWarning) {
+      setWarning(result.testPushWarning);
+    }
+    setShowPrompt(false);
+    return true;
+  }, [refreshStatus]);
+
   const enablePush = useCallback(async () => {
     if (!staffKey) return false;
     setLoading(true);
@@ -75,27 +117,30 @@ export function useWebPush(staffKey?: string) {
     setWarning('');
     try {
       const result = await subscribeToWebPush(staffKey);
-      if (!result.subscription) {
-        setPermission(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
-        if (Notification.permission === 'denied') {
-          setError('Trình duyệt đã chặn thông báo. Hãy bật lại trong Cài đặt.');
-        }
-        return false;
-      }
-      setPermission('granted');
-      await refreshStatus();
-      if (result.testPushWarning) {
-        setWarning(result.testPushWarning);
-      }
-      setShowPrompt(false);
-      return true;
+      return applySubscribeResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể bật thông báo điện thoại');
       return false;
     } finally {
       setLoading(false);
     }
-  }, [staffKey, refreshStatus]);
+  }, [staffKey, applySubscribeResult]);
+
+  const reregisterPush = useCallback(async () => {
+    if (!staffKey) return false;
+    setLoading(true);
+    setError('');
+    setWarning('');
+    try {
+      const result = await reregisterPushDevice(staffKey);
+      return applySubscribeResult(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể đăng ký lại thiết bị nhận thông báo');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [staffKey, applySubscribeResult]);
 
   const disablePush = useCallback(async () => {
     if (!staffKey) return;
@@ -124,6 +169,7 @@ export function useWebPush(staffKey?: string) {
         setError(issue);
         if (result.needsResubscribe) {
           setSubscribed(false);
+          setNeedsReregister(true);
         }
         return false;
       }
@@ -155,12 +201,16 @@ export function useWebPush(staffKey?: string) {
     supported: isPushSupported(),
     configured,
     subscribed,
+    serverSubscribed,
+    browserSubscribed,
+    needsReregister,
     permission,
     loading,
     error,
     warning,
     showPrompt,
     enablePush,
+    reregisterPush,
     disablePush,
     testPush,
     dismissPrompt,

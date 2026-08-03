@@ -54,11 +54,15 @@ interface StaffProfileViewProps {
     supported: boolean;
     configured: boolean;
     subscribed: boolean;
+    serverSubscribed: boolean;
+    browserSubscribed: boolean;
+    needsReregister: boolean;
     permission: NotificationPermission;
     loading: boolean;
     error: string;
     warning?: string;
     enablePush: () => Promise<boolean>;
+    reregisterPush: () => Promise<boolean>;
     disablePush: () => Promise<void>;
     testPush: () => Promise<boolean>;
     resetDismiss: () => void;
@@ -429,6 +433,8 @@ export default function StaffProfileView({
     if (webPush.permission === 'denied') return 'Đã chặn — bật lại trong Cài đặt iOS → Thông báo';
     if (!webPush.configured) return 'Đang khởi tạo push trên server — thử lại sau vài phút';
     if (webPush.subscribed) return 'Đang bật — nhận alert màn hình khóa';
+    if (webPush.needsReregister) return 'Máy chủ đã ghi nhận thiết bị nhưng điện thoại chưa đăng ký — bấm Đổi thiết bị';
+    if (webPush.serverSubscribed && !webPush.browserSubscribed) return 'Đăng ký trên server còn nhưng thiết bị mất kết nối — bấm Đổi thiết bị';
     if (webPush.permission === 'granted') return 'Đã cho phép nhưng chưa đăng ký thiết bị';
     return 'Chưa bật';
   })();
@@ -437,9 +443,16 @@ export default function StaffProfileView({
     && webPush.supported
     && webPush.configured
     && webPush.permission !== 'denied'
-    && !webPush.subscribed;
+    && !webPush.subscribed
+    && !webPush.needsReregister;
 
-  const canDisablePush = !!webPush && webPush.subscribed;
+  const canReregisterPush = !!webPush
+    && webPush.supported
+    && webPush.configured
+    && webPush.permission !== 'denied'
+    && (webPush.needsReregister || webPush.subscribed);
+
+  const canDisablePush = !!webPush && (webPush.subscribed || webPush.serverSubscribed);
   const canTestPush = !!webPush
     && webPush.supported
     && webPush.configured
@@ -788,6 +801,25 @@ export default function StaffProfileView({
                             {webPush.loading ? 'Đang tắt...' : 'Tắt thông báo'}
                           </button>
                         )}
+                        {canReregisterPush && (
+                          <button
+                            type="button"
+                            disabled={webPush.loading}
+                            onClick={() => {
+                              void webPush.reregisterPush().then(ok => {
+                                if (ok) {
+                                  triggerAlert?.(
+                                    webPush.warning || 'Đã đăng ký lại thiết bị nhận thông báo',
+                                    MODAL_TITLE.notify
+                                  );
+                                }
+                              });
+                            }}
+                            className="px-3 py-1.5 rounded-xl border border-amber-400 bg-white text-amber-900 text-[10px] font-bold hover:bg-amber-100 disabled:opacity-60"
+                          >
+                            {webPush.loading ? 'Đang đăng ký...' : 'Đổi thiết bị'}
+                          </button>
+                        )}
                         {canTestPush && (
                           <button
                             type="button"
@@ -802,7 +834,7 @@ export default function StaffProfileView({
                                 }
                               });
                             }}
-                            className="px-3 py-1.5 rounded-xl border border-amber-400 bg-white text-amber-900 text-[10px] font-bold hover:bg-amber-100 disabled:opacity-60"
+                            className="px-3 py-1.5 rounded-xl border border-amber-300 text-amber-900 text-[10px] font-bold hover:bg-amber-100 disabled:opacity-60"
                           >
                             {webPush.loading ? 'Đang gửi...' : 'Gửi thử push'}
                           </button>
