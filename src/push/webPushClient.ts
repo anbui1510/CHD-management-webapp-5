@@ -54,8 +54,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+async function pushNativeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const nativeFetch = (typeof window !== 'undefined' && (window as Window & { __CHD_NATIVE_FETCH__?: typeof fetch }).__CHD_NATIVE_FETCH__)
+    || fetch;
+  return nativeFetch(input, init);
+}
+
 async function fetchVapidPublicKey(): Promise<string> {
-  const res = await fetch('/api/push/vapid-public-key');
+  const res = await pushNativeFetch('/api/push/vapid-public-key');
   if (!res.ok) throw new Error('Không lấy được khóa push của hệ thống');
   const data = await res.json() as { publicKey?: string };
   if (!data.publicKey) throw new Error('Khóa push chưa được cấu hình trên server');
@@ -91,37 +97,45 @@ function formatSubscribeTestWarning(testPush?: PushDeliverResult): string {
 }
 
 export async function subscribeToWebPush(staffKey: string): Promise<SubscribeWebPushResult> {
-  if (!isPushSupported()) return { subscription: null };
+  if (!isPushSupported()) {
+    throw new Error('Thiết bị hoặc trình duyệt không hỗ trợ push');
+  }
+  if (isIosDevice() && !isStandaloneDisplayMode()) {
+    throw new Error('Trên iPhone, hãy Thêm vào Màn hình chính trước khi bật push');
+  }
 
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return { subscription: null };
+  if (permission !== 'granted') {
+    return { subscription: null };
+  }
 
   const registration = await registerAppServiceWorker();
-  if (!registration) return { subscription: null };
+  if (!registration) {
+    throw new Error('Không đăng ký được service worker — thử tải lại app');
+  }
 
   await navigator.serviceWorker.ready;
 
-  let publicKey: string;
-  try {
-    publicKey = await fetchVapidPublicKey();
-  } catch (error) {
-    console.warn('[web-push]', error);
-    return { subscription: null };
-  }
+  const publicKey = await fetchVapidPublicKey();
 
   let subscription = await registration.pushManager.getSubscription();
   if (subscription) {
     await subscription.unsubscribe().catch(() => undefined);
   }
 
-  subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey),
-  });
+  try {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Không tạo được push subscription';
+    throw new Error(message.includes('not allowed') ? 'iOS chưa cho phép push — kiểm tra Cài đặt → Thông báo' : message);
+  }
 
   const json = subscription.toJSON();
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  const res = await fetch('/api/push/subscribe', {
+  const res = await pushNativeFetch('/api/push/subscribe', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -137,7 +151,8 @@ export async function subscribeToWebPush(staffKey: string): Promise<SubscribeWeb
 
   if (!res.ok) {
     await subscription.unsubscribe().catch(() => undefined);
-    throw new Error('Không thể đăng ký thiết bị nhận thông báo');
+    const errBody = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(errBody.error || 'Không thể đăng ký thiết bị nhận thông báo');
   }
 
   const subscribeData = await res.json().catch(() => ({})) as {
@@ -159,7 +174,7 @@ export async function unsubscribeFromWebPush(staffKey: string): Promise<void> {
 
   const endpoint = subscription.endpoint;
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  await fetch('/api/push/unsubscribe', {
+  await pushNativeFetch('/api/push/unsubscribe', {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
@@ -171,6 +186,23 @@ export async function unsubscribeFromWebPush(staffKey: string): Promise<void> {
   await subscription.unsubscribe();
 }
 
+export async function repairPushRegistration(staffKey: string): Promise<boolean> {
+  if (!isPushSupported() || Notification.permission !== 'granted') return false;
+
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  if (existing) {
+    return syncExistingPushSubscription(staffKey);
+  }
+
+  try {
+    const result = await subscribeToWebPush(staffKey);
+    return !!result.subscription;
+  } catch {
+    return false;
+  }
+}
+
 export async function syncExistingPushSubscription(staffKey: string): Promise<boolean> {
   if (!isPushSupported() || Notification.permission !== 'granted') return false;
   const registration = await navigator.serviceWorker.ready;
@@ -179,7 +211,7 @@ export async function syncExistingPushSubscription(staffKey: string): Promise<bo
 
   const json = subscription.toJSON();
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  const res = await fetch('/api/push/subscribe', {
+  const res = await pushNativeFetch('/api/push/subscribe', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -201,7 +233,7 @@ export async function fetchPushStatus(staffKey?: string): Promise<{ configured: 
   const staffQuery = staffKey ? `?staffKey=${encodeURIComponent(staffKey)}` : '';
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`/api/push/status${staffQuery}`, { headers });
+  const res = await pushNativeFetch(`/api/push/status${staffQuery}`, { headers });
   if (!res.ok) {
     return { configured: false, subscribed: false, permission };
   }
@@ -224,7 +256,7 @@ export type PushDeliverResult = {
 
 export async function sendTestPush(staffKey: string): Promise<PushDeliverResult> {
   const token = localStorage.getItem('CHD_AUTH_TOKEN') || '';
-  const res = await fetch('/api/push/test', {
+  const res = await pushNativeFetch('/api/push/test', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
