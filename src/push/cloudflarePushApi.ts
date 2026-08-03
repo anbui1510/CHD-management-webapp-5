@@ -282,7 +282,12 @@ export async function handleCloudflarePushRequest(request: Request, env: Cloudfl
     if (!publicKey) {
       return json({ error: 'Web Push chưa được cấu hình trên server', configured: false }, 503);
     }
-    return json({ publicKey, configured: true });
+    return json({
+      publicKey,
+      configured: true,
+      pushSender: 'web-push-browser',
+      hasPrivateKey: !!String(env.VAPID_PRIVATE_KEY || '').trim(),
+    });
   }
 
   if (action === 'status' && method === 'GET') {
