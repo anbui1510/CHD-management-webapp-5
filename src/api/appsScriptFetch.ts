@@ -109,6 +109,7 @@ const endpointMap: Record<string, { type: SheetType; collection: keyof SheetData
 
 let cache: SheetData | null = null;
 let pendingLoad: Promise<SheetData> | null = null;
+let pendingLoadIsForce = false;
 let staffCache: any[] | null = null;
 let pendingStaffLoad: Promise<any[]> | null = null;
 
@@ -438,6 +439,7 @@ const setScriptUrl = (scriptUrl: string) => {
   }
   cache = null;
   pendingLoad = null;
+  pendingLoadIsForce = false;
   staffCache = null;
   pendingStaffLoad = null;
   void clearPersistedData();
@@ -575,7 +577,14 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
 
 
 const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
-  if (pendingLoad) return pendingLoad;
+  if (pendingLoad) {
+    // A soft fetch must not satisfy a force sync — wait and retry with force.
+    if (force && !pendingLoadIsForce) {
+      await pendingLoad.catch(() => undefined);
+    } else {
+      return pendingLoad;
+    }
+  }
 
   if (!getScriptUrl()) {
     await ensureSyncConfigHydrated();
@@ -585,6 +594,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
 
   if (!scriptUrl) {
     if (isLocalHost()) {
+      pendingLoadIsForce = force;
       pendingLoad = (async () => {
         const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ || window.fetch;
         const localRes = await nativeFetch('/api/all');
@@ -601,6 +611,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
         return cache;
       })().finally(() => {
         pendingLoad = null;
+        pendingLoadIsForce = false;
       });
       return pendingLoad;
     }
@@ -613,6 +624,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
     fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
   }
 
+  pendingLoadIsForce = force;
   pendingLoad = fetchAppsScriptWithRetry(
     () => fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force)),
     { maxAttempts: force ? 3 : 2 }
@@ -675,6 +687,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
     })
     .finally(() => {
       pendingLoad = null;
+      pendingLoadIsForce = false;
     });
 
   return pendingLoad;
@@ -1262,11 +1275,8 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       const token = extractBridgeToken(init);
       if (token) bridgeRevokeToken(token);
 
-      // Clear in-memory caches only — keep IndexedDB for fast next login on this device.
-      cache = null;
-      staffCache = null;
-      pendingLoad = null;
-      pendingStaffLoad = null;
+      // Clear all local caches so the next login always pulls fresh Sheets data.
+      await clearAllPersistedCache();
 
       return jsonResponse({ success: true });
     }
@@ -1588,6 +1598,7 @@ export const clearLocalCache = async (): Promise<void> => {
   cache = null;
   staffCache = null;
   pendingLoad = null;
+  pendingLoadIsForce = false;
   pendingStaffLoad = null;
 };
 
