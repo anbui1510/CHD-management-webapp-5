@@ -13,6 +13,7 @@ export const SCAR_WORKFLOW_NOTIFY_TITLE = WORKFLOW_INFO_NOTIFY_TITLE;
 
 export const HIS_IMPORT_AUTO_CLOSE_NOTIFY_TITLE = 'HIS import tự hoàn tất ca treo';
 export const REPEAT_INTERVENTION_NOTIFY_TITLE = 'Chỉ định can thiệp lại';
+export const SCHEDULER_NEW_CONSULT_NOTIFY_TITLE = 'Ca mới cần xếp lịch';
 
 export const REPEAT_INTERVENTION_WARNING =
   'Bệnh nhân này sẽ tự động chuyển vào view "Xếp lịch & Dụng cụ". Hãy thông báo cho người phụ trách nhận thông tin';
@@ -141,6 +142,19 @@ export function buildRepeatInterventionNotificationMessage(input: {
   postDiagnosisID: string;
 }): string {
   return `Bệnh nhân ${input.patientName} chẩn đoán ${input.postDiagnosisID} có chỉ định can thiệp lại đã được lưu trong "Xếp lịch & Dụng cụ".`;
+}
+
+export function buildSchedulerNewConsultNotificationMessage(input: {
+  patientName: string;
+  patientId: string;
+  consultResultID: string;
+  diagnosisID: string;
+}): string {
+  const name = input.patientName || 'không rõ tên';
+  const id = input.patientId || 'không rõ mã';
+  const result = input.consultResultID || 'chỉ định can thiệp';
+  const dx = input.diagnosisID ? ` (${input.diagnosisID})` : '';
+  return `Bệnh nhi ${name} (ID1: ${id})${dx} có kết luận "${result}" — cần xếp lịch trong "Xếp lịch & Dụng cụ".`;
 }
 
 export function buildSchedulingSummaryHeader(patientNameWithPtvUpper: string): string {

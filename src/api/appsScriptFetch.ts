@@ -2,12 +2,13 @@ import { handleChdBriefRequest } from './chdBriefBridge';
 import { buildWebPushPayload } from '../push/pushPayload';
 import { getAppVersionPayload } from '../appVersion';
 import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
-import type { Staff, Source } from '../types';
+import type { Staff, Source, Consult, Patient, Notification } from '../types';
 import {
   fetchAppsScriptWithRetry,
   formatAppsScriptFetchError,
   formatAppsScriptHttpError
 } from '../utils/appsScriptRetry';
+import { resolveSchedulerConsultNotification } from '../utils/consultSchedulerNotification';
 
 type SheetData = {
   patients: any[];
@@ -951,6 +952,98 @@ const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'i
   return result;
 };
 
+const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
+
+  const apiKey = getScriptSecret();
+  const response = await fetchAppsScriptWithRetry(
+    () => fetchWithTimeout(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete', ...payload, apiKey })
+    }),
+    { maxAttempts: 3 }
+  );
+
+  const text = await response.text();
+  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  const result = JSON.parse(text);
+  if (result.status === 'error') {
+    throw new Error(result.message || 'Apps Script không thể xóa dữ liệu');
+  }
+  return result;
+};
+
+const appendNotificationIfMissingBridge = async (input: Notification): Promise<Notification | null> => {
+  if (!input.StaffKey || !input.DedupKey) return null;
+
+  if (!cache) {
+    try {
+      await loadAllData();
+    } catch {
+      // fall through
+    }
+  }
+  if (!cache) return null;
+
+  const notifications = Array.isArray(cache.notifications) ? cache.notifications : [];
+  const existing = notifications.find(
+    item => item.DedupKey === input.DedupKey && item.StaffKey === input.StaffKey
+  );
+  if (existing) return existing as Notification;
+
+  const record: Notification = {
+    ...input,
+    NotificationKey: input.NotificationKey || createKey('notif'),
+    CreatedTime: input.CreatedTime || new Date().toISOString(),
+    IsRead: input.IsRead ?? false,
+  };
+
+  upsertCachedRecord(endpointMap.notifications, record, true);
+
+  const scriptUrl = getScriptUrl();
+  if (scriptUrl) {
+    try {
+      await postToScript(
+        { type: 'Notification', action: 'insert', key: record.NotificationKey, data: record },
+        endpointMap.notifications,
+        record,
+        true
+      );
+    } catch (err) {
+      console.error('Scheduler notification sync failed:', err);
+    }
+  }
+
+  deliverWebPushForNotification(record);
+  return record;
+};
+
+const maybeNotifySchedulerAboutConsultMutation = async (
+  previous: Consult | undefined,
+  updated: Consult
+): Promise<void> => {
+  if (!cache) {
+    try {
+      await loadAllData();
+    } catch {
+      return;
+    }
+  }
+  if (!cache) return;
+
+  const notification = resolveSchedulerConsultNotification({
+    previous,
+    updated,
+    staffList: cache.staff as Staff[],
+    patients: cache.patients as Patient[],
+  });
+  if (!notification) return;
+
+  await appendNotificationIfMissingBridge(notification);
+};
+
 const createKey = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 const getRecordKey = (record: any, config: (typeof endpointMap)[string]) => {
@@ -1077,6 +1170,11 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
     deliverWebPushForNotification(record);
   }
 
+  if (endpoint === 'consults') {
+    const previousConsult = existing ? ({ ...existing } as Consult) : undefined;
+    void maybeNotifySchedulerAboutConsultMutation(previousConsult, record as Consult);
+  }
+
   return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
 };
 
@@ -1120,35 +1218,17 @@ const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) =
 
   const finalKey = String(getRecordKey(existing, config) || key);
 
-  // Xoá cache ngay để UI phản hồi tức thì; đồng bộ Google Sheets ở background.
-  deleteCachedRecord(config, finalKey);
-
   const scriptUrl = getScriptUrl();
   if (scriptUrl) {
-    const apiKey = getScriptSecret();
-    const syncPayload = { action: 'delete', type: config.type, key: finalKey, apiKey };
-    void fetchWithTimeout(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(syncPayload)
-    }).then(async (response) => {
-      const text = await response.text();
-      if (!response.ok) {
-        console.error(`Background delete sync HTTP ${response.status}:`, text);
-        return;
-      }
-      try {
-        const result = JSON.parse(text);
-        if (result.status === 'error') {
-          console.error('Background delete sync error:', result.message);
-        }
-      } catch {
-        console.error('Background delete sync returned invalid JSON:', text);
-      }
-    }).catch((err) => {
-      console.error('Background delete sync failed:', err);
-    });
+    try {
+      await deleteFromScript({ type: config.type, key: finalKey });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể xóa trên Google Sheets';
+      return jsonResponse({ error: message }, { status: 502 });
+    }
   }
+
+  deleteCachedRecord(config, finalKey);
 
   return jsonResponse({ success: true, [config.keyField]: finalKey });
 };
