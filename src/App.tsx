@@ -67,7 +67,7 @@ import AppInlineSubheader from './components/layout/AppInlineSubheader';
 import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError, getMedicalDataFetchTimeout, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
-import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
+import { clearAllPersistedCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
@@ -679,6 +679,9 @@ export default function App() {
     void refreshMedicalData('mri', force);
   }, [refreshMedicalData]);
 
+  const isMedicalDataSyncing =
+    medicalDataLoadState.phase === 'loading' || medicalDataLoadState.phase === 'syncing';
+
   const refreshFullData = useCallback((force = false) => {
     if (force) {
       void syncMedicalDataInBackground('full', {
@@ -803,7 +806,7 @@ export default function App() {
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
           await hydrateSyncConfigFromServer();
-          void migrateLocalSyncConfigToServer();
+          await migrateLocalSyncConfigToServer();
           void loadMedicalDataAfterAuth('full', {
             onSyncStatus: (status) => reportPullResult(status)
           }).then(() => {
@@ -1049,7 +1052,7 @@ export default function App() {
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
 
       await hydrateSyncConfigFromServer();
-      void migrateLocalSyncConfigToServer();
+      await migrateLocalSyncConfigToServer();
       void loadMedicalDataAfterAuth('full', {
         onSyncStatus: (status) => reportPullResult(status)
       }).then(() => {
@@ -1104,8 +1107,8 @@ export default function App() {
     setNotifications([]);
     setDoctorPerformanceMarks([]);
 
-    // Clear IndexedDB cache and bridge memory cache
-    void clearLocalCache().catch(err => console.warn('Failed to clear local cache on logout:', err));
+    // Clear IndexedDB + bridge memory cache so next login always force-pulls Sheets.
+    void clearAllPersistedCache().catch(err => console.warn('Failed to clear local cache on logout:', err));
   }, [currentStaff]);
 
   handleLogoutRef.current = handleLogout;
@@ -2142,10 +2145,13 @@ export default function App() {
             {/* Sync trigger — bấm để kéo dữ liệu mới từ Google Sheets */}
             <button 
               onClick={() => refreshFullData(true)}
-              className="hover:bg-white/10 px-2 py-1.5 rounded-xl transition flex items-center gap-1 text-[10px] font-bold shrink-0 border border-white/20"
-              title="Đồng bộ lại dữ liệu từ Google Sheets"
+              disabled={isMedicalDataSyncing}
+              className={`hover:bg-white/10 px-2 py-1.5 rounded-xl transition flex items-center gap-1 text-[10px] font-bold shrink-0 border border-white/20 ${
+                isMedicalDataSyncing ? 'opacity-60 cursor-not-allowed' : ''
+              }`}
+              title={isMedicalDataSyncing ? 'Đang đồng bộ...' : 'Đồng bộ lại dữ liệu từ Google Sheets'}
             >
-              <RefreshCw className="w-3.5 h-3.5 text-white/90" />
+              <RefreshCw className={`w-3.5 h-3.5 text-white/90 ${isMedicalDataSyncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Đồng bộ</span>
             </button>
 
@@ -2237,8 +2243,12 @@ export default function App() {
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           <span>
             {medicalDataLoadState.phase === 'loading'
-              ? `Đang tải dữ liệu vào app... ${medicalLoadElapsedSec}s`
-              : `Đang đồng bộ Google Sheets... ${medicalLoadElapsedSec}s`}
+              ? (medicalLoadElapsedSec > 0
+                ? `Đang tải dữ liệu vào app... ${medicalLoadElapsedSec}s`
+                : 'Đang tải dữ liệu vào app...')
+              : (medicalLoadElapsedSec > 0
+                ? `Đang đồng bộ Google Sheets... ${medicalLoadElapsedSec}s`
+                : 'Đang đồng bộ Google Sheets...')}
           </span>
         </div>
       )}

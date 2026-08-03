@@ -29,6 +29,8 @@ export type RefreshMedicalDataOptions = {
 export type ForceSyncOptions = {
   /** Prefer "Đang đồng bộ…" even when UI already has cached rows. */
   preferSyncingBanner?: boolean;
+  /** Không hiện banner — dùng khi đã hydrate cache và sync nền sau login/F5. */
+  silent?: boolean;
   onSyncStatus?: (status: SheetsSyncStatus | undefined) => void;
 };
 
@@ -74,7 +76,7 @@ export function useRefreshMedicalData(
     if (shouldShowBanner && (meta.phase === 'idle' || meta.phase === 'error' || meta.phase === 'ready')) {
       emitState({
         phase: force ? 'syncing' : 'loading',
-        startedAt: meta.startedAt ?? now,
+        startedAt: now,
         message: force ? 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...' : 'Đang tải dữ liệu...'
       });
     }
@@ -128,14 +130,17 @@ export function useRefreshMedicalData(
     const meta = metaRef.current;
     if (meta.forcePending) return meta.forcePending;
 
-    const startedAt = meta.startedAt ?? Date.now();
-    emitState({
-      phase: bannerPhase,
-      startedAt,
-      message: bannerPhase === 'loading'
-        ? 'Đang tải dữ liệu vào app...'
-        : 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...'
-    });
+    const silent = options?.silent ?? false;
+    const startedAt = Date.now();
+    if (!silent) {
+      emitState({
+        phase: bannerPhase,
+        startedAt,
+        message: bannerPhase === 'loading'
+          ? 'Đang tải dữ liệu vào app...'
+          : 'Đang đồng bộ dữ liệu mới nhất từ Google Sheets...'
+      });
+    }
 
     meta.forcePending = fetchMedicalDataBundle(true)
       .then(bundle => {
@@ -144,11 +149,29 @@ export function useRefreshMedicalData(
         meta.lastForceAt = meta.lastAt;
         options?.onSyncStatus?.(bundle._syncStatus);
         const pullFailed = bundle._syncStatus?.configured && bundle._syncStatus.lastPullOk === false;
-        emitState({
-          phase: 'ready',
-          startedAt: null,
-          message: pullFailed ? bundle._syncStatus?.lastPullMessage : undefined
-        });
+        if (silent) {
+          if (pullFailed) {
+            emitState({
+              phase: 'error',
+              startedAt: null,
+              message: bundle._syncStatus?.lastPullMessage
+                || 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
+            });
+          } else if (meta.phase === 'loading' || meta.phase === 'syncing') {
+            emitState({ phase: 'ready', startedAt: null });
+          }
+          return;
+        }
+        if (pullFailed) {
+          emitState({
+            phase: 'error',
+            startedAt: null,
+            message: bundle._syncStatus?.lastPullMessage
+              || 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
+          });
+          return;
+        }
+        emitState({ phase: 'ready', startedAt: null });
       })
       .catch(async err => {
         console.warn('Force medical data sync failed:', err);
@@ -166,10 +189,20 @@ export function useRefreshMedicalData(
         if (hasCache && cached) {
           applyMedicalDataBundle(cached, scope, setters);
           meta.lastAt = Date.now();
+          if (silent) {
+            emitState({
+              phase: 'error',
+              startedAt: null,
+              message: err instanceof Error ? err.message : undefined
+            });
+            return;
+          }
           emitState({
-            phase: 'ready',
+            phase: 'error',
             startedAt: null,
-            message: err instanceof Error ? err.message : undefined
+            message: err instanceof Error
+              ? err.message
+              : 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
           });
           return;
         }
@@ -203,17 +236,26 @@ export function useRefreshMedicalData(
   ) => {
     const cached = await peekCachedMedicalDataBundle();
     const hasCache = !!cached && (cached.patients.length > 0 || cached.consults.length > 0);
+
     if (hasCache && cached) {
+      // F5 / tab còn cache: hiện dữ liệu ngay, sync nền không banner (tránh banner chạy 10–15s trong khi UI đã có dữ liệu).
       applyMedicalDataBundle(cached, scope, setters);
+      emitState({ phase: 'ready', startedAt: null });
+      try {
+        await runSingleForcePull(scope, 'syncing', { ...options, silent: true });
+      } catch (err) {
+        if (err instanceof AuthRequiredError) throw err;
+      }
+      return;
     }
 
+    // Login mới / sau logout: không có cache — banner gắn với force-pull thật, tắt ngay khi xong.
     try {
-      await runSingleForcePull(scope, hasCache ? 'syncing' : 'loading', options);
+      await runSingleForcePull(scope, 'loading', options);
     } catch (err) {
       if (err instanceof AuthRequiredError) throw err;
-      // Cached rows already on screen; keep error banner for the failed pull.
     }
-  }, [runSingleForcePull, setters]);
+  }, [runSingleForcePull, setters, emitState]);
 
   const wasRecentlyForceSynced = useCallback(() => {
     const meta = metaRef.current;
@@ -222,10 +264,16 @@ export function useRefreshMedicalData(
     return Date.now() - meta.lastForceAt < FORCE_SYNC_SETTLE_MS;
   }, []);
 
+  const isSyncInProgress = useCallback(() => {
+    const meta = metaRef.current;
+    return !!meta.forcePending || meta.phase === 'loading' || meta.phase === 'syncing';
+  }, []);
+
   return {
     refreshMedicalData,
     syncMedicalDataInBackground,
     loadMedicalDataAfterAuth,
-    wasRecentlyForceSynced
+    wasRecentlyForceSynced,
+    isSyncInProgress
   };
 }
