@@ -15,14 +15,14 @@ export default function BootstrapErrorScreen({
         </h1>
         <p className="text-sm text-neutral-300 leading-relaxed">{message}</p>
         <p className="text-xs text-neutral-500 leading-relaxed">
-          Nếu mở từ icon màn hình chính (PWA) bị lỗi, hãy bấm nút bên dưới hoặc xóa shortcut cũ rồi thêm lại từ Safari sau khi trang đã mở bình thường.
+          Ứng dụng thường tự cập nhật sau mỗi lần deploy. Nếu vẫn lỗi, bấm nút bên dưới để tải lại — không cần gõ link hay thao tác kỹ thuật.
         </p>
         <button
           type="button"
           onClick={onRetry || (() => window.location.reload())}
           className="w-full rounded-xl bg-[#d2145a] hover:bg-pink-700 py-2.5 text-xs font-bold uppercase tracking-wide cursor-pointer"
         >
-          Xóa cache app &amp; tải lại
+          Xóa cache &amp; tải lại
         </button>
       </div>
     </div>

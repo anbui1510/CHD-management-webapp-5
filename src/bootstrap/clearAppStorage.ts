@@ -32,13 +32,35 @@ async function deleteIndexedDb(): Promise<void> {
   });
 }
 
-export async function clearAppStorage(options?: { preserveScriptConfig?: boolean }): Promise<void> {
+export async function clearAppRuntimeCaches(): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(key => caches.delete(key)));
+  }
+
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(reg => reg.unregister()));
+  }
+}
+
+export async function clearAppStorage(options?: {
+  preserveScriptConfig?: boolean;
+  preserveAuth?: boolean;
+  preserveMedicalCache?: boolean;
+}): Promise<void> {
   if (typeof window === 'undefined') return;
 
   const preserveScriptConfig = options?.preserveScriptConfig !== false;
+  const preserveAuth = options?.preserveAuth === true;
+  const preserveMedicalCache = options?.preserveMedicalCache === true;
   const preserved = preserveScriptConfig ? preserveLocalStorageValues() : {};
 
-  localStorage.removeItem('CHD_AUTH_TOKEN');
+  if (!preserveAuth) {
+    localStorage.removeItem('CHD_AUTH_TOKEN');
+  }
 
   if (!preserveScriptConfig) {
     localStorage.clear();
@@ -57,20 +79,14 @@ export async function clearAppStorage(options?: { preserveScriptConfig?: boolean
     restoreLocalStorageValues(preserved);
   }
 
-  if ('caches' in window) {
-    const keys = await caches.keys();
-    await Promise.all(keys.map(key => caches.delete(key)));
-  }
+  await clearAppRuntimeCaches();
 
-  if ('serviceWorker' in navigator) {
-    const regs = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(regs.map(reg => reg.unregister()));
-  }
-
-  try {
-    await deleteIndexedDb();
-  } catch (err) {
-    console.warn('Failed to delete IndexedDB:', err);
+  if (!preserveMedicalCache) {
+    try {
+      await deleteIndexedDb();
+    } catch (err) {
+      console.warn('Failed to delete IndexedDB:', err);
+    }
   }
 }
 

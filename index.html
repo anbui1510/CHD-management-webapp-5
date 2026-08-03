@@ -52,8 +52,37 @@
           return;
         }
 
-        // Detect Cloudflare deploy while PWA still serves cached HTML/JS (build id was stuck as gsheets-v5).
+        // Detect Cloudflare deploy while PWA still serves cached HTML/JS.
         var localBuildId = window.__CHD_APP_BUILD_ID;
+        function chdClearRuntimeCaches() {
+          if ('caches' in window) {
+            caches.keys().then(function (keys) {
+              keys.forEach(function (key) { caches.delete(key); });
+            });
+          }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              regs.forEach(function (reg) { reg.unregister(); });
+            });
+          }
+        }
+        function chdTryAutoRecover(reason) {
+          if (sessionStorage.getItem('CHD_STALE_RECOVERY_AT')) return;
+          fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+              var remoteBuildId = data && (data.buildId || data.buildTime);
+              var versionMismatch = remoteBuildId && localBuildId && remoteBuildId !== localBuildId;
+              var staleError = reason && /can't find variable|cannot find variable|importing a module script failed|failed to fetch dynamically imported module| is not defined/i.test(reason);
+              var bootTimeout = reason === 'boot-timeout';
+              if (!versionMismatch && !staleError && !bootTimeout) return;
+              sessionStorage.setItem('CHD_STALE_RECOVERY_AT', String(Date.now()));
+              chdClearRuntimeCaches();
+              location.reload();
+            })
+            .catch(function () {});
+        }
+        window.__CHD_tryAutoRecover = chdTryAutoRecover;
         if (localBuildId && localBuildId !== '__CHD_BUILD_ID__' && !sessionStorage.getItem('CHD_DEPLOY_RELOAD_AT')) {
           fetch('/version.json?_=' + Date.now(), { cache: 'no-store' })
             .then(function (res) { return res.ok ? res.json() : null; })
@@ -63,16 +92,7 @@
               if (sessionStorage.getItem('CHD_BUILD_MISMATCH_RELOAD')) return;
               sessionStorage.setItem('CHD_BUILD_MISMATCH_RELOAD', '1');
               sessionStorage.setItem('CHD_DEPLOY_RELOAD_AT', String(Date.now()));
-              if ('caches' in window) {
-                caches.keys().then(function (keys) {
-                  keys.forEach(function (key) { caches.delete(key); });
-                });
-              }
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function (regs) {
-                  regs.forEach(function (reg) { reg.unregister(); });
-                });
-              }
+              chdClearRuntimeCaches();
               location.reload();
             })
             .catch(function () {});
@@ -86,7 +106,7 @@
           '<div style="max-width:420px">' +
           '<h1 style="color:#d2145a;font-size:18px;margin:0 0 12px">' + title + '</h1>' +
           '<p style="font-size:14px;line-height:1.5;color:#d4d4d4;margin:0 0 16px">' + message + '</p>' +
-          '<button type="button" id="boot-clear-btn" style="margin-top:4px;background:#d2145a;color:#fff;border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer">Xóa cache app &amp; tải lại</button>' +
+          '<button type="button" id="boot-clear-btn" style="margin-top:4px;background:#d2145a;color:#fff;border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer">Xóa cache &amp; tải lại</button>' +
           '</div>';
         var btn = document.getElementById('boot-clear-btn');
         if (btn) {
@@ -116,18 +136,24 @@
         var msg = (event && event.message) || '';
         if (!msg || msg === 'Script error.' || msg === 'Script error') return;
         if (msg.indexOf('supabaseUrl is required') !== -1 || msg.indexOf('Importing a module script failed') !== -1) {
+          window.__CHD_tryAutoRecover?.(msg);
           window.__CHD_showBootFallback(
-            'Trình duyệt đang giữ bản app cũ',
-            'Cache trình duyệt vẫn chứa bản Supabase cũ. Bấm nút bên dưới để xóa cache và tải lại.'
+            'Đang cập nhật phiên bản mới',
+            'Ứng dụng phát hiện bản cũ và đang tự tải lại. Chờ vài giây hoặc bấm nút bên dưới.'
           );
+          return;
+        }
+        if (/can't find variable|cannot find variable| is not defined/i.test(msg)) {
+          window.__CHD_tryAutoRecover?.(msg);
         }
       });
       setTimeout(function () {
         var root = document.getElementById('root');
         if (root && !root.innerHTML.trim()) {
+          window.__CHD_tryAutoRecover?.('boot-timeout');
           window.__CHD_showBootFallback(
-            'App đang tải chậm hoặc bị kẹt',
-            'Nếu màn hình vẫn trắng, bấm nút bên dưới để xóa cache cũ. Hoặc mở link này kèm ?reset=1'
+            'App đang tải chậm',
+            'Hệ thống sẽ tự thử tải phiên bản mới. Nếu vẫn trắng sau vài giây, bấm nút bên dưới.'
           );
         }
       }, 8000);

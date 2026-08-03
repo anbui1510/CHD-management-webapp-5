@@ -10,7 +10,11 @@ export async function migrateAppBuild(): Promise<void> {
   const previous = localStorage.getItem('CHD_APP_BUILD_ID');
 
   if (previous && previous !== activeBuildId) {
-    await clearAppStorage({ preserveScriptConfig: true });
+    await clearAppStorage({
+      preserveScriptConfig: true,
+      preserveAuth: true,
+      preserveMedicalCache: true,
+    });
     if (!sessionStorage.getItem(MIGRATE_RELOAD_KEY)) {
       sessionStorage.setItem(MIGRATE_RELOAD_KEY, '1');
       localStorage.setItem('CHD_APP_BUILD_ID', activeBuildId);
