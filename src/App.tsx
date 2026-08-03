@@ -809,14 +809,19 @@ export default function App() {
           localStorage.setItem(CHD_APP_BUILD_ID_KEY, APP_BUILD_ID);
           setAuthToken(storedToken);
           setCurrentStaff(staffData);
-          void loadMedicalDataAfterAuth('full', {
-            onSyncStatus: (status) => reportPullResult(status)
-          }).then(() => {
+          try {
+            await loadMedicalDataAfterAuth('full', {
+              onSyncStatus: (status) => reportPullResult(status)
+            });
             reportPullResult();
             void refreshSheetsSyncStatus();
-          }).catch(handleAuthDataFailure);
-          await hydrateSyncConfigFromServer();
-          await migrateLocalSyncConfigToServer();
+          } catch (err) {
+            handleAuthDataFailure(err);
+          } finally {
+            void hydrateSyncConfigFromServer()
+              .then(() => migrateLocalSyncConfigToServer())
+              .catch(err => console.warn('Sync config hydrate failed after session restore:', err));
+          }
         })
         .catch(() => {
           localStorage.removeItem('CHD_AUTH_TOKEN');
@@ -1067,25 +1072,28 @@ export default function App() {
       setCurrentStaff(staffData);
       setNewConsultData(prev => ({ ...prev, RequestBy: staffData.StaffName }));
 
-      void loadMedicalDataAfterAuth('full', {
-        onSyncStatus: (status) => reportPullResult(status)
-      }).then(() => {
-        reportPullResult();
-        void refreshSheetsSyncStatus();
-      }).catch(err => {
-        if (err instanceof AuthRequiredError) {
-          handleAuthDataFailure(err);
-          return;
+      void (async () => {
+        try {
+          await loadMedicalDataAfterAuth('full', {
+            onSyncStatus: (status) => reportPullResult(status)
+          });
+          reportPullResult();
+          void refreshSheetsSyncStatus();
+        } catch (err) {
+          if (err instanceof AuthRequiredError) {
+            handleAuthDataFailure(err);
+            return;
+          }
+          reportPullResult();
+          void refreshSheetsSyncStatus();
+          const msg = err instanceof Error ? err.message : String(err);
+          setLoginError(msg || 'Không tải được dữ liệu từ Google Sheets.');
+        } finally {
+          void hydrateSyncConfigFromServer()
+            .then(() => migrateLocalSyncConfigToServer())
+            .catch(err => console.warn('Sync config hydrate failed after login:', err));
         }
-        reportPullResult();
-        void refreshSheetsSyncStatus();
-        const msg = err instanceof Error ? err.message : String(err);
-        setLoginError(msg || 'Không tải được dữ liệu từ Google Sheets.');
-      });
-
-      void hydrateSyncConfigFromServer()
-        .then(() => migrateLocalSyncConfigToServer())
-        .catch(err => console.warn('Sync config hydrate failed after login:', err));
+      })();
     } catch (err) {
       setLoginError('L\u1ed7i k\u1ebft n\u1ed1i. Vui l\u00f2ng ki\u1ec3m tra m\u1ea1ng v\u00e0 th\u1eed l\u1ea1i.');
     }

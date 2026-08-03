@@ -62,18 +62,26 @@ const getScriptSecret = () =>
   localStorage.getItem(SCRIPT_SECRET_STORAGE_KEY) ||
   String(viteEnv.VITE_GOOGLE_SCRIPT_SECRET || viteEnv.VITE_GOOGLE_SCRIPT_API_KEY || '').trim();
 
-const setScriptSecret = (secret: string) => {
+const clearMemoryCache = (): void => {
+  cache = null;
+  pendingLoad = null;
+  pendingLoadIsForce = false;
+  staffCache = null;
+  pendingStaffLoad = null;
+};
+
+const setScriptSecret = (secret: string): boolean => {
   const trimmed = secret.trim();
+  const previous = getScriptSecret();
+  if (trimmed === previous) return false;
+
   if (trimmed) {
     localStorage.setItem(SCRIPT_SECRET_STORAGE_KEY, trimmed);
   } else {
     localStorage.removeItem(SCRIPT_SECRET_STORAGE_KEY);
   }
-  cache = null;
-  pendingLoad = null;
-  staffCache = null;
-  pendingStaffLoad = null;
-  void clearPersistedData();
+  clearMemoryCache();
+  return true;
 };
 const viteEnv = (import.meta as any).env || {};
 
@@ -430,19 +438,24 @@ export const getClientSheetsSyncStatus = () => ({
   lastPushMessage: clientSheetsPullState.lastPushMessage
 });
 
-const setScriptUrl = (scriptUrl: string) => {
+const setScriptUrl = (scriptUrl: string): boolean => {
   const trimmed = scriptUrl.trim();
+  const previous = getScriptUrl();
+  if (trimmed === previous) {
+    if (trimmed && !localStorage.getItem(SCRIPT_URL_STORAGE_KEY)) {
+      localStorage.setItem(SCRIPT_URL_STORAGE_KEY, trimmed);
+    }
+    return false;
+  }
+
   if (trimmed) {
     localStorage.setItem(SCRIPT_URL_STORAGE_KEY, trimmed);
   } else {
     localStorage.removeItem(SCRIPT_URL_STORAGE_KEY);
   }
-  cache = null;
-  pendingLoad = null;
-  pendingLoadIsForce = false;
-  staffCache = null;
-  pendingStaffLoad = null;
+  clearMemoryCache();
   void clearPersistedData();
+  return true;
 };
 
 const jsonResponse = (body: unknown, init?: ResponseInit) =>
@@ -1616,7 +1629,8 @@ const applySyncConfigRecord = (scriptUrl: string, scriptSecret?: string): boolea
   const trimmedUrl = String(scriptUrl || '').trim();
   if (!trimmedUrl) return false;
   setScriptUrl(trimmedUrl);
-  if (scriptSecret) setScriptSecret(scriptSecret);
+  const secret = String(scriptSecret || '').trim();
+  if (secret) setScriptSecret(secret);
   return true;
 };
 
@@ -1685,6 +1699,17 @@ export const installAppsScriptFetchBridge = () => {
   (window as any).__CHD_APPS_SCRIPT_FETCH_BRIDGE__ = true;
 
   hydrateBridgeSessions();
+
+  const builtInUrl = String(viteEnv.VITE_GOOGLE_SCRIPT_URL || '').trim();
+  if (builtInUrl && !localStorage.getItem(SCRIPT_URL_STORAGE_KEY)) {
+    localStorage.setItem(SCRIPT_URL_STORAGE_KEY, builtInUrl);
+  }
+  const builtInSecret = String(
+    viteEnv.VITE_GOOGLE_SCRIPT_SECRET || viteEnv.VITE_GOOGLE_SCRIPT_API_KEY || ''
+  ).trim();
+  if (builtInSecret && !localStorage.getItem(SCRIPT_SECRET_STORAGE_KEY)) {
+    localStorage.setItem(SCRIPT_SECRET_STORAGE_KEY, builtInSecret);
+  }
 
   const nativeFetch = window.fetch.bind(window);
   (window as any).__CHD_NATIVE_FETCH__ = nativeFetch;
