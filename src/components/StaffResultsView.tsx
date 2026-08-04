@@ -10,7 +10,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import ResultStaffDrawer from './ResultStaffDrawer';
 import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
-import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
+import { buildSyncContext, persistWithSheetsSync, withSyncContext } from '../utils/sheetsSyncMutation';
 import {
   findDuplicatePatientById1,
   PATIENT_VALIDATION_MSG,
