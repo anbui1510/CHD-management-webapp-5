@@ -1583,6 +1583,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                           createLabel={(val) => `Thêm BS "${val}"`}
                           placeholder="-- Chọn BS --"
                           searchPlaceholder="Gõ tên BS..."
+                          direction={isMobile ? 'down' : 'up'}
                         />
                       </div>
 
@@ -1596,6 +1597,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                           createLabel={(val) => `Thêm khoa "${val}"`}
                           placeholder="-- Chọn khoa --"
                           searchPlaceholder="Gõ tên khoa..."
+                          direction={isMobile ? 'down' : 'up'}
                         />
                       </div>
                     </div>
