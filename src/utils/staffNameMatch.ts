@@ -99,6 +99,15 @@ export function resolveStaffByNameOrKey(
   });
 }
 
+/** Tên hiển thị chuẩn từ StaffKey / StaffName / Name (vd. BS. Ân). */
+export function resolveStaffDisplayName(
+  candidate: string | undefined | null,
+  staffList: Staff[] = []
+): string {
+  const staff = resolveStaffByNameOrKey(candidate, staffList);
+  return staff?.StaffName || staff?.Name || String(candidate || '').trim();
+}
+
 export function getStaffInitial(staff: Staff): string {
   const parts = staff.StaffName.trim().split(/\s+/);
   const lastName = parts[parts.length - 1] || staff.StaffName.charAt(0) || '?';

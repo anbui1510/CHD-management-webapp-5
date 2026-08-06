@@ -41,15 +41,48 @@ export const SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER = '📅 *THÔNG TIN CẬP 
 
 export const SCHEDULE_DELAY_REMINDER_NOTIFY_TITLE = 'Cảnh báo trễ xếp lịch';
 
+/** Tiền tố chuẩn: BN {PatientName} hoặc BN {PatientName} ({DiagnosisID}). */
+export function buildNotificationPatientPrefix(input: {
+  patientName: string;
+  diagnosisID?: string;
+}): string {
+  const name = String(input.patientName || '').trim();
+  if (!name) return 'BN';
+  const diagnosisID = String(input.diagnosisID || '').trim();
+  return diagnosisID ? `BN ${name} (${diagnosisID})` : `BN ${name}`;
+}
+
+export function buildPendingStaffResultNotificationMessage(input: {
+  patientName: string;
+  diagnosisID?: string;
+  requestBy: string;
+}): string {
+  const prefix = buildNotificationPatientPrefix(input);
+  const requester = String(input.requestBy || 'BS đăng ký').trim();
+  return `${prefix} của ${requester} đăng ký chưa có kết quả hội chẩn.`;
+}
+
+export function buildMissingCathResultNotificationMessage(input: {
+  patientName: string;
+  diagnosisID?: string;
+  ptv1Name: string;
+}): string {
+  const prefix = buildNotificationPatientPrefix(input);
+  const ptv1 = String(input.ptv1Name || 'PTV phụ 1').trim();
+  return `${prefix} của PTV1 ${ptv1} đã quá 1 tháng từ ngày dự kiến thông tim nhưng chưa có kết quả thông tim.`;
+}
+
 export function buildScheduleDelayReminderMessage(input: {
   patientName: string;
-  patientId: string;
+  diagnosisID?: string;
   delayLabel: string;
   missedDays: number;
 }): string {
-  const name = input.patientName || 'không rõ tên';
-  const id = input.patientId || 'không rõ mã';
-  return `Bệnh nhi ${name} (ID1: ${id}) ${input.delayLabel.toLowerCase()} (${input.missedDays} ngày) chưa xếp lịch thông tim dự kiến. Mời bạn xem lại và xếp lịch.`;
+  const prefix = buildNotificationPatientPrefix({
+    patientName: input.patientName,
+    diagnosisID: input.diagnosisID,
+  });
+  return `${prefix} ${input.delayLabel.toLowerCase()} (${input.missedDays} ngày) chưa xếp lịch thông tim dự kiến. Mời bạn xem lại và xếp lịch.`;
 }
 
 export function getHisStageLabel(stage: HisWorkflowStage): string {
@@ -66,12 +99,15 @@ export function getHisImportMarkScore(stage: HisWorkflowStage): number {
 
 export function buildHisImportNotificationMessage(input: {
   patientName: string;
-  patientId?: string;
+  diagnosisID?: string;
   cathDateFormatted: string;
   stage: HisWorkflowStage;
 }): string {
-  const displayName = input.patientName || input.patientId || '';
-  return `${displayName} đã có kết quả thông tim thực tế ngày ${input.cathDateFormatted} từ HIS. Workflow treo "${getHisStageLabel(input.stage)}" đã được tự động đóng.`;
+  const prefix = buildNotificationPatientPrefix({
+    patientName: input.patientName,
+    diagnosisID: input.diagnosisID,
+  });
+  return `${prefix} đã có kết quả thông tim thực tế ngày ${input.cathDateFormatted} từ HIS. Workflow treo "${getHisStageLabel(input.stage)}" đã được tự động đóng.`;
 }
 
 export function buildHisAutoCloseConsultLogLine(input: {
@@ -83,9 +119,9 @@ export function buildHisAutoCloseConsultLogLine(input: {
   return `[HIS import ${input.isoTimestamp}] Đã tự hoàn tất workflow "${getHisStageLabel(input.stage)}" vì HIS ghi nhận ca thông tim thực tế ngày ${input.cathDateFormatted}. CathKey=${input.cathKey}`;
 }
 
-/** Ca CT đã TT khi chưa đăng ký HC — thông báo sự việc đã xảy ra. */
-export function buildEmergProgCaseAScar(input: { patientName: string; patientId: string }) {
-  const text = `Bệnh nhi ${input.patientName} (ID1: ${input.patientId}) đã thông tim chương trình khi chưa được đăng ký hội chẩn.`;
+/** Ca CT đã TT khi chưa đăng ký HC — ghi nhận trong hồ sơ cảnh báo. */
+export function buildEmergProgCaseAScar(input: { patientName: string; diagnosisID?: string }) {
+  const text = `${buildNotificationPatientPrefix(input)} đã thông tim chương trình khi chưa được đăng ký hội chẩn.`;
   return {
     label: EMERG_PROG_LABEL_SKIP_CONSULT,
     reason: text,
@@ -93,9 +129,9 @@ export function buildEmergProgCaseAScar(input: { patientName: string; patientId:
   };
 }
 
-/** Ca CT đã TT, HC vẫn treo chưa KQ staff — thông báo sự việc đã xảy ra. */
-export function buildEmergProgCaseBTaiScar(input: { patientName: string }) {
-  const text = `Bệnh nhi ${input.patientName} đã thông tim chương trình; hồ sơ hội chẩn vẫn còn treo chưa có kết quả staff.`;
+/** Ca CT đã TT, HC vẫn treo chưa KQ staff — ghi nhận trong hồ sơ cảnh báo. */
+export function buildEmergProgCaseBTaiScar(input: { patientName: string; diagnosisID?: string }) {
+  const text = `${buildNotificationPatientPrefix(input)} đã thông tim chương trình; hồ sơ hội chẩn vẫn còn treo chưa có kết quả staff.`;
   return {
     label: EMERG_PROG_LABEL_LATE_STAFF_RESULT,
     reason: text,
@@ -103,9 +139,9 @@ export function buildEmergProgCaseBTaiScar(input: { patientName: string }) {
   };
 }
 
-/** Ca CT đã TT, vẫn còn trên DS HC chưa chuyển phòng — thông báo sự việc đã xảy ra. */
-export function buildEmergProgCaseBHieuScar(input: { patientName: string }) {
-  const text = `Bệnh nhi ${input.patientName} đã thông tim chương trình; ca vẫn còn trên danh sách hội chẩn chưa chuyển phòng.`;
+/** Ca CT đã TT, vẫn còn trên DS HC chưa chuyển phòng — ghi nhận trong hồ sơ cảnh báo. */
+export function buildEmergProgCaseBHieuScar(input: { patientName: string; diagnosisID?: string }) {
+  const text = `${buildNotificationPatientPrefix(input)} đã thông tim chương trình; ca vẫn còn trên danh sách hội chẩn chưa chuyển phòng.`;
   return {
     label: EMERG_PROG_LABEL_PENDING_TRANSFER,
     reason: text,
@@ -113,9 +149,9 @@ export function buildEmergProgCaseBHieuScar(input: { patientName: string }) {
   };
 }
 
-/** Ca CT đã TT khi HC chưa chuyển phòng đúng quy trình — thông báo sự việc đã xảy ra. */
-export function buildEmergProgCaseCScar(input: { patientName: string }) {
-  const text = `Bệnh nhi ${input.patientName} đã thông tim chương trình khi hồ sơ hội chẩn chưa được chuyển phòng.`;
+/** Ca CT đã TT khi HC chưa chuyển phòng đúng quy trình — ghi nhận trong hồ sơ cảnh báo. */
+export function buildEmergProgCaseCScar(input: { patientName: string; diagnosisID?: string }) {
+  const text = `${buildNotificationPatientPrefix(input)} đã thông tim chương trình khi hồ sơ hội chẩn chưa được chuyển phòng.`;
   return {
     label: EMERG_PROG_LABEL_SLOW_TRANSFER,
     reason: text,
@@ -123,9 +159,9 @@ export function buildEmergProgCaseCScar(input: { patientName: string }) {
   };
 }
 
-/** Vượt quyền xếp lịch đã kích hoạt — thông báo sự việc đã xảy ra. */
-export function buildOverrideSchedulingScar(input: { patientName: string; patientId: string }) {
-  const text = `BS xếp lịch đã vượt quyền kích hoạt xếp lịch bổ sung cho bệnh nhi ${input.patientName} (ID1: ${input.patientId}); kết quả hội chẩn của ca này chưa được điền đúng hạn.`;
+/** Vượt quyền xếp lịch đã kích hoạt — ghi nhận trong hồ sơ cảnh báo. */
+export function buildOverrideSchedulingScar(input: { patientName: string; diagnosisID?: string }) {
+  const text = `${buildNotificationPatientPrefix(input)} đã được xếp lịch bổ sung khi kết quả hội chẩn chưa được điền đúng hạn.`;
   return {
     label: EMERG_PROG_LABEL_LATE_STAFF_RESULT,
     reason: text,
@@ -141,20 +177,24 @@ export function buildRepeatInterventionNotificationMessage(input: {
   patientName: string;
   postDiagnosisID: string;
 }): string {
-  return `Bệnh nhân ${input.patientName} chẩn đoán ${input.postDiagnosisID} có chỉ định can thiệp lại đã được lưu trong "Xếp lịch & Dụng cụ".`;
+  const prefix = buildNotificationPatientPrefix({
+    patientName: input.patientName,
+    diagnosisID: input.postDiagnosisID,
+  });
+  return `${prefix} có chỉ định can thiệp lại đã được lưu trong "Xếp lịch & Dụng cụ".`;
 }
 
 export function buildSchedulerNewConsultNotificationMessage(input: {
   patientName: string;
-  patientId: string;
+  diagnosisID?: string;
   consultResultID: string;
-  diagnosisID: string;
 }): string {
-  const name = input.patientName || 'không rõ tên';
-  const id = input.patientId || 'không rõ mã';
+  const prefix = buildNotificationPatientPrefix({
+    patientName: input.patientName,
+    diagnosisID: input.diagnosisID,
+  });
   const result = input.consultResultID || 'chỉ định can thiệp';
-  const dx = input.diagnosisID ? ` (${input.diagnosisID})` : '';
-  return `Bệnh nhi ${name} (ID1: ${id})${dx} có kết luận "${result}" — cần xếp lịch trong "Xếp lịch & Dụng cụ".`;
+  return `${prefix} có kết luận "${result}" — cần xếp lịch trong "Xếp lịch & Dụng cụ".`;
 }
 
 export function buildSchedulingSummaryHeader(patientNameWithPtvUpper: string): string {

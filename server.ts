@@ -13,8 +13,12 @@ import { Patient, Consult, Staff, CathLab, CMR, Transplant, Source, DeviceTempla
 import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
 import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
-import { resolveStaffByNameOrKey } from './src/utils/staffNameMatch';
-import { resolveSchedulerConsultNotification } from './src/utils/consultSchedulerNotification';
+import { resolveStaffByNameOrKey, resolveStaffDisplayName } from './src/utils/staffNameMatch';
+import {
+  buildMissingCathResultNotificationMessage,
+  buildNotificationPatientPrefix,
+  buildPendingStaffResultNotificationMessage,
+} from './src/utils/workflowMessages';
 import {
   buildScheduleDelayReminderDedupKey,
   buildScheduleDelayReminderMessage,
@@ -817,7 +821,7 @@ function checkSchedulingDelays(): void {
           Title: SCHEDULE_DELAY_REMINDER_NOTIFY_TITLE,
           Message: buildScheduleDelayReminderMessage({
             patientName: patientContext.PatientName,
-            patientId: patientContext.PatientID,
+            diagnosisID: consult.DiagnosisID,
             delayLabel: levelConfig.label,
             missedDays,
           }),
@@ -993,9 +997,10 @@ function extractSyncContext(body: any): { payload: any; syncContext?: SheetsSync
 }
 
 function buildSheetsFailureMessage(syncContext: SheetsSyncContext | undefined, syncResult: SheetsSyncResult): string {
-  const patient = String(syncContext?.patientName || '').trim() || 'không rõ tên';
+  const patient = String(syncContext?.patientName || '').trim();
+  const prefix = patient ? buildNotificationPatientPrefix({ patientName: patient }) : 'BN';
   const view = String(syncContext?.viewLabel || syncContext?.viewModule || '').trim() || 'không rõ';
-  return `Thay đổi của bệnh nhân ${patient} ở view ${view} chưa ghi lên Google thành công. ${syncResult.message}`;
+  return `${prefix} thay đổi ở view ${view} chưa ghi lên Google thành công. ${syncResult.message}`;
 }
 
 function mapEntityToNotificationType(entityType: string): Notification['RelatedEntityType'] {
@@ -1756,22 +1761,12 @@ function isRemovedConsult(consult: Consult): boolean {
 }
 
 function notifySchedulerIfEligibleConsult(
-  previous: Consult | undefined,
-  updated: Consult,
-  staffList: Staff[],
-  patients: Patient[]
+  _previous: Consult | undefined,
+  _updated: Consult,
+  _staffList: Staff[],
+  _patients: Patient[]
 ): void {
-  const notification = resolveSchedulerConsultNotification({
-    previous,
-    updated,
-    staffList,
-    patients,
-  });
-  if (!notification) return;
-
-  void appendNotificationIfMissing(notification).catch(err => {
-    console.error('Error pushing scheduler new consult notification:', err);
-  });
+  // Không gửi thông báo chuông/push khi Consult đủ điều kiện xếp lịch — chỉ xử lý nghiệp vụ khác nếu cần.
 }
 
 function notifyStaffAboutConsult(staff: Staff | undefined, consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, title: string, message: string, dedupPrefix: string, severity: Notification['Severity'] = 'warning') {
@@ -1799,7 +1794,7 @@ function createSecretaryOverrideMark(consult: Consult, patientCtx: ReturnType<ty
     StaffName: secretary.StaffName,
     MarkType: 'missing_staff_result',
     Label: 'Không hoàn thành điền kết quả staff',
-    Reason: `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} đã phải xếp bổ sung do thiếu kết quả hội chẩn.`,
+    Reason: `${buildNotificationPatientPrefix({ patientName: patientCtx.PatientName, diagnosisID: consult.DiagnosisID })} đã phải xếp bổ sung vì chưa có kết quả hội chẩn.`,
     RelatedEntityType: 'Consult',
     RelatedEntityKey: consult.ConsultKey,
     PatientKey: patientCtx.PatientKey,
@@ -1808,14 +1803,6 @@ function createSecretaryOverrideMark(consult: Consult, patientCtx: ReturnType<ty
     DedupKey: `mark:secretary-missing-staff-result:${consult.ConsultKey}`,
     CreatedBy: actorKey
   }).catch(err => console.error('Error pushing secretary override mark:', err));
-  notifyStaffAboutConsult(
-    secretary,
-    consult,
-    patientCtx,
-    'Thiếu kết quả hội chẩn',
-    `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} đã phải xếp bổ sung vì chưa có kết quả hội chẩn.`,
-    'notif:secretary-missing-staff-result'
-  );
 }
 
 function createSchedulerEmergencyTransferMark(consult: Consult, patientCtx: ReturnType<typeof getPatientContext>, staffList: Staff[], actorKey = 'workflow-monitor') {
@@ -1826,7 +1813,7 @@ function createSchedulerEmergencyTransferMark(consult: Consult, patientCtx: Retu
     StaffName: scheduler.StaffName,
     MarkType: 'scheduler_missing_transfer',
     Label: 'Không hoàn thành chuyển phòng TT',
-    Reason: `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} phải dùng thông tim cấp cứu do chưa được chuyển phòng TT.`,
+    Reason: `${buildNotificationPatientPrefix({ patientName: patientCtx.PatientName, diagnosisID: consult.DiagnosisID })} phải dùng thông tim cấp cứu do chưa được chuyển phòng TT.`,
     RelatedEntityType: 'Consult',
     RelatedEntityKey: consult.ConsultKey,
     PatientKey: patientCtx.PatientKey,
@@ -1835,14 +1822,6 @@ function createSchedulerEmergencyTransferMark(consult: Consult, patientCtx: Retu
     DedupKey: `mark:scheduler-missing-transfer:${consult.ConsultKey}`,
     CreatedBy: actorKey
   }).catch(err => console.error('Error pushing scheduler transfer mark:', err));
-  notifyStaffAboutConsult(
-    scheduler,
-    consult,
-    patientCtx,
-    'Thiếu thao tác chuyển phòng TT',
-    `BN ${patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey} phải vượt quyền bằng thông tim cấp cứu vì chưa được chuyển phòng TT.`,
-    'notif:scheduler-missing-transfer'
-  );
 }
 
 function handleConsultWorkflowMutation(previous: Consult, updated: Consult, updateData: Partial<Consult>, staffList: Staff[], patients: Patient[]) {
@@ -1882,13 +1861,16 @@ function runWorkflowMonitor() {
   consults.forEach(consult => {
     if (isRemovedConsult(consult)) return;
     const patientCtx = getPatientContext(consult.PatientKey, patients);
-    const patientLabel = patientCtx.PatientID || patientCtx.PatientName || consult.PatientKey;
     const requestByStaff = resolveStaff(consult.RequestBy, staffList) || resolveStaff(consult.ConsultCreateBy, staffList);
 
     if (!hasConsultResult(consult)) {
       const overdueDays = daysSince(consult.ConsultDate);
       if (overdueDays > 3) {
-        const message = `BN ${patientLabel} của ${consult.RequestBy || 'BS đăng ký'} đăng ký chưa có KQ hội chẩn.`;
+        const message = buildPendingStaffResultNotificationMessage({
+          patientName: patientCtx.PatientName,
+          diagnosisID: consult.DiagnosisID,
+          requestBy: consult.RequestBy || 'BS đăng ký',
+        });
         notifyStaffAboutConsult(requestByStaff, consult, patientCtx, 'Chưa có kết quả hội chẩn', message, 'notif:pending-staff-result');
         notifyStaffAboutConsult(secretary, consult, patientCtx, 'Chưa có kết quả hội chẩn', message, 'notif:pending-staff-result');
       }
@@ -1898,7 +1880,7 @@ function runWorkflowMonitor() {
           StaffName: requestByStaff.StaffName,
           MarkType: 'requester_overdue_staff_result',
           Label: 'Không hoàn thành theo dõi kết quả hội chẩn',
-          Reason: `BN ${patientLabel} đã quá ${overdueDays} ngày từ ngày đăng ký nhưng chưa có kết quả hội chẩn.`,
+          Reason: `${buildNotificationPatientPrefix({ patientName: patientCtx.PatientName, diagnosisID: consult.DiagnosisID })} đã quá ${overdueDays} ngày từ ngày đăng ký nhưng chưa có kết quả hội chẩn.`,
           RelatedEntityType: 'Consult',
           RelatedEntityKey: consult.ConsultKey,
           PatientKey: patientCtx.PatientKey,
@@ -1918,12 +1900,17 @@ function runWorkflowMonitor() {
     if (consult.PlannedCathLabDate && plannedOverdueDays > 30 && eligibleForCath && !hasCathResult) {
       const ptvAssistant = resolveStaff(consult.Scheduled2ndInterventionist, staffList);
       if (ptvAssistant) {
+        const ptv1Name = resolveStaffDisplayName(consult.Scheduled2ndInterventionist, staffList);
         void appendDoctorMarkIfMissing({
           StaffKey: ptvAssistant.StaffKey,
           StaffName: ptvAssistant.StaffName,
           MarkType: 'missing_cath_result',
           Label: 'Không hoàn thành điền kết quả thông tim',
-          Reason: `BN ${patientLabel} đã quá ${plannedOverdueDays} ngày từ ngày dự kiến thông tim nhưng chưa có kết quả thông tim.`,
+          Reason: buildMissingCathResultNotificationMessage({
+            patientName: patientCtx.PatientName,
+            diagnosisID: consult.DiagnosisID,
+            ptv1Name,
+          }),
           RelatedEntityType: 'Consult',
           RelatedEntityKey: consult.ConsultKey,
           PatientKey: patientCtx.PatientKey,
@@ -1937,7 +1924,11 @@ function runWorkflowMonitor() {
           consult,
           patientCtx,
           'Chưa điền kết quả thông tim',
-          `BN ${patientLabel} đã quá 1 tháng từ ngày dự kiến thông tim nhưng chưa có kết quả thông tim.`,
+          buildMissingCathResultNotificationMessage({
+            patientName: patientCtx.PatientName,
+            diagnosisID: consult.DiagnosisID,
+            ptv1Name,
+          }),
           'notif:missing-cath-result',
           'critical'
         );

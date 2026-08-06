@@ -64,9 +64,8 @@ export function buildSchedulerConsultNotification(input: {
     Title: SCHEDULER_NEW_CONSULT_NOTIFY_TITLE,
     Message: buildSchedulerNewConsultNotificationMessage({
       patientName,
-      patientId,
-      consultResultID: String(input.consult.ConsultResultID || ''),
       diagnosisID: String(input.consult.DiagnosisID || ''),
+      consultResultID: String(input.consult.ConsultResultID || ''),
     }),
     Severity: 'info',
     RelatedEntityType: 'Consult',
