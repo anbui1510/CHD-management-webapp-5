@@ -1242,7 +1242,14 @@ export default function App() {
         setIsMobileMoreMenuOpen(false);
         return;
       }
-      if (!canAccessModule(currentStaff, menu as AppModule)) {
+      const requiredModule: AppModule = isMarks
+        ? 'staff-marks'
+        : isSettings
+          ? 'staff-settings'
+          : isGuide
+            ? 'staff-guide'
+            : (menu as AppModule);
+      if (!canAccessModule(currentStaff, requiredModule)) {
         triggerAlert('Bạn không có quyền truy cập module này.', MODAL_TITLE.warning);
         setActiveMenu('workspace');
         return;

@@ -8,7 +8,7 @@ import {
   getModuleLabel,
   getRuntimeRolePresets,
   isSystemRolePresetId,
-  modulesByGroup,
+  getOrderedModulesByGroup,
   parsePermissions,
   serializePermissions,
 } from '../auth/permissions';
@@ -48,7 +48,7 @@ export default function RolePresetMatrixPanel({
   triggerConfirm,
 }: RolePresetMatrixPanelProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
-  const groupedModules = useMemo(() => modulesByGroup(), []);
+  const groupedModules = useMemo(() => getOrderedModulesByGroup(), []);
   const runtimePresets = getRuntimeRolePresets();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -302,7 +302,7 @@ export default function RolePresetMatrixPanel({
                     <p className="text-[11px] font-black uppercase text-slate-500">
                       Module trong preset ({draft.moduleSet.size}/{ALL_APP_MODULES.length})
                     </p>
-                    {(Object.entries(groupedModules) as [string, AppModuleDefinition[]][]).map(([group, modules]) => (
+                    {groupedModules.map(({ group, modules }) => (
                       <div key={group}>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">{group}</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

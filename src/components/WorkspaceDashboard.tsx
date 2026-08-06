@@ -210,7 +210,7 @@ export default function WorkspaceDashboard({
             iconBg: 'bg-indigo-50',
           },
           {
-            module: 'staff-mgmt',
+            module: 'staff-marks',
             target: 'staff-mgmt:marks',
             label: 'Thống kê sẹo workflow',
             description: 'Tổng hợp sẹo · xếp hạng · sự kiện',
@@ -218,7 +218,7 @@ export default function WorkspaceDashboard({
             iconBg: 'bg-red-50',
           },
           {
-            module: 'staff-mgmt',
+            module: 'staff-settings',
             target: 'staff-mgmt:settings',
             label: 'Cài đặt danh mục',
             description: 'Tỉnh thành · chẩn đoán · phương pháp',
@@ -226,7 +226,7 @@ export default function WorkspaceDashboard({
             iconBg: 'bg-pink-50',
           },
           {
-            module: 'staff-mgmt',
+            module: 'staff-guide',
             target: 'staff-mgmt:guide',
             label: 'Hướng dẫn sử dụng',
             description: 'Quy trình · vượt quyền · phạt sẹo',

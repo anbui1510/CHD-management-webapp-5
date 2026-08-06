@@ -8,7 +8,7 @@ export interface RolePresetRecord {
 }
 
 const ALL_MODULES_CSV =
-  'home,workspace,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,mri-overview,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,excel-export,google-sheets,staff-mgmt,chd-daily-brief,cathlab-report,heart-transplant';
+  'home,workspace,chd-daily-brief,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,cathlab-report,mri-overview,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,heart-transplant,excel-export,google-sheets,staff-mgmt,staff-marks,staff-settings,staff-guide';
 
 export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
   {

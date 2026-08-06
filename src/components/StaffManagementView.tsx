@@ -28,9 +28,10 @@ import {
   getPresetById,
   getRuntimeRolePresets,
   getStaffPermissions,
+  canAccessStaffManagementTab,
+  getOrderedModulesByGroup,
   inferPresetFromPermissions,
   isAdminStaff,
-  modulesByGroup,
   parsePermissions,
   serializePermissions,
 } from '../auth/permissions';
@@ -94,7 +95,24 @@ export default function StaffManagementView({
   const [activeTab, setActiveTab] = useState<'edit' | 'matrix' | 'marks' | 'settings' | 'guide'>(initialTab);
 
   const rolePresets = getRuntimeRolePresets();
-  const groupedModules = useMemo(() => modulesByGroup(), []);
+  const groupedModules = useMemo(() => getOrderedModulesByGroup(), []);
+
+  const staffTabs = useMemo(() => {
+    const tabs: Array<{ id: 'edit' | 'matrix' | 'marks' | 'settings' | 'guide'; label: string }> = [
+      { id: 'edit', label: 'Chỉnh sửa nhân sự' },
+      { id: 'matrix', label: 'Ma trận vai trò mẫu' },
+      { id: 'marks', label: 'Thống kê sẹo' },
+      { id: 'settings', label: 'Cài đặt danh mục' },
+      { id: 'guide', label: 'Hướng dẫn sử dụng' },
+    ];
+    return tabs.filter(tab => canAccessStaffManagementTab(currentStaff, tab.id));
+  }, [currentStaff]);
+
+  useEffect(() => {
+    if (!staffTabs.some(tab => tab.id === activeTab)) {
+      setActiveTab(staffTabs[0]?.id || 'edit');
+    }
+  }, [activeTab, staffTabs]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -366,62 +384,21 @@ export default function StaffManagementView({
             Gán vai trò mẫu hoặc chọn từng module. Sidebar, Không gian làm việc và Truy cập nhanh (Home) sẽ ẩn/hiện theo quyền đã lưu.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('edit')}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-              activeTab === 'edit'
-                ? 'bg-[#d2145a] text-white border-[#d2145a]'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
-            }`}
-          >
-            Chỉnh sửa nhân sự
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('matrix')}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-              activeTab === 'matrix'
-                ? 'bg-[#d2145a] text-white border-[#d2145a]'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
-            }`}
-          >
-            Ma trận vai trò mẫu
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('marks')}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-              activeTab === 'marks'
-                ? 'bg-[#d2145a] text-white border-[#d2145a]'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
-            }`}
-          >
-            Thống kê sẹo
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('settings')}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-              activeTab === 'settings'
-                ? 'bg-[#d2145a] text-white border-[#d2145a]'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
-            }`}
-          >
-            Cài đặt danh mục
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('guide')}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-              activeTab === 'guide'
-                ? 'bg-[#d2145a] text-white border-[#d2145a]'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
-            }`}
-          >
-            Hướng dẫn sử dụng
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {staffTabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+                activeTab === tab.id
+                  ? 'bg-[#d2145a] text-white border-[#d2145a]'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -998,7 +975,7 @@ export default function StaffManagementView({
                       </p>
                     ) : (
                       <div className="space-y-4">
-                        {(Object.entries(groupedModules) as [string, AppModuleDefinition[]][]).map(([group, modules]) => (
+                        {groupedModules.map(({ group, modules }) => (
                           <div key={group}>
                             <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">{group}</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

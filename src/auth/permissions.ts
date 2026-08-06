@@ -26,6 +26,9 @@ export type AppModule =
   | 'excel-export'
   | 'google-sheets'
   | 'staff-mgmt'
+  | 'staff-marks'
+  | 'staff-settings'
+  | 'staff-guide'
   | 'chd-daily-brief'
   | 'cathlab-report'
   | 'heart-transplant';
@@ -49,6 +52,7 @@ export interface AppModuleDefinition {
 export const APP_MODULE_DEFINITIONS: AppModuleDefinition[] = [
   { id: 'home', label: 'Home', group: 'Chung', description: 'Trang chủ tổng quan' },
   { id: 'workspace', label: 'Không gian làm việc', group: 'Chung', description: 'Dashboard điều hướng module' },
+  { id: 'chd-daily-brief', label: 'CHD Daily Brief', group: 'Chung', description: 'Bản tin y văn tim mạch nhi mỗi sáng 7h' },
   { id: 'patients', label: 'Hồ sơ bệnh án', group: 'Bệnh nhân & Hội chẩn', description: 'Quản lý hành chính bệnh nhi' },
   { id: 'consult-list', label: 'Hội chẩn', group: 'Bệnh nhân & Hội chẩn', description: 'Đăng ký staff hội chẩn' },
   { id: 'results-staff', label: 'Nhập kết quả staff', group: 'Bệnh nhân & Hội chẩn', description: 'Nhập kết luận hội chẩn' },
@@ -56,6 +60,7 @@ export const APP_MODULE_DEFINITIONS: AppModuleDefinition[] = [
   { id: 'schedule-view', label: 'Lịch thông tim dự kiến', group: 'Thông tim', description: 'Xem lịch cathlab' },
   { id: 'cathlab-room', label: 'Phòng thông tim', group: 'Thông tim', description: 'Nhập kết quả can thiệp TT' },
   { id: 'archive', label: 'Lưu trữ TT', group: 'Thông tim', description: 'Ca đã chuyển phòng / lưu trữ' },
+  { id: 'cathlab-report', label: 'Báo cáo thông tim', group: 'Thông tim', description: 'Xem báo cáo, thống kê ca thông tim' },
   { id: 'mri-overview', label: 'Tổng quan MRI', group: 'MRI tim', description: 'Thống kê tổng quan và lịch chụp MRI tim' },
   { id: 'mri-register', label: 'Đăng ký MRI', group: 'MRI tim', description: 'Đăng ký chụp MRI tim' },
   { id: 'mri-scheduler', label: 'Xếp lịch MRI', group: 'MRI tim', description: 'Phân ca chụp MRI' },
@@ -64,12 +69,13 @@ export const APP_MODULE_DEFINITIONS: AppModuleDefinition[] = [
   { id: 'surgery-room', label: 'Phòng phẫu thuật', group: 'Phẫu thuật', description: 'Nhập kết quả mổ tim' },
   { id: 'surgery-scheduler', label: 'Xếp lịch phẫu thuật', group: 'Phẫu thuật', description: 'Phân ca mổ tim' },
   { id: 'surgery-schedule-view', label: 'Lịch mổ dự kiến', group: 'Phẫu thuật', description: 'Xem lịch phòng mổ' },
+  { id: 'heart-transplant', label: 'Quản lý ghép tim', group: 'Ghép tim', description: 'Danh sách chờ ghép tim, đăng ký và xuất Excel' },
   { id: 'excel-export', label: 'Bảng Filter_Consult', group: 'Quản trị', description: 'Xuất Excel / filter consult' },
   { id: 'google-sheets', label: 'Virtual Google Sheets', group: 'Quản trị', description: 'Sửa dữ liệu trực tiếp trên sheet ảo' },
-  { id: 'staff-mgmt', label: 'Quản lý nhân sự', group: 'Quản trị', description: 'Phân quyền module cho nhân viên' },
-  { id: 'chd-daily-brief', label: 'CHD Daily Brief', group: 'Chung', description: 'Bản tin y văn tim mạch nhi mỗi sáng 7h' },
-  { id: 'cathlab-report', label: 'Báo cáo thông tim', group: 'Thông tim', description: 'Xem báo cáo, thống kê ca thông tim' },
-  { id: 'heart-transplant', label: 'Quản lý ghép tim', group: 'Ghép tim', description: 'Danh sách chờ ghép tim, đăng ký và xuất Excel' },
+  { id: 'staff-mgmt', label: 'Phân quyền nhân sự', group: 'Quản trị', description: 'Chỉnh sửa tài khoản, vai trò mẫu và module cho nhân viên' },
+  { id: 'staff-marks', label: 'Thống kê sẹo workflow', group: 'Quản trị', description: 'Xem bảng xếp hạng sẹo và sự kiện workflow' },
+  { id: 'staff-settings', label: 'Cài đặt danh mục', group: 'Quản trị', description: 'Cấu hình tỉnh thành, chẩn đoán, phương pháp can thiệp' },
+  { id: 'staff-guide', label: 'Hướng dẫn sử dụng', group: 'Quản trị', description: 'Quy trình nghiệp vụ, vượt quyền và quy định phạt sẹo' },
 ];
 
 export const ALL_APP_MODULES: AppModule[] = APP_MODULE_DEFINITIONS.map(item => item.id);
@@ -247,16 +253,60 @@ export function getStaffPermissions(staff: Staff | null | undefined): Set<AppMod
 }
 
 export function canAccessModule(staff: Staff | null | undefined, module: AppModule): boolean {
-  return getStaffPermissions(staff).has(module);
+  const permissions = getStaffPermissions(staff);
+  if (permissions.has(module)) return true;
+  if (
+    (module === 'staff-marks' || module === 'staff-settings' || module === 'staff-guide')
+    && permissions.has('staff-mgmt')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function canManageStaff(staff: Staff | null | undefined): boolean {
-  return isAdminStaff(staff) || canAccessModule(staff, 'staff-mgmt');
+  return (
+    isAdminStaff(staff)
+    || canAccessModule(staff, 'staff-mgmt')
+    || canAccessModule(staff, 'staff-marks')
+    || canAccessModule(staff, 'staff-settings')
+    || canAccessModule(staff, 'staff-guide')
+  );
+}
+
+export function canAccessStaffManagementTab(
+  staff: Staff | null | undefined,
+  tab: 'edit' | 'matrix' | 'marks' | 'settings' | 'guide'
+): boolean {
+  if (isAdminStaff(staff)) return true;
+  switch (tab) {
+    case 'edit':
+    case 'matrix':
+      return canAccessModule(staff, 'staff-mgmt');
+    case 'marks':
+      return canAccessModule(staff, 'staff-marks');
+    case 'settings':
+      return canAccessModule(staff, 'staff-settings');
+    case 'guide':
+      return canAccessModule(staff, 'staff-guide');
+    default:
+      return false;
+  }
 }
 
 export function isSystemRolePresetId(id: string): boolean {
   return isSystemPresetId(id);
 }
+
+export const MODULE_GROUP_ORDER: AppModuleGroup[] = [
+  'Chung',
+  'Bệnh nhân & Hội chẩn',
+  'Thông tim',
+  'MRI tim',
+  'Phẫu thuật',
+  'Ghép tim',
+  'Quản trị',
+];
 
 export function modulesByGroup(): Record<AppModuleGroup, AppModuleDefinition[]> {
   return APP_MODULE_DEFINITIONS.reduce((acc, item) => {
@@ -264,6 +314,13 @@ export function modulesByGroup(): Record<AppModuleGroup, AppModuleDefinition[]> 
     acc[item.group].push(item);
     return acc;
   }, {} as Record<AppModuleGroup, AppModuleDefinition[]>);
+}
+
+export function getOrderedModulesByGroup(): Array<{ group: AppModuleGroup; modules: AppModuleDefinition[] }> {
+  const grouped = modulesByGroup();
+  return MODULE_GROUP_ORDER
+    .map(group => ({ group, modules: grouped[group] || [] }))
+    .filter(entry => entry.modules.length > 0);
 }
 
 export function slugifyRolePresetId(label: string): string {
