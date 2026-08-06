@@ -494,6 +494,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [confirmDeleteKeys, setConfirmDeleteKeys] = useState<string[] | null>(null);
   const [selectedDeleteKeys, setSelectedDeleteKeys] = useState<Set<string>>(() => new Set());
   const [deletingKeys, setDeletingKeys] = useState<Set<string>>(() => new Set());
+  const [deleteFeedback, setDeleteFeedback] = useState<{ phase: 'deleting' } | { phase: 'success'; message: string } | null>(null);
 
   const toggleSelectDeleteKey = useCallback((consultKey: string) => {
     setSelectedDeleteKeys(prev => {
@@ -520,6 +521,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     if (uniqueKeys.length === 0) return;
 
     setConfirmDeleteKeys(null);
+    setDeleteFeedback({ phase: 'deleting' });
     setDeletingKeys(prev => new Set([...prev, ...uniqueKeys]));
 
     const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('CHD_AUTH_TOKEN') || '' : '';
@@ -543,7 +545,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           const errText = await res.text();
           throw new Error(parseDeleteErrorMessage(errText, res.status));
         }
-        reportMutationResponse(await res.json(), { baseMessage: 'Đã xóa đăng ký staff' });
+        await res.json().catch(() => ({}));
         return key;
       })
     );
@@ -582,11 +584,20 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       .filter((msg): msg is string => !!msg);
 
     if (failedCount > 0) {
+      setDeleteFeedback(null);
       onRefreshData?.();
       const detail = failedMessages[0] ? `\n${failedMessages[0]}` : '';
       triggerAlert(`Không xoá được ${failedCount}/${uniqueKeys.length} ca. Đã tải lại danh sách.${detail}`, MODAL_TITLE.warning);
+      return;
     }
-  }, [consults, mobileDrawerKey, onRemoveConsult, onRemoveConsults, onRefreshData, patients, reportMutationResponse, selectedConsultKey, triggerAlert]);
+
+    setDeleteFeedback({
+      phase: 'success',
+      message: succeededKeys.length > 1
+        ? `Đã xóa ${succeededKeys.length} lượt hội chẩn thành công.`
+        : 'Đã xóa lượt hội chẩn thành công.',
+    });
+  }, [consults, mobileDrawerKey, onRemoveConsult, onRemoveConsults, onRefreshData, patients, selectedConsultKey, triggerAlert]);
 
   useEffect(() => {
     setSelectedDeleteKeys(new Set());
@@ -1870,6 +1881,35 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           </div>
         );
       })()}
+
+      {deleteFeedback?.phase === 'deleting' && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-3 animate-in zoom-in-95 duration-150">
+            <div className="mx-auto w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
+            <h4 className="font-extrabold text-sm uppercase text-slate-800">Đang xóa...</h4>
+            <p className="text-[11px] text-slate-500 font-medium">Vui lòng chờ trong giây lát</p>
+          </div>
+        </div>
+      )}
+
+      {deleteFeedback?.phase === 'success' && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="mx-auto bg-emerald-50 text-emerald-600 rounded-full w-12 h-12 flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h4 className="font-extrabold text-sm uppercase text-emerald-700">Đã xóa thành công</h4>
+            <p className="text-[11px] text-slate-600 font-medium leading-relaxed">{deleteFeedback.message}</p>
+            <button
+              type="button"
+              onClick={() => setDeleteFeedback(null)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
+            >
+              Đồng ý
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
