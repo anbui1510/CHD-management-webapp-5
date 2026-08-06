@@ -27,7 +27,6 @@ import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
 import {
-  WORKFLOW_INFO_NOTIFY_TITLE,
   buildOverrideSchedulingConsultNote,
   buildOverrideSchedulingScar,
 } from '../utils/workflowMessages';
@@ -1862,7 +1861,10 @@ Xin cảm ơn!`;
         const patName = pat?.PatientName || 'Bệnh nhi';
         const patId = pat?.PatientID1 || '';
 
-        const scar = buildOverrideSchedulingScar({ patientName: patName, patientId: patId });
+        const scar = buildOverrideSchedulingScar({
+          patientName: patName,
+          diagnosisID: pendingConsult.DiagnosisID,
+        });
 
         const markPayload = {
           MarkKey: `mark_override_sched_${Date.now()}_tai`,
@@ -1898,36 +1900,6 @@ Xin cảm ơn!`;
           },
           schedSyncContext,
           { baseMessage: 'Đã ghi cảnh báo workflow' }
-        );
-
-        const notifPayload = {
-          NotificationKey: `notif_override_sched_${Date.now()}_tai`,
-          StaffKey: keyTai,
-          StaffName: nameTai,
-          Title: WORKFLOW_INFO_NOTIFY_TITLE,
-          Message: scar.message,
-          Severity: 'warning' as const,
-          RelatedEntityType: 'Consult' as const,
-          RelatedEntityKey: pendingConsult.ConsultKey,
-          PatientKey: pendingConsult.PatientKey,
-          PatientID: patId,
-          PatientName: patName,
-          DedupKey: `override_sched_tai_notif:${pendingConsult.ConsultKey}`,
-          IsRead: false,
-          CreatedTime: new Date().toISOString(),
-          ReadTime: ''
-        };
-
-        await persistWithSheetsSync(
-          reportMutationResponse,
-          '/api/notifications',
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}` },
-            body: JSON.stringify(notifPayload)
-          },
-          schedSyncContext,
-          { baseMessage: 'Đã gửi thông báo cảnh báo' }
         );
       } catch (markErr) {
         console.error('Lỗi khi lưu cảnh báo workflow:', markErr);

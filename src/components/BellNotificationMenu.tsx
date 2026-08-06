@@ -29,8 +29,6 @@ const getNotificationTitleClass = (severity?: Notification['Severity']): string 
 export default function BellNotificationMenu({
   staff,
   notifications,
-  patients = [],
-  consults = [],
   isOpen,
   onToggle,
   onClose,
@@ -70,45 +68,8 @@ export default function BellNotificationMenu({
 
   const unreadCount = staffNotifications.filter(item => !item.IsRead).length;
 
-  const getPatientDiagnosisText = (item: Notification) => {
-    const consult = consults.find(record =>
-      String(record.ConsultKey || '') === String(item.RelatedEntityKey || '') ||
-      String(record.PatientKey || '') === String(item.PatientKey || '')
-    );
-    const patient = patients.find(record =>
-      String(record.PatientKey || '') === String(item.PatientKey || '') ||
-      String(record.PatientID1 || '') === String(item.PatientID || '') ||
-      String(record.PatientID2 || '') === String(item.PatientID || '')
-    );
-    const patientName = item.PatientName || patient?.PatientName || patient?.OtherPatientName || '';
-    const diagnosisID = consult?.DiagnosisID || '';
-
-    if (patientName && diagnosisID) return `BN ${patientName.toUpperCase()} - ${diagnosisID}`;
-    if (patientName) return `BN ${patientName.toUpperCase()}`;
-    if (diagnosisID) return `ICD ${diagnosisID}`;
-    return item.PatientID ? `BN ${item.PatientID}` : '';
-  };
-
   const formatNotificationMessage = (item: Notification, sanitizedMessage?: string) => {
-    const patientDiagnosisText = getPatientDiagnosisText(item);
-    const message = String(sanitizedMessage ?? sanitizeNotificationFields(item).Message).trim();
-    if (!patientDiagnosisText || !message) return message;
-
-    const replaceTokens = [
-      item.PatientID,
-      item.PatientName,
-      item.PatientKey
-    ].map(value => String(value || '').trim()).filter(Boolean);
-
-    for (const token of replaceTokens) {
-      const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pattern = new RegExp(`^BN\\s+${escapedToken}`, 'i');
-      if (pattern.test(message)) {
-        return message.replace(pattern, patientDiagnosisText);
-      }
-    }
-
-    return message.startsWith('BN ') ? message : `${patientDiagnosisText} ${message}`;
+    return String(sanitizedMessage ?? sanitizeNotificationFields(item).Message).trim();
   };
 
   return (

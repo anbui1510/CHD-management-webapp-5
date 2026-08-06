@@ -28,7 +28,6 @@ import { MODAL_TITLE } from '../utils/modalTitles';
 import { useViewSubheader } from '../hooks/useViewSubheader';
 import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
 import {
-  WORKFLOW_INFO_NOTIFY_TITLE,
   HIS_IMPORT_AUTO_CLOSE_NOTIFY_TITLE,
   buildEmergProgCaseAScar,
   buildEmergProgCaseBHieuScar,
@@ -747,7 +746,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     const cathDateFormatted = formatVNTime(cathPayload.CathDate);
     const message = buildHisImportNotificationMessage({
       patientName: patient.PatientName || '',
-      patientId: patient.PatientID1,
+      diagnosisID: consult.DiagnosisID,
       cathDateFormatted,
       stage,
     });
@@ -1315,9 +1314,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        } as Consult;
      }
 
-     // Build scars if Programme (Chương trình) is selected
+     // Build workflow marks if Programme (Chương trình) is selected
      const marksToCreate: any[] = [];
-     const notificationsToCreate: any[] = [];
      if (adHocPriorityOrder === 'Chương trình') {
        const bsHieu = staffList?.find(s => {
          const name = removeVietnameseTones(s.Name || '').toLowerCase();
@@ -1337,9 +1335,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        const nameTai = bsTai?.StaffName || 'BS. Tài';
 
        const patientIdVal = adHocPatientMode === 'existing' ? (existingPat?.PatientID1 || '') : adHocPatientID1;
+       const diagnosisID = String(formData.PostDiagnosisID || latestConsult?.DiagnosisID || '').trim();
 
        if (consultCase === 'A') {
-         const scar = buildEmergProgCaseAScar({ patientName: pName, patientId: patientIdVal });
+         const scar = buildEmergProgCaseAScar({ patientName: pName, diagnosisID });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
@@ -1357,26 +1356,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            CreatedBy: loggedInStaffId || 'SYSTEM',
            CreatedTime: new Date().toISOString()
          });
-
-         notificationsToCreate.push({
-           NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
-           StaffKey: keyHieu,
-           StaffName: nameHieu,
-           Title: WORKFLOW_INFO_NOTIFY_TITLE,
-           Message: scar.message,
-           Severity: 'warning',
-           RelatedEntityType: 'Patient',
-           RelatedEntityKey: patientKey,
-           PatientKey: patientKey,
-           PatientID: patientIdVal,
-           PatientName: pName,
-           DedupKey: `emerg_prog_hieu_notif:${patientKey}`,
-           IsRead: false,
-           CreatedTime: new Date().toISOString(),
-           ReadTime: ''
-         });
        } else if (consultCase === 'B' && latestConsult) {
-         const scarTai = buildEmergProgCaseBTaiScar({ patientName: pName });
+         const scarTai = buildEmergProgCaseBTaiScar({ patientName: pName, diagnosisID });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_tai`,
            StaffKey: keyTai,
@@ -1395,25 +1376,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            CreatedTime: new Date().toISOString()
          });
 
-         notificationsToCreate.push({
-           NotificationKey: `notif_emerg_prog_${Date.now()}_tai`,
-           StaffKey: keyTai,
-           StaffName: nameTai,
-           Title: WORKFLOW_INFO_NOTIFY_TITLE,
-           Message: scarTai.message,
-           Severity: 'warning',
-           RelatedEntityType: 'Consult',
-           RelatedEntityKey: latestConsult.ConsultKey,
-           PatientKey: patientKey,
-           PatientID: patientIdVal,
-           PatientName: pName,
-           DedupKey: `emerg_prog_tai_notif:${latestConsult.ConsultKey}`,
-           IsRead: false,
-           CreatedTime: new Date().toISOString(),
-           ReadTime: ''
-         });
-
-         const scarHieu = buildEmergProgCaseBHieuScar({ patientName: pName });
+         const scarHieu = buildEmergProgCaseBHieuScar({ patientName: pName, diagnosisID });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
@@ -1431,26 +1394,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            CreatedBy: loggedInStaffId || 'SYSTEM',
            CreatedTime: new Date().toISOString()
          });
-
-         notificationsToCreate.push({
-           NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
-           StaffKey: keyHieu,
-           StaffName: nameHieu,
-           Title: WORKFLOW_INFO_NOTIFY_TITLE,
-           Message: scarHieu.message,
-           Severity: 'warning',
-           RelatedEntityType: 'Consult',
-           RelatedEntityKey: latestConsult.ConsultKey,
-           PatientKey: patientKey,
-           PatientID: patientIdVal,
-           PatientName: pName,
-           DedupKey: `emerg_prog_hieu_notif:${latestConsult.ConsultKey}`,
-           IsRead: false,
-           CreatedTime: new Date().toISOString(),
-           ReadTime: ''
-         });
        } else if (consultCase === 'C' && latestConsult) {
-         const scar = buildEmergProgCaseCScar({ patientName: pName });
+         const scar = buildEmergProgCaseCScar({ patientName: pName, diagnosisID });
          marksToCreate.push({
            MarkKey: `mark_emerg_prog_${Date.now()}_hieu`,
            StaffKey: keyHieu,
@@ -1467,24 +1412,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            DedupKey: `emerg_prog_hieu:${latestConsult.ConsultKey}`,
            CreatedBy: loggedInStaffId || 'SYSTEM',
            CreatedTime: new Date().toISOString()
-         });
-
-         notificationsToCreate.push({
-           NotificationKey: `notif_emerg_prog_${Date.now()}_hieu`,
-           StaffKey: keyHieu,
-           StaffName: nameHieu,
-           Title: WORKFLOW_INFO_NOTIFY_TITLE,
-           Message: scar.message,
-           Severity: 'warning',
-           RelatedEntityType: 'Consult',
-           RelatedEntityKey: latestConsult.ConsultKey,
-           PatientKey: patientKey,
-           PatientID: patientIdVal,
-           PatientName: pName,
-           DedupKey: `emerg_prog_hieu_notif:${latestConsult.ConsultKey}`,
-           IsRead: false,
-           CreatedTime: new Date().toISOString(),
-           ReadTime: ''
          });
        }
      }
@@ -1607,26 +1534,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            console.error('Lỗi khi lưu cảnh báo workflow BS:', mark, errMsg);
          }
        }
-
-        for (const notif of notificationsToCreate) {
-          try {
-            await persistWithSheetsSync(
-              reportMutationResponse,
-              '/api/notifications',
-              {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${localStorage.getItem('CHD_AUTH_TOKEN') || ''}` },
-                body: JSON.stringify(notif)
-              },
-              syncContext,
-              { baseMessage: 'Đã ghi thông báo workflow' }
-            );
-          } catch (err) {
-            const errMsg = err instanceof Error ? err.message : 'Lỗi không xác định';
-            triggerAlert(`Lỗi khi lưu thông báo cảnh báo: ${errMsg}`, MODAL_TITLE.saveError);
-            console.error('Lỗi khi lưu thông báo:', notif, errMsg);
-          }
-        }
 
        onRefreshData(true);
      };

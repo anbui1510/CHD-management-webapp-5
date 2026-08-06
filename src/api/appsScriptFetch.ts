@@ -8,7 +8,6 @@ import {
   formatAppsScriptFetchError,
   formatAppsScriptHttpError
 } from '../utils/appsScriptRetry';
-import { resolveSchedulerConsultNotification } from '../utils/consultSchedulerNotification';
 import { sanitizeNotificationFields } from '../utils/workflowMessages';
 
 type SheetData = {
@@ -1051,27 +1050,10 @@ const appendNotificationIfMissingBridge = async (input: Notification): Promise<N
 };
 
 const maybeNotifySchedulerAboutConsultMutation = async (
-  previous: Consult | undefined,
-  updated: Consult
+  _previous: Consult | undefined,
+  _updated: Consult
 ): Promise<void> => {
-  if (!cache) {
-    try {
-      await loadAllData();
-    } catch {
-      return;
-    }
-  }
-  if (!cache) return;
-
-  const notification = resolveSchedulerConsultNotification({
-    previous,
-    updated,
-    staffList: cache.staff as Staff[],
-    patients: cache.patients as Patient[],
-  });
-  if (!notification) return;
-
-  await appendNotificationIfMissingBridge(notification);
+  // Không gửi thông báo chuông/push khi Consult đủ điều kiện xếp lịch.
 };
 
 const createKey = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
