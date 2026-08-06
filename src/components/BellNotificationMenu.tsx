@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, Bell, CheckCheck } from 'lucide-react';
 import type { Consult, Notification, Patient, Staff } from '../types';
 import { formatVNTime } from '../types';
+import { sanitizeNotificationFields } from '../utils/workflowMessages';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 const isEqualStaffKey = (keyA: any, keyB: any): boolean => {
@@ -88,9 +89,9 @@ export default function BellNotificationMenu({
     return item.PatientID ? `BN ${item.PatientID}` : '';
   };
 
-  const formatNotificationMessage = (item: Notification) => {
+  const formatNotificationMessage = (item: Notification, sanitizedMessage?: string) => {
     const patientDiagnosisText = getPatientDiagnosisText(item);
-    const message = String(item.Message || '').trim();
+    const message = String(sanitizedMessage ?? sanitizeNotificationFields(item).Message).trim();
     if (!patientDiagnosisText || !message) return message;
 
     const replaceTokens = [
@@ -161,6 +162,7 @@ export default function BellNotificationMenu({
               </div>
             ) : (
               staffNotifications.slice(0, 30).map(item => {
+                const display = sanitizeNotificationFields(item);
                 return (
                   <div key={item.NotificationKey} className={`px-3 py-3 border-b border-slate-100 ${item.IsRead ? 'bg-white' : 'bg-pink-50/70'}`}>
                     <div className="flex items-start gap-2">
@@ -169,9 +171,9 @@ export default function BellNotificationMenu({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={`text-xs font-black leading-snug ${getNotificationTitleClass(item.Severity)}`}>
-                          {item.Title}
+                          {display.Title}
                         </p>
-                        <p className="text-[11px] font-semibold text-slate-600 leading-snug mt-1">{formatNotificationMessage(item)}</p>
+                        <p className="text-[11px] font-semibold text-slate-600 leading-snug mt-1">{formatNotificationMessage(item, display.Message)}</p>
                         <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">
                           {formatVNTime(item.CreatedTime)}
                         </p>

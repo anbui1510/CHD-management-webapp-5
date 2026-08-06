@@ -9,6 +9,7 @@ import {
   formatAppsScriptHttpError
 } from '../utils/appsScriptRetry';
 import { resolveSchedulerConsultNotification } from '../utils/consultSchedulerNotification';
+import { sanitizeNotificationFields } from '../utils/workflowMessages';
 
 type SheetData = {
   patients: any[];
@@ -1023,6 +1024,7 @@ const appendNotificationIfMissingBridge = async (input: Notification): Promise<N
 
   const record: Notification = {
     ...input,
+    ...sanitizeNotificationFields(input),
     NotificationKey: input.NotificationKey || createKey('notif'),
     CreatedTime: input.CreatedTime || new Date().toISOString(),
     IsRead: input.IsRead ?? false,

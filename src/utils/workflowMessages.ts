@@ -160,3 +160,81 @@ export function buildSchedulerNewConsultNotificationMessage(input: {
 export function buildSchedulingSummaryHeader(patientNameWithPtvUpper: string): string {
   return `📋 *THÔNG TIN TÓM TẮT XẾP LỊCH: ${patientNameWithPtvUpper}* 📋`;
 }
+
+const LEGACY_PENALTY_TITLE_PATTERN = /phạt\s*sẹo/gi;
+const LEGACY_PENALTY_SENTENCE_PATTERN =
+  /\s*(?:[;.]\s*)?Bạn\s+(?:đã\s+)?bị\s+phạt[^.!?]*[.!?]?\s*$/gi;
+const LEGACY_PENALTY_INLINE_PATTERN = /\bphạt\s+\d+\s*sẹo\b/gi;
+const LEGACY_SCAR_WORD_PATTERN = /\bsẹo\b/gi;
+const LEGACY_PENALTY_WORD_PATTERN = /\bphạt\b/gi;
+
+type NotificationLike = {
+  Title?: string;
+  Message?: string;
+};
+
+/** Chuẩn hóa tiêu đề thông báo cũ — bỏ thuật ngữ "phạt/sẹo", chỉ giữ "cảnh báo". */
+export function sanitizeNotificationTitle(title: string): string {
+  const raw = String(title || '').trim();
+  if (!raw) return raw;
+
+  if (LEGACY_PENALTY_TITLE_PATTERN.test(raw)) {
+    return raw
+      .replace(LEGACY_PENALTY_TITLE_PATTERN, 'Cảnh báo')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  if (/(?:phạt|sẹo)/i.test(raw)) {
+    const cleaned = raw
+      .replace(LEGACY_SCAR_WORD_PATTERN, '')
+      .replace(LEGACY_PENALTY_WORD_PATTERN, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return cleaned || WORKFLOW_REMINDER_NOTIFY_TITLE;
+  }
+
+  return raw;
+}
+
+/** Chuẩn hóa nội dung thông báo cũ — bỏ câu/cụm "phạt sẹo". */
+export function sanitizeNotificationMessage(message: string): string {
+  let text = String(message || '').trim();
+  if (!text) return text;
+
+  text = text.replace(LEGACY_PENALTY_SENTENCE_PATTERN, '');
+  text = text.replace(/\s*Bạn\s+bị\s+phạt\s+\d+\s*sẹo\.?\s*/gi, '');
+  text = text.replace(/\s*\([^)]*\bphạt\b[^)]*\bsẹo\b[^)]*\)\s*/gi, ' ');
+  text = text.replace(LEGACY_PENALTY_INLINE_PATTERN, '');
+  text = text.replace(LEGACY_SCAR_WORD_PATTERN, '');
+  text = text.replace(LEGACY_PENALTY_WORD_PATTERN, '');
+
+  text = text.replace(
+    /đã thông tim chương trình nhưng kết quả hội chẩn bị treo chưa điền/gi,
+    'đã thông tim chương trình; hồ sơ hội chẩn vẫn còn treo chưa có kết quả staff'
+  );
+
+  return text
+    .replace(/\s+([,.;!?])/g, '$1')
+    .replace(/([,.;!?])\s*([,.;!?])+/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+export function sanitizeNotificationFields(input: {
+  Title?: string;
+  Message?: string;
+}): { Title: string; Message: string } {
+  return {
+    Title: sanitizeNotificationTitle(input.Title || ''),
+    Message: sanitizeNotificationMessage(input.Message || ''),
+  };
+}
+
+export function notificationNeedsLegacyWordingCleanup(
+  notification: Pick<NotificationLike, 'Title' | 'Message'>
+): boolean {
+  const title = String(notification.Title || '');
+  const message = String(notification.Message || '');
+  return /(?:phạt|sẹo)/i.test(title) || /(?:phạt|sẹo)/i.test(message);
+}

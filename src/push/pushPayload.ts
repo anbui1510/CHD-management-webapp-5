@@ -1,4 +1,5 @@
 import type { Notification } from '../types';
+import { sanitizeNotificationFields } from '../utils/workflowMessages';
 
 export interface WebPushPayload {
   title: string;
@@ -18,9 +19,10 @@ export function resolveNotificationDeepLink(
 }
 
 export function buildWebPushPayload(notification: Notification): WebPushPayload {
+  const sanitized = sanitizeNotificationFields(notification);
   return {
-    title: notification.Title || 'CHD Management',
-    body: notification.Message || 'Bạn có thông báo mới',
+    title: sanitized.Title || 'CHD Management',
+    body: sanitized.Message || 'Bạn có thông báo mới',
     url: resolveNotificationDeepLink(notification),
     notificationKey: notification.NotificationKey,
   };

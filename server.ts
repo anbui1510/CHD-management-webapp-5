@@ -44,6 +44,10 @@ import {
   sendWebPushToStaff,
   upsertPushSubscription,
 } from './pushService';
+import {
+  notificationNeedsLegacyWordingCleanup,
+  sanitizeNotificationFields,
+} from './src/utils/workflowMessages';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
@@ -735,6 +739,9 @@ async function syncFromGoogleSheets(force = false): Promise<boolean> {
           if (recent && (Date.now() - recent.timestamp < 45000)) {
             n = { ...n, ...recent.data };
           }
+          const sanitized = sanitizeNotificationFields(n);
+          n.Title = sanitized.Title;
+          n.Message = sanitized.Message;
           nMap.set(k, n);
         });
         preserveLocalOnlyRecords(nMap, currentNotifications, record => record.NotificationKey);
@@ -1573,6 +1580,39 @@ function getPatientContext(patientKey: string | undefined, patients: Patient[]) 
   };
 }
 
+function sanitizeNotificationRecord(notification: Notification): Notification {
+  const sanitized = sanitizeNotificationFields(notification);
+  return {
+    ...notification,
+    Title: sanitized.Title,
+    Message: sanitized.Message,
+  };
+}
+
+function migrateLegacyNotificationWording(notifications: Notification[]): {
+  notifications: Notification[];
+  changed: boolean;
+} {
+  let changed = false;
+  const migrated = notifications.map(item => {
+    if (!notificationNeedsLegacyWordingCleanup(item)) return item;
+    const sanitized = sanitizeNotificationRecord(item);
+    changed = true;
+    return sanitized;
+  });
+  return { notifications: migrated, changed };
+}
+
+function readNotificationsDb(): Notification[] {
+  const notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
+  const { notifications: migrated, changed } = migrateLegacyNotificationWording(notifications);
+  if (changed) {
+    writeDB(NOTIFICATIONS_FILE, migrated);
+    markLocalMutation();
+  }
+  return migrated;
+}
+
 async function appendNotificationIfMissing(
   input: Omit<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'> & Partial<Pick<Notification, 'NotificationKey' | 'CreatedTime' | 'IsRead'>>,
   pushOptions?: {
@@ -1587,12 +1627,13 @@ async function appendNotificationIfMissing(
   const existing = notifications.find(item => item.DedupKey === input.DedupKey && item.StaffKey === input.StaffKey);
   if (existing) return { record: existing, sheetsSync: { configured: getSyncConfig().scriptUrl ? true : false, ok: true, at: Date.now(), message: 'Thông báo đã tồn tại.' } };
 
+  const sanitizedInput = sanitizeNotificationFields(input);
   const record: Notification = {
     NotificationKey: input.NotificationKey || createUniqueKey('notif', notifications.map(item => item.NotificationKey)),
     StaffKey: input.StaffKey,
     StaffName: input.StaffName || '',
-    Title: input.Title,
-    Message: input.Message,
+    Title: sanitizedInput.Title,
+    Message: sanitizedInput.Message,
     Severity: input.Severity || 'info',
     RelatedEntityType: input.RelatedEntityType,
     RelatedEntityKey: input.RelatedEntityKey,
@@ -1649,7 +1690,7 @@ async function appendDoctorMarkIfMissing(
   if (!input.StaffKey || !input.DedupKey) return { record: null };
   const marks = readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []);
   const existing = marks.find(item => item.DedupKey === input.DedupKey && item.StaffKey === input.StaffKey);
-  if (existing) return { record: existing, sheetsSync: { configured: getSyncConfig().scriptUrl ? true : false, ok: true, at: Date.now(), message: 'Sẹo workflow đã tồn tại.' } };
+  if (existing) return { record: existing, sheetsSync: { configured: getSyncConfig().scriptUrl ? true : false, ok: true, at: Date.now(), message: 'Cảnh báo workflow đã tồn tại.' } };
 
   const record: DoctorPerformanceMark = {
     MarkKey: input.MarkKey || createUniqueKey('mark', marks.map(item => item.MarkKey)),
@@ -1938,7 +1979,7 @@ app.get('/api/all', requireAuth, async (req, res) => {
     sources: readDB<Source>(SOURCES_FILE, []),
     deviceTemplates: readDB<DeviceTemplate>(DEVICE_TEMPLATES_FILE, []),
     rolePresets: ensureRolePresetsDB(),
-    notifications: readDB<Notification>(NOTIFICATIONS_FILE, []),
+    notifications: readNotificationsDb(),
     doctorPerformanceMarks: readDB<DoctorPerformanceMark>(DOCTOR_MARKS_FILE, []),
     _syncStatus: {
       configured: !!config.scriptUrl,
@@ -2004,7 +2045,7 @@ app.put('/api/sheets-sync/failures/acknowledge-all', requireAuth, (req, res) => 
 app.get('/api/notifications', requireAuth, async (req, res) => {
   await syncFromGoogleSheets();
   const staffKey = String(req.query.staffKey || '').trim();
-  let notifications = readDB<Notification>(NOTIFICATIONS_FILE, []);
+  let notifications = readNotificationsDb();
   if (staffKey) {
     notifications = notifications.filter(item => String(item.StaffKey || '') === staffKey);
   }
