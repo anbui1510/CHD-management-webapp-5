@@ -640,6 +640,11 @@ export default function CathLabSchedulerView({
   const [adHocPendingConsult, setAdHocPendingConsult] = useState<Consult | null>(null);
   const [adHocValidationMsg, setAdHocValidationMsg] = useState('');
 
+  const clearAdHocFieldError = useCallback((fieldKey: string) => {
+    setAdHocErrors(prev => (prev.includes(fieldKey) ? prev.filter(key => key !== fieldKey) : prev));
+    setAdHocValidationMsg('');
+  }, []);
+
   useEffect(() => {
     if (adHocPatientMode !== 'existing' || !adHocSelectedPatientKey) {
       setAdHocDetailDiagnosis('');
@@ -1749,6 +1754,7 @@ Xin cảm ơn!`;
   }, [patients, adHocSearchQuery]);
 
   const handleSelectPatient = (pat: Patient) => {
+    clearAdHocFieldError('PatientKey');
     setAdHocSelectedPatientKey(String(pat.PatientKey || ''));
     setAdHocPatientID1(String(pat.PatientID1 || ''));
     setAdHocPatientID2(String(pat.PatientID2 || ''));
@@ -2131,18 +2137,18 @@ Xin cảm ơn!`;
         errors.push('PatientKey');
       }
     } else {
-      if (!adHocPatientID1) errors.push('PatientID1');
-      if (!adHocPatientName) errors.push('PatientName');
-      if (!adHocPatientDOB) errors.push('PatientDOB');
-      if (!adHocPatientAddress) errors.push('PatientAddress');
+      if (!String(adHocPatientID1).trim()) errors.push('PatientID1');
+      if (!String(adHocPatientName).trim()) errors.push('PatientName');
+      if (!String(adHocPatientDOB).trim()) errors.push('PatientDOB');
+      if (!String(adHocPatientAddress).trim()) errors.push('PatientAddress');
     }
 
-    if (!adHocConsultDate) errors.push('ConsultDate');
-    if (!adHocPatientWeight) errors.push('PatientWeight');
-    if (!adHocRequestBy) errors.push('RequestBy');
-    if (!adHocDiagnosisID) errors.push('DiagnosisID');
-    if (!adHocDetailDiagnosis) errors.push('DetailDiagnosis');
-    if (!adHocDetailConsultResult) errors.push('DetailConsultResult');
+    if (!String(adHocConsultDate).trim()) errors.push('ConsultDate');
+    if (!String(adHocPatientWeight).trim()) errors.push('PatientWeight');
+    if (!String(adHocRequestBy).trim()) errors.push('RequestBy');
+    if (!String(adHocDiagnosisID).trim()) errors.push('DiagnosisID');
+    if (!String(adHocDetailDiagnosis).trim()) errors.push('DetailDiagnosis');
+    if (!String(adHocDetailConsultResult).trim()) errors.push('DetailConsultResult');
     if (errors.length > 0) {
       setAdHocErrors(errors);
       setAdHocValidationMsg(`Vui lòng điền đầy đủ các trường bắt buộc: ${errors.map(field => ({
@@ -2696,33 +2702,68 @@ Xin cảm ơn!`;
 
   const adHocInputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-[13px] text-slate-800 min-h-[34px]';
   const adHocSelectCls = `${adHocInputCls} font-bold`;
-  const adHocLabelCls = 'text-slate-500 font-bold text-[10.5px] uppercase shrink-0 leading-tight w-[11rem]';
+  const adHocLabelCls = 'text-slate-500 font-bold text-[10.5px] uppercase shrink-0 leading-tight w-full sm:w-[11rem]';
+
+  const AD_HOC_FIELD_LABELS: Record<string, string> = {
+    PatientKey: 'bệnh nhi',
+    PatientID1: 'mã BN',
+    PatientName: 'họ tên',
+    PatientDOB: 'ngày sinh',
+    PatientAddress: 'địa chỉ',
+    ConsultDate: 'ngày hội chẩn',
+    PatientWeight: 'cân nặng',
+    RequestBy: 'BS đăng ký',
+    DiagnosisID: 'ICD chẩn đoán',
+    DetailDiagnosis: 'chẩn đoán chi tiết',
+    DetailConsultResult: 'kết quả chi tiết',
+  };
+
+  const adHocHasError = (fieldKey?: string) => !!fieldKey && adHocErrors.includes(fieldKey);
+
+  const adHocControlCls = (fieldKey?: string, extra = '') =>
+    [adHocInputCls, extra, adHocHasError(fieldKey) ? 'border-rose-500 bg-rose-50/80 ring-2 ring-rose-200 focus:ring-rose-200' : '']
+      .filter(Boolean)
+      .join(' ');
 
   const renderAdHocRow = (
     label: string,
     control: React.ReactNode,
-    opts?: { span?: 1 | 2 | 3; alignTop?: boolean; labelWidth?: string }
-  ) => (
-    <div
-      className={`flex gap-1.5 ${opts?.alignTop ? 'items-start' : 'items-center'} ${
-        opts?.span === 2 ? 'xl:col-span-2' : opts?.span === 3 ? 'xl:col-span-3' : ''
-      }`}
-    >
-      <label
-        className={`${adHocLabelCls} ${opts?.alignTop ? 'pt-1' : ''}`}
-        style={opts?.labelWidth ? { width: opts.labelWidth } : undefined}
+    opts?: { span?: 1 | 2 | 3; alignTop?: boolean; labelWidth?: string; fieldKey?: string }
+  ) => {
+    const hasError = adHocHasError(opts?.fieldKey);
+    const labelText = label.replace(/\s*!\s*$/, '').trim();
+    return (
+      <div
+        className={`flex flex-col sm:flex-row gap-1 sm:gap-1.5 ${opts?.alignTop ? 'sm:items-start' : 'sm:items-center'} ${
+          opts?.span === 2 ? 'xl:col-span-2' : opts?.span === 3 ? 'xl:col-span-3' : ''
+        }`}
       >
-        {label}
-      </label>
-      <div className="flex-1 min-w-0">{control}</div>
-    </div>
-  );
+        <label
+          className={`${adHocLabelCls} ${opts?.alignTop ? 'pt-1' : ''} ${hasError ? 'text-rose-600' : ''}`}
+          style={opts?.labelWidth ? { width: opts.labelWidth } : undefined}
+        >
+          {labelText}
+        </label>
+        <div className="flex-1 min-w-0">
+          <div className={hasError ? 'rounded-xl ring-2 ring-rose-400/80' : ''}>{control}</div>
+          {hasError && opts?.fieldKey && (
+            <p className="mt-1 text-[10px] font-bold text-rose-600 leading-tight">
+              Vui lòng điền {AD_HOC_FIELD_LABELS[opts.fieldKey] || labelText.replace(/\s*\*$/, '').toLowerCase()}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-  const renderAdHocDatePicker = (value: string, onChange: (val: string) => void) => (
+  const renderAdHocDatePicker = (value: string, onChange: (val: string) => void, fieldKey?: string) => (
     <VNDateInput
       value={value}
-      onChange={onChange}
-      className={`${adHocInputCls} font-sans font-bold`}
+      onChange={(val) => {
+        if (fieldKey) clearAdHocFieldError(fieldKey);
+        onChange(val);
+      }}
+      className={`${adHocControlCls(fieldKey)} font-sans font-bold`}
     />
   );
 
@@ -5207,9 +5248,19 @@ Xin cảm ơn!`;
                             type="text"
                             placeholder="🔍 Tên hoặc mã ID1..."
                             value={adHocSearchQuery}
-                            onChange={(e) => setAdHocSearchQuery(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] focus:outline-none placeholder-slate-400 font-semibold"
+                            onChange={(e) => {
+                              clearAdHocFieldError('PatientKey');
+                              setAdHocSearchQuery(e.target.value);
+                            }}
+                            className={`w-full bg-white border rounded-lg px-2 py-1 text-[11px] focus:outline-none placeholder-slate-400 font-semibold ${
+                              adHocHasError('PatientKey')
+                                ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-200'
+                                : 'border-slate-200'
+                            }`}
                           />
+                          {adHocHasError('PatientKey') && (
+                            <p className="mt-1 text-[10px] font-bold text-rose-600">Vui lòng chọn bệnh nhi</p>
+                          )}
 
                               {/* Search Dropdown Result List */}
                               {adHocSearchQuery.trim() && filteredSearchPatients.length > 0 && (
@@ -5272,15 +5323,15 @@ Xin cảm ơn!`;
                                  </button>
                                </div>
                               <div className="grid grid-cols-1 gap-1">
-                                {renderAdHocRow(`Mã BN *${adHocErrors.includes('PatientID1') ? ' !' : ''}`, (
-                                  <input type="text" required placeholder="ID1..." value={adHocPatientID1} onChange={(e) => { const val = e.target.value; setAdHocPatientID1(val); const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === val.trim().toLowerCase()); setAdHocPendingConsult(dup ? getPendingConsultForPatient(dup.PatientKey) || null : null); }} className={`${adHocInputCls} font-bold`} />
-                                ))}
-                                {renderAdHocRow(`Họ tên *${adHocErrors.includes('PatientName') ? ' !' : ''}`, (
-                                  <input type="text" required placeholder="Họ tên..." value={adHocPatientName} onChange={(e) => setAdHocPatientName(e.target.value)} className={`${adHocInputCls} font-black`} />
-                                ))}
-                                {renderAdHocRow(`Ngày sinh *${adHocErrors.includes('PatientDOB') ? ' !' : ''}`, (
-                                  <VNDateInput required value={adHocPatientDOB} onChange={(val) => setAdHocPatientDOB(val)} className={`${adHocInputCls} font-sans font-bold`} />
-                                ))}
+                                {renderAdHocRow('Mã BN *', (
+                                  <input type="text" required placeholder="ID1..." value={adHocPatientID1} onChange={(e) => { clearAdHocFieldError('PatientID1'); const val = e.target.value; setAdHocPatientID1(val); const dup = patients.find(p => String(p.PatientID1 || '').trim().toLowerCase() === val.trim().toLowerCase()); setAdHocPendingConsult(dup ? getPendingConsultForPatient(dup.PatientKey) || null : null); }} className={`${adHocControlCls('PatientID1')} font-bold`} />
+                                ), { fieldKey: 'PatientID1' })}
+                                {renderAdHocRow('Họ tên *', (
+                                  <input type="text" required placeholder="Họ tên..." value={adHocPatientName} onChange={(e) => { clearAdHocFieldError('PatientName'); setAdHocPatientName(e.target.value); }} className={`${adHocControlCls('PatientName')} font-black`} />
+                                ), { fieldKey: 'PatientName' })}
+                                {renderAdHocRow('Ngày sinh *', (
+                                  <VNDateInput required value={adHocPatientDOB} onChange={(val) => { clearAdHocFieldError('PatientDOB'); setAdHocPatientDOB(val); }} className={`${adHocControlCls('PatientDOB')} font-sans font-bold`} />
+                                ), { fieldKey: 'PatientDOB' })}
                                 {renderAdHocRow('Giới tính *', (
                                   <div className="flex gap-1">
                                     {(['Nam', 'Nữ'] as const).map((gender) => (
@@ -5288,9 +5339,9 @@ Xin cảm ơn!`;
                                     ))}
                                   </div>
                                 ))}
-                                {renderAdHocRow(`Địa chỉ *${adHocErrors.includes('PatientAddress') ? ' !' : ''}`, (
-                                  <SearchableEnumSelect required options={provinceOptions} value={adHocPatientAddress} onChange={setAdHocPatientAddress} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." />
-                                ))}
+                                {renderAdHocRow('Địa chỉ *', (
+                                  <SearchableEnumSelect required options={provinceOptions} value={adHocPatientAddress} onChange={(val) => { clearAdHocFieldError('PatientAddress'); setAdHocPatientAddress(val); }} placeholder="-- Tỉnh/thành --" searchPlaceholder="Gõ tìm..." className={adHocHasError('PatientAddress') ? '[&>button]:border-rose-500 [&>button]:bg-rose-50 [&>button]:ring-2 [&>button]:ring-rose-200' : ''} />
+                                ), { fieldKey: 'PatientAddress' })}
                                 {renderAdHocRow('SĐT 1', (
                                   <input type="text" placeholder="ĐT..." value={adHocPatientPhone1} onChange={(e) => setAdHocPatientPhone1(e.target.value)} className={`${adHocInputCls} font-sans font-bold`} />
                                 ))}
@@ -5330,48 +5381,50 @@ Xin cảm ơn!`;
                             })}
                           </div>
                         ))}
-                        {renderAdHocRow(`Ngày hội chẩn *${adHocErrors.includes('ConsultDate') ? ' !' : ''}`, renderAdHocDatePicker(adHocConsultDate, setAdHocConsultDate))}
-                        {renderAdHocRow(`Cân nặng (kg) *${adHocErrors.includes('PatientWeight') ? ' !' : ''}`, (
-                          <input type="text" required placeholder="12.5" value={adHocPatientWeight} onChange={(e) => setAdHocPatientWeight(e.target.value)} className={`${adHocInputCls} font-bold`} />
-                        ))}
+                        {renderAdHocRow('Ngày hội chẩn *', renderAdHocDatePicker(adHocConsultDate, setAdHocConsultDate, 'ConsultDate'), { fieldKey: 'ConsultDate' })}
+                        {renderAdHocRow('Cân nặng (kg) *', (
+                          <input type="text" required placeholder="12.5" value={adHocPatientWeight} onChange={(e) => { clearAdHocFieldError('PatientWeight'); setAdHocPatientWeight(e.target.value); }} className={`${adHocControlCls('PatientWeight')} font-bold`} />
+                        ), { fieldKey: 'PatientWeight' })}
                         {renderAdHocRow('Chiều cao (cm)', (
                           <input type="text" placeholder="95" value={adHocPatientHeight} onChange={(e) => setAdHocPatientHeight(e.target.value)} className={adHocInputCls} />
                         ))}
-                        {renderAdHocRow(`BS đăng ký *${adHocErrors.includes('RequestBy') ? ' !' : ''}`, (
+                        {renderAdHocRow('BS đăng ký *', (
                           <SearchableEnumSelect
                             required
                             options={requestByDoctorOptions}
                             value={adHocRequestBy}
                             onChange={(val) => {
+                              clearAdHocFieldError('RequestBy');
                               setAdHocRequestBy(val);
                               setAdHocScheduled2nd(getAutoScheduled2nd(val));
                             }}
                             placeholder="— Chọn BS —"
                             searchPlaceholder="Gõ tên BS..."
+                            className={adHocHasError('RequestBy') ? '[&>button]:border-rose-500 [&>button]:bg-rose-50 [&>button]:ring-2 [&>button]:ring-rose-200' : ''}
                           />
-                        ))}
+                        ), { fieldKey: 'RequestBy' })}
                         {renderAdHocRow('Khoa nội trú *', (
                           <select value={adHocDepartment} onChange={(e) => setAdHocDepartment(e.target.value)} className={adHocSelectCls}>
                             {DEPARTMENTS_LIST.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
                           </select>
                         ))}
-                        {renderAdHocRow(`ICD chẩn đoán *${adHocErrors.includes('DiagnosisID') ? ' !' : ''}`, (
-                          <SearchableEnumSelect required options={diagnosisOptions} value={adHocDiagnosisID} onChange={(value) => setAdHocDiagnosisID(normalizeDiagnosisID(value))} allowCreate createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`} onCreateOption={createDiagnosisSource} placeholder="— Chọn ICD —" searchPlaceholder="Gõ ICD..." />
-                        ))}
+                        {renderAdHocRow('ICD chẩn đoán *', (
+                          <SearchableEnumSelect required options={diagnosisOptions} value={adHocDiagnosisID} onChange={(value) => { clearAdHocFieldError('DiagnosisID'); setAdHocDiagnosisID(normalizeDiagnosisID(value)); }} allowCreate createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`} onCreateOption={createDiagnosisSource} placeholder="— Chọn ICD —" searchPlaceholder="Gõ ICD..." className={adHocHasError('DiagnosisID') ? '[&>button]:border-rose-500 [&>button]:bg-rose-50 [&>button]:ring-2 [&>button]:ring-rose-200' : ''} />
+                        ), { fieldKey: 'DiagnosisID' })}
                         {renderAdHocRow('Ưu tiên *', (
                           <select value={adHocPriorityOrder} onChange={(e) => setAdHocPriorityOrder(e.target.value as any)} className={`${adHocSelectCls} text-[#d2145a]`}>
                             {PRIORITY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
                         ))}
-                        {renderAdHocRow(`Chẩn đoán chi tiết *${adHocErrors.includes('DetailDiagnosis') ? ' !' : ''}`, (
-                          <MobileAutoExpandTextarea minRows={2} required placeholder="Chẩn đoán chi tiết..." value={adHocDetailDiagnosis} onChange={(e) => setAdHocDetailDiagnosis(e.target.value)} className={adHocInputCls} />
-                        ), { alignTop: true })}
+                        {renderAdHocRow('Chẩn đoán chi tiết *', (
+                          <MobileAutoExpandTextarea minRows={2} required placeholder="Chẩn đoán chi tiết..." value={adHocDetailDiagnosis} onChange={(e) => { clearAdHocFieldError('DetailDiagnosis'); setAdHocDetailDiagnosis(e.target.value); }} className={adHocControlCls('DetailDiagnosis')} />
+                        ), { alignTop: true, fieldKey: 'DetailDiagnosis' })}
                         {renderAdHocRow('Kết luận chính *', (
                           <SearchableEnumSelect required options={['Can thiệp thông tim', 'Chụp chẩn đoán +/- can thiệp', 'Chụp chẩn đoán/Đo kháng lực', 'Tiền Glenn', 'Tiền Fontan', 'Điện sinh lý', 'Mổ tim', 'Thêm CĐHA; vđ khác - Staff lại', 'Chưa có chỉ định - Theo dõi tiếp', 'Điều trị nội khoa - Hẹn staff lại', 'Quá chỉ định', 'Không có thông tin']} value={adHocConsultResultID} onChange={setAdHocConsultResultID} direction="up" placeholder="— Chọn kết luận —" searchPlaceholder="Gõ tìm..." />
                         ))}
-                        {renderAdHocRow(`Kết quả chi tiết *${adHocErrors.includes('DetailConsultResult') ? ' !' : ''}`, (
-                          <MobileAutoExpandTextarea minRows={2} placeholder="Kết quả chi tiết..." value={adHocDetailConsultResult} onChange={(e) => setAdHocDetailConsultResult(e.target.value)} className={adHocInputCls} />
-                        ), { alignTop: true })}
+                        {renderAdHocRow('Kết quả chi tiết *', (
+                          <MobileAutoExpandTextarea minRows={2} placeholder="Kết quả chi tiết..." value={adHocDetailConsultResult} onChange={(e) => { clearAdHocFieldError('DetailConsultResult'); setAdHocDetailConsultResult(e.target.value); }} className={adHocControlCls('DetailConsultResult')} />
+                        ), { alignTop: true, fieldKey: 'DetailConsultResult' })}
 
                       </div>
                     </div>
