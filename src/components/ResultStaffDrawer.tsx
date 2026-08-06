@@ -336,9 +336,9 @@ export default function ResultStaffDrawer({
   };
 
   const drawerHeader = (
-    <div className="bg-[#d2145a] text-white px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
+    <div className="bg-[#d2145a] text-white px-4 md:px-5 py-3.5 md:py-2 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
       <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
-        <Stethoscope className="w-5 h-5 text-white shrink-0" />
+        <Stethoscope className="w-5 h-5 md:w-4 md:h-4 text-white shrink-0" />
         <span className="truncate">Điền kết quả staff</span>
       </h3>
       <button
@@ -374,7 +374,7 @@ export default function ResultStaffDrawer({
                             <div>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <h4 className="text-sm font-black text-[#d2145a] uppercase leading-tight">{patient.PatientName}</h4>
+                                  <h4 className="text-sm lg:text-lg font-black text-[#d2145a] uppercase leading-tight">{patient.PatientName}</h4>
                                   {patient.OtherPatientName && (
                                     <p className="text-[10px] text-slate-400 font-medium italic mt-0.5 md:mt-1">Tên khác: {patient.OtherPatientName}</p>
                                   )}
@@ -522,6 +522,7 @@ export default function ResultStaffDrawer({
                                         options={CATH_PTV_MAIN_OPTIONS}
                                         value={formData.ConsultMember || ''}
                                         onChange={(val) => setFormData(prev => ({ ...prev, ConsultMember: val }))}
+                                        direction={isMobile ? 'down' : 'up'}
                                         placeholder="-- Chọn PTV chính --"
                                         searchPlaceholder="Gõ tên PTV..."
                                       />
@@ -596,8 +597,8 @@ export default function ResultStaffDrawer({
                               </div>
                             ) : (
                               <div className="space-y-3.5 pt-1">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                  <div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                                  <div className="md:col-span-1">
                                     <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
                                     <SearchableEnumSelect
                                       required
@@ -611,7 +612,7 @@ export default function ResultStaffDrawer({
                                       searchPlaceholder="Gõ ICD để tìm..."
                                     />
                                   </div>
-                                  <div>
+                                  <div className="md:col-span-2">
                                     <label className="block md:mb-1 text-slate-500 font-bold text-[10px] mb-1 font-sans">
                                       <span className="md:hidden inline mr-1">Kết luận chính</span>
                                       <span className="hidden md:inline">Kết luận chính </span>
@@ -628,9 +629,9 @@ export default function ResultStaffDrawer({
                                   </div>
                                 </div>
 
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Ưu tiên</label>
-                                  <div className="flex gap-2">
+                                <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+                                  <label className="block md:mb-0 text-slate-500 font-bold text-[10px] md:shrink-0">Ưu tiên</label>
+                                  <div className="flex gap-2 flex-1 min-w-0">
                                     {PRIORITY_OPTIONS.map((opt) => {
                                       const isSel = formData.PriorityOrder === opt;
                                       return (
