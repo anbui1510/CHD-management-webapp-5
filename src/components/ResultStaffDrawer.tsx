@@ -370,9 +370,9 @@ export default function ResultStaffDrawer({
                         <div className="lg:col-span-5 flex flex-col gap-4 min-h-0">
                         {/* Khung 1: Bệnh nhi đang hội chẩn (Hành chính) — phía trên */}
                         <div className="flex flex-col shrink-0">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-1 md:space-y-3 relative shadow-sm flex flex-col">
+                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-0 relative shadow-sm flex flex-col">
                             <div>
-                              <div className="flex items-start justify-between gap-2 mt-0 md:mt-1">
+                              <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <h4 className="text-sm font-black text-[#d2145a] uppercase leading-tight">{patient.PatientName}</h4>
                                   {patient.OtherPatientName && (
@@ -388,22 +388,28 @@ export default function ResultStaffDrawer({
                                 />
                               </div>
                               
-                              <div className="grid grid-cols-1 gap-y-1 md:gap-y-1.5 text-[11px] text-slate-600 font-medium pt-1.5 mt-1.5 md:pt-3 md:mt-3 border-t border-slate-100">
+                              <div className="grid grid-cols-1 gap-y-0.5 text-[11px] text-slate-600 font-medium pt-0.5 border-t border-slate-100">
                                 <p><span className="text-slate-400">Mã BN 1:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientID1 || ''}</span></p>
                                 {patient.PatientID2 && <p><span className="text-slate-400">Mã BN 2:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientID2}</span></p>}
-                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0 md:contents">
+                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
                                   <p><span className="text-slate-400">Ngày sinh:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(patient.PatientDOB)}</span></p>
                                   <p><span className="text-slate-400">Tuổi:</span> <span className="font-bold text-rose-600 font-mono">{getExcelAgeHelper(patient.PatientDOB)}</span></p>
                                 </div>
-                                <p><span className="text-slate-400">Giới tính:</span> <span className="font-bold text-slate-800">{patient.PatientSex}</span></p>
-                                {patient.PatientAddress && <p className="col-span-1"><span className="text-slate-400">Địa chỉ:</span> <span className="font-bold text-slate-800 leading-tight">{patient.PatientAddress}</span></p>}
-                                {patient.PatientPhone1 && <p><span className="text-slate-400">Số ĐT 1:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientPhone1}</span></p>}
-                                {patient.PatientPhone2 && <p><span className="text-slate-400">Số ĐT 2:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientPhone2}</span></p>}
+                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
+                                  <p><span className="text-slate-400">Giới tính:</span> <span className="font-bold text-slate-800">{patient.PatientSex}</span></p>
+                                  {patient.PatientAddress && <p><span className="text-slate-400">Địa chỉ:</span> <span className="font-bold text-slate-800 leading-tight">{patient.PatientAddress}</span></p>}
+                                </div>
+                                {(patient.PatientPhone1 || patient.PatientPhone2) && (
+                                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
+                                    {patient.PatientPhone1 && <p><span className="text-slate-400">Số ĐT 1:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientPhone1}</span></p>}
+                                    {patient.PatientPhone2 && <p><span className="text-slate-400">Số ĐT 2:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientPhone2}</span></p>}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
-                            <div className="space-y-2 md:space-y-4">
-                               <div className="grid grid-cols-2 gap-2 mt-2 pt-2 md:mt-4 md:pt-4 border-t border-slate-100">
+                            <div>
+                               <div className="grid grid-cols-2 gap-2 pt-0.5 border-t border-slate-100">
                                   {!isFormEditing ? (
                                     <>
                                       {formData.PatientHeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Chiều cao:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientHeight} cm</span></p>}
@@ -441,13 +447,13 @@ export default function ResultStaffDrawer({
                         {/* Khung 2: Thông tin hội chẩn — phía dưới */}
                         <div className="flex flex-col flex-1 min-h-0">
                           <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar">
-                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-teal-600 border-b border-slate-100 pb-2 shrink-0">Thông tin hội chẩn</span>
-                            
                             {!isFormEditing ? (
-                              <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium pt-1">
-                                <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(formData.ConsultDate)}</span></p>
+                              <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium">
+                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
+                                  <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(formData.ConsultDate)}</span></p>
+                                  <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{formData.RequestBy || ''}</span></p>
+                                </div>
                                 <p><span className="text-slate-400">Kiểu staff:</span> <span className="font-bold text-[#d2145a]">{formData.ConsultType || ''}</span></p>
-                                <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{formData.RequestBy || ''}</span></p>
                                 {formData.ConsultMember && String(formData.ConsultMember).trim() && (
                                   <p>
                                     <span className="text-slate-400">
@@ -460,15 +466,30 @@ export default function ResultStaffDrawer({
                                 )}
                               </div>
                             ) : (
-                              <div className="space-y-3 pt-1 flex-1">
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Ngày hội chẩn</label>
-                                  <VNDateInput
-                                    required
-                                    value={formData.ConsultDate}
-                                    onChange={(val) => setFormData(prev => ({ ...prev, ConsultDate: val }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium font-sans"
-                                  />
+                              <div className="space-y-3 flex-1">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">Ngày hội chẩn</label>
+                                    <VNDateInput
+                                      required
+                                      value={formData.ConsultDate}
+                                      onChange={(val) => setFormData(prev => ({ ...prev, ConsultDate: val }))}
+                                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium font-sans"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">BS đăng ký</label>
+                                    <SearchableEnumSelect
+                                      required
+                                      options={doctorOptions}
+                                      value={formData.RequestBy || ''}
+                                      onChange={(val) => setFormData(prev => ({ ...prev, RequestBy: val }))}
+                                      allowCreate
+                                      createLabel={(val) => `Thêm BS "${val}"`}
+                                      placeholder="-- Chọn BS --"
+                                      searchPlaceholder="Gõ tên BS..."
+                                    />
+                                  </div>
                                 </div>
                                 <div>
                                   <label className="block text-slate-500 font-bold text-[10px] mb-1">Kiểu staff</label>
@@ -488,20 +509,6 @@ export default function ResultStaffDrawer({
                                       </button>
                                     ))}
                                   </div>
-                                </div>
-                                
-                                <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">BS đăng ký</label>
-                                  <SearchableEnumSelect
-                                    required
-                                    options={doctorOptions}
-                                    value={formData.RequestBy || ''}
-                                    onChange={(val) => setFormData(prev => ({ ...prev, RequestBy: val }))}
-                                    allowCreate
-                                    createLabel={(val) => `Thêm BS "${val}"`}
-                                    placeholder="-- Chọn BS --"
-                                    searchPlaceholder="Gõ tên BS..."
-                                  />
                                 </div>
 
                                 <div className="pb-2">
@@ -721,26 +728,36 @@ export default function ResultStaffDrawer({
                 </div>
 
                       {/* Action buttons area — sticky footer */}
-                      <div className="pt-2 border-t border-slate-100 flex flex-col gap-2 shrink-0 px-4 md:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white">
-                        <button
-                          type="button"
-                          onClick={() => setShowSummaryModal(true)}
-                          className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-2.5 px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-2 text-[11px]"
-                        >
-                          <Clipboard className="w-4 h-4 shrink-0" />
-                          Tóm tắt &amp; copy ảnh
-                        </button>
+                      <div className="pt-2 border-t border-slate-100 shrink-0 px-4 md:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white">
                         {!autoEdit && !isFormEditing ? (
-                          <button
-                            type="button"
-                            onClick={() => setIsEditing(true)}
-                            className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-6 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer text-xs flex items-center justify-center gap-1.5 font-sans"
-                          >
-                            <ClipboardList className="w-4 h-4 shrink-0" />
-                            {consult.ConsultResultID ? 'Sửa kết quả hội chẩn' : 'Điền kết quả hội chẩn'}
-                          </button>
+                          <div className="w-full grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowSummaryModal(true)}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 text-[11px]"
+                            >
+                              <Clipboard className="w-4 h-4 shrink-0" />
+                              Tóm tắt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditing(true)}
+                              className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer text-xs flex items-center justify-center gap-1.5 font-sans"
+                            >
+                              <ClipboardList className="w-4 h-4 shrink-0" />
+                              {consult.ConsultResultID ? 'Sửa kết quả hội chẩn' : 'Điền kết quả hội chẩn'}
+                            </button>
+                          </div>
                         ) : (
-                          <div className="w-full grid grid-cols-2 lg:flex lg:justify-end gap-3">
+                          <div className="w-full grid grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowSummaryModal(true)}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 text-[10px] md:text-[11px]"
+                            >
+                              <Clipboard className="w-4 h-4 shrink-0" />
+                              Tóm tắt
+                            </button>
                             <button
                               type="button"
                               onClick={() => {
@@ -758,14 +775,14 @@ export default function ResultStaffDrawer({
                                 setIsEditing(false);
                                 if (autoEdit) forceClose();
                               }}
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl transition cursor-pointer text-xs font-sans text-center lg:w-48"
+                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl transition cursor-pointer text-[10px] md:text-xs font-sans text-center"
                             >
                               {autoEdit ? 'Đóng' : 'Hủy'}
                             </button>
                             <button
                               type="submit"
                               disabled={saving}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-4 md:px-6 rounded-2xl shadow-md transition cursor-pointer text-xs font-sans text-center font-bold lg:w-48 disabled:opacity-50"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-md transition cursor-pointer text-[10px] md:text-xs font-sans text-center font-bold disabled:opacity-50"
                             >
                               {saving ? 'Đang lưu...' : '✓ Lưu kết quả'}
                             </button>
