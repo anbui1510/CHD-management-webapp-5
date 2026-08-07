@@ -113,14 +113,58 @@ export function removePushSubscription(
   return true;
 }
 
+const PUSH_DELIVERY_LOG_MAX = 2000;
+
+type PushDeliveryLogEntry = {
+  notificationKey: string;
+  deliveredAt: string;
+};
+
+export function getPushDeliveryLogFile(dbDir: string): string {
+  return path.join(dbDir, 'push-delivery-log.json');
+}
+
+function readPushDeliveryLog(db: ReadWriteDb, deliveryLogFile: string): PushDeliveryLogEntry[] {
+  return db.readDB<PushDeliveryLogEntry[]>(deliveryLogFile, []);
+}
+
+export function hasServerPushBeenDelivered(
+  db: ReadWriteDb,
+  deliveryLogFile: string,
+  notificationKey: string
+): boolean {
+  const key = String(notificationKey || '').trim();
+  if (!key) return false;
+  return readPushDeliveryLog(db, deliveryLogFile).some(item => item.notificationKey === key);
+}
+
+export function markServerPushDelivered(
+  db: ReadWriteDb,
+  deliveryLogFile: string,
+  notificationKey: string
+): void {
+  const key = String(notificationKey || '').trim();
+  if (!key || hasServerPushBeenDelivered(db, deliveryLogFile, key)) return;
+  const log = readPushDeliveryLog(db, deliveryLogFile);
+  log.push({ notificationKey: key, deliveredAt: db.newTimestamp() });
+  db.writeDB(deliveryLogFile, log.slice(-PUSH_DELIVERY_LOG_MAX));
+}
+
 export async function sendWebPushToStaff(
   db: ReadWriteDb,
   subscriptionsFile: string,
   staffKey: string,
-  payload: WebPushPayload
-): Promise<{ sent: number; removed: number; skipped: boolean }> {
+  payload: WebPushPayload,
+  options?: { deliveryLogFile?: string }
+): Promise<{ sent: number; removed: number; skipped: boolean; alreadyDelivered?: boolean }> {
   if (!isWebPushConfigured()) {
     return { sent: 0, removed: 0, skipped: true };
+  }
+
+  const notificationKey = String(payload.notificationKey || '').trim();
+  const deliveryLogFile = options?.deliveryLogFile;
+  if (notificationKey && deliveryLogFile && hasServerPushBeenDelivered(db, deliveryLogFile, notificationKey)) {
+    return { sent: 0, removed: 0, skipped: true, alreadyDelivered: true };
   }
 
   const subscriptions = db.readDB<PushSubscriptionRecord[]>(subscriptionsFile, [])
@@ -163,6 +207,10 @@ export async function sendWebPushToStaff(
       .filter(item => !staleEndpoints.includes(item.endpoint));
     db.writeDB(subscriptionsFile, next);
     removed = staleEndpoints.length;
+  }
+
+  if (sent > 0 && notificationKey && deliveryLogFile) {
+    markServerPushDelivered(db, deliveryLogFile, notificationKey);
   }
 
   return { sent, removed, skipped: false };

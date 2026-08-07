@@ -49,7 +49,7 @@ self.addEventListener('push', (event: PushEvent) => {
     icon: '/icons/icon.svg',
     badge: '/icons/icon.svg',
     tag: payload.notificationKey || 'chd-notification',
-    renotify: true,
+    renotify: false,
     data: {
       url: payload.url || '/',
       notificationKey: payload.notificationKey || '',

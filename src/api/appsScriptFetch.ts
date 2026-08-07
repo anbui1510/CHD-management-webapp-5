@@ -9,6 +9,7 @@ import {
   formatAppsScriptHttpError
 } from '../utils/appsScriptRetry';
 import { sanitizeNotificationFields } from '../utils/workflowMessages';
+import { hasOsPushBeenDelivered, markOsPushDelivered } from '../utils/notificationPushDelivery';
 
 type SheetData = {
   patients: any[];
@@ -1102,6 +1103,9 @@ const deliverWebPushForNotification = (record: Record<string, unknown>): void =>
   const staffKey = String(record?.StaffKey || '').trim();
   if (!staffKey) return;
 
+  const notificationKey = String(record?.NotificationKey || '').trim();
+  if (notificationKey && hasOsPushBeenDelivered(notificationKey)) return;
+
   const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
   if (!nativeFetch) return;
 
@@ -1118,11 +1122,15 @@ const deliverWebPushForNotification = (record: Record<string, unknown>): void =>
         const err = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      return res.json() as Promise<{ sent?: number; skipped?: boolean; needsResubscribe?: boolean; errors?: string[] }>;
+      return res.json() as Promise<{ sent?: number; skipped?: boolean; alreadyDelivered?: boolean; needsResubscribe?: boolean; errors?: string[] }>;
     });
 
   void send()
     .then(result => {
+      if (result.alreadyDelivered) return;
+      if (notificationKey && (result.sent || result.skipped)) {
+        markOsPushDelivered(notificationKey);
+      }
       if (result.skipped) {
         console.warn('[web-push] Server chưa cấu hình VAPID — không gửi được push OS.');
       } else if (result.needsResubscribe) {
