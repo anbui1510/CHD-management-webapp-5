@@ -321,12 +321,6 @@ export default function App() {
   const [mobileQuickTabIds, setMobileQuickTabIds] = useState<ActiveMenuId[]>(DEFAULT_MOBILE_QUICK_SLOTS);
   const isMobile = useIsMobile();
   const webPush = useWebPush(currentStaff?.StaffKey);
-  useForegroundPushAlerts(
-    notifications,
-    currentStaff?.StaffKey,
-    webPush.subscribed,
-    medicalDataLoadState.phase === 'ready'
-  );
 
   // Collapsible Filter Panel State
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
@@ -340,6 +334,12 @@ export default function App() {
     phase: 'idle',
     startedAt: null
   });
+  useForegroundPushAlerts(
+    notifications,
+    currentStaff?.StaffKey,
+    webPush.subscribed,
+    medicalDataLoadState.phase === 'ready'
+  );
   const [medicalLoadElapsedSec, setMedicalLoadElapsedSec] = useState(0);
 
   // Search Filter State (Patient List & Globals)
