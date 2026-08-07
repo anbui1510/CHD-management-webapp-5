@@ -41,6 +41,7 @@ import { startChdBriefScheduler } from './src/chdDailyBrief/scheduler';
 import {
   buildWebPushPayload,
   getPushSubscriptionsFile,
+  getPushDeliveryLogFile,
   getVapidPublicKey,
   initWebPushFromEnv,
   isWebPushConfigured,
@@ -355,6 +356,7 @@ const DEVICE_TEMPLATES_FILE = path.join(DB_DIR, 'device-templates.json');
 const ROLE_PRESETS_FILE = path.join(DB_DIR, 'role-presets.json');
 const NOTIFICATIONS_FILE = path.join(DB_DIR, 'notifications.json');
 const PUSH_SUBSCRIPTIONS_FILE = getPushSubscriptionsFile(DB_DIR);
+const PUSH_DELIVERY_LOG_FILE = getPushDeliveryLogFile(DB_DIR);
 const DOCTOR_MARKS_FILE = path.join(DB_DIR, 'doctor-performance-marks.json');
 const SHEETS_SYNC_FAILURES_FILE = path.join(DB_DIR, 'sheets-sync-failures.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
@@ -1675,7 +1677,8 @@ async function appendNotificationIfMissing(
     { readDB, writeDB, createUniqueKey, newTimestamp },
     PUSH_SUBSCRIPTIONS_FILE,
     record.StaffKey,
-    buildWebPushPayload(record)
+    buildWebPushPayload(record),
+    { deliveryLogFile: PUSH_DELIVERY_LOG_FILE }
   ).catch(err => {
     console.warn('[web-push] Delivery failed:', err);
   });
@@ -2114,12 +2117,13 @@ app.post('/api/push/deliver', requireAuth, async (req, res) => {
     { readDB, writeDB, createUniqueKey, newTimestamp },
     PUSH_SUBSCRIPTIONS_FILE,
     staffKey,
-    payload
+    payload,
+    { deliveryLogFile: PUSH_DELIVERY_LOG_FILE }
   );
   res.json({
     ...result,
-    attempted: result.skipped ? 0 : undefined,
-    needsResubscribe: !result.skipped && result.sent === 0,
+    attempted: result.skipped && !result.alreadyDelivered ? 0 : undefined,
+    needsResubscribe: !result.skipped && !result.alreadyDelivered && result.sent === 0,
   });
 });
 

@@ -321,7 +321,12 @@ export default function App() {
   const [mobileQuickTabIds, setMobileQuickTabIds] = useState<ActiveMenuId[]>(DEFAULT_MOBILE_QUICK_SLOTS);
   const isMobile = useIsMobile();
   const webPush = useWebPush(currentStaff?.StaffKey);
-  useForegroundPushAlerts(notifications, currentStaff?.StaffKey, webPush.subscribed);
+  useForegroundPushAlerts(
+    notifications,
+    currentStaff?.StaffKey,
+    webPush.subscribed,
+    medicalDataLoadState.phase === 'ready'
+  );
 
   // Collapsible Filter Panel State
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
