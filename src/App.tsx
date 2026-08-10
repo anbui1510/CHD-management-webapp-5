@@ -3449,9 +3449,15 @@ export default function App() {
           {activeMenu === 'cathlab-report' && (
             <CathLabReportView
               patients={patients}
+              consults={consults}
               cathlabs={cathlabs}
               sources={sources}
               staffList={staffList}
+              onRefreshData={refreshClinicalData}
+              onPatchConsult={patchConsult}
+              onPatchCathlab={patchCathlab}
+              onAddCathlab={addCathlab}
+              onAddPatient={addPatient}
               triggerAlert={triggerAlert}
               onViewPatientRecord={(pat) => {
                 setActiveMenu('patients');

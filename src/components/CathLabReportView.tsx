@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { CathLab, Patient, Staff, Source, formatVNTime, findPatientByKey, removeDiacritics } from '../types';
+import { CathLab, Patient, Consult, Staff, Source, formatVNTime, findPatientByKey, removeDiacritics } from '../types';
 import { VNDateInput } from './VNDateInput';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
+import HisCathImportPanel from './HisCathImportPanel';
 import { 
   FileText, 
   Filter, 
@@ -13,16 +14,23 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertCircle,
-  Users
+  Users,
+  Upload
 } from 'lucide-react';
 import { MODAL_TITLE } from '../utils/modalTitles';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface CathLabReportViewProps {
   patients: Patient[];
+  consults: Consult[];
   cathlabs: CathLab[];
   sources?: Source[];
   staffList?: Staff[];
+  onRefreshData?: (force?: boolean) => void;
+  onPatchConsult?: (consultKey: string, patch: Partial<Consult>) => void;
+  onPatchCathlab?: (cathKey: string, patch: Partial<CathLab>) => void;
+  onAddCathlab?: (cath: CathLab) => void;
+  onAddPatient?: (patient: Patient) => void;
   onViewPatientRecord?: (patient: Patient) => void;
   triggerAlert?: (message: string, title?: string) => void;
 }
@@ -58,12 +66,29 @@ const parseCathMethods = (methodStr: any): string[] => {
 
 function CathLabReportViewInner({
   patients,
+  consults = [],
   cathlabs = [],
   sources = [],
   staffList = [],
+  onRefreshData,
+  onPatchConsult,
+  onPatchCathlab,
+  onAddCathlab,
+  onAddPatient,
   onViewPatientRecord,
   triggerAlert
 }: CathLabReportViewProps) {
+  const [activeTab, setActiveTab] = useState<'report' | 'his-import'>('report');
+
+  let loggedInStaffId = localStorage.getItem('CurrentStaffKey') || '';
+  if (loggedInStaffId.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(loggedInStaffId);
+      loggedInStaffId = parsed.StaffKey || '';
+    } catch {
+      // ignore
+    }
+  }
   // Ensure we are working with arrays safely
   const safeCathlabs = useMemo(() => Array.isArray(cathlabs) ? cathlabs : [], [cathlabs]);
   const safePatients = useMemo(() => Array.isArray(patients) ? patients : [], [patients]);
@@ -301,16 +326,17 @@ function CathLabReportViewInner({
   }, []);
 
   const subheaderActions = useMemo(
-    () => (
-      <button
-        type="button"
-        onClick={handleExportCSV}
-        className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition uppercase tracking-wider cursor-pointer"
-      >
-        <Download className="w-3.5 h-3.5 text-white" /> Xuất Excel
-      </button>
-    ),
-    [handleExportCSV]
+    () =>
+      activeTab === 'report' ? (
+        <button
+          type="button"
+          onClick={handleExportCSV}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition uppercase tracking-wider cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5 text-white" /> Xuất Excel
+        </button>
+      ) : null,
+    [handleExportCSV, activeTab]
   );
 
   useModuleSubheader('cathlab-report', {
@@ -321,7 +347,7 @@ function CathLabReportViewInner({
   });
 
   return (
-    <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50 overflow-y-auto">
+    <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50 overflow-hidden">
       
       {/* Title Header — mobile only */}
       <div className="shrink-0 md:hidden flex flex-col gap-3 bg-white p-5 border border-slate-200 rounded-3xl shadow-sm">
@@ -331,10 +357,46 @@ function CathLabReportViewInner({
           </div>
           <div>
             <h2 className="text-lg font-black text-neutral-900 tracking-tight uppercase">Báo cáo & Thống kê thông tim</h2>
-            <p className="text-xs text-slate-500 font-medium">Truy xuất, thống kê số liệu và xuất báo cáo ca can thiệp tim mạch</p>
+            <p className="text-xs text-slate-500 font-medium">Truy xuất, thống kê số liệu và import ca từ HIS</p>
           </div>
         </div>
       </div>
+
+      <div className="shrink-0 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('report')}
+          className={`font-extrabold text-[11px] sm:text-[13px] px-4 py-2 rounded-2xl transition flex items-center gap-2 ${activeTab === 'report' ? 'bg-[#d2145a] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+        >
+          <FileText className="w-4 h-4 shrink-0" />
+          Báo cáo & Thống kê
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('his-import')}
+          className={`font-extrabold text-[11px] sm:text-[13px] px-4 py-2 rounded-2xl transition flex items-center gap-2 ${activeTab === 'his-import' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+        >
+          <Upload className="w-4 h-4 shrink-0" />
+          Import HIS
+        </button>
+      </div>
+
+      {activeTab === 'his-import' ? (
+        <HisCathImportPanel
+          patients={safePatients}
+          consults={consults}
+          cathlabs={safeCathlabs}
+          staffList={staffList}
+          loggedInStaffId={loggedInStaffId}
+          onRefreshData={onRefreshData || (() => {})}
+          onPatchConsult={onPatchConsult}
+          onPatchCathlab={onPatchCathlab}
+          onAddCathlab={onAddCathlab}
+          onAddPatient={onAddPatient}
+          triggerAlert={triggerAlert}
+        />
+      ) : (
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4">
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
@@ -754,6 +816,8 @@ function CathLabReportViewInner({
           </div>
         )}
       </div>
+      </div>
+      )}
 
     </div>
   );
