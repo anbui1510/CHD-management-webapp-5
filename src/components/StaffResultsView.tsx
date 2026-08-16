@@ -36,7 +36,6 @@ const DEFAULT_CONCLUSION_OPTIONS = [
 ];
 
 const CONSULT_TYPE_OPTIONS = ['Staff mổ', 'Staff thông'] as const;
-const CATH_PTV_MAIN_OPTIONS = ['BS. Phụng', 'BS. Lợi', 'BS. Thịnh'];
 
 const DEFAULT_DEPARTMENTS = [
   'Ngoại trú',
@@ -226,7 +225,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const [detailDiagnosis, setDetailDiagnosis] = useState<string>('');
   
   const [consultMembers, setConsultMembers] = useState<string>('');
-  const [scheduled1st, setScheduled1st] = useState<string>('');
   
   // 4. Clinical Result outcome fields
   const [consultResultID, setConsultResultID] = useState<string>('');
@@ -286,7 +284,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     setShowAddDeptInput(false);
     setCustomDeptVal('');
     setConsultMembers('');
-    setScheduled1st('');
     setDiagnosisID('');
     setDetailDiagnosis('');
     setConsultResultID('');
@@ -377,12 +374,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       // 2. Add the consult
       const chosenDept = department;
       const chosenDoc = requestBy;
-      const isCathStaff = consultType === 'Staff thông';
-      if (isCathStaff && !scheduled1st.trim()) {
-        setSubmitLoading(false);
-        setErrorMsg('Vui lòng chọn Hội chẩn PTV chính!');
-        return;
-      }
 
       const consultPayload: Consult = {
         ConsultKey: `con_${Date.now()}`,
@@ -392,7 +383,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         PatientHeight: patHeight || '',
         ConsultDate: consultDate,
         RequestBy: chosenDoc || 'BS Hội đồng',
-        ConsultMember: isCathStaff ? scheduled1st : consultMembers,
+        ConsultMember: consultMembers,
         DiagnosisID: diagnosisID,
         DetailDiagnosis: detailDiagnosis,
         Department: chosenDept || '',
@@ -409,10 +400,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         ConsultResultUpdatedBy: currentStaff?.StaffKey || '01378',
         ConsultResultUpdatedTime: new Date().toISOString(),
         PDFTrigger: false,
-        ...(isCathStaff && scheduled1st && {
-          Scheduled1stInterventionist: scheduled1st,
-          Scheduled2ndInterventionist: chosenDoc || '',
-        }),
       };
 
       onAddConsult?.(consultPayload);
@@ -1602,33 +1589,16 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       </div>
                     </div>
 
-                    {consultType === 'Staff thông' ? (
-                      <div className="pb-0.5">
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">
-                          Hội chẩn PTV chính <span className="text-red-500">*</span>
-                        </label>
-                        <SearchableEnumSelect
-                          required
-                          options={CATH_PTV_MAIN_OPTIONS}
-                          value={scheduled1st}
-                          onChange={setScheduled1st}
-                          placeholder="-- Chọn PTV chính --"
-                          searchPlaceholder="Gõ tên PTV..."
-                          direction="up"
-                        />
-                      </div>
-                    ) : (
-                      <div className="pb-0.5">
-                        <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên hội chẩn</label>
-                        <MobileAutoExpandTextarea
-                          minRows={2}
-                          value={consultMembers}
-                          onChange={(e) => setConsultMembers(e.target.value)}
-                          placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"
-                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
-                        />
-                      </div>
-                    )}
+                    <div className="pb-0.5">
+                      <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Thành viên hội chẩn</label>
+                      <MobileAutoExpandTextarea
+                        minRows={2}
+                        value={consultMembers}
+                        onChange={(e) => setConsultMembers(e.target.value)}
+                        placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
+                      />
+                    </div>
 
                   </div>
                 </div>
