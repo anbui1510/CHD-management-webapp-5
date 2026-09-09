@@ -838,6 +838,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
      // Save to database
      const persist = async () => {
+       // Declare before the new-patient POST — that branch reads syncContext.
+       const syncContext = buildSyncContext('cathlab-room', {
+         patientName: adHocPatientName || pName,
+         patientKey: patientKey
+       });
+
        if (adHocPatientMode === 'new') {
          await persistWithSheetsSync(
            reportMutationResponse,
@@ -858,10 +864,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        // Save consult (either POST for Case A or PUT for Case B/C)
        const consultUrl = consultCase === 'A' ? '/api/consults' : `/api/consults/${consultPayload.ConsultKey}`;
        const consultMethod = consultCase === 'A' ? 'POST' : 'PUT';
-       const syncContext = buildSyncContext('cathlab-room', {
-         patientName: adHocPatientName || pName,
-         patientKey: patientKey
-       });
        const conRes = await fetch(consultUrl, {
          method: consultMethod,
          headers: { 
