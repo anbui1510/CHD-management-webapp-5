@@ -2327,10 +2327,10 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className="max-w-none px-4 md:px-6 mx-auto py-4 flex-1 w-full flex flex-row gap-4 overflow-hidden min-h-0 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4">
+      <div className="max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1.5 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-2 xl:pb-4">
         
         {/* Collapsible Left navigation Aside drawer */}
-        <aside className={`hidden md:block ${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-4`}>
+        <aside className={`hidden md:block ${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-2 xl:pb-4`}>
           <div className={`bg-white border border-slate-200 rounded-3xl ${isSidebarExpanded ? 'p-4' : 'p-2 sm:p-2'} shadow-sm space-y-4`}>
             
             {/* Quick profile overview */}

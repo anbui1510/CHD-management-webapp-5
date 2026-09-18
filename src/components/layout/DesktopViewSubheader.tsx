@@ -16,7 +16,7 @@ export default function DesktopViewSubheader({ config }: DesktopViewSubheaderPro
 
   return (
     <div className="hidden md:block shrink-0 bg-white border-b border-slate-200 shadow-sm">
-      <div className="px-4 md:px-6 py-2 flex items-center gap-3 min-h-[44px]">
+      <div className="px-2 sm:px-3 md:px-4 xl:px-6 py-1.5 md:py-2 flex items-center gap-2 md:gap-3 min-h-[40px] md:min-h-[44px]">
         {/* Trái: tên view */}
         <div className="flex items-center gap-2 min-w-0 shrink-0 max-w-[220px] lg:max-w-[260px]">
           {config.icon ? (

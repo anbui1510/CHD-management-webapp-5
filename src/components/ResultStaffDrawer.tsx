@@ -830,7 +830,7 @@ export default function ResultStaffDrawer({
   if (layout === 'panel') {
     return (
       <>
-        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-2xl xl:rounded-3xl shadow-sm overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-xl xl:rounded-2xl 2xl:rounded-3xl shadow-sm overflow-hidden">
           {drawerHeader}
           {drawerForm}
         </div>
