@@ -311,6 +311,21 @@ export default function ResultStaffDrawer({
 
   if (!consultKey || !consult || !patient || !formData) return null;
 
+  const isPanelLayout = layout === 'panel';
+  const formScrollPadding = isPanelLayout ? 'p-3 lg:p-4 xl:p-5' : 'p-4 md:p-6';
+  const formSectionSpacing = isPanelLayout ? 'space-y-4 xl:space-y-5' : 'space-y-6';
+  const mainFormGridClass = isPanelLayout
+    ? 'grid grid-cols-1 2xl:grid-cols-12 gap-3 xl:gap-4 items-stretch animate-in fade-in duration-300 min-h-0'
+    : 'grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch animate-in fade-in duration-300 min-h-0';
+  const leftFormColClass = isPanelLayout
+    ? '2xl:col-span-5 flex flex-col gap-3 xl:gap-4 min-h-0'
+    : 'lg:col-span-5 flex flex-col gap-4 min-h-0';
+  const rightFormColClass = isPanelLayout
+    ? '2xl:col-span-7 flex flex-col min-h-0'
+    : 'lg:col-span-7 flex flex-col min-h-0';
+  const innerCardPadding = isPanelLayout ? 'p-2.5 lg:p-3 xl:p-4' : 'p-3 md:p-4';
+  const innerCardRadius = isPanelLayout ? 'rounded-2xl xl:rounded-3xl' : 'rounded-3xl';
+
   const summaryConsultOverride: Partial<Consult> = {
     ConsultResultID: (formData.ConsultResultID || consult.ConsultResultID) as Consult['ConsultResultID'],
     DetailConsultResult: formData.DetailConsultResult,
@@ -352,22 +367,22 @@ export default function ResultStaffDrawer({
               >
                 <div
                   ref={scrollContainerRef}
-                  className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 p-4 md:p-6${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
+                  className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${formScrollPadding}${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
-                <div className="space-y-6">
+                <div className={formSectionSpacing}>
                       
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch animate-in fade-in duration-300 min-h-0">
+                      <div className={mainFormGridClass}>
                         
                         {/* Cột trái: Bệnh nhi (trên) + Thông tin hội chẩn (dưới) */}
-                        <div className="lg:col-span-5 flex flex-col gap-4 min-h-0">
+                        <div className={leftFormColClass}>
                         {/* Khung 1: Bệnh nhi đang hội chẩn (Hành chính) — phía trên */}
                         <div className="flex flex-col shrink-0">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-0 relative shadow-sm flex flex-col">
+                          <div className={`bg-slate-50 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-0 relative shadow-sm flex flex-col`}>
                             <div>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <h4 className="text-sm lg:text-lg font-black text-[#d2145a] uppercase leading-tight">{patient.PatientName}</h4>
+                                  <h4 className={`font-black text-[#d2145a] uppercase leading-tight ${isPanelLayout ? 'text-sm xl:text-base 2xl:text-lg' : 'text-sm lg:text-lg'}`}>{patient.PatientName}</h4>
                                   {patient.OtherPatientName && (
                                     <p className="text-[10px] text-slate-400 font-medium italic mt-0.5 md:mt-1">Tên khác: {patient.OtherPatientName}</p>
                                   )}
@@ -439,10 +454,10 @@ export default function ResultStaffDrawer({
 
                         {/* Khung 2: Thông tin hội chẩn — phía dưới */}
                         <div className="flex flex-col flex-1 min-h-0">
-                          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar">
+                          <div className={`bg-slate-50 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
                             {!isFormEditing ? (
                               <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium">
-                                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
+                                <div className="flex flex-wrap items-baseline gap-x-2 xl:gap-x-3 gap-y-0">
                                   <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(formData.ConsultDate)}</span></p>
                                   <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{formData.RequestBy || ''}</span></p>
                                 </div>
@@ -520,8 +535,8 @@ export default function ResultStaffDrawer({
                         </div>
 
                         {/* Cột phải: Kết quả hội chẩn */}
-                        <div className="lg:col-span-7 flex flex-col min-h-0">
-                          <div className="bg-indigo-50/20 border border-slate-200 rounded-3xl p-3 md:p-4 space-y-3 shadow-sm h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar">
+                        <div className={rightFormColClass}>
+                          <div className={`bg-indigo-50/20 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
                             <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2 shrink-0">Kết quả hội chẩn</span>
                             
                             {!isFormEditing ? (
@@ -569,8 +584,8 @@ export default function ResultStaffDrawer({
                               </div>
                             ) : (
                               <div className="space-y-3.5 pt-1">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                                  <div className="md:col-span-1">
+                                <div className={`grid grid-cols-1 gap-2.5 xl:gap-3.5 ${isPanelLayout ? 'xl:grid-cols-3' : 'md:grid-cols-3'}`}>
+                                  <div className={isPanelLayout ? 'xl:col-span-1' : 'md:col-span-1'}>
                                     <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
                                     <SearchableEnumSelect
                                       required
@@ -584,7 +599,7 @@ export default function ResultStaffDrawer({
                                       searchPlaceholder="Gõ ICD để tìm..."
                                     />
                                   </div>
-                                  <div className="md:col-span-2">
+                                  <div className={isPanelLayout ? 'xl:col-span-2' : 'md:col-span-2'}>
                                     <label className="block md:mb-1 text-slate-500 font-bold text-[10px] mb-1 font-sans">
                                       <span className="md:hidden inline mr-1">Kết luận chính</span>
                                       <span className="hidden md:inline">Kết luận chính </span>
@@ -701,7 +716,7 @@ export default function ResultStaffDrawer({
                 </div>
 
                       {/* Action buttons area — sticky footer */}
-                      <div className="pt-2 border-t border-slate-100 shrink-0 px-4 md:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white">
+                      <div className={`pt-2 border-t border-slate-100 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'px-4 md:px-6'}`}>
                         {!autoEdit && !isFormEditing ? (
                           <div className="w-full grid grid-cols-2 gap-2">
                             <button
@@ -815,7 +830,7 @@ export default function ResultStaffDrawer({
   if (layout === 'panel') {
     return (
       <>
-        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-2xl xl:rounded-3xl shadow-sm overflow-hidden">
           {drawerHeader}
           {drawerForm}
         </div>
