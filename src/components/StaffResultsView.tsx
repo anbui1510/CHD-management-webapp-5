@@ -752,8 +752,12 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     const allPageSelected = pageKeys.length > 0 && pageKeys.every(key => selectedDeleteKeys.has(key));
     const somePageSelected = pageKeys.some(key => selectedDeleteKeys.has(key));
 
+    const splitPanelOpen = !!selectedConsultKey && !isMobile;
+    const compactSplitColumnClass = splitPanelOpen ? 'hidden 2xl:table-cell' : '';
+
     const renderSortableHeader = (field: 'name' | 'id' | 'dob' | 'diagnosis' | 'date', label: string, freezeName = false) => {
       const isSorted = sortField === field;
+      const hideInSplit = splitPanelOpen && (field === 'diagnosis' || field === 'date');
       return (
         <th 
           scope="col" 
@@ -765,8 +769,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               setSortOrder('asc');
             }
           }}
-          className={`px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20 ${
-            freezeName ? 'sticky left-10 z-30 min-w-[160px] border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
+          className={`px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 bg-slate-50 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20 ${
+            hideInSplit ? compactSplitColumnClass : ''
+          } ${
+            freezeName ? `sticky left-10 z-30 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] ${splitPanelOpen ? 'min-w-[130px] 2xl:min-w-[160px]' : 'min-w-[160px]'}` : ''
           }`}
         >
           <div className="flex items-center gap-1.5 justify-start">
@@ -807,7 +813,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               {renderSortableHeader('dob', 'Ngày sinh / GT')}
               {renderSortableHeader('diagnosis', 'Chẩn đoán')}
               {renderSortableHeader('date', 'Ngày staff')}
-              <th scope="col" className="px-4 py-3 bg-slate-50 border-b border-slate-200 text-center text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20">Hành động</th>
+              <th scope="col" className="px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 bg-slate-50 border-b border-slate-200 text-center text-slate-500 font-extrabold uppercase text-[10px] tracking-wider sticky top-0 z-20 w-[72px]">Hành động</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
@@ -841,22 +847,24 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   </td>
                   <td 
                     onClick={() => handleOpenConsult(c)}
-                    className={`px-4 py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer min-w-[160px] sticky left-10 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] group-hover:bg-slate-50/80 ${
+                    className={`px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer sticky left-10 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] group-hover:bg-slate-50/80 ${
+                      splitPanelOpen ? 'min-w-[130px] 2xl:min-w-[160px]' : 'min-w-[160px]'
+                    } ${
                       selectedConsultKey === c.ConsultKey ? 'bg-indigo-50/80' : selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : 'bg-white'
                     }`}
                   >
-                    {pat.PatientName}
+                    <span className="line-clamp-2 leading-snug">{pat.PatientName}</span>
                   </td>
                   <td 
                     onClick={() => handleOpenConsult(c)}
-                    className="px-4 py-3 text-slate-700 font-mono font-bold cursor-pointer whitespace-nowrap"
+                    className="px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 text-slate-700 font-mono font-bold cursor-pointer whitespace-nowrap"
                   >
                     {pat.PatientID1}
                     {pat.PatientID2 && <span className="text-[9px] text-slate-450 font-semibold block font-sans">Mã phụ: {pat.PatientID2}</span>}
                   </td>
                   <td 
                     onClick={() => handleOpenConsult(c)}
-                    className="px-4 py-3 text-slate-600 font-medium cursor-pointer whitespace-nowrap"
+                    className="px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 text-slate-600 font-medium cursor-pointer whitespace-nowrap"
                   >
                     <span className="font-mono">{formatVNTime(pat.PatientDOB)}</span>
                     <span className="ml-2 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
@@ -865,7 +873,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   </td>
                   <td 
                     onClick={() => handleOpenConsult(c)}
-                    className="px-4 py-3 cursor-pointer"
+                    className={`px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 cursor-pointer ${compactSplitColumnClass}`}
                   >
                     <span className="font-bold text-red-650 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[10px] font-mono">
                       {c.DiagnosisID || '—'}
@@ -873,11 +881,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   </td>
                   <td 
                     onClick={() => handleOpenConsult(c)}
-                    className="px-4 py-3 text-slate-600 font-semibold font-mono cursor-pointer"
+                    className={`px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 text-slate-600 font-semibold font-mono cursor-pointer whitespace-nowrap ${compactSplitColumnClass}`}
                   >
                     {formatVNTime(c.ConsultDate)}
                   </td>
-                  <td className="px-4 py-3 text-center whitespace-nowrap min-w-[120px]">
+                  <td className="px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 text-center whitespace-nowrap w-[72px]">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
                         type="button"
@@ -909,7 +917,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col gap-3 md:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-4 lg:p-6 bg-slate-50 overflow-hidden">
+    <div className="flex-1 h-full flex flex-col gap-2 md:gap-3 xl:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-3 lg:p-4 xl:p-6 bg-slate-50 overflow-hidden">
       
       {/* Header Area — mobile only; desktop dùng subheader toàn app */}
       <div className="md:hidden shrink-0 flex flex-col gap-3 bg-white p-4 border border-slate-200 rounded-3xl shadow-sm">
@@ -974,13 +982,13 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       </div>
 
       {/* Main workspace: split list + detail panel on desktop */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 overflow-hidden">
-        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl p-4 lg:p-6 shadow-sm gap-4 overflow-hidden transition-all duration-300 ${
-          selectedConsultKey && !isMobile ? 'lg:w-[46%] lg:shrink-0' : 'flex-1'
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-2 lg:gap-3 xl:gap-4 overflow-hidden">
+        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-2xl xl:rounded-3xl p-3 lg:p-4 xl:p-6 shadow-sm gap-3 xl:gap-4 overflow-hidden transition-all duration-300 ${
+          selectedConsultKey && !isMobile ? 'lg:w-[36%] xl:w-[40%] 2xl:w-[46%] lg:shrink-0' : 'flex-1'
         }`}>
         
         {/* Tab "Staff thông" và "Staff mổ" cùng line */}
-        <div className="shrink-0 flex border-b border-slate-200 gap-6">
+        <div className="shrink-0 flex border-b border-slate-200 gap-4 xl:gap-6">
           <button
             type="button"
             onClick={() => {
