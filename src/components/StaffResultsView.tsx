@@ -917,7 +917,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col gap-2 md:gap-3 xl:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-3 lg:p-4 xl:p-6 bg-slate-50 overflow-hidden">
+    <div className="flex-1 h-full flex flex-col gap-1.5 md:gap-2 xl:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-0 bg-slate-50 overflow-hidden">
       
       {/* Header Area — mobile only; desktop dùng subheader toàn app */}
       <div className="md:hidden shrink-0 flex flex-col gap-3 bg-white p-4 border border-slate-200 rounded-3xl shadow-sm">
@@ -982,9 +982,9 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       </div>
 
       {/* Main workspace: split list + detail panel on desktop */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-2 lg:gap-3 xl:gap-4 overflow-hidden">
-        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-2xl xl:rounded-3xl p-3 lg:p-4 xl:p-6 shadow-sm gap-3 xl:gap-4 overflow-hidden transition-all duration-300 ${
-          selectedConsultKey && !isMobile ? 'lg:w-[36%] xl:w-[40%] 2xl:w-[46%] lg:shrink-0' : 'flex-1'
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-1.5 lg:gap-2 xl:gap-3 2xl:gap-4 overflow-hidden">
+        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl xl:rounded-2xl 2xl:rounded-3xl p-2.5 lg:p-3 xl:p-4 2xl:p-6 shadow-sm gap-2 lg:gap-2.5 xl:gap-4 overflow-hidden transition-all duration-300 ${
+          selectedConsultKey && !isMobile ? 'lg:w-[35%] xl:w-[38%] 2xl:w-[46%] lg:shrink-0' : 'flex-1'
         }`}>
         
         {/* Tab "Staff thông" và "Staff mổ" cùng line */}
