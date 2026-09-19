@@ -48,6 +48,7 @@ export function usePreventBackgroundTouchScroll(
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (container && (container === target || container.contains(target))) return;
+      if (target instanceof Element && target.closest('[data-touch-scroll-container]')) return;
       event.preventDefault();
     };
 

@@ -129,10 +129,11 @@ export default function ResultStaffDrawer({
   const isMobile = useIsMobile();
   const isModalOpen = layout === 'modal' && !!consultKey;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const { keyboardInset, viewportHeight } = useMobileKeyboardInset(isModalOpen);
   const keyboardOpen = isMobile && keyboardInset > 80;
   useLockBodyScroll(isModalOpen);
-  usePreventBackgroundTouchScroll(scrollContainerRef, isModalOpen);
+  usePreventBackgroundTouchScroll(scrollContainerRef, isModalOpen && !showSummaryModal);
 
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [isEditing, setIsEditing] = useState(false);
@@ -142,7 +143,6 @@ export default function ResultStaffDrawer({
   const [exitConfirmError, setExitConfirmError] = useState('');
   const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
   const conclusionOptions = useMemo(() => getSourceConsultResultOptions(sources), [sources]);
 
