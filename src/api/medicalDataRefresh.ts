@@ -60,7 +60,7 @@ const isLikelyMobileDevice = (): boolean => {
 export const getMedicalDataFetchTimeout = (force: boolean): number => {
   const desktopTimeout = force ? 60000 : 20000;
   if (!isLikelyMobileDevice()) return desktopTimeout;
-  return force ? 90000 : 45000;
+  return force ? 120000 : 45000;
 };
 
 /** Build fetch headers with optional Authorization */

@@ -365,7 +365,7 @@ export function ConsultSummaryModal({
   );
 
   if (isMobile && typeof document !== 'undefined') {
-    return createPortal(modal, document.documentElement);
+    return createPortal(modal, document.body);
   }
 
   return modal;

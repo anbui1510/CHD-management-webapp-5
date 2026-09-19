@@ -66,7 +66,7 @@ import { SubheaderRenderer } from './components/layout/DesktopViewSubheader';
 import AppInlineSubheader from './components/layout/AppInlineSubheader';
 import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
-import { AuthRequiredError, getMedicalDataFetchTimeout, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
+import { AuthRequiredError, getMedicalDataFetchTimeout, peekCachedMedicalDataBundle, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
 import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
@@ -743,26 +743,63 @@ export default function App() {
     const tick = () => setMedicalLoadElapsedSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
-    const safetyMs = getMedicalDataFetchTimeout(true) + 5000;
+    const safetyMs = getMedicalDataFetchTimeout(true) + 15000;
     const safetyTimer = setTimeout(() => {
-      setMedicalDataLoadState(prev => {
-        if (prev.phase !== 'loading' && prev.phase !== 'syncing') return prev;
-        if (prev.backgroundSync && (patients.length > 0 || consults.length > 0)) {
-          return { phase: 'ready', startedAt: null, backgroundSync: false };
+      void (async () => {
+        let settled = false;
+        setMedicalDataLoadState(prev => {
+          if (prev.phase !== 'loading' && prev.phase !== 'syncing') {
+            settled = true;
+            return prev;
+          }
+          if (prev.backgroundSync && (patients.length > 0 || consults.length > 0)) {
+            settled = true;
+            return { phase: 'ready', startedAt: null, backgroundSync: false };
+          }
+          return prev;
+        });
+        if (settled) return;
+
+        const inMemory = peekInMemoryMedicalDataBundle();
+        let bundle = inMemory;
+        if (!bundle || (bundle.patients.length === 0 && bundle.consults.length === 0)) {
+          bundle = await peekCachedMedicalDataBundle();
         }
-        return {
-          phase: 'error',
-          startedAt: null,
-          backgroundSync: false,
-          message: 'Đồng bộ quá lâu — dữ liệu có thể chưa cập nhật. Bấm nút Đồng bộ trên header để thử lại.'
-        };
-      });
+        if (bundle && (bundle.patients.length > 0 || bundle.consults.length > 0)) {
+          applyMedicalDataBundle(bundle, 'full', medicalDataSetters);
+          setMedicalDataLoadState({
+            phase: 'ready',
+            startedAt: null,
+            backgroundSync: false
+          });
+          void syncMedicalDataInBackground('full', { silent: true })?.catch(() => undefined);
+          return;
+        }
+
+        setMedicalDataLoadState(prev => {
+          if (prev.phase !== 'loading' && prev.phase !== 'syncing') return prev;
+          return {
+            phase: 'error',
+            startedAt: null,
+            backgroundSync: false,
+            message: 'Đồng bộ quá lâu — dữ liệu có thể chưa cập nhật. Bấm nút Đồng bộ trên header để thử lại.'
+          };
+        });
+      })();
     }, safetyMs);
     return () => {
       clearInterval(interval);
       clearTimeout(safetyTimer);
     };
-  }, [medicalDataLoadState.phase, medicalDataLoadState.startedAt, medicalDataLoadState.backgroundSync, patients.length, consults.length]);
+  }, [
+    medicalDataLoadState.phase,
+    medicalDataLoadState.startedAt,
+    medicalDataLoadState.backgroundSync,
+    patients.length,
+    consults.length,
+    medicalDataSetters,
+    syncMedicalDataInBackground
+  ]);
 
   const loadPublicStaffForLogin = useCallback(() => {
     setLoginLoadError('');
