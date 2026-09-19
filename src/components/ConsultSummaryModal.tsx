@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Clipboard, X } from 'lucide-react';
 import { Consult, Patient, formatVNTime, normalizePriorityOrder, removeDiacritics, restoreWeightFromDate } from '../types';
 import { ConsultSummaryReadOnly } from './ConsultSummaryReadOnly';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
+import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { copyElementAsImage, CopyImageResultType } from '../utils/copySummaryImage';
 import {
@@ -160,7 +161,9 @@ export function ConsultSummaryModal({
   zIndexClass = 'z-[80]'
 }: ConsultSummaryModalProps) {
   const isMobile = useIsMobile();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   useLockBodyScroll(true);
+  usePreventBackgroundTouchScroll(scrollContainerRef, isMobile);
   const [copied, setCopied] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [copiedImageType, setCopiedImageType] = useState<CopyImageResultType | null>(null);
@@ -211,24 +214,29 @@ export function ConsultSummaryModal({
     }
   };
 
-  return (
+  const mobileZIndex = 'z-[130]';
+  const effectiveZIndex = isMobile ? mobileZIndex : zIndexClass;
+
+  const modal = (
     <div
-      className={`fixed inset-0 bg-slate-900/60 backdrop-blur-xs ${zIndexClass} flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
+      className={`fixed inset-0 ${effectiveZIndex} flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
         isMobile
-          ? 'items-stretch p-0 pb-[calc(4rem+env(safe-area-inset-bottom,0px))]'
-          : 'items-center justify-center p-4'
+          ? 'flex-col bg-slate-50'
+          : `bg-slate-900/60 backdrop-blur-xs items-center justify-center p-4 ${zIndexClass}`
       }`}
-      onClick={onClose}
+      onClick={isMobile ? undefined : onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div
-        className={`bg-slate-50/95 backdrop-blur-md w-full shadow-2xl border border-slate-250 flex flex-col min-h-0 overflow-hidden font-sans text-xs animate-in zoom-in-95 duration-200 ${
+        className={`bg-slate-50/95 backdrop-blur-md w-full shadow-2xl flex flex-col min-h-0 overflow-hidden font-sans text-xs animate-in zoom-in-95 duration-200 ${
           isMobile
-            ? 'max-h-none h-full rounded-none max-w-none'
-            : 'max-w-3xl max-h-[95vh] rounded-3xl'
+            ? 'h-full max-h-none rounded-none max-w-none border-0 shadow-none flex-1'
+            : 'max-w-3xl max-h-[95vh] rounded-3xl border border-slate-250'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`border-b border-slate-200 bg-white flex items-center justify-between text-[#d2145a] shrink-0 ${isMobile ? 'p-3 rounded-none' : 'p-4 rounded-t-3xl'}`}>
+        <div className={`border-b border-slate-200 bg-white flex items-center justify-between text-[#d2145a] shrink-0 ${isMobile ? 'p-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] rounded-none' : 'p-4 rounded-t-3xl'}`}>
           <div className="flex items-center gap-2 min-w-0">
             <div className="bg-emerald-50 text-emerald-600 rounded-xl p-2 shrink-0">
               <Clipboard className="w-5 h-5" />
@@ -253,7 +261,8 @@ export function ConsultSummaryModal({
         </div>
 
         <div
-          className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${isMobile ? 'p-2' : 'p-4 shrink-0'}`}
+          ref={scrollContainerRef}
+          className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${isMobile ? 'p-2 pb-3' : 'p-4 shrink-0'}`}
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <div
@@ -288,7 +297,7 @@ export function ConsultSummaryModal({
           </div>
         </div>
 
-        <div className={`border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 ${isMobile ? 'p-3 rounded-none' : 'p-4 rounded-b-3xl'}`}>
+        <div className={`border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 ${isMobile ? 'p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] rounded-none' : 'p-4 rounded-b-3xl'}`}>
           <span className="text-[9.5px] text-slate-400 font-semibold italic text-center sm:text-left leading-normal px-1">
             {isMobile
               ? 'Bấm Lưu ảnh để mở menu chia sẻ và chọn Lưu vào Ảnh, hoặc chụp màn hình trực tiếp trên khung tóm tắt.'
@@ -344,4 +353,10 @@ export function ConsultSummaryModal({
       </div>
     </div>
   );
+
+  if (isMobile && typeof document !== 'undefined') {
+    return createPortal(modal, document.body);
+  }
+
+  return modal;
 }
