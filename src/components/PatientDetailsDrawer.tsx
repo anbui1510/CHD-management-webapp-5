@@ -64,7 +64,7 @@ export default function PatientDetailsDrawer({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [summaryConsult, setSummaryConsult] = useState<Consult | null>(null);
   useLockBodyScroll(true);
-  usePreventBackgroundTouchScroll(scrollContainerRef, true);
+  usePreventBackgroundTouchScroll(scrollContainerRef, !summaryConsult);
 
   const patientKey = normalizeRecordKey(patient.PatientKey);
   const patientId1 = normalizeRecordKey(patient.PatientID1);
