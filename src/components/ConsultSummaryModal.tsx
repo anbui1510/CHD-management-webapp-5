@@ -226,7 +226,7 @@ export function ConsultSummaryModal({
 
   const modal = (
     <div
-      className={isMobile ? mobileShellClass : modalShellClass}
+      className={modalShellClass}
       style={isMobile ? {
         position: 'fixed',
         top: 0,
