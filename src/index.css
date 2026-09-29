@@ -14,6 +14,20 @@ body,
 }
 
 /*
+ * Mobile bottom tab bar metrics (Home / quick tabs / Thêm).
+ * Content height is compact so labels sit just above the home-indicator
+ * safe area — avoids the double white gap (extra py/min-height + safe-area).
+ * All views/modals that clear the tab bar should use --mobile-bottom-nav-offset.
+ */
+:root {
+  --mobile-bottom-nav-content: 3rem; /* ~48px: icon + label, tight */
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-bottom-nav-offset: calc(
+    var(--mobile-bottom-nav-content) + var(--mobile-safe-bottom)
+  );
+}
+
+/*
  * Mobile-only: prevent iOS Safari from auto-zooming when focusing inputs.
  * Safari zooms if editable field font-size is below 16px, which shifts/zooms the viewport.
  */

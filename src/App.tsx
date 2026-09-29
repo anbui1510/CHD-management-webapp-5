@@ -2364,7 +2364,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className="max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1.5 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-2 xl:pb-4">
+      <div className="max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1.5 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4">
         
         {/* Collapsible Left navigation Aside drawer */}
         <aside className={`hidden md:block ${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-2 xl:pb-4`}>
@@ -2702,8 +2702,8 @@ export default function App() {
           {/* NEW CONSULT REGISTRATION OVERLAY DIALOG MODAL */}
           <AnimatePresence>
             {showAddConsult && (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4">
-                <div className="bg-white rounded-3xl max-w-xl w-full max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4">
+                <div className="bg-white rounded-3xl max-w-xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
                   
                   <div className="flex items-center justify-between border-b border-slate-150 px-6 py-3.5 text-[#d2145a] shrink-0">
                     <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
@@ -3799,9 +3799,9 @@ export default function App() {
       {/* Centered Registration Edit Modal Dialog (Sửa Đăng ký staff) */}
       <AnimatePresence>
         {editingRegConsultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4 animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={() => setEditingRegConsultKey(null)}></div>
-            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden">
               
               <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
                 <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">

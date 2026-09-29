@@ -27,7 +27,7 @@ export default function MobileMoreMenu({
         aria-label="Đóng menu"
         onClick={onClose}
       />
-      <div className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,640px)] bg-white rounded-t-3xl shadow-2xl border border-slate-200 flex flex-col pb-[env(safe-area-inset-bottom)]">
+      <div className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,640px)] bg-white rounded-t-3xl shadow-2xl border border-slate-200 flex flex-col pb-[var(--mobile-safe-bottom)]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
           <div>
             <p className="text-sm font-black text-slate-800 uppercase tracking-wide">Thêm module</p>
