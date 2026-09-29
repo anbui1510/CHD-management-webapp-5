@@ -129,14 +129,14 @@ export default function PatientDetailsDrawer({
   });
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4 overflow-hidden overscroll-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 flex items-center justify-center p-3 md:p-4 pb-mobile-nav md:pb-4 overflow-hidden overscroll-none animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true"></div>
 
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="patient-details-drawer-title"
-        className="relative bg-white w-full max-w-2xl max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[90vh] rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-250 overflow-hidden min-h-0"
+        className="relative bg-white w-full max-w-2xl max-h-above-mobile-nav md:max-h-[90vh] rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-250 overflow-hidden min-h-0"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
