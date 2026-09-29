@@ -852,12 +852,12 @@ export default function ResultStaffDrawer({
   const modalOverlayStyle: React.CSSProperties | undefined = isMobile && keyboardOpen
     ? { paddingBottom: `${keyboardInset}px` }
     : isMobile
-      ? { paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }
+      ? { paddingBottom: 'var(--mobile-bottom-nav-offset)' }
       : undefined;
 
   const mobilePanelMaxHeight = keyboardOpen
     ? `${Math.max(viewportHeight - 8, 320)}px`
-    : 'calc(100dvh - 4rem - env(safe-area-inset-bottom, 0px))';
+    : 'calc(100dvh - var(--mobile-bottom-nav-offset))';
   const modalPanelStyle: React.CSSProperties | undefined = isMobile
     ? {
         maxHeight: mobilePanelMaxHeight,
@@ -870,7 +870,7 @@ export default function ResultStaffDrawer({
       {consultKey && (
           <div
             className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
-              isMobile ? 'items-end justify-center p-0' : 'items-center justify-center p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4'
+              isMobile ? 'items-end justify-center p-0' : 'items-center justify-center p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4'
             }`}
             style={modalOverlayStyle}
           >

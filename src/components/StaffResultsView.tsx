@@ -1186,8 +1186,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
       {/* COMBINED STAFF BỔ SUNG MODAL */}
       {showCombinedForm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[min(88dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom)))] md:max-h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative font-sans">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative font-sans">
             
             {/* Header */}
             <div className="flex items-center justify-between gap-2 border-b border-slate-150 px-4 md:px-6 py-3 md:py-4 bg-indigo-50/50 text-[#d2145a] shrink-0">
