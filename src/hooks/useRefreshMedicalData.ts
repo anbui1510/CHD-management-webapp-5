@@ -189,30 +189,41 @@ export function useRefreshMedicalData(
         meta.lastForceAt = meta.lastAt;
         options?.onSyncStatus?.(bundle._syncStatus);
         const pullFailed = bundle._syncStatus?.configured && bundle._syncStatus.lastPullOk === false;
+        const hasClinicalData = bundle.patients.length > 0 || bundle.consults.length > 0;
+        const pullFailMessage =
+          bundle._syncStatus?.lastPullMessage
+          || 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.';
+
         if (silent || backgroundSync) {
-          if (pullFailed && !backgroundSync) {
+          if (pullFailed && !backgroundSync && !hasClinicalData) {
             emitState({
               phase: 'error',
               startedAt: null,
               backgroundSync: false,
-              message: bundle._syncStatus?.lastPullMessage
-                || 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
+              message: pullFailMessage
             });
-          } else if (meta.phase === 'loading' || meta.phase === 'syncing') {
-            emitState({ phase: 'ready', startedAt: null, backgroundSync: false });
+          } else if (meta.phase === 'loading' || meta.phase === 'syncing' || meta.phase === 'error') {
+            // Soft-fail: keep using cached clinical data, surface warning via message.
+            emitState({
+              phase: 'ready',
+              startedAt: null,
+              backgroundSync: false,
+              message: pullFailed && hasClinicalData ? pullFailMessage : undefined
+            });
           }
           return;
         }
         if (pullFailed) {
+          // Hard error only when there is nothing usable to show.
           emitState({
-            phase: 'error',
+            phase: hasClinicalData ? 'ready' : 'error',
             startedAt: null,
-            message: bundle._syncStatus?.lastPullMessage
-              || 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
+            backgroundSync: false,
+            message: pullFailMessage
           });
           return;
         }
-        emitState({ phase: 'ready', startedAt: null, backgroundSync: false });
+        emitState({ phase: 'ready', startedAt: null, backgroundSync: false, message: undefined });
       })
       .catch(async err => {
         if (meta.forceGeneration !== runId) return;
@@ -230,20 +241,17 @@ export function useRefreshMedicalData(
         const cached = await peekCachedMedicalDataBundle();
         if (meta.forceGeneration !== runId) return;
         const hasCache = !!cached && (cached.patients.length > 0 || cached.consults.length > 0);
+        const failMessage = err instanceof Error
+          ? err.message
+          : 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.';
         if (hasCache && cached) {
           applyMedicalDataBundle(cached, scope, setters);
           meta.lastAt = Date.now();
-          if (backgroundSync || silent) {
-            emitState({ phase: 'ready', startedAt: null, backgroundSync: false });
-            return;
-          }
           emitState({
-            phase: 'error',
+            phase: 'ready',
             startedAt: null,
             backgroundSync: false,
-            message: err instanceof Error
-              ? err.message
-              : 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
+            message: silent ? undefined : failMessage
           });
           return;
         }
@@ -251,7 +259,7 @@ export function useRefreshMedicalData(
           phase: 'error',
           startedAt: null,
           backgroundSync: false,
-          message: err instanceof Error ? err.message : 'Không đồng bộ được Google Sheets. Bấm Đồng bộ để thử lại.'
+          message: failMessage
         });
         throw err;
       })

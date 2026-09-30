@@ -60,16 +60,19 @@ async function writeSyncConfig(env: CloudflareSyncConfigEnv, config: SyncConfigR
 }
 
 async function validateAppsScriptSetup(scriptUrl: string, scriptSecret: string): Promise<string | null> {
-  if (!scriptUrl.startsWith('https://script.google.com/macros/s/')) {
+  const trimmed = String(scriptUrl || '').trim().replace(/\/+$/, '').split('?')[0].split('#')[0];
+  if (!trimmed.startsWith('https://script.google.com/macros/s/')) {
     return 'Địa chỉ Apps Script không hợp lệ.';
   }
 
-  let setupUrl = `${scriptUrl}?action=setup`;
+  const setupUrl = new URL(trimmed);
+  setupUrl.searchParams.set('action', 'setup');
   if (scriptSecret) {
-    setupUrl += `&apiKey=${encodeURIComponent(scriptSecret)}`;
+    setupUrl.searchParams.set('apiKey', scriptSecret);
   }
+  setupUrl.searchParams.set('_ts', String(Date.now()));
 
-  const setupRes = await fetch(setupUrl);
+  const setupRes = await fetch(setupUrl.toString());
   if (!setupRes.ok) {
     return `Google Apps Script setup trả về HTTP ${setupRes.status}`;
   }

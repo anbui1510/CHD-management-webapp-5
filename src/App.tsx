@@ -2365,6 +2365,31 @@ export default function App() {
         </div>
       )}
 
+      {medicalDataLoadState.phase === 'ready' && medicalDataLoadState.message && (
+        <div className="relative z-30 bg-amber-500 text-white text-center py-2.5 px-3 text-xs font-bold shadow-inner flex flex-col sm:flex-row items-center justify-center gap-2 flex-wrap">
+          <div className="flex items-start sm:items-center justify-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
+            <span className="min-w-0 leading-snug">{medicalDataLoadState.message}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => refreshFullData(true)}
+              className="relative z-30 min-h-[44px] px-4 py-2 rounded-xl bg-white text-amber-800 font-extrabold hover:bg-amber-50 active:bg-amber-100 touch-manipulation"
+            >
+              Đồng bộ lại
+            </button>
+            <button
+              type="button"
+              onClick={() => setMedicalDataLoadState(prev => ({ ...prev, message: undefined }))}
+              className="relative z-30 min-h-[44px] px-3 py-2 rounded-xl border border-white/40 text-white font-extrabold hover:bg-white/10 touch-manipulation"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Dual Panel Workspace Block */}
       <div className="max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1.5 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4">
         

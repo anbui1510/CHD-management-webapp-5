@@ -4,9 +4,11 @@ import { getAppVersionPayload } from '../appVersion';
 import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
 import type { Staff, Source, Consult, Patient, Notification } from '../types';
 import {
+  buildAppsScriptActionUrl,
   fetchAppsScriptWithRetry,
   formatAppsScriptFetchError,
-  formatAppsScriptHttpError
+  formatAppsScriptHttpError,
+  normalizeAppsScriptUrl
 } from '../utils/appsScriptRetry';
 import { sanitizeNotificationFields } from '../utils/workflowMessages';
 import { hasOsPushBeenDelivered, markOsPushDelivered } from '../utils/notificationPushDelivery';
@@ -441,10 +443,10 @@ export const getClientSheetsSyncStatus = () => ({
 });
 
 const setScriptUrl = (scriptUrl: string): boolean => {
-  const trimmed = scriptUrl.trim();
-  const previous = getScriptUrl();
+  const trimmed = normalizeAppsScriptUrl(scriptUrl);
+  const previous = normalizeAppsScriptUrl(getScriptUrl());
   if (trimmed === previous) {
-    if (trimmed && !localStorage.getItem(SCRIPT_URL_STORAGE_KEY)) {
+    if (trimmed && localStorage.getItem(SCRIPT_URL_STORAGE_KEY) !== trimmed) {
       localStorage.setItem(SCRIPT_URL_STORAGE_KEY, trimmed);
     }
     return false;
@@ -549,14 +551,11 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
   if (pendingStaffLoad && !force) return pendingStaffLoad;
 
   const apiKey = getScriptSecret();
-  let fetchUrl = `${scriptUrl}?action=getStaff`;
-  if (apiKey) {
-    fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
-  }
+  const fetchUrl = buildAppsScriptActionUrl(scriptUrl, 'getStaff', { apiKey: apiKey || undefined });
 
   pendingStaffLoad = fetchAppsScriptWithRetry(
     () => fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force)),
-    { maxAttempts: force ? 3 : 2 }
+    { maxAttempts: force ? 5 : 3, baseDelayMs: 1500 }
   )
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
@@ -634,15 +633,12 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
   }
 
   const apiKey = getScriptSecret();
-  let fetchUrl = `${scriptUrl}?action=getAll`;
-  if (apiKey) {
-    fetchUrl += `&apiKey=${encodeURIComponent(apiKey)}`;
-  }
+  const fetchUrl = buildAppsScriptActionUrl(scriptUrl, 'getAll', { apiKey: apiKey || undefined });
 
   pendingLoadIsForce = force;
   pendingLoad = fetchAppsScriptWithRetry(
     () => fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force)),
-    { maxAttempts: force ? 3 : 2 }
+    { maxAttempts: force ? 5 : 3, baseDelayMs: 1500 }
   )
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
@@ -1829,7 +1825,7 @@ export const installAppsScriptFetchBridge = () => {
 
   hydrateBridgeSessions();
 
-  const builtInUrl = String(viteEnv.VITE_GOOGLE_SCRIPT_URL || '').trim();
+  const builtInUrl = normalizeAppsScriptUrl(String(viteEnv.VITE_GOOGLE_SCRIPT_URL || ''));
   if (builtInUrl && !localStorage.getItem(SCRIPT_URL_STORAGE_KEY)) {
     localStorage.setItem(SCRIPT_URL_STORAGE_KEY, builtInUrl);
   }
