@@ -41,6 +41,16 @@ body,
 }
 
 /*
+ * App shell height — keep in plain CSS.
+ * Do NOT use Tailwind arbitrary `h-[var(--app-vh,100dvh)]`: the comma breaks
+ * the utility parser and the shell loses height → huge white gap above the tab bar.
+ */
+.app-shell {
+  min-height: var(--app-vh, 100dvh);
+  height: var(--app-vh, 100dvh);
+}
+
+/*
  * Mobile-only: prevent iOS Safari from auto-zooming when focusing inputs.
  * Safari zooms if editable field font-size is below 16px, which shifts/zooms the viewport.
  */
@@ -83,21 +93,21 @@ body,
   }
 
   /*
-   * Edge-to-edge white tab bar: home indicator sits on white (Facebook-like),
-   * never on boot-black chin.
+   * Edge-to-edge white tab bar: home indicator sits on white.
+   * Chin fill below the bar must stay tiny (ios gap only) — never 50vh.
    */
   .mobile-bottom-nav {
     padding-bottom: var(--mobile-safe-bottom) !important;
     background-color: #ffffff;
   }
 
-  .mobile-bottom-nav::before {
+  .mobile-bottom-nav::after {
     content: "";
     position: absolute;
     left: 0;
     right: 0;
     top: 100%;
-    height: max(50vh, var(--ios-bottom-gap, 0px));
+    height: var(--ios-bottom-gap, 0px);
     background: #ffffff;
     pointer-events: none;
   }
