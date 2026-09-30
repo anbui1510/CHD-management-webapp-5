@@ -5162,8 +5162,8 @@ Xin cảm ơn!`;
 
       {/* AD-HOC SCHEDULING MODAL (XẾP BỔ SUNG) */}
       {showAdHocModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-3 overflow-hidden animate-in fade-in duration-200">
-          <div className="bg-slate-50 rounded-3xl shadow-2xl border border-slate-205 w-full max-w-[min(1800px,99vw)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[94vh]">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-3 md:p-4 mobile-modal-overlay overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-slate-50 rounded-3xl shadow-2xl border border-slate-205 w-full max-w-[min(1800px,99vw)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[78dvh] md:max-h-[94vh] mobile-modal-panel mobile-modal-panel-compact">
             
             {/* Modal Header */}
             <div className="py-3 px-5 bg-indigo-900 text-white flex justify-between items-center shrink-0">
@@ -5182,10 +5182,10 @@ Xin cảm ơn!`;
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSaveAdHoc} className="flex-1 flex flex-col min-h-0 overflow-hidden" noValidate>
+            {/* Modal Form — content-sized up to max-h; body scrolls when needed */}
+            <form onSubmit={handleSaveAdHoc} className="flex flex-col min-h-0 overflow-hidden flex-1" noValidate>
               
-              <div className="p-4 overflow-y-auto flex-1 min-h-0">
+              <div className="p-3 md:p-4 overflow-y-auto min-h-0 flex-1 overscroll-contain">
                 {adHocValidationMsg && (
                   <div className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-bold text-rose-800 flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -5510,7 +5510,7 @@ Xin cảm ơn!`;
               </div>
 
               {/* Form Save Footer Bar for Ad-hoc Scheduling */}
-              <div className="py-1.5 px-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 shrink-0">
+              <div className="py-2 px-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 shrink-0 mobile-modal-footer">
                 <button
                   type="button"
                   onClick={() => {

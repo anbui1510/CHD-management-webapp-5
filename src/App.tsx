@@ -2729,8 +2729,8 @@ export default function App() {
           {/* NEW CONSULT REGISTRATION OVERLAY DIALOG MODAL */}
           <AnimatePresence>
             {showAddConsult && (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4">
-                <div className="bg-white rounded-3xl max-w-xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 mobile-modal-overlay">
+                <div className="bg-white rounded-3xl max-w-xl w-full max-h-[85dvh] md:max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 mobile-modal-panel">
                   
                   <div className="flex items-center justify-between border-b border-slate-150 px-6 py-3.5 text-[#d2145a] shrink-0">
                     <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
@@ -3021,7 +3021,7 @@ export default function App() {
                   </div>
 
                   {/* Fixed Footer with Actions */}
-                  <div className="border-t border-slate-150 px-4 md:px-6 py-3.5 bg-slate-50 flex gap-3 shrink-0 rounded-b-3xl w-full pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3.5">
+                  <div className="border-t border-slate-150 px-4 md:px-6 py-3.5 bg-slate-50 flex gap-3 shrink-0 rounded-b-3xl w-full pb-3.5 mobile-modal-footer md:pb-3.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -3826,9 +3826,9 @@ export default function App() {
       {/* Centered Registration Edit Modal Dialog (Sửa Đăng ký staff) */}
       <AnimatePresence>
         {editingRegConsultKey && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 mobile-modal-overlay animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={() => setEditingRegConsultKey(null)}></div>
-            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 max-h-[min(88dvh,var(--mobile-modal-max-h))] md:max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden mobile-modal-panel">
               
               <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
                 <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">
@@ -4118,7 +4118,7 @@ export default function App() {
                       </div>
 
                       {/* Sticky Fixed Footer */}
-                      <div className="border-t border-slate-150 p-4 bg-slate-50 flex gap-3 justify-end shrink-0 w-full pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4">
+                      <div className="border-t border-slate-150 p-4 bg-slate-50 flex gap-3 justify-end shrink-0 w-full pb-4 mobile-modal-footer md:pb-4">
                         <button
                           type="button"
                           onClick={() => setEditingRegConsultKey(null)}

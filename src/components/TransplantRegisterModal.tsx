@@ -240,8 +240,8 @@ export default function TransplantRegisterModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 mobile-modal-overlay">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85dvh] md:max-h-[92vh] flex flex-col overflow-hidden mobile-modal-panel">
         <div className="px-5 py-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-[#d2145a]" />
@@ -329,7 +329,7 @@ export default function TransplantRegisterModal({
               <FileField label="File TTE" value={form.TTEFile} onChange={v => setForm(f => ({ ...f, TTEFile: v }))} onAlert={triggerAlert} />
             </div>
           </div>
-          <div className="px-4 py-3 border-t flex gap-2">
+          <div className="px-4 py-3 border-t flex gap-2 mobile-modal-footer">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-2xl border font-bold text-sm">Hủy</button>
             <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-2xl bg-[#d2145a] text-white font-bold text-sm flex items-center justify-center gap-2"><Save className="w-4 h-4" />{saving ? 'Đang lưu...' : 'Lưu đăng ký'}</button>
           </div>
