@@ -2202,7 +2202,7 @@ export default function App() {
       onRefreshSheetsStatus={refreshSheetsSyncStatus}
     >
     <ViewSubheaderProvider>
-    <div className="min-h-dvh h-dvh bg-slate-50 text-slate-800 flex flex-col font-sans overflow-hidden">
+    <div className="min-h-[var(--app-vh,100dvh)] h-[var(--app-vh,100dvh)] bg-slate-50 text-slate-800 flex flex-col font-sans overflow-hidden">
       
       {/* Top Application Header Bar styled beautifully like the secondary custom red banner in screenshot */}
       <header className="bg-[#d2145a] text-white shrink-0 shadow-md pt-[env(safe-area-inset-top)]">

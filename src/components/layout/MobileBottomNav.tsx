@@ -27,14 +27,19 @@ export default function MobileBottomNav({
 
   return (
     <nav
-      className="mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.08)] pb-[env(safe-area-inset-bottom,0px)]"
+      className="mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.08)]"
       aria-label="Điều hướng chính"
+      style={{
+        // Safe-area + iOS chin filled via CSS; keep inline fallback for older WebKit.
+        paddingBottom:
+          'calc(env(safe-area-inset-bottom, 0px) + var(--ios-bottom-gap, 0px))',
+      }}
     >
       <div className="grid grid-cols-5 h-[var(--mobile-bottom-nav-content)]">
         <button
           type="button"
           onClick={() => onNavigate('home')}
-          className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1 pb-1 text-[10px] font-bold transition ${
+          className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1 pb-0.5 text-[10px] font-bold transition ${
             isBottomTabActive(activeMenu, 'home') ? 'text-[#d2145a]' : 'text-slate-500'
           }`}
         >
@@ -52,7 +57,7 @@ export default function MobileBottomNav({
               key={tabId}
               type="button"
               onClick={() => onNavigate(tabId)}
-              className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1 pb-1 text-[10px] font-bold transition ${
+              className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1 pb-0.5 text-[10px] font-bold transition ${
                 active ? 'text-[#d2145a]' : 'text-slate-500'
               }`}
             >
@@ -72,7 +77,7 @@ export default function MobileBottomNav({
         <button
           type="button"
           onClick={onOpenMore}
-          className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1 pb-1 text-[10px] font-bold transition ${
+          className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1 pb-0.5 text-[10px] font-bold transition ${
             moreActive ? 'text-[#d2145a]' : 'text-slate-500'
           }`}
         >

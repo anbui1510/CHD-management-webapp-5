@@ -8,14 +8,17 @@
 
 /*
  * Mobile bottom nav height — single source of truth for all views.
- * Content row ~iOS UITabBar (50px); safe-area added so home-indicator phones
- * get inset automatically and older/Android phones get 0.
+ * Content row ~iOS UITabBar (50px). Safe-area pads labels above the home
+ * indicator; --ios-bottom-gap covers the iOS standalone “lying viewport” chin
+ * so the white tab bar reads edge-to-edge (no black strip under Home).
  */
 :root {
   --mobile-bottom-nav-content: 3.125rem;
+  --ios-bottom-gap: 0px;
   --mobile-bottom-nav-height: calc(
-    var(--mobile-bottom-nav-content) + env(safe-area-inset-bottom, 0px)
+    var(--mobile-bottom-nav-content) + env(safe-area-inset-bottom, 0px) + var(--ios-bottom-gap, 0px)
   );
+  --app-vh: 100dvh;
 }
 
 html,
@@ -23,6 +26,13 @@ body,
 #root {
   min-height: 100%;
   min-height: 100dvh;
+  min-height: var(--app-vh, 100dvh);
+  min-height: -webkit-fill-available;
+  background-color: #ffffff;
+}
+
+#root {
+  min-height: var(--app-vh, 100dvh);
 }
 
 /*
@@ -40,6 +50,7 @@ body,
   #root {
     overflow-x: hidden;
     max-width: 100%;
+    background-color: #ffffff;
   }
 
   /* Unify to one sans-serif family on mobile (size/weight/italic may still vary). */
@@ -72,21 +83,26 @@ body,
   }
 
   .max-h-above-mobile-nav {
-    max-height: min(88dvh, calc(100dvh - var(--mobile-bottom-nav-height) - 0.5rem));
+    max-height: min(88dvh, calc(var(--app-vh, 100dvh) - var(--mobile-bottom-nav-height) - 0.5rem));
   }
 
   /*
-   * Cover residual iOS standalone “lying viewport” gap below fixed bottom nav
-   * so it does not read as a second white band under Home / Thêm.
+   * Edge-to-edge white tab bar: fill safe-area + any remaining iOS chin so the
+   * home indicator sits on white (like Facebook), never on boot-black.
    */
-  .mobile-bottom-nav::after {
+  .mobile-bottom-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ios-bottom-gap, 0px)) !important;
+    background-color: #ffffff;
+  }
+
+  .mobile-bottom-nav::before {
     content: "";
     position: absolute;
     left: 0;
     right: 0;
     top: 100%;
-    height: 50vh;
-    background: #fff;
+    height: max(50vh, var(--ios-bottom-gap, 0px));
+    background: #ffffff;
     pointer-events: none;
   }
 }

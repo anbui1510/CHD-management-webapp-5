@@ -6,11 +6,13 @@ import './bootstrap/clearAppStorage'
 import { hydrateSyncConfigFromServer, installAppsScriptFetchBridge } from './api/appsScriptFetch'
 import { setupServiceWorkerUpdates } from './push/serviceWorkerUpdates'
 import { migrateAppBuild } from './bootstrap/appVersion'
+import { installMobileViewportFix } from './bootstrap/mobileViewport'
 import { attemptStaleBundleRecovery, isRecoverableStaleBundleError } from './bootstrap/staleBundleRecovery'
 import BootstrapErrorScreen from './components/BootstrapErrorScreen'
 import { isStandaloneDisplayMode } from './push/webPushClient'
 
 installAppsScriptFetchBridge()
+installMobileViewportFix()
 
 function normalizeBootError(error: unknown): string | null {
   const message = (error instanceof Error ? error.message : String(error || '')).trim()
