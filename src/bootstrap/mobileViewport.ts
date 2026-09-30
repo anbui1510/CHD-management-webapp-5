@@ -48,7 +48,11 @@ export function applyMobileViewportMetrics(): void {
   }
 
   root.style.setProperty('--app-vh', `${layoutVh}px`);
-  root.style.setProperty('--ios-bottom-gap', `${bottomGap}px`);
+
+  // Only expose ios-gap when safe-area is missing/too small (avoid double inset).
+  const safeBottom = readSafeAreaInsetBottomPx();
+  const effectiveGap = bottomGap > safeBottom + 4 ? bottomGap : 0;
+  root.style.setProperty('--ios-bottom-gap', `${effectiveGap}px`);
 
   // Keep document chin the same white as the tab bar (never boot black).
   const chinFill = '#ffffff';

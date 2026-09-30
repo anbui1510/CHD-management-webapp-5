@@ -15,8 +15,14 @@
 :root {
   --mobile-bottom-nav-content: 3.125rem;
   --ios-bottom-gap: 0px;
+  /*
+   * Use max(safe-area, ios-gap) — never sum them. On many iPhones the lying
+   * viewport chin and safe-area-inset-bottom describe the same region; adding
+   * both created the huge white band under Home.
+   */
   --mobile-bottom-nav-height: calc(
-    var(--mobile-bottom-nav-content) + env(safe-area-inset-bottom, 0px) + var(--ios-bottom-gap, 0px)
+    var(--mobile-bottom-nav-content) +
+      max(env(safe-area-inset-bottom, 0px), var(--ios-bottom-gap, 0px))
   );
   --app-vh: 100dvh;
 }
@@ -91,7 +97,7 @@ body,
    * home indicator sits on white (like Facebook), never on boot-black.
    */
   .mobile-bottom-nav {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ios-bottom-gap, 0px)) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--ios-bottom-gap, 0px)) !important;
     background-color: #ffffff;
   }
 

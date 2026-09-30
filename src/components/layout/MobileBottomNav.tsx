@@ -30,9 +30,9 @@ export default function MobileBottomNav({
       className="mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.08)]"
       aria-label="Điều hướng chính"
       style={{
-        // Safe-area + iOS chin filled via CSS; keep inline fallback for older WebKit.
+        // max(safe-area, ios-gap) — do not sum (avoids double white chin on iPhone).
         paddingBottom:
-          'calc(env(safe-area-inset-bottom, 0px) + var(--ios-bottom-gap, 0px))',
+          'max(env(safe-area-inset-bottom, 0px), var(--ios-bottom-gap, 0px))',
       }}
     >
       <div className="grid grid-cols-5 h-[var(--mobile-bottom-nav-content)]">
