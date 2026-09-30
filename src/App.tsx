@@ -454,7 +454,7 @@ export default function App() {
     []
   );
 
-  const { refreshMedicalData, syncMedicalDataInBackground, loadMedicalDataAfterAuth, wasRecentlyForceSynced } = useRefreshMedicalData(
+  const { refreshMedicalData, syncMedicalDataInBackground, loadMedicalDataAfterAuth, wasRecentlyForceSynced, releaseForceSyncLock, markForceSyncTimedOut } = useRefreshMedicalData(
     medicalDataSetters,
     setMedicalDataLoadState
   );
@@ -747,6 +747,7 @@ export default function App() {
     const safetyTimer = setTimeout(() => {
       void (async () => {
         let settled = false;
+        let releaseAfterReady = false;
         setMedicalDataLoadState(prev => {
           if (prev.phase !== 'loading' && prev.phase !== 'syncing') {
             settled = true;
@@ -754,10 +755,12 @@ export default function App() {
           }
           if (prev.backgroundSync && (patients.length > 0 || consults.length > 0)) {
             settled = true;
+            releaseAfterReady = true;
             return { phase: 'ready', startedAt: null, backgroundSync: false };
           }
           return prev;
         });
+        if (releaseAfterReady) releaseForceSyncLock();
         if (settled) return;
 
         const inMemory = peekInMemoryMedicalDataBundle();
@@ -767,6 +770,7 @@ export default function App() {
         }
         if (bundle && (bundle.patients.length > 0 || bundle.consults.length > 0)) {
           applyMedicalDataBundle(bundle, 'full', medicalDataSetters);
+          releaseForceSyncLock();
           setMedicalDataLoadState({
             phase: 'ready',
             startedAt: null,
@@ -776,15 +780,9 @@ export default function App() {
           return;
         }
 
-        setMedicalDataLoadState(prev => {
-          if (prev.phase !== 'loading' && prev.phase !== 'syncing') return prev;
-          return {
-            phase: 'error',
-            startedAt: null,
-            backgroundSync: false,
-            message: 'Đồng bộ quá lâu — dữ liệu có thể chưa cập nhật. Bấm nút Đồng bộ trên header để thử lại.'
-          };
-        });
+        markForceSyncTimedOut(
+          'Đồng bộ quá lâu — dữ liệu có thể chưa cập nhật. Bấm Đồng bộ lại để thử lại.'
+        );
       })();
     }, safetyMs);
     return () => {
@@ -798,7 +796,9 @@ export default function App() {
     patients.length,
     consults.length,
     medicalDataSetters,
-    syncMedicalDataInBackground
+    syncMedicalDataInBackground,
+    releaseForceSyncLock,
+    markForceSyncTimedOut
   ]);
 
   const loadPublicStaffForLogin = useCallback(() => {
@@ -2350,13 +2350,15 @@ export default function App() {
       )}
 
       {medicalDataLoadState.phase === 'error' && medicalDataLoadState.message && (
-        <div className="bg-red-600 text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2 flex-wrap">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{medicalDataLoadState.message}</span>
+        <div className="relative z-30 bg-red-600 text-white text-center py-2.5 px-3 text-xs font-bold shadow-inner flex flex-col sm:flex-row items-center justify-center gap-2 flex-wrap">
+          <div className="flex items-start sm:items-center justify-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
+            <span className="min-w-0 leading-snug">{medicalDataLoadState.message}</span>
+          </div>
           <button
             type="button"
             onClick={() => refreshFullData(true)}
-            className="underline underline-offset-2 hover:text-white/90 font-extrabold shrink-0"
+            className="relative z-30 shrink-0 min-h-[44px] px-4 py-2 rounded-xl bg-white text-red-700 font-extrabold underline-offset-2 hover:bg-red-50 active:bg-red-100 touch-manipulation"
           >
             Đồng bộ lại
           </button>

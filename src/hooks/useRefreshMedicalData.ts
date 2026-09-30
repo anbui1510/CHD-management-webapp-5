@@ -45,6 +45,8 @@ export function useRefreshMedicalData(
   const metaRef = useRef({
     pending: null as Promise<void> | null,
     forcePending: null as Promise<void> | null,
+    /** Bumped to abandon an in-flight force pull (safety timeout / user retry). */
+    forceGeneration: 0,
     lastAt: 0,
     lastForceAt: 0,
     phase: 'idle' as MedicalDataLoadPhase,
@@ -62,6 +64,27 @@ export function useRefreshMedicalData(
       backgroundSync: patch.backgroundSync
     });
   }, [onLoadStateChange]);
+
+  /**
+   * Safety timeout / hung fetch: UI may show error while forcePending is still set.
+   * Without releasing the lock, "Đồng bộ lại" becomes a no-op (returns the stuck promise).
+   */
+  const releaseForceSyncLock = useCallback(() => {
+    const meta = metaRef.current;
+    meta.forceGeneration += 1;
+    meta.forcePending = null;
+    meta.pending = null;
+  }, []);
+
+  const markForceSyncTimedOut = useCallback((message: string) => {
+    releaseForceSyncLock();
+    emitState({
+      phase: 'error',
+      startedAt: null,
+      backgroundSync: false,
+      message
+    });
+  }, [emitState, releaseForceSyncLock]);
 
   const refreshMedicalData = useCallback(async (
     scope: RefreshScope = 'clinical',
@@ -133,7 +156,13 @@ export function useRefreshMedicalData(
     options?: ForceSyncOptions
   ) => {
     const meta = metaRef.current;
-    if (meta.forcePending) return meta.forcePending;
+    // Explicit user retry (preferSyncingBanner) must supersede a hung pull;
+    // otherwise "Đồng bộ lại" after safety-timeout is a silent no-op.
+    const allowSupersede = options?.preferSyncingBanner === true && !options?.silent;
+    if (meta.forcePending && !allowSupersede) return meta.forcePending;
+    if (meta.forcePending && allowSupersede) {
+      releaseForceSyncLock();
+    }
 
     const silent = options?.silent ?? false;
     const backgroundSync = options?.backgroundSync ?? false;
@@ -151,8 +180,10 @@ export function useRefreshMedicalData(
       });
     }
 
-    meta.forcePending = fetchMedicalDataBundle(true)
+    const runId = ++meta.forceGeneration;
+    const work = fetchMedicalDataBundle(true)
       .then(bundle => {
+        if (meta.forceGeneration !== runId) return;
         applyMedicalDataBundle(bundle, scope, setters);
         meta.lastAt = Date.now();
         meta.lastForceAt = meta.lastAt;
@@ -184,6 +215,7 @@ export function useRefreshMedicalData(
         emitState({ phase: 'ready', startedAt: null, backgroundSync: false });
       })
       .catch(async err => {
+        if (meta.forceGeneration !== runId) return;
         console.warn('Force medical data sync failed:', err);
         options?.onSyncStatus?.(undefined);
         if (err instanceof AuthRequiredError) {
@@ -196,6 +228,7 @@ export function useRefreshMedicalData(
           throw err;
         }
         const cached = await peekCachedMedicalDataBundle();
+        if (meta.forceGeneration !== runId) return;
         const hasCache = !!cached && (cached.patients.length > 0 || cached.consults.length > 0);
         if (hasCache && cached) {
           applyMedicalDataBundle(cached, scope, setters);
@@ -223,11 +256,14 @@ export function useRefreshMedicalData(
         throw err;
       })
       .finally(() => {
-        meta.forcePending = null;
+        if (meta.forceGeneration === runId) {
+          meta.forcePending = null;
+        }
       });
 
-    return meta.forcePending;
-  }, [setters, emitState]);
+    meta.forcePending = work;
+    return work;
+  }, [setters, emitState, releaseForceSyncLock]);
 
   const syncMedicalDataInBackground = useCallback((
     scope: RefreshScope = 'full',
@@ -284,6 +320,8 @@ export function useRefreshMedicalData(
     syncMedicalDataInBackground,
     loadMedicalDataAfterAuth,
     wasRecentlyForceSynced,
-    isSyncInProgress
+    isSyncInProgress,
+    releaseForceSyncLock,
+    markForceSyncTimedOut
   };
 }
