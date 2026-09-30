@@ -13,7 +13,18 @@
     <link rel="apple-touch-icon" href="/icons/icon.svg" />
     <title>CHD Management</title>
     <style>
-      html, body { background: #0a0a0a; margin: 0; min-height: 100%; }
+      /*
+       * Boot background must stay light on iOS PWA: a dark html/body paints the
+       * “lying viewport” chin below the tab bar as a black strip. Login keeps
+       * its own dark full-screen panel.
+       */
+      html, body {
+        background: #ffffff;
+        margin: 0;
+        min-height: 100%;
+        min-height: 100dvh;
+        min-height: -webkit-fill-available;
+      }
       #boot-fallback {
         display: none;
         min-height: 100vh;
@@ -28,6 +39,19 @@
     </style>
     <script>
       window.__CHD_APP_BUILD_ID = '__CHD_BUILD_ID__';
+      /* Early iOS PWA chin paint — before React/CSS load */
+      (function () {
+        try {
+          document.documentElement.style.backgroundColor = '#ffffff';
+          var standalone = (window.navigator.standalone === true) ||
+            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+          if (standalone) {
+            var vv = window.visualViewport;
+            var vh = Math.round((vv && vv.height) || window.innerHeight || 0);
+            if (vh > 0) document.documentElement.style.setProperty('--app-vh', vh + 'px');
+          }
+        } catch (e) {}
+      })();
       (function () {
         if (/[?&]reset=1(?:&|$)/.test(location.search)) {
           try {

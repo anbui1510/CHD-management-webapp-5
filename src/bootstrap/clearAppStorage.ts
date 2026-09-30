@@ -58,8 +58,12 @@ export async function clearAppStorage(options?: {
   const preserveMedicalCache = options?.preserveMedicalCache === true;
   const preserved = preserveScriptConfig ? preserveLocalStorageValues() : {};
 
+  const authToken = preserveAuth ? localStorage.getItem('CHD_AUTH_TOKEN') : null;
+  const authStaffKey = preserveAuth ? localStorage.getItem('CHD_AUTH_STAFF_KEY') : null;
+
   if (!preserveAuth) {
     localStorage.removeItem('CHD_AUTH_TOKEN');
+    localStorage.removeItem('CHD_AUTH_STAFF_KEY');
   }
 
   if (!preserveScriptConfig) {
@@ -70,6 +74,8 @@ export async function clearAppStorage(options?: {
       const key = localStorage.key(i);
       if (!key) continue;
       if (PRESERVE_LOCAL_KEYS.includes(key as (typeof PRESERVE_LOCAL_KEYS)[number])) continue;
+      // preserveAuth must win over the generic key sweep (token is not in PRESERVE_LOCAL_KEYS)
+      if (preserveAuth && (key === 'CHD_AUTH_TOKEN' || key === 'CHD_AUTH_STAFF_KEY')) continue;
       keysToRemove.push(key);
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
@@ -77,6 +83,10 @@ export async function clearAppStorage(options?: {
 
   if (preserveScriptConfig) {
     restoreLocalStorageValues(preserved);
+  }
+  if (preserveAuth) {
+    if (authToken) localStorage.setItem('CHD_AUTH_TOKEN', authToken);
+    if (authStaffKey) localStorage.setItem('CHD_AUTH_STAFF_KEY', authStaffKey);
   }
 
   await clearAppRuntimeCaches();

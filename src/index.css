@@ -6,25 +6,38 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+/*
+ * Mobile bottom tab bar metrics (Home / quick tabs / Thêm).
+ * Content height is compact so labels sit just above the home-indicator.
+ * --mobile-safe-bottom uses max(safe-area, ios-gap) so we never double-count
+ * the iOS PWA chin. Views/modals use --mobile-bottom-nav-offset.
+ */
+:root {
+  --mobile-bottom-nav-content: 3rem; /* ~48px: icon + label, tight */
+  --ios-bottom-gap: 0px;
+  --mobile-safe-bottom: max(
+    env(safe-area-inset-bottom, 0px),
+    var(--ios-bottom-gap, 0px)
+  );
+  --mobile-bottom-nav-offset: calc(
+    var(--mobile-bottom-nav-content) + var(--mobile-safe-bottom)
+  );
+  --app-vh: 100dvh;
+}
+
 html,
 body,
 #root {
   min-height: 100%;
   min-height: 100dvh;
+  min-height: var(--app-vh, 100dvh);
+  min-height: -webkit-fill-available;
+  /* Light chin: iOS PWA gap below fixed tab bar paints document background */
+  background-color: #ffffff;
 }
 
-/*
- * Mobile bottom tab bar metrics (Home / quick tabs / Thêm).
- * Content height is compact so labels sit just above the home-indicator
- * safe area — avoids the double white gap (extra py/min-height + safe-area).
- * All views/modals that clear the tab bar should use --mobile-bottom-nav-offset.
- */
-:root {
-  --mobile-bottom-nav-content: 3rem; /* ~48px: icon + label, tight */
-  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
-  --mobile-bottom-nav-offset: calc(
-    var(--mobile-bottom-nav-content) + var(--mobile-safe-bottom)
-  );
+#root {
+  min-height: var(--app-vh, 100dvh);
 }
 
 /*
@@ -42,6 +55,7 @@ body,
   #root {
     overflow-x: hidden;
     max-width: 100%;
+    background-color: #ffffff;
   }
 
   /* Unify to one sans-serif family on mobile (size/weight/italic may still vary). */
@@ -66,5 +80,25 @@ body,
     top: env(safe-area-inset-top, 0px);
     left: env(safe-area-inset-left, 0px);
     right: env(safe-area-inset-right, 0px);
+  }
+
+  /*
+   * Edge-to-edge white tab bar: home indicator sits on white (Facebook-like),
+   * never on boot-black chin.
+   */
+  .mobile-bottom-nav {
+    padding-bottom: var(--mobile-safe-bottom) !important;
+    background-color: #ffffff;
+  }
+
+  .mobile-bottom-nav::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: max(50vh, var(--ios-bottom-gap, 0px));
+    background: #ffffff;
+    pointer-events: none;
   }
 }
