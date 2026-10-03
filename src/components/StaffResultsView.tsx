@@ -13,6 +13,7 @@ import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync, withSyncContext } from '../utils/sheetsSyncMutation';
 import {
   findDuplicatePatientById1,
+  getFormattedDateKey,
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
 import { MODAL_TITLE } from '../utils/modalTitles';
@@ -237,19 +238,19 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   const getLatestPriorDetailDiagnosis = (patientKey: any, beforeDate?: string) => {
     const normalizedKey = normalizePatientKey(patientKey);
     if (!normalizedKey) return '';
-    const targetTime = beforeDate ? new Date(beforeDate).getTime() : Number.POSITIVE_INFINITY;
+    const beforeKey = beforeDate ? getFormattedDateKey(beforeDate) : '';
 
     return [...consults]
       .filter(c => normalizePatientKey(c.PatientKey) === normalizedKey && String(c.DetailDiagnosis || '').trim())
       .filter(c => {
-        if (!beforeDate || !c.ConsultDate) return true;
-        const consultTime = new Date(c.ConsultDate).getTime();
-        return !Number.isNaN(consultTime) && consultTime <= targetTime;
+        if (!beforeKey || !c.ConsultDate) return true;
+        const consultKey = getFormattedDateKey(c.ConsultDate);
+        return !!consultKey && consultKey <= beforeKey;
       })
       .sort((a, b) => {
-        const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-        const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA;
+        const dateA = getFormattedDateKey(a.ConsultDate);
+        const dateB = getFormattedDateKey(b.ConsultDate);
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
         return String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || ''));
       })[0]?.DetailDiagnosis || '';
   };
@@ -665,31 +666,31 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     }).sort((a, b) => {
       let comparison = 0;
       if (sortField === 'date') {
-        const da = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-        const db = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-        comparison = da - db;
+        const da = getFormattedDateKey(a.ConsultDate);
+        const db = getFormattedDateKey(b.ConsultDate);
+        comparison = da.localeCompare(db);
       } else if (sortField === 'name') {
         const patA = getPatientByKey(a.PatientKey);
         const patB = getPatientByKey(b.PatientKey);
         const nameA = patA?.PatientName ? removeDiacritics(patA.PatientName).toLowerCase() : '';
         const nameB = patB?.PatientName ? removeDiacritics(patB.PatientName).toLowerCase() : '';
-        comparison = nameA.localeCompare(nameB);
+        comparison = nameA.localeCompare(nameB, 'vi');
       } else if (sortField === 'id') {
         const patA = getPatientByKey(a.PatientKey);
         const patB = getPatientByKey(b.PatientKey);
         const idA = patA?.PatientID1 ? patA.PatientID1.toLowerCase() : '';
         const idB = patB?.PatientID1 ? patB.PatientID1.toLowerCase() : '';
-        comparison = idA.localeCompare(idB);
+        comparison = idA.localeCompare(idB, 'vi');
       } else if (sortField === 'dob') {
         const patA = getPatientByKey(a.PatientKey);
         const patB = getPatientByKey(b.PatientKey);
-        const dobA = patA?.PatientDOB ? new Date(patA.PatientDOB).getTime() : 0;
-        const dobB = patB?.PatientDOB ? new Date(patB.PatientDOB).getTime() : 0;
-        comparison = dobA - dobB;
+        const dobA = getFormattedDateKey(patA?.PatientDOB);
+        const dobB = getFormattedDateKey(patB?.PatientDOB);
+        comparison = dobA.localeCompare(dobB);
       } else if (sortField === 'diagnosis') {
         const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
         const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
-        comparison = diagA.localeCompare(diagB);
+        comparison = diagA.localeCompare(diagB, 'vi');
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
