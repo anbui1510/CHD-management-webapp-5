@@ -2399,7 +2399,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className="max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1.5 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4">
+      <div className="app-main-workspace max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4">
         
         {/* Collapsible Left navigation Aside drawer */}
         <aside className={`hidden md:block ${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-2 xl:pb-4`}>
@@ -2547,26 +2547,24 @@ export default function App() {
           {activeMenu === 'patients' && (
             <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-2 sm:p-6 gap-2 sm:gap-4 overflow-hidden">
               
-              <div className="flex flex-col gap-2 shrink-0 md:hidden">
-                <h2 className="text-sm font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase pt-0.5">
+              <div className="mobile-view-shell flex flex-col shrink-0 md:hidden">
+                <h2 className="text-sm font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase">
                   <Heart className="w-5 h-5 text-pink-600 fill-pink-50" /> Hồ sơ bệnh án
                 </h2>
                 
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1 min-w-0">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <div className="flex items-center gap-1.5">
+                  <div className="mobile-view-search-wrap relative flex-1 min-w-0 flex items-center bg-slate-50 border border-slate-200">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                     <SearchTextInput
                       type="text"
                       placeholder="Tìm tên, mã NB, chẩn đoán..."
                       value={patientSearch}
                       onChange={(value) => {
-                        startTransition(() => {
-                          setPatientSearch(value);
-                          setPatientCurrentPage(1);
-                          setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
-                        });
+                        setPatientSearch(value);
+                        setPatientCurrentPage(1);
+                        setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
                       }}
-                      className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a] focus:border-[#d2145a] font-sans shadow-sm"
+                      className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0 font-sans"
                     />
                     {patientSearch && (
                       <button 
@@ -3064,29 +3062,27 @@ export default function App() {
               
               <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-3xl p-3 sm:p-4 lg:p-5 shadow-sm min-w-0">
                 
-                <div className="shrink-0 flex flex-col gap-2 border-b border-slate-150 pb-2.5 mb-2">
+                <div className="mobile-view-shell shrink-0 flex flex-col border-b border-slate-150 pb-1.5 mb-1.5">
                   <div className="md:hidden">
                     <h3 className="font-extrabold text-neutral-900 uppercase flex items-center gap-1.5 text-sm">
                       <ClipboardCheck className="w-5 h-5 text-teal-600" />
                       Đăng ký hội chẩn
                     </h3>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Đăng ký + báo cáo danh sách hội chẩn thông tim - mổ tim</p>
+                    <p className="text-[10px] text-slate-400">Đăng ký + báo cáo danh sách hội chẩn thông tim - mổ tim</p>
                   </div>
 
-                  <div className="flex items-center gap-2 md:hidden">
-                    <div className="relative flex-1 min-w-0">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <div className="flex items-center gap-1.5 md:hidden">
+                    <div className="mobile-view-search-wrap relative flex-1 min-w-0 flex items-center bg-slate-50 border border-slate-200">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                       <SearchTextInput
                         type="text"
                         placeholder="Tìm tên, ID1 bệnh nhi..."
                         value={consultListSearch}
                         onChange={(value) => {
-                          startTransition(() => {
-                            setConsultListSearch(value);
-                            setConsultCurrentPage(1);
-                          });
+                          setConsultListSearch(value);
+                          setConsultCurrentPage(1);
                         }}
-                        className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
+                        className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0 font-sans"
                       />
                       {consultListSearch && (
                         <button 

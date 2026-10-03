@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { setMobileKeyboardOpen } from '../bootstrap/mobileViewport';
 
 export interface SearchTextInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
   value: string;
   onChange: (value: string) => void;
-  /** Debounce trước khi đẩy giá trị lên parent (lọc nặng). Mặc định 180ms. */
+  /** Debounce trước khi đẩy giá trị lên parent (lọc nặng). Mặc định 0 = cập nhật ngay. */
   debounceMs?: number;
 }
 
@@ -12,23 +13,25 @@ export interface SearchTextInputProps
  * Ô tìm kiếm chống giật IME tiếng Việt:
  * - Giữ state local để gõ mượt, không chờ parent re-render
  * - Không flush lên parent khi đang composition
- * - Debounce onChange để lọc danh sách lớn không chạy mỗi phím
+ * - Debounce tùy chọn (mặc định tắt) — parent nên dùng useDeferredValue khi lọc nặng
  */
 export function SearchTextInput({
   value,
   onChange,
-  debounceMs = 180,
+  debounceMs = 0,
   onBlur,
+  onFocus,
   ...rest
 }: SearchTextInputProps) {
   const [localValue, setLocalValue] = useState(value);
   const composingRef = useRef(false);
+  const focusedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (composingRef.current) return;
+    if (composingRef.current || focusedRef.current) return;
     setLocalValue(value);
   }, [value]);
 
@@ -38,23 +41,27 @@ export function SearchTextInput({
     };
   }, []);
 
+  const pushToParent = (next: string) => {
+    onChangeRef.current(next);
+  };
+
   const flush = (next: string) => {
     if (timerRef.current != null) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (next !== value) onChangeRef.current(next);
+    if (next !== value) pushToParent(next);
   };
 
   const scheduleFlush = (next: string) => {
-    if (timerRef.current != null) window.clearTimeout(timerRef.current);
     if (debounceMs <= 0) {
-      flush(next);
+      pushToParent(next);
       return;
     }
+    if (timerRef.current != null) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-      onChangeRef.current(next);
+      pushToParent(next);
     }, debounceMs);
   };
 
@@ -76,7 +83,14 @@ export function SearchTextInput({
         setLocalValue(next);
         flush(next);
       }}
+      onFocus={(event) => {
+        focusedRef.current = true;
+        setMobileKeyboardOpen(true);
+        onFocus?.(event);
+      }}
       onBlur={(event) => {
+        focusedRef.current = false;
+        setMobileKeyboardOpen(false);
         if (!composingRef.current) flush(localValue);
         onBlur?.(event);
       }}

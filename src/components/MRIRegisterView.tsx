@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -113,6 +113,7 @@ export default function MRIRegisterView({
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<RegisterTab>('pending');
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Preview / edit-registration popup states
@@ -214,7 +215,7 @@ export default function MRIRegisterView({
 
   const displayItems = useMemo(() => {
     const source = activeTab === 'pending' ? segmented.pending : segmented.done;
-    const q = removeDiacritics(searchQuery).toLowerCase().trim();
+    const q = removeDiacritics(deferredSearchQuery).toLowerCase().trim();
     const filtered = !q
       ? source
       : source.filter(item => {
@@ -236,7 +237,7 @@ export default function MRIRegisterView({
       const db = getFormattedDateKey(b.CMRScheduledDate);
       return sortOrder === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
     });
-  }, [activeTab, segmented, searchQuery, sortOrder]);
+  }, [activeTab, segmented, deferredSearchQuery, sortOrder]);
 
   const resetForm = () => {
     setPatientMode('select');
@@ -531,19 +532,17 @@ export default function MRIRegisterView({
   });
 
   return (
-    <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50">
+    <div className="mobile-view-shell flex-1 h-full flex flex-col animate-in fade-in duration-200 font-sans min-h-0 p-2 lg:p-6 bg-slate-50">
 
       {/* Title + action — mobile only */}
-      <div className="shrink-0 md:hidden flex flex-col gap-3 bg-white p-4 border border-slate-200 rounded-3xl shadow-sm">
-        <div>
-          <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
-            <Activity className="w-5 h-5 text-[#d2145a]" /> Đăng ký MRI tim
-          </h2>
-        </div>
+      <div className="mobile-view-card shrink-0 md:hidden flex flex-col bg-white border border-slate-200 shadow-sm">
+        <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
+          <Activity className="w-5 h-5 text-[#d2145a]" /> Đăng ký MRI tim
+        </h2>
       </div>
 
       {/* Tabs + search */}
-      <div className="shrink-0 bg-white border border-slate-200 rounded-3xl shadow-sm p-4 space-y-3">
+      <div className="mobile-view-card shrink-0 bg-white border border-slate-200 shadow-sm space-y-2">
         <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600 gap-1">
           <button
             onClick={() => setActiveTab('pending')}
@@ -574,9 +573,9 @@ export default function MRIRegisterView({
           </button>
         </div>
 
-        <div className="flex gap-2 md:hidden">
-          <div className="relative flex-1">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+        <div className="flex gap-1.5 md:hidden">
+          <div className="mobile-view-search-wrap relative flex-1 flex items-center border border-slate-200 bg-white">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />
             </span>
             <SearchTextInput
@@ -584,7 +583,7 @@ export default function MRIRegisterView({
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Tìm họ tên, ID, chẩn đoán MRI..."
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 shadow-sm"
+              className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0"
             />
             {searchQuery && (
               <button

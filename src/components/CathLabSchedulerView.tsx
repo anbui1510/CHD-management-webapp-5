@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder, restoreWeightFromDate } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
@@ -433,6 +433,7 @@ export default function CathLabSchedulerView({
   const [activeTab, setActiveTab] = useState<WaitlistTab>('unscheduled');
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [waitlistSortField, setWaitlistSortField] = useState<WaitlistSortField>('default');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
   const [filterListSortField, setFilterListSortField] = useState<FilterListSortField>('default');
@@ -1661,7 +1662,7 @@ Xin cảm ơn!`;
             : segmentedWaitlist[activeTab];
     let result = activeList;
     
-    const q = removeDiacritics(searchQuery).toLowerCase().trim();
+    const q = removeDiacritics(deferredSearchQuery).toLowerCase().trim();
     if (q) {
       result = activeList.filter(c => {
         const pat = findPatientByKey(patients, c.PatientKey);
@@ -1715,7 +1716,7 @@ Xin cảm ơn!`;
       }
       return waitlistSortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [segmentedWaitlist, activeTab, searchQuery, patients, waitlistSortOrder, waitlistSortField]);
+  }, [segmentedWaitlist, activeTab, deferredSearchQuery, patients, waitlistSortOrder, waitlistSortField]);
 
   const totalWaitlistPages = Math.ceil(displayWaitlist.length / rowsPerWaitlistPage) || 1;
   const paginatedWaitlist = useMemo(() => {
@@ -3076,15 +3077,15 @@ Xin cảm ơn!`;
           </div>
 
           {/* Search bar inside queue listing — mobile/tablet; desktop dùng subheader */}
-          <div className="p-3 border-b border-slate-200 flex items-center relative gap-2 shrink-0 md:hidden">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+          <div className="p-2 border-b border-slate-200 flex items-center relative gap-1.5 shrink-0 md:hidden">
+            <div className="mobile-view-search-wrap relative flex-1 flex items-center bg-slate-100 border border-slate-200">
+              <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <SearchTextInput
                 type="text"
                 placeholder="Tìm họ tên, ID1 bệnh nhi..."
                 value={searchQuery}
                 onChange={setSearchQuery}
-                className="w-full pl-9 pr-3 py-1.5 bg-slate-100 border-0 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]/50 text-slate-800 placeholder-slate-400 font-sans transition"
+                className="mobile-view-search-input w-full pl-8 pr-3 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0 text-slate-800 placeholder-slate-400 font-sans"
               />
               {searchQuery && (
                 <button 
