@@ -1237,7 +1237,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const handleSubheaderSearch = useCallback((value: string) => {
-    // Cập nhật ngay để lọc chạy; lọc nặng dùng deferredSearchTerm.
     setSearchTerm(value);
     setCurrentPage(1);
   }, []);
@@ -1265,12 +1264,12 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   });
 
   return (
-    <div className="flex-1 flex flex-col p-4 w-full h-full overflow-hidden bg-slate-50">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 shrink-0 lg:flex-nowrap">
-           <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+    <div className="mobile-view-shell flex-1 flex flex-col p-2 sm:p-4 w-full h-full overflow-hidden bg-slate-50">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-4 shrink-0 lg:flex-nowrap">
+           <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0">
               <button 
                 onClick={() => setActiveTab('pending')}
-                className={`font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'pending' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
+                className={`mobile-tab-pill font-extrabold text-[11px] sm:text-[13px] sm:px-5 sm:py-2.5 sm:rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'pending' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
               >
                  <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0"/>
                  <span className="hidden sm:inline">Chờ thông tim</span>
@@ -1280,7 +1279,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
               
               <button 
                 onClick={() => setActiveTab('done')}
-                className={`font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'done' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
+                className={`mobile-tab-pill font-extrabold text-[11px] sm:text-[13px] sm:px-5 sm:py-2.5 sm:rounded-2xl transition flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 ${activeTab === 'done' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'}`}
               >
                  <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0"/>
                  <span className="hidden sm:inline">Đã thông tim</span>
@@ -1289,20 +1288,20 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
               </button>
            </div>
 
-           <div className="md:hidden sm:ml-auto flex flex-wrap lg:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
-              <div className="flex-1 sm:flex-initial flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5">
-                 <Search className="w-4 h-4 text-slate-400 shrink-0" />
+           <div className="md:hidden sm:ml-auto flex flex-wrap lg:flex-nowrap items-center gap-1.5 w-full sm:w-auto shrink-0">
+              <div className="mobile-view-search-wrap flex-1 sm:flex-initial flex items-center gap-1.5 bg-white border border-slate-200">
+                 <Search className="w-4 h-4 text-slate-400 shrink-0 ml-0.5" />
                  <SearchTextInput
                     type="text"
                     placeholder="Tìm tên, mã ICD..."
                     value={searchTerm}
                     onChange={setSearchTerm}
-                    className="bg-transparent border-none outline-none text-[12px] sm:text-[13px] text-slate-700 w-full sm:w-56 font-bold placeholder:font-medium placeholder:text-slate-400"
+                    className="mobile-view-search-input bg-transparent border-none outline-none text-[12px] sm:text-[13px] text-slate-700 w-full sm:w-56 font-bold placeholder:font-medium placeholder:text-slate-400"
                  />
               </div>
               <button
                  onClick={openAdHocForm}
-                 className="font-extrabold text-[11px] sm:text-[13px] px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl transition flex items-center gap-1.5 sm:gap-2 bg-rose-600 text-white shadow-md hover:bg-rose-700 sm:ml-2"
+                 className="mobile-tab-pill font-extrabold text-[11px] sm:text-[13px] sm:px-5 sm:py-2.5 sm:rounded-2xl transition flex items-center gap-1.5 sm:gap-2 bg-rose-600 text-white shadow-md hover:bg-rose-700 sm:ml-2"
               >
                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                  <span className="hidden sm:inline">Nhập TT cấp cứu</span>

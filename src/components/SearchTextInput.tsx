@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { setMobileKeyboardOpen } from '../bootstrap/mobileViewport';
 
 export interface SearchTextInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
@@ -65,6 +66,7 @@ export function SearchTextInput({
       value={localValue}
       onFocus={(event) => {
         focusedRef.current = true;
+        setMobileKeyboardOpen(true);
         onFocus?.(event);
       }}
       onChange={(event) => {
@@ -79,6 +81,7 @@ export function SearchTextInput({
       }}
       onBlur={(event) => {
         focusedRef.current = false;
+        setMobileKeyboardOpen(false);
         emit(localValue);
         onBlur?.(event);
       }}

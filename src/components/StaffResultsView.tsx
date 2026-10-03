@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, restoreWeightFromDate } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -902,8 +902,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     <div className="flex-1 h-full flex flex-col gap-1.5 md:gap-2 xl:gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-2 md:p-0 bg-slate-50 overflow-hidden">
       
       {/* Header Area — mobile only; desktop dùng subheader toàn app */}
-      <div className="md:hidden shrink-0 flex flex-col gap-2.5 bg-white p-3 border border-slate-200 rounded-3xl shadow-sm">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="mobile-view-card md:hidden shrink-0 flex flex-col bg-white border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-1.5 min-w-0">
           <ClipboardList className="w-5 h-5 text-[#d2145a] animate-pulse shrink-0" />
           <h2 className="text-sm font-extrabold text-neutral-[#d2145a] tracking-tight uppercase truncate min-w-0 flex-1">
             Nhập kết quả staff
@@ -920,8 +920,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           </button>
         </div>
 
-        <div className="w-full relative">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+        <div className="mobile-view-search-wrap w-full relative flex items-center border border-slate-200 bg-white">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
             <Search className="h-4 w-4 text-slate-400" />
           </span>
           <SearchTextInput
@@ -932,7 +932,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               setCurrentPage(1);
             }}
             placeholder="Tìm tên, mã NB, chẩn đoán..."
-            className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
+            className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0 font-sans"
           />
           {searchTerm && (
             <button
