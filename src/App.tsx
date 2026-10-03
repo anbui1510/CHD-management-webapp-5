@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue, startTransition } from 'react';
 import { 
   Staff, 
   Patient, 
@@ -64,6 +64,7 @@ import { SheetsSyncFeedbackProvider } from './context/SheetsSyncFeedbackContext'
 import { ViewSubheaderProvider } from './context/ViewSubheaderContext';
 import { SubheaderRenderer } from './components/layout/DesktopViewSubheader';
 import AppInlineSubheader from './components/layout/AppInlineSubheader';
+import { SearchTextInput } from './components/SearchTextInput';
 import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError, getMedicalDataFetchTimeout, peekCachedMedicalDataBundle, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
@@ -1950,27 +1951,30 @@ export default function App() {
     });
   };
 
+  const patientSearchIndex = useMemo(() => {
+    return patients.map((p) => ({
+      patient: p,
+      nameKey: removeDiacritics(String(p.PatientName || '')).toLowerCase(),
+      id1Key: String(p.PatientID1 || '').toLowerCase(),
+      id2Key: String(p.PatientID2 || '').toLowerCase(),
+      addrKey: removeDiacritics(String(p.PatientAddress || '')).toLowerCase(),
+    }));
+  }, [patients]);
+
+  const deferredPatientSearch = useDeferredValue(patientSearch);
+
   const filteredPatients = useMemo(() => {
-    return patients.filter(p => {
-      const q = (patientSearch || '').toLowerCase().trim();
-      if (!q) return true;
-      
-      const qRaw = removeDiacritics(q);
-      
-      const name = p.PatientName ? String(p.PatientName).toLowerCase() : '';
-      const nameRaw = removeDiacritics(name);
-      
-      const id1 = p.PatientID1 ? String(p.PatientID1).toLowerCase() : '';
-      const id2 = p.PatientID2 ? String(p.PatientID2).toLowerCase() : '';
-      
-      const addr = (p.PatientAddress || (p as any).PatientAddress) ? String(p.PatientAddress || (p as any).PatientAddress).toLowerCase() : '';
-      const addrRaw = removeDiacritics(addr);
-      
-      return name.includes(q) || nameRaw.includes(qRaw) ||
-             id1.includes(q) || id2.includes(q) ||
-             addr.includes(q) || addrRaw.includes(qRaw);
-    });
-  }, [patients, patientSearch]);
+    const q = removeDiacritics(deferredPatientSearch || '').toLowerCase().trim();
+    if (!q) return patients;
+    return patientSearchIndex
+      .filter((row) =>
+        row.nameKey.includes(q) ||
+        row.id1Key.includes(q) ||
+        row.id2Key.includes(q) ||
+        row.addrKey.includes(q)
+      )
+      .map((row) => row.patient);
+  }, [patients, patientSearchIndex, deferredPatientSearch]);
 
   const getLatestDiagnosisForPatient = useMemo(
     () => createLatestDiagnosisResolver(consults, cathlabs, operations),
@@ -2070,14 +2074,18 @@ export default function App() {
   }, []);
 
   const handlePatientSubheaderSearch = useCallback((value: string) => {
-    setPatientSearch(value);
-    setPatientCurrentPage(1);
-    setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
+    startTransition(() => {
+      setPatientSearch(value);
+      setPatientCurrentPage(1);
+      setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
+    });
   }, []);
 
   const handleConsultSubheaderSearch = useCallback((value: string) => {
-    setConsultListSearch(value);
-    setConsultCurrentPage(1);
+    startTransition(() => {
+      setConsultListSearch(value);
+      setConsultCurrentPage(1);
+    });
   }, []);
 
   // Return Login screen if not authenticated
@@ -2547,14 +2555,16 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1 min-w-0">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                    <input
+                    <SearchTextInput
                       type="text"
                       placeholder="Tìm tên, mã NB, chẩn đoán..."
                       value={patientSearch}
-                      onChange={(e) => {
-                        setPatientSearch(e.target.value);
-                        setPatientCurrentPage(1);
-                        setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
+                      onChange={(value) => {
+                        startTransition(() => {
+                          setPatientSearch(value);
+                          setPatientCurrentPage(1);
+                          setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
+                        });
                       }}
                       className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a] focus:border-[#d2145a] font-sans shadow-sm"
                     />
@@ -3066,13 +3076,15 @@ export default function App() {
                   <div className="flex items-center gap-2 md:hidden">
                     <div className="relative flex-1 min-w-0">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                      <input
+                      <SearchTextInput
                         type="text"
                         placeholder="Tìm tên, ID1 bệnh nhi..."
                         value={consultListSearch}
-                        onChange={(e) => {
-                          setConsultListSearch(e.target.value);
-                          setConsultCurrentPage(1);
+                        onChange={(value) => {
+                          startTransition(() => {
+                            setConsultListSearch(value);
+                            setConsultCurrentPage(1);
+                          });
                         }}
                         className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
                       />

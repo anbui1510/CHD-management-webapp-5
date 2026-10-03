@@ -9,6 +9,7 @@ import { VNDateInput } from './VNDateInput';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import ResultStaffDrawer from './ResultStaffDrawer';
 import { SortColumnIcon } from './SortColumnIcon';
+import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync, withSyncContext } from '../utils/sheetsSyncMutation';
 import {
@@ -933,11 +934,11 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <Search className="h-4 w-4 text-slate-400" />
           </span>
-          <input
+          <SearchTextInput
             type="text"
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
+            onChange={(value) => {
+              setSearchTerm(value);
               setCurrentPage(1);
             }}
             placeholder="Tìm tên, mã NB, chẩn đoán..."

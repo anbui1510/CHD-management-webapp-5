@@ -20,6 +20,7 @@ import {
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { VNDateInput } from './VNDateInput';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
+import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { formatFetchErrorMessage } from '../utils/patientFormValidation';
@@ -296,10 +297,10 @@ export default function MRIResultView({
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />
             </span>
-            <input
+            <SearchTextInput
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               placeholder="Tìm họ tên, ID, chẩn đoán, kết quả MRI..."
               className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 shadow-sm"
             />

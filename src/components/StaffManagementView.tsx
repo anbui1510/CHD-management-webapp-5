@@ -36,6 +36,7 @@ import {
   serializePermissions,
 } from '../auth/permissions';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
+import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { MODAL_TITLE } from '../utils/modalTitles';
@@ -719,9 +720,9 @@ export default function StaffManagementView({
             <div className="p-4 border-b border-slate-100 space-y-3 shrink-0">
               <div className="relative md:hidden">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
+                <SearchTextInput
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={setSearchQuery}
                   placeholder="Tìm mã NV, tên, khoa..."
                   className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-pink-300"
                 />

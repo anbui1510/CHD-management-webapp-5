@@ -3,6 +3,7 @@ import { CathLab, Patient, Consult, Staff, Source, formatVNTime, findPatientByKe
 import { VNDateInput } from './VNDateInput';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import HisCathImportPanel from './HisCathImportPanel';
+import { SearchTextInput } from './SearchTextInput';
 import { 
   FileText, 
   Filter, 
@@ -551,10 +552,10 @@ function CathLabReportViewInner({
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                 <Search className="h-4 w-4 text-slate-400" />
               </span>
-              <input
+              <SearchTextInput
                 type="text"
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                onChange={(value) => { setSearchQuery(value); setCurrentPage(1); }}
                 placeholder="Tìm tên bệnh nhi, mã NB, mã ICD..."
                 className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400"
               />

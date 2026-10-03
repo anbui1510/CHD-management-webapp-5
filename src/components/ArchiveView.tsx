@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Search, ArrowUpDown, Undo2, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import { findPatientByKey, formatVNTime, removeDiacritics } from '../types';
+import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
@@ -183,11 +184,11 @@ export default function ArchiveView({
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-center md:hidden">
             <div className="relative w-full sm:w-1/2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
+              <SearchTextInput
                 type="text"
                 placeholder="Tìm kiếm mã hồ sơ, họ tên, chẩn đoán..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                onChange={(value) => { setSearchQuery(value); setCurrentPage(1); }}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-cyan-500 transition shadow-sm"
               />
             </div>

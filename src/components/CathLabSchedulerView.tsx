@@ -23,6 +23,7 @@ import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 import { SortColumnIcon } from './SortColumnIcon';
+import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
@@ -3078,11 +3079,11 @@ Xin cảm ơn!`;
           <div className="p-3 border-b border-slate-200 flex items-center relative gap-2 shrink-0 md:hidden">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
-              <input
+              <SearchTextInput
                 type="text"
                 placeholder="Tìm họ tên, ID1 bệnh nhi..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={setSearchQuery}
                 className="w-full pl-9 pr-3 py-1.5 bg-slate-100 border-0 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]/50 text-slate-800 placeholder-slate-400 font-sans transition"
               />
               {searchQuery && (

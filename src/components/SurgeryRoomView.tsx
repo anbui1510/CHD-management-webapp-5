@@ -9,6 +9,7 @@ import {
   User
 } from 'lucide-react';
 import { Operation, Patient, findPatientByKey, formatVNTime, removeDiacritics } from '../types';
+import { SearchTextInput } from './SearchTextInput';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface SurgeryRoomViewProps {
@@ -105,11 +106,11 @@ export default function SurgeryRoomView({
       <div className="mb-4 shrink-0 md:hidden">
         <div className="flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-2.5 max-w-xl">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
-          <input
+          <SearchTextInput
             type="text"
             placeholder="Tìm tên, chẩn đoán, phương pháp PT, PTV..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={setSearchTerm}
             className="bg-transparent border-none outline-none text-[13px] text-slate-700 w-full font-bold placeholder:font-medium placeholder:text-slate-400"
           />
         </div>

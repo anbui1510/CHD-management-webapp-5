@@ -26,6 +26,7 @@ import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/pati
 import { VNDateInput } from './VNDateInput';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { SortColumnIcon } from './SortColumnIcon';
+import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import {
@@ -1159,11 +1160,11 @@ export default function MRISchedulerView({
 
             <div className="p-3 border-b border-slate-150 relative shrink-0 md:hidden">
               <Search className="w-4 h-4 text-slate-400 absolute left-6 top-5.5" />
-              <input
+              <SearchTextInput
                 type="text"
                 placeholder="Tìm họ tên, ID, chẩn đoán MRI..."
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={setSearchQuery}
                 className="w-full pl-9 pr-9 py-2 bg-slate-100 border-0 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]/50"
               />
               {searchQuery && (

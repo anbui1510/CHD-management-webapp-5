@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, startTransition } from 'react';
 import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User, AlertTriangle } from 'lucide-react';
 import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceCathMethodOptions } from '../data/source';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
 import { SortColumnIcon } from './SortColumnIcon';
+import { SearchTextInput } from './SearchTextInput';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync, withSyncContext } from '../utils/sheetsSyncMutation';
@@ -16,6 +17,7 @@ import {
 import { MODAL_TITLE } from '../utils/modalTitles';
 import { useViewSubheader } from '../hooks/useViewSubheader';
 import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
+import { getFormattedDateKey } from '../utils/patientFormValidation';
 import {
   buildEmergProgCaseAScar,
   buildEmergProgCaseBHieuScar,
@@ -213,9 +215,6 @@ const cathLabHasConsultKey = (cathlabs: CathLab[], consultKey: any): boolean => 
   return cathlabs.some(cath => normalizeRefKey(cath.ConsultKey) === normalizedConsultKey);
 };
 
-const compareSortText = (a: string, b: string): number =>
-  removeVietnameseTones(a).toLowerCase().localeCompare(removeVietnameseTones(b).toLowerCase());
-
 type PendingSortField = 'name' | 'dob' | 'diagnosis' | 'date' | 'ptv';
 type DoneSortField = 'name' | 'dob' | 'postDiagnosis' | 'postDiagnosisText' | 'method' | 'date' | 'ptv';
 
@@ -278,91 +277,127 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
   
   // Data prep
+  const patientsByKey = useMemo(() => {
+    const map = new Map<string, Patient>();
+    patients.forEach((patient) => {
+      const key = normalizePatientKey(patient.PatientKey);
+      if (key) map.set(key, patient);
+    });
+    return map;
+  }, [patients]);
+
+  const getPatientCached = useCallback(
+    (patientKey?: string) => {
+      const key = normalizePatientKey(patientKey);
+      return key ? patientsByKey.get(key) : undefined;
+    },
+    [patientsByKey]
+  );
+
+  const pendingBase = useMemo(() => {
+    return consults
+      .filter((c) => {
+        const transferred = c.TransferredToCathLab === true || String(c.TransferredToCathLab).trim().toLowerCase() === 'true';
+        return transferred && !c.Removed && !cathLabHasConsultKey(cathlabs, c.ConsultKey);
+      })
+      .map((c) => {
+        const p = getPatientCached(c.PatientKey);
+        return {
+          consult: c,
+          patient: p,
+          nameKey: removeVietnameseTones(String(p?.PatientName || '')).toLowerCase(),
+          diagKey: removeVietnameseTones(String(c.DiagnosisID || '')).toLowerCase(),
+          dobKey: getFormattedDateKey(p?.PatientDOB),
+          dateKey: getFormattedDateKey(c.PlannedCathLabDate) || '9999-99-99',
+          ptvKey: removeVietnameseTones(String(c.Scheduled2ndInterventionist || '')).toLowerCase(),
+        };
+      });
+  }, [consults, cathlabs, getPatientCached]);
+
+  const doneBase = useMemo(() => {
+    return cathlabs.map((cath) => {
+      const p = getPatientCached(cath.PatientKey);
+      return {
+        cath,
+        patient: p,
+        nameKey: removeVietnameseTones(String(p?.PatientName || '')).toLowerCase(),
+        postDiagKey: removeVietnameseTones(String(cath.PostDiagnosisID || '')).toLowerCase(),
+        postDiagTextKey: removeVietnameseTones(String(cath.PostDiagnosis || '')).toLowerCase(),
+        methodKey: removeVietnameseTones(parseCathMethods(cath.CathMethod).join(', ')).toLowerCase(),
+        dobKey: getFormattedDateKey(p?.PatientDOB),
+        dateKey: getFormattedDateKey(cath.CathDate),
+        ptvKey: removeVietnameseTones(String(cath._2ndInterventionist || '')).toLowerCase(),
+      };
+    });
+  }, [cathlabs, getPatientCached]);
+
   const pendingConsults = useMemo(() => {
-     let list = consults.filter(c => {
-       const transferred = c.TransferredToCathLab === true || String(c.TransferredToCathLab).trim().toLowerCase() === 'true';
-       return transferred && !c.Removed && !cathLabHasConsultKey(cathlabs, c.ConsultKey);
-     });
-     
-     if (searchTerm.trim() !== '') {
-        const lowerSearch = removeVietnameseTones(searchTerm).toLowerCase();
-        list = list.filter(c => {
-           const p = findPatientByKey(patients, c.PatientKey);
-           const pName = removeVietnameseTones(String(p?.PatientName || '')).toLowerCase();
-           const dId = removeVietnameseTones(String(c.DiagnosisID || '')).toLowerCase();
-           return pName.includes(lowerSearch) || dId.includes(lowerSearch);
-        });
-     }
+    const lowerSearch = removeVietnameseTones(searchTerm).toLowerCase().trim();
+    let list = lowerSearch
+      ? pendingBase.filter((row) => row.nameKey.includes(lowerSearch) || row.diagKey.includes(lowerSearch))
+      : pendingBase;
 
-     list.sort((a, b) => {
-        const pA = findPatientByKey(patients, a.PatientKey);
-        const pB = findPatientByKey(patients, b.PatientKey);
-        let comparison = 0;
-        switch (pendingSortField) {
-          case 'name':
-            comparison = compareSortText(String(pA?.PatientName || ''), String(pB?.PatientName || ''));
-            break;
-          case 'dob':
-            comparison = new Date(pA?.PatientDOB || '1970-01-01').getTime() - new Date(pB?.PatientDOB || '1970-01-01').getTime();
-            break;
-          case 'diagnosis':
-            comparison = compareSortText(String(a.DiagnosisID || ''), String(b.DiagnosisID || ''));
-            break;
-          case 'date':
-            comparison = new Date(a.PlannedCathLabDate || '2100-01-01').getTime() - new Date(b.PlannedCathLabDate || '2100-01-01').getTime();
-            break;
-          case 'ptv':
-            comparison = compareSortText(String(a.Scheduled2ndInterventionist || ''), String(b.Scheduled2ndInterventionist || ''));
-            break;
-        }
-        return pendingSortOrder === 'asc' ? comparison : -comparison;
-     });
+    list = [...list].sort((a, b) => {
+      let comparison = 0;
+      switch (pendingSortField) {
+        case 'name':
+          comparison = a.nameKey.localeCompare(b.nameKey);
+          break;
+        case 'dob':
+          comparison = a.dobKey.localeCompare(b.dobKey);
+          break;
+        case 'diagnosis':
+          comparison = a.diagKey.localeCompare(b.diagKey);
+          break;
+        case 'date':
+          comparison = a.dateKey.localeCompare(b.dateKey);
+          break;
+        case 'ptv':
+          comparison = a.ptvKey.localeCompare(b.ptvKey);
+          break;
+      }
+      return pendingSortOrder === 'asc' ? comparison : -comparison;
+    });
 
-     return list;
-  }, [consults, cathlabs, patients, searchTerm, pendingSortField, pendingSortOrder]);
+    return list.map((row) => row.consult);
+  }, [pendingBase, searchTerm, pendingSortField, pendingSortOrder]);
 
   const doneCathlabs = useMemo(() => {
-     let list = cathlabs;
-     if (searchTerm.trim() !== '') {
-        const lowerSearch = removeVietnameseTones(searchTerm).toLowerCase();
-        list = list.filter(cath => {
-           const p = findPatientByKey(patients, cath.PatientKey);
-           const pName = removeVietnameseTones(String(p?.PatientName || '')).toLowerCase();
-           const postD = removeVietnameseTones(String(cath.PostDiagnosisID || '')).toLowerCase();
-           return pName.includes(lowerSearch) || postD.includes(lowerSearch);
-        });
-     }
-     list.sort((a, b) => {
-        const pA = findPatientByKey(patients, a.PatientKey);
-        const pB = findPatientByKey(patients, b.PatientKey);
-        let comparison = 0;
-        switch (doneSortField) {
-          case 'name':
-            comparison = compareSortText(String(pA?.PatientName || ''), String(pB?.PatientName || ''));
-            break;
-          case 'dob':
-            comparison = new Date(pA?.PatientDOB || '1970-01-01').getTime() - new Date(pB?.PatientDOB || '1970-01-01').getTime();
-            break;
-          case 'postDiagnosis':
-            comparison = compareSortText(String(a.PostDiagnosisID || ''), String(b.PostDiagnosisID || ''));
-            break;
-          case 'postDiagnosisText':
-            comparison = compareSortText(String(a.PostDiagnosis || ''), String(b.PostDiagnosis || ''));
-            break;
-          case 'method':
-            comparison = compareSortText(parseCathMethods(a.CathMethod).join(', '), parseCathMethods(b.CathMethod).join(', '));
-            break;
-          case 'date':
-            comparison = new Date(a.CathDate || '1970-01-01').getTime() - new Date(b.CathDate || '1970-01-01').getTime();
-            break;
-          case 'ptv':
-            comparison = compareSortText(String(a._2ndInterventionist || ''), String(b._2ndInterventionist || ''));
-            break;
-        }
-        return doneSortOrder === 'asc' ? comparison : -comparison;
-     });
-     return list;
-  }, [cathlabs, patients, searchTerm, doneSortField, doneSortOrder]);
+    const lowerSearch = removeVietnameseTones(searchTerm).toLowerCase().trim();
+    let list = lowerSearch
+      ? doneBase.filter((row) => row.nameKey.includes(lowerSearch) || row.postDiagKey.includes(lowerSearch))
+      : doneBase;
+
+    list = [...list].sort((a, b) => {
+      let comparison = 0;
+      switch (doneSortField) {
+        case 'name':
+          comparison = a.nameKey.localeCompare(b.nameKey);
+          break;
+        case 'dob':
+          comparison = a.dobKey.localeCompare(b.dobKey);
+          break;
+        case 'postDiagnosis':
+          comparison = a.postDiagKey.localeCompare(b.postDiagKey);
+          break;
+        case 'postDiagnosisText':
+          comparison = a.postDiagTextKey.localeCompare(b.postDiagTextKey);
+          break;
+        case 'method':
+          comparison = a.methodKey.localeCompare(b.methodKey);
+          break;
+        case 'date':
+          comparison = a.dateKey.localeCompare(b.dateKey);
+          break;
+        case 'ptv':
+          comparison = a.ptvKey.localeCompare(b.ptvKey);
+          break;
+      }
+      return doneSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return list.map((row) => row.cath);
+  }, [doneBase, searchTerm, doneSortField, doneSortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(doneCathlabs.length / ITEMS_PER_PAGE));
   const paginatedDoneCathlabs = useMemo(() => {
@@ -1070,21 +1105,25 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const handlePendingSort = (field: PendingSortField) => {
-    if (pendingSortField === field) {
-      setPendingSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setPendingSortField(field);
-      setPendingSortOrder('asc');
-    }
+    startTransition(() => {
+      if (pendingSortField === field) {
+        setPendingSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+      } else {
+        setPendingSortField(field);
+        setPendingSortOrder('asc');
+      }
+    });
   };
 
   const handleDoneSort = (field: DoneSortField) => {
-    if (doneSortField === field) {
-      setDoneSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setDoneSortField(field);
-      setDoneSortOrder('asc');
-    }
+    startTransition(() => {
+      if (doneSortField === field) {
+        setDoneSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+      } else {
+        setDoneSortField(field);
+        setDoneSortOrder('asc');
+      }
+    });
   };
 
   const renderPendingSortHeader = (field: PendingSortField, label: string, className = '') => {
@@ -1168,8 +1207,10 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   };
 
   const handleSubheaderSearch = useCallback((value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
+    startTransition(() => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    });
   }, []);
 
   const subheaderActions = useMemo(
@@ -1222,11 +1263,11 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
            <div className="md:hidden sm:ml-auto flex flex-wrap lg:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
               <div className="flex-1 sm:flex-initial flex items-center gap-2 bg-white rounded-2xl shadow-sm border border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5">
                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
-                 <input 
-                    type="text" 
+                 <SearchTextInput
+                    type="text"
                     placeholder="Tìm tên, mã ICD..."
                     value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
+                    onChange={setSearchTerm}
                     className="bg-transparent border-none outline-none text-[12px] sm:text-[13px] text-slate-700 w-full sm:w-56 font-bold placeholder:font-medium placeholder:text-slate-400"
                  />
               </div>

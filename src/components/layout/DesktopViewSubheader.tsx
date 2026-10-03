@@ -1,6 +1,7 @@
 import { Search, X } from 'lucide-react';
 import { DEFAULT_SUBHEADER_SEARCH_PLACEHOLDER } from '../../constants/appHeader';
 import { useViewSubheaderContext, type ViewSubheaderConfig } from '../../context/ViewSubheaderContext';
+import { SearchTextInput } from '../SearchTextInput';
 
 interface DesktopViewSubheaderProps {
   config: ViewSubheaderConfig | null;
@@ -32,10 +33,10 @@ export default function DesktopViewSubheader({ config }: DesktopViewSubheaderPro
           <div className="flex-1 min-w-0 max-w-xl mx-auto">
             <div className="relative">
               <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
+              <SearchTextInput
                 type="text"
                 value={config.searchValue ?? ''}
-                onChange={(e) => config.onSearchChange?.(e.target.value)}
+                onChange={(next) => config.onSearchChange?.(next)}
                 placeholder={config.searchPlaceholder ?? DEFAULT_SUBHEADER_SEARCH_PLACEHOLDER}
                 className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans"
               />

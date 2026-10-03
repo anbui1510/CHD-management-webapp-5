@@ -36,6 +36,7 @@ import {
 } from '../data/transplantDefaults';
 import TransplantRegisterModal from './TransplantRegisterModal';
 import { SortColumnIcon } from './SortColumnIcon';
+import { SearchTextInput } from './SearchTextInput';
 import {
   COLUMN_LABELS,
   DEFAULT_VISIBLE_COLUMNS,
@@ -301,7 +302,7 @@ export default function TransplantManagementView({
         </button>
         <div className="flex-1 min-w-[200px] relative md:hidden">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Tìm tên, mã NB, chẩn đoán..." className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm bg-white" />
+          <SearchTextInput value={searchQuery} onChange={setSearchQuery} placeholder="Tìm tên, mã NB, chẩn đoán..." className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm bg-white" />
         </div>
         <button type="button" onClick={() => setShowRegister(true)} className="md:hidden px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center gap-1">
           <Plus className="w-4 h-4" /> Thêm BN
