@@ -3,7 +3,6 @@ import {
   Activity,
   AlertTriangle,
   Calendar,
-  CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -129,7 +128,11 @@ export default function MRISchedulerView({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<MRISchedulerItem | null>(null);
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [exportDateType, setExportDateType] = useState<'all' | 'custom' | 'group'>('custom');
   const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [exportGroupType, setExportGroupType] = useState<'month' | 'quarter'>('month');
+  const [exportGroupValue, setExportGroupValue] = useState('1');
   const [currentMonth, setCurrentMonth] = useState(5);
   const [currentYear, setCurrentYear] = useState(2026);
   const [saving, setSaving] = useState(false);
@@ -312,43 +315,72 @@ export default function MRISchedulerView({
     return cells;
   }, [currentMonth, currentYear]);
 
-  const exportEndDate = useMemo(() => {
-    if (!exportStartDate) return '';
-    const date = new Date(exportStartDate);
-    date.setDate(date.getDate() + 7);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  }, [exportStartDate]);
+  const exportDateRange = useMemo(() => {
+    let start = '';
+    let end = '';
+    if (exportDateType === 'all') {
+      // no date filtering
+    } else if (exportDateType === 'custom') {
+      start = exportStartDate;
+      end = exportEndDate;
+    } else if (exportGroupType === 'month') {
+      const m = parseInt(exportGroupValue, 10);
+      start = `${currentYear}-${String(m).padStart(2, '0')}-01`;
+      const lastDay = new Date(currentYear, m, 0).getDate();
+      end = `${currentYear}-${String(m).padStart(2, '0')}-${lastDay}`;
+    } else {
+      const q = parseInt(exportGroupValue, 10);
+      const startMonth = (q - 1) * 3 + 1;
+      const endMonth = startMonth + 2;
+      start = `${currentYear}-${String(startMonth).padStart(2, '0')}-01`;
+      const lastDay = new Date(currentYear, endMonth, 0).getDate();
+      end = `${currentYear}-${String(endMonth).padStart(2, '0')}-${lastDay}`;
+    }
+    return { start, end };
+  }, [exportDateType, exportStartDate, exportEndDate, exportGroupType, exportGroupValue, currentYear]);
 
   const filteredScheduleItems = useMemo(() => {
-    if (!exportStartDate || !exportEndDate) return [];
+    const { start, end } = exportDateRange;
     return segmentedItems.scheduled.filter(item => {
-      const date = getFormattedDateKey(item.CMRScheduledDate);
-      return date >= exportStartDate && date <= exportEndDate;
-    });
-  }, [exportStartDate, exportEndDate, segmentedItems.scheduled]);
+      if (start && end) {
+        const date = getFormattedDateKey(item.CMRScheduledDate);
+        if (!date || date < start || date > end) return false;
+      }
+      return true;
+    }).sort((a, b) =>
+      getFormattedDateKey(a.CMRScheduledDate).localeCompare(getFormattedDateKey(b.CMRScheduledDate))
+    );
+  }, [exportDateRange, segmentedItems.scheduled]);
 
   const handleExportExcel = async () => {
     try {
-      if (!exportStartDate || filteredScheduleItems.length === 0) {
+      if (filteredScheduleItems.length === 0) {
         setExportMsg('Không có ca bệnh nào trong khoảng thời gian này!');
         return;
       }
 
       const vnDays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-      const startFormatted = exportStartDate.split('-').reverse().join('/');
-      const endFormatted = exportEndDate.split('-').reverse().join('/');
+      const exportItems = [...filteredScheduleItems];
+      const { start: rangeStart, end: rangeEnd } = exportDateRange;
+      const firstDate = rangeStart || getFormattedDateKey(exportItems[0]?.CMRScheduledDate);
+      const lastDate = rangeEnd || getFormattedDateKey(exportItems[exportItems.length - 1]?.CMRScheduledDate);
+      const startFormatted = firstDate ? firstDate.split('-').reverse().join('/') : '';
+      const endFormatted = lastDate ? lastDate.split('-').reverse().join('/') : '';
 
-      const startMonth = Number(exportStartDate.split('-')[1]);
-      const endMonth = Number(exportEndDate.split('-')[1]);
-      const startYear = exportStartDate.split('-')[0];
-      const endYear = exportEndDate.split('-')[0];
-      const titleStr = startMonth === endMonth && startYear === endYear
-        ? `LỊCH CHỤP MRI TIM THÁNG ${startMonth} NĂM ${startYear}`
-        : `LỊCH CHỤP MRI TIM TỪ THÁNG ${startMonth} ĐẾN THÁNG ${endMonth} NĂM ${endYear}`;
-
-      const exportItems = [...filteredScheduleItems].sort((a, b) =>
-        getFormattedDateKey(a.CMRScheduledDate).localeCompare(getFormattedDateKey(b.CMRScheduledDate))
-      );
+      let titleStr = 'LỊCH CHỤP MRI TIM';
+      if (exportDateType === 'group' && exportGroupType === 'month') {
+        titleStr = `LỊCH CHỤP MRI TIM THÁNG ${exportGroupValue} NĂM ${currentYear}`;
+      } else if (exportDateType === 'group' && exportGroupType === 'quarter') {
+        titleStr = `LỊCH CHỤP MRI TIM QUÝ ${exportGroupValue} NĂM ${currentYear}`;
+      } else if (firstDate && lastDate) {
+        const startMonth = Number(firstDate.split('-')[1]);
+        const endMonth = Number(lastDate.split('-')[1]);
+        const startYear = firstDate.split('-')[0];
+        const endYear = lastDate.split('-')[0];
+        titleStr = startMonth === endMonth && startYear === endYear
+          ? `LỊCH CHỤP MRI TIM THÁNG ${startMonth} NĂM ${startYear}`
+          : `LỊCH CHỤP MRI TIM TỪ THÁNG ${startMonth} ĐẾN THÁNG ${endMonth} NĂM ${endYear}`;
+      }
 
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
@@ -537,7 +569,9 @@ export default function MRISchedulerView({
       document.body.appendChild(a);
       a.style.display = 'none';
       a.href = url;
-      a.download = `Lịch chụp MRI tim_Tuần ${startFormatted.replace(/\//g, '-')}_${endFormatted.replace(/\//g, '-')}.xlsx`;
+      a.download = startFormatted && endFormatted
+        ? `Lịch chụp MRI tim_${startFormatted.replace(/\//g, '-')}_${endFormatted.replace(/\//g, '-')}.xlsx`
+        : `Lịch chụp MRI tim_Tat_ca.xlsx`;
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
@@ -1384,8 +1418,24 @@ export default function MRISchedulerView({
           </div>
         </div>
 
-        <div className="shrink-0 flex flex-col gap-4 self-start h-full min-h-0">
-          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-[320px] flex-1 min-h-0' : 'w-[52px]'}`}>
+        <div className={`shrink-0 flex flex-col gap-4 self-start h-full min-h-0 w-full lg:w-auto ${
+          isFilterExpanded
+            ? 'fixed inset-0 z-40 p-3 bg-slate-50/95 backdrop-blur-[1px] lg:relative lg:inset-auto lg:z-auto lg:p-0 lg:bg-transparent'
+            : 'hidden lg:flex'
+        }`}>
+          {isFilterExpanded && (
+            <div className="lg:hidden flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsFilterExpanded(false)}
+                className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600"
+              >
+                Đóng bộ lọc
+              </button>
+            </div>
+          )}
+
+          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isFilterExpanded ? (
               <button
                 className="flex flex-col items-center py-5 hover:bg-slate-50 transition rounded-3xl h-full"
@@ -1409,20 +1459,85 @@ export default function MRISchedulerView({
                   </button>
                 </div>
 
-                <div className="p-5 overflow-y-auto space-y-6 flex-1">
+                <div className="p-4 overflow-y-auto space-y-3 flex-1 bg-white">
                   <div>
-                    <label className="block text-slate-500 font-bold text-[10px] uppercase mb-2 flex items-center gap-1.5">
-                      <CalendarDays className="w-4 h-4" /> Chọn ngày đầu tuần
+                    <label className="block text-slate-500 font-bold text-[10px] uppercase mb-1.5">
+                      Lọc theo ngày chụp dự kiến
                     </label>
-                    <VNDateInput
-                      value={exportStartDate}
-                      onChange={setExportStartDate}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-extrabold text-xs text-slate-800 font-sans shadow-sm focus:outline-none"
-                    />
-                    {exportEndDate && (
+                    <div className="flex bg-slate-100 p-1 rounded-xl mb-2.5">
+                      <button
+                        type="button"
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition ${exportDateType === 'all' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setExportDateType('all')}
+                      >
+                        Tất cả
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition ${exportDateType === 'custom' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setExportDateType('custom')}
+                      >
+                        Tùy chọn
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition ${exportDateType === 'group' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setExportDateType('group')}
+                      >
+                        Theo nhóm
+                      </button>
+                    </div>
+
+                    {exportDateType === 'all' ? null : exportDateType === 'custom' ? (
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <VNDateInput
+                            value={exportStartDate}
+                            onChange={setExportStartDate}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold font-sans text-slate-700 focus:outline-none min-h-[24px]"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <VNDateInput
+                            value={exportEndDate}
+                            onChange={setExportEndDate}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[10px] font-bold font-sans text-slate-700 focus:outline-none min-h-[24px]"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <select
+                          value={exportGroupType}
+                          onChange={(e) => {
+                            setExportGroupType(e.target.value as 'month' | 'quarter');
+                            setExportGroupValue('1');
+                          }}
+                          className="w-1/3 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 text-[10px] font-bold"
+                        >
+                          <option value="month">Tháng</option>
+                          <option value="quarter">Quý</option>
+                        </select>
+                        <select
+                          value={exportGroupValue}
+                          onChange={(e) => setExportGroupValue(e.target.value)}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 text-[10px] font-bold"
+                        >
+                          {exportGroupType === 'month'
+                            ? [...Array(12)].map((_, i) => (
+                                <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>
+                              ))
+                            : [...Array(4)].map((_, i) => (
+                                <option key={i + 1} value={i + 1}>Quý {i + 1}</option>
+                              ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {exportDateType !== 'all' && exportDateRange.start && exportDateRange.end && (
                       <p className="mt-2 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 p-2 rounded-lg">
-                        Lọc từ ngày: <strong>{exportStartDate.split('-').reverse().join('/')}</strong><br />
-                        Đến ngày: <strong>{exportEndDate.split('-').reverse().join('/')}</strong> (+7 ngày)
+                        Lọc từ ngày: <strong>{exportDateRange.start.split('-').reverse().join('/')}</strong><br />
+                        Đến ngày: <strong>{exportDateRange.end.split('-').reverse().join('/')}</strong>
                       </p>
                     )}
                   </div>
@@ -1431,7 +1546,12 @@ export default function MRISchedulerView({
                     {filteredScheduleItems.map((item, index) => (
                       <button
                         key={item.CMRKey || item.CMRkey || index}
-                        onClick={() => handleSelectItem(item)}
+                        onClick={() => {
+                          handleSelectItem(item);
+                          if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                            setIsFilterExpanded(false);
+                          }
+                        }}
                         className="w-full text-left bg-slate-50 hover:bg-pink-50 border border-slate-150 rounded-xl p-3 transition"
                       >
                         <span className="block text-[9px] font-black text-[#d2145a] font-mono">
