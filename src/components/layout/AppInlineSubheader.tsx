@@ -99,7 +99,7 @@ export default function AppInlineSubheader({
         onSearchChange: handlePatientSearch,
         actions: patientsActions,
       });
-      return () => setConfig(null);
+      return;
     }
 
     if (activeMenu === 'consult-list') {
@@ -110,7 +110,7 @@ export default function AppInlineSubheader({
         onSearchChange: handleConsultSearch,
         actions: consultActions,
       });
-      return () => setConfig(null);
+      return;
     }
 
     setConfig({
@@ -118,7 +118,6 @@ export default function AppInlineSubheader({
       icon: iconMap[activeMenu],
       showSearch: false,
     });
-    return () => setConfig(null);
   }, [
     activeMenu,
     profileName,
@@ -130,6 +129,14 @@ export default function AppInlineSubheader({
     consultActions,
     setConfig,
   ]);
+
+  // Chỉ clear khi rời nhóm menu inline (hoặc unmount), không clear mỗi lần gõ search.
+  useEffect(() => {
+    if (!INLINE_SUBHEADER_MENUS.includes(activeMenu)) {
+      return;
+    }
+    return () => setConfig(null);
+  }, [activeMenu, setConfig]);
 
   return null;
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, restoreWeightFromDate } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -159,28 +159,19 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     }
   }, [isMobile]);
 
-  const patientMap = useMemo(() => {
+  const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();
-    patients.forEach(p => {
-      if (!p.PatientKey) return;
+    patients.forEach((p) => {
       const keyStr = normalizePatientKey(p.PatientKey);
-      map.set(keyStr, p);
-      const pid1 = String(p.PatientID1 || '').trim().toLowerCase();
-      if (pid1) {
-        map.set(pid1, p);
-      }
+      if (keyStr) map.set(keyStr, p);
     });
     return map;
   }, [patients]);
 
   const getPatientByKey = useCallback((patientKey: any): Patient | undefined => {
     if (!patientKey) return undefined;
-    const keyStr = normalizePatientKey(patientKey);
-    // Prioritize direct match by PatientKey to prevent collisions with PatientID1 mapping
-    const directMatch = patients.find(p => p && normalizePatientKey(p.PatientKey) === keyStr);
-    if (directMatch) return directMatch;
-    return patientMap.get(keyStr);
-  }, [patients, patientMap]);
+    return patientsByKey.get(normalizePatientKey(patientKey));
+  }, [patientsByKey]);
 
   // New Staff Registration combined states
   const [showCombinedForm, setShowCombinedForm] = useState<boolean>(false);
@@ -476,6 +467,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   // Combined state variables for filter and pagination
   const [staffType, setStaffType] = useState<'cath' | 'surg'>('cath');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [statusTab, setStatusTab] = useState<'all' | 'pending' | 'completed'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortField, setSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'date'>('date');
@@ -646,56 +638,54 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     return staffType === 'cath' ? cathConsults : surgConsults;
   }, [staffType, cathConsults, surgConsults]);
 
+  const activeConsultIndex = useMemo(() => {
+    return activeConsults.map((c) => {
+      const pat = getPatientByKey(c.PatientKey);
+      return {
+        consult: c,
+        nameKey: removeDiacritics(String(pat?.PatientName || '')).toLowerCase(),
+        id1Key: String(pat?.PatientID1 || '').toLowerCase(),
+        id2Key: String(pat?.PatientID2 || '').toLowerCase(),
+        diagKey: removeDiacritics(String(c.DiagnosisID || '')).toLowerCase(),
+        dobKey: getFormattedDateKey(pat?.PatientDOB),
+        dateKey: getFormattedDateKey(c.ConsultDate),
+        pending: isPendingStaffResult(c),
+      };
+    });
+  }, [activeConsults, getPatientByKey, isPendingStaffResult]);
+
   const filteredConsultsAll = useMemo(() => {
-    return activeConsults.filter(c => {
-      // 1. Tab filtering
-      if (statusTab === 'pending' && !isPendingStaffResult(c)) return false;
-      if (statusTab === 'completed' && isPendingStaffResult(c)) return false;
+    const q = removeDiacritics(deferredSearchTerm).toLowerCase().trim();
+    let list = activeConsultIndex.filter((row) => {
+      if (statusTab === 'pending' && !row.pending) return false;
+      if (statusTab === 'completed' && row.pending) return false;
+      if (!q) return true;
+      return (
+        row.nameKey.includes(q) ||
+        row.id1Key.includes(q) ||
+        row.id2Key.includes(q) ||
+        row.diagKey.includes(q)
+      );
+    });
 
-      // 2. Search query filtering
-      if (searchTerm.trim() !== '') {
-        const q = removeDiacritics(searchTerm).toLowerCase().trim();
-        const pat = getPatientByKey(c.PatientKey);
-        const nameMatch = pat?.PatientName ? removeDiacritics(String(pat.PatientName)).toLowerCase().includes(q) : false;
-        const id1Match = pat?.PatientID1 ? removeDiacritics(String(pat.PatientID1)).toLowerCase().includes(q) : false;
-        const id2Match = pat?.PatientID2 ? removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q) : false;
-        const diagMatch = c.DiagnosisID ? removeDiacritics(String(c.DiagnosisID)).toLowerCase().includes(q) : false;
-        return nameMatch || id1Match || id2Match || diagMatch;
-      }
-
-      return true;
-    }).sort((a, b) => {
+    list = [...list].sort((a, b) => {
       let comparison = 0;
       if (sortField === 'date') {
-        const da = getFormattedDateKey(a.ConsultDate);
-        const db = getFormattedDateKey(b.ConsultDate);
-        comparison = da.localeCompare(db);
+        comparison = a.dateKey.localeCompare(b.dateKey);
       } else if (sortField === 'name') {
-        const patA = getPatientByKey(a.PatientKey);
-        const patB = getPatientByKey(b.PatientKey);
-        const nameA = patA?.PatientName ? removeDiacritics(patA.PatientName).toLowerCase() : '';
-        const nameB = patB?.PatientName ? removeDiacritics(patB.PatientName).toLowerCase() : '';
-        comparison = nameA.localeCompare(nameB, 'vi');
+        comparison = a.nameKey.localeCompare(b.nameKey, 'vi');
       } else if (sortField === 'id') {
-        const patA = getPatientByKey(a.PatientKey);
-        const patB = getPatientByKey(b.PatientKey);
-        const idA = patA?.PatientID1 ? patA.PatientID1.toLowerCase() : '';
-        const idB = patB?.PatientID1 ? patB.PatientID1.toLowerCase() : '';
-        comparison = idA.localeCompare(idB, 'vi');
+        comparison = a.id1Key.localeCompare(b.id1Key, 'vi');
       } else if (sortField === 'dob') {
-        const patA = getPatientByKey(a.PatientKey);
-        const patB = getPatientByKey(b.PatientKey);
-        const dobA = getFormattedDateKey(patA?.PatientDOB);
-        const dobB = getFormattedDateKey(patB?.PatientDOB);
-        comparison = dobA.localeCompare(dobB);
+        comparison = a.dobKey.localeCompare(b.dobKey);
       } else if (sortField === 'diagnosis') {
-        const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
-        const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
-        comparison = diagA.localeCompare(diagB, 'vi');
+        comparison = a.diagKey.localeCompare(b.diagKey, 'vi');
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [activeConsults, statusTab, searchTerm, sortField, sortOrder, getPatientByKey, isPendingStaffResult]);
+
+    return list.map((row) => row.consult);
+  }, [activeConsultIndex, statusTab, deferredSearchTerm, sortField, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filteredConsultsAll.length / ITEMS_PER_PAGE));
   const displayedConsults = useMemo(() => {

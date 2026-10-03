@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue, startTransition } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue } from 'react';
 import { 
   Staff, 
   Patient, 
@@ -2074,18 +2074,14 @@ export default function App() {
   }, []);
 
   const handlePatientSubheaderSearch = useCallback((value: string) => {
-    startTransition(() => {
-      setPatientSearch(value);
-      setPatientCurrentPage(1);
-      setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
-    });
+    setPatientSearch(value);
+    setPatientCurrentPage(1);
+    setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
   }, []);
 
   const handleConsultSubheaderSearch = useCallback((value: string) => {
-    startTransition(() => {
-      setConsultListSearch(value);
-      setConsultCurrentPage(1);
-    });
+    setConsultListSearch(value);
+    setConsultCurrentPage(1);
   }, []);
 
   // Return Login screen if not authenticated
@@ -2560,11 +2556,9 @@ export default function App() {
                       placeholder="Tìm tên, mã NB, chẩn đoán..."
                       value={patientSearch}
                       onChange={(value) => {
-                        startTransition(() => {
-                          setPatientSearch(value);
-                          setPatientCurrentPage(1);
-                          setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
-                        });
+                        setPatientSearch(value);
+                        setPatientCurrentPage(1);
+                        setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
                       }}
                       className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a] focus:border-[#d2145a] font-sans shadow-sm"
                     />
@@ -3081,10 +3075,8 @@ export default function App() {
                         placeholder="Tìm tên, ID1 bệnh nhi..."
                         value={consultListSearch}
                         onChange={(value) => {
-                          startTransition(() => {
-                            setConsultListSearch(value);
-                            setConsultCurrentPage(1);
-                          });
+                          setConsultListSearch(value);
+                          setConsultCurrentPage(1);
                         }}
                         className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans shadow-sm"
                       />
