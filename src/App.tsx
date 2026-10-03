@@ -114,7 +114,7 @@ import {
 import { PatientAdminEditButton } from './components/PatientAdminEditButton';
 import { SortColumnIcon } from './components/SortColumnIcon';
 import { MODAL_TITLE } from './utils/modalTitles';
-import { PATIENT_VALIDATION_MSG, getFormattedDateKey, compareFormattedDates } from './utils/patientFormValidation';
+import { PATIENT_VALIDATION_MSG, getFormattedDateKey, compareFormattedDates, dateSortNumber } from './utils/patientFormValidation';
 
 import { 
   Users, 
@@ -1944,8 +1944,9 @@ export default function App() {
         return consultSortOrder === 'asc' ? cmp : -cmp;
       }
 
-      const cmp = compareFormattedDates(a.ConsultDate, b.ConsultDate);
-      return consultSortOrder === 'asc' ? cmp : -cmp;
+      const cmp = dateSortNumber(a.ConsultDate) - dateSortNumber(b.ConsultDate);
+      if (cmp !== 0) return consultSortOrder === 'asc' ? cmp : -cmp;
+      return String(a.ConsultKey || '').localeCompare(String(b.ConsultKey || ''));
     });
   };
 

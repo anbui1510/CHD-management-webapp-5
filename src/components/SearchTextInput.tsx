@@ -4,79 +4,58 @@ export interface SearchTextInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
   value: string;
   onChange: (value: string) => void;
-  /** Debounce trước khi đẩy giá trị lên parent (lọc nặng). Mặc định 120ms. */
+  /** Debounce trước khi đẩy giá trị lên parent (lọc nặng). Mặc định 80ms. */
   debounceMs?: number;
 }
 
 /**
- * Ô tìm kiếm chống giật IME tiếng Việt:
- * - Giữ state local để gõ mượt, không chờ parent re-render
- * - Không flush lên parent khi đang composition
- * - Debounce onChange để lọc danh sách lớn không chạy mỗi phím
- * - Flush giá trị đang chờ khi unmount (tránh mất search)
+ * Ô tìm kiếm:
+ * - Gõ trên state local để IME tiếng Việt không bị cắt
+ * - Vẫn báo parent cả khi đang composition, để bộ lọc chạy
+ * - Chỉ nhận value từ parent khi ô không focus (nút Xóa)
  */
 export function SearchTextInput({
   value,
   onChange,
-  debounceMs = 120,
+  debounceMs = 80,
   onBlur,
+  onFocus,
   ...rest
 }: SearchTextInputProps) {
   const [localValue, setLocalValue] = useState(value);
-  const composingRef = useRef(false);
+  const focusedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
-  const pendingRef = useRef(value);
-  const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  valueRef.current = value;
 
   useEffect(() => {
-    // Chỉ sync từ parent khi không còn debounce pending (vd. bấm Xóa).
-    if (composingRef.current) return;
-    if (timerRef.current != null) return;
-    if (value === pendingRef.current && value === localValue) return;
-    pendingRef.current = value;
+    if (focusedRef.current) return;
     setLocalValue(value);
-  }, [value, localValue]);
+  }, [value]);
 
   useEffect(() => {
     return () => {
-      if (timerRef.current != null) {
-        window.clearTimeout(timerRef.current);
-        timerRef.current = null;
-        const pending = pendingRef.current;
-        if (pending !== valueRef.current) {
-          onChangeRef.current(pending);
-        }
-      }
+      if (timerRef.current != null) window.clearTimeout(timerRef.current);
     };
   }, []);
 
-  const flush = (next: string) => {
+  const emit = (next: string) => {
     if (timerRef.current != null) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    pendingRef.current = next;
-    if (next !== valueRef.current) {
-      onChangeRef.current(next);
-    }
+    onChangeRef.current(next);
   };
 
-  const scheduleFlush = (next: string) => {
-    pendingRef.current = next;
+  const schedule = (next: string) => {
     if (timerRef.current != null) window.clearTimeout(timerRef.current);
     if (debounceMs <= 0) {
-      flush(next);
+      emit(next);
       return;
     }
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-      const pending = pendingRef.current;
-      if (pending !== valueRef.current) {
-        onChangeRef.current(pending);
-      }
+      onChangeRef.current(next);
     }, debounceMs);
   };
 
@@ -84,24 +63,23 @@ export function SearchTextInput({
     <input
       {...rest}
       value={localValue}
+      onFocus={(event) => {
+        focusedRef.current = true;
+        onFocus?.(event);
+      }}
       onChange={(event) => {
         const next = event.target.value;
-        pendingRef.current = next;
         setLocalValue(next);
-        if (!composingRef.current) scheduleFlush(next);
-      }}
-      onCompositionStart={() => {
-        composingRef.current = true;
+        schedule(next);
       }}
       onCompositionEnd={(event) => {
-        composingRef.current = false;
         const next = event.currentTarget.value;
-        pendingRef.current = next;
         setLocalValue(next);
-        flush(next);
+        emit(next);
       }}
       onBlur={(event) => {
-        if (!composingRef.current) flush(pendingRef.current);
+        focusedRef.current = false;
+        emit(localValue);
         onBlur?.(event);
       }}
     />

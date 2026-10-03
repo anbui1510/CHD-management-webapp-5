@@ -1,10 +1,33 @@
 import type { CMR, Patient } from '../types';
 import { normalizePatientKey } from '../types';
 
-/** Chuẩn hóa ngày để so sánh (yyyy-mm-dd) */
-export function getFormattedDateKey(str?: string): string {
-  if (!str) return '';
-  const trimmed = String(str).trim().split('T')[0];
+/** Chuẩn hóa ngày để so sánh (yyyy-mm-dd). Trả về '' nếu không nhận ra ngày. */
+export function getFormattedDateKey(str?: unknown): string {
+  if (str == null || str === '') return '';
+  if (str instanceof Date && !Number.isNaN(str.getTime())) {
+    const y = str.getFullYear();
+    const m = String(str.getMonth() + 1).padStart(2, '0');
+    const d = String(str.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  let trimmed = String(str).trim();
+  if (!trimmed) return '';
+
+  // Excel/Sheets serial (ví dụ 45000)
+  if (/^\d{5}(\.\d+)?$/.test(trimmed)) {
+    const serial = Math.floor(Number(trimmed));
+    if (serial > 20000 && serial < 80000) {
+      const utc = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      const y = utc.getUTCFullYear();
+      const m = String(utc.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(utc.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  trimmed = trimmed.split('T')[0].split(' ')[0];
+  trimmed = trimmed.replace(/[.／⁄]/g, '/');
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
 
   const slashParts = trimmed.split('/');
@@ -21,12 +44,19 @@ export function getFormattedDateKey(str?: string): string {
     return `${dashParts[2]}-${dashParts[1].padStart(2, '0')}-${dashParts[0].padStart(2, '0')}`;
   }
 
-  return trimmed;
+  return '';
 }
 
-/** So sánh ngày (hỗ trợ dd/mm/yyyy và yyyy-mm-dd). */
-export function compareFormattedDates(a?: string, b?: string): number {
-  return getFormattedDateKey(a).localeCompare(getFormattedDateKey(b));
+/** Số yyyymmdd để sort. Ngày không hợp lệ xếp cuối. */
+export function dateSortNumber(str?: unknown): number {
+  const key = getFormattedDateKey(str);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return 0;
+  return Number(key.replace(/-/g, ''));
+}
+
+/** So sánh ngày (hỗ trợ dd/mm/yyyy, yyyy-mm-dd, serial). */
+export function compareFormattedDates(a?: unknown, b?: unknown): number {
+  return dateSortNumber(a) - dateSortNumber(b);
 }
 
 export const PATIENT_VALIDATION_MSG = {

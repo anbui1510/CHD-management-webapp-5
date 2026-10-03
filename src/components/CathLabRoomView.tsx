@@ -283,6 +283,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     patients.forEach((patient) => {
       const key = normalizePatientKey(patient.PatientKey);
       if (key) map.set(key, patient);
+      const id1 = String(patient.PatientID1 || '').trim().toLowerCase();
+      if (id1 && !map.has(id1)) map.set(id1, patient);
     });
     return map;
   }, [patients]);
@@ -290,7 +292,8 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const getPatientCached = useCallback(
     (patientKey?: string) => {
       const key = normalizePatientKey(patientKey);
-      return key ? patientsByKey.get(key) : undefined;
+      if (!key) return undefined;
+      return patientsByKey.get(key) || patientsByKey.get(String(patientKey).trim().toLowerCase());
     },
     [patientsByKey]
   );
@@ -416,6 +419,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
     return list.map((row) => row.cath);
   }, [doneBase, deferredSearchTerm, doneSortField, doneSortOrder]);
+
+  useEffect(() => {
+    const q = removeVietnameseTones(searchTerm).toLowerCase().trim();
+    if (!q) return;
+    const pendingHit = pendingConsults.length > 0;
+    const doneHit = doneCathlabs.length > 0;
+    if (activeTab === 'pending' && !pendingHit && doneHit) setActiveTab('done');
+    else if (activeTab === 'done' && !doneHit && pendingHit) setActiveTab('pending');
+  }, [searchTerm, activeTab, pendingConsults.length, doneCathlabs.length]);
 
   const totalPages = Math.max(1, Math.ceil(doneCathlabs.length / ITEMS_PER_PAGE));
   const paginatedDoneCathlabs = useMemo(() => {
