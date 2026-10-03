@@ -25,6 +25,7 @@ import {
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { VNDateInput } from './VNDateInput';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
+import { SortColumnIcon } from './SortColumnIcon';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import {
@@ -73,6 +74,8 @@ const getShortStaffName = (fullName: string, staffList: { StaffName: string }[] 
 };
 
 type MriTab = 'unscheduled' | 'scheduled';
+
+type MriSortField = 'default' | 'name' | 'diagnosis' | 'request' | 'anesthesia' | 'scheduledDate' | 'callStatus';
 
 type MRISchedulerItem = CMR & {
   __patient?: Patient;
@@ -127,6 +130,8 @@ export default function MRISchedulerView({
   const [adHocForm, setAdHocForm] = useState<Partial<CMR>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<MRISchedulerItem | null>(null);
+  const [listSortField, setListSortField] = useState<MriSortField>('default');
+  const [listSortOrder, setListSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [exportDateType, setExportDateType] = useState<'all' | 'custom' | 'group'>('custom');
   const [exportStartDate, setExportStartDate] = useState('');
@@ -253,21 +258,62 @@ export default function MRISchedulerView({
   const displayItems = useMemo(() => {
     const source = activeTab === 'unscheduled' ? segmentedItems.unscheduled : segmentedItems.scheduled;
     const q = removeDiacritics(searchQuery).toLowerCase().trim();
-    if (!q) return source;
-    return source.filter(item => {
-      const patient = item.__patient;
-      return [
-        patient?.PatientName,
-        patient?.PatientID1,
-        item['Họ và tên'],
-        item.MBN,
-        item.CMRDiagnosisID,
-        item.CMRDiagnosis,
-        item.CMRRequest,
-        item.CMRCallStatus
-      ].some(value => removeDiacritics(String(value || '')).toLowerCase().includes(q));
+    let result = source;
+    if (q) {
+      result = source.filter(item => {
+        const patient = item.__patient;
+        return [
+          patient?.PatientName,
+          patient?.PatientID1,
+          item['Họ và tên'],
+          item.MBN,
+          item.CMRDiagnosisID,
+          item.CMRDiagnosis,
+          item.CMRRequest,
+          item.CMRCallStatus
+        ].some(value => removeDiacritics(String(value || '')).toLowerCase().includes(q));
+      });
+    }
+
+    if (listSortField === 'default') return result;
+
+    return [...result].sort((a, b) => {
+      let comparison = 0;
+      if (listSortField === 'name') {
+        const nameA = removeDiacritics(a.__patient?.PatientName || a['Họ và tên'] || '').toLowerCase();
+        const nameB = removeDiacritics(b.__patient?.PatientName || b['Họ và tên'] || '').toLowerCase();
+        comparison = nameA.localeCompare(nameB, 'vi');
+      } else if (listSortField === 'diagnosis') {
+        const diagA = removeDiacritics(`${a.CMRDiagnosisID || ''} ${a.CMRDiagnosis || ''}`).toLowerCase();
+        const diagB = removeDiacritics(`${b.CMRDiagnosisID || ''} ${b.CMRDiagnosis || ''}`).toLowerCase();
+        comparison = diagA.localeCompare(diagB, 'vi');
+      } else if (listSortField === 'request') {
+        const reqA = removeDiacritics(a.CMRRequest || '').toLowerCase();
+        const reqB = removeDiacritics(b.CMRRequest || '').toLowerCase();
+        comparison = reqA.localeCompare(reqB, 'vi');
+      } else if (listSortField === 'anesthesia') {
+        const anA = removeDiacritics(a.Anesthesia || '').toLowerCase();
+        const anB = removeDiacritics(b.Anesthesia || '').toLowerCase();
+        comparison = anA.localeCompare(anB, 'vi');
+      } else if (listSortField === 'scheduledDate') {
+        comparison = getFormattedDateKey(a.CMRScheduledDate).localeCompare(getFormattedDateKey(b.CMRScheduledDate));
+      } else if (listSortField === 'callStatus') {
+        const stA = removeDiacritics(a.CMRCallStatus || '').toLowerCase();
+        const stB = removeDiacritics(b.CMRCallStatus || '').toLowerCase();
+        comparison = stA.localeCompare(stB, 'vi');
+      }
+      return listSortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [activeTab, segmentedItems, searchQuery]);
+  }, [activeTab, segmentedItems, searchQuery, listSortField, listSortOrder]);
+
+  const toggleListSort = (field: MriSortField) => {
+    if (listSortField === field) {
+      setListSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setListSortField(field);
+    setListSortOrder('asc');
+  };
 
   const calendarCells = useMemo(() => {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
@@ -1132,12 +1178,60 @@ export default function MRISchedulerView({
                 <thead className="bg-slate-50/70 text-slate-500 sticky top-0 uppercase text-[9px] font-extrabold tracking-wider z-10 shadow-xs">
                   <tr>
                     <th className="py-3 px-3 border-b border-slate-200 w-14 text-center">STT</th>
-                    <th className="py-3 px-3 border-b border-slate-200 min-w-[170px]">PatientName</th>
-                    <th className="py-3 px-3 border-b border-slate-200 min-w-[170px]">CMRDiagnosis</th>
-                    <th className="py-3 px-3 border-b border-slate-200 min-w-[170px]">CMRRequest</th>
-                    <th className="py-3 px-3 border-b border-slate-200 w-28">Anesthesia</th>
-                    <th className="py-3 px-3 border-b border-slate-200 w-32">CMRScheduledDate</th>
-                    <th className="py-3 px-3 border-b border-slate-200 w-36">CMRCallStatus</th>
+                    <th
+                      onClick={() => toggleListSort('name')}
+                      className="py-3 px-3 border-b border-slate-200 min-w-[170px] cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Họ và tên</span>
+                        <SortColumnIcon active={listSortField === 'name'} order={listSortOrder} />
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => toggleListSort('diagnosis')}
+                      className="py-3 px-3 border-b border-slate-200 min-w-[170px] cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Chẩn đoán</span>
+                        <SortColumnIcon active={listSortField === 'diagnosis'} order={listSortOrder} />
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => toggleListSort('request')}
+                      className="py-3 px-3 border-b border-slate-200 min-w-[170px] cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Yêu cầu</span>
+                        <SortColumnIcon active={listSortField === 'request'} order={listSortOrder} />
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => toggleListSort('anesthesia')}
+                      className="py-3 px-3 border-b border-slate-200 w-28 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Gây mê</span>
+                        <SortColumnIcon active={listSortField === 'anesthesia'} order={listSortOrder} />
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => toggleListSort('scheduledDate')}
+                      className="py-3 px-3 border-b border-slate-200 w-32 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Ngày chụp dự kiến</span>
+                        <SortColumnIcon active={listSortField === 'scheduledDate'} order={listSortOrder} />
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => toggleListSort('callStatus')}
+                      className="py-3 px-3 border-b border-slate-200 w-36 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Trạng thái gọi bệnh</span>
+                        <SortColumnIcon active={listSortField === 'callStatus'} order={listSortOrder} />
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150">
