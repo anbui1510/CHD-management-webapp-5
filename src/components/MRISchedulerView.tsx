@@ -33,6 +33,7 @@ import {
   findBlockingPendingCmr,
   findDuplicatePatientById1,
   getFormattedDateKey,
+  compareFormattedDates,
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
@@ -252,7 +253,7 @@ export default function MRISchedulerView({
       .sort((a, b) => String(b.UpdateTime || b.__consult?.ConsultDate || '').localeCompare(String(a.UpdateTime || a.__consult?.ConsultDate || '')));
     const scheduled = allMriItems
       .filter(item => !!getFormattedDateKey(item.CMRScheduledDate))
-      .sort((a, b) => getFormattedDateKey(b.CMRScheduledDate).localeCompare(getFormattedDateKey(a.CMRScheduledDate)));
+      .sort((a, b) => compareFormattedDates(b.CMRScheduledDate, a.CMRScheduledDate));
     return { unscheduled, scheduled };
   }, [allMriItems]);
 
@@ -276,7 +277,13 @@ export default function MRISchedulerView({
       });
     }
 
-    if (listSortField === 'default') return result;
+    if (listSortField === 'default') {
+      // Tab đã xếp: mặc định sort theo ngày chụp dự kiến (mới → cũ)
+      if (activeTab === 'scheduled') {
+        return [...result].sort((a, b) => compareFormattedDates(b.CMRScheduledDate, a.CMRScheduledDate));
+      }
+      return result;
+    }
 
     return [...result].sort((a, b) => {
       let comparison = 0;
@@ -297,7 +304,7 @@ export default function MRISchedulerView({
         const anB = removeDiacritics(b.Anesthesia || '').toLowerCase();
         comparison = anA.localeCompare(anB, 'vi');
       } else if (listSortField === 'scheduledDate') {
-        comparison = getFormattedDateKey(a.CMRScheduledDate).localeCompare(getFormattedDateKey(b.CMRScheduledDate));
+        comparison = compareFormattedDates(a.CMRScheduledDate, b.CMRScheduledDate);
       } else if (listSortField === 'callStatus') {
         const stA = removeDiacritics(a.CMRCallStatus || '').toLowerCase();
         const stB = removeDiacritics(b.CMRCallStatus || '').toLowerCase();
@@ -313,7 +320,7 @@ export default function MRISchedulerView({
       return;
     }
     setListSortField(field);
-    setListSortOrder('asc');
+    setListSortOrder(field === 'scheduledDate' ? 'desc' : 'asc');
   };
 
   const calendarCells = useMemo(() => {
@@ -1241,7 +1248,7 @@ export default function MRISchedulerView({
                     const isSelected = selectedItem?.CMRKey === item.CMRKey;
                     return (
                       <tr
-                        key={item.CMRKey || item.CMRkey || `${item.PatientKey}-${index}`}
+                        key={`${item.CMRKey || item.CMRkey || item.PatientKey || 'mri'}-${index}`}
                         onClick={() => handleSelectItem(item)}
                         className={`hover:bg-indigo-50/45 cursor-pointer transition ${isSelected ? 'bg-indigo-50/90 font-bold' : ''}`}
                       >

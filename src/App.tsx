@@ -114,7 +114,7 @@ import {
 import { PatientAdminEditButton } from './components/PatientAdminEditButton';
 import { SortColumnIcon } from './components/SortColumnIcon';
 import { MODAL_TITLE } from './utils/modalTitles';
-import { PATIENT_VALIDATION_MSG } from './utils/patientFormValidation';
+import { PATIENT_VALIDATION_MSG, getFormattedDateKey, compareFormattedDates } from './utils/patientFormValidation';
 
 import { 
   Users, 
@@ -401,19 +401,18 @@ export default function App() {
   const getLatestPriorDetailDiagnosis = (patientKey: any, beforeDate?: string) => {
     const normalizedKey = normalizePatientKey(patientKey);
     if (!normalizedKey) return '';
-    const targetTime = beforeDate ? new Date(beforeDate).getTime() : Number.POSITIVE_INFINITY;
+    const beforeKey = beforeDate ? getFormattedDateKey(beforeDate) : '';
 
     return [...consults]
       .filter(c => normalizePatientKey(c.PatientKey) === normalizedKey && String(c.DetailDiagnosis || '').trim())
       .filter(c => {
-        if (!beforeDate || !c.ConsultDate) return true;
-        const consultTime = new Date(c.ConsultDate).getTime();
-        return !Number.isNaN(consultTime) && consultTime <= targetTime;
+        if (!beforeKey || !c.ConsultDate) return true;
+        const consultKey = getFormattedDateKey(c.ConsultDate);
+        return !!consultKey && consultKey <= beforeKey;
       })
       .sort((a, b) => {
-        const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-        const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA;
+        const cmp = compareFormattedDates(b.ConsultDate, a.ConsultDate);
+        if (cmp !== 0) return cmp;
         return String(b.ConsultCreateTime || '').localeCompare(String(a.ConsultCreateTime || ''));
       })[0]?.DetailDiagnosis || '';
   };
@@ -1945,9 +1944,8 @@ export default function App() {
         return consultSortOrder === 'asc' ? cmp : -cmp;
       }
 
-      const dateA = a.ConsultDate ? new Date(a.ConsultDate).getTime() : 0;
-      const dateB = b.ConsultDate ? new Date(b.ConsultDate).getTime() : 0;
-      return consultSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      const cmp = compareFormattedDates(a.ConsultDate, b.ConsultDate);
+      return consultSortOrder === 'asc' ? cmp : -cmp;
     });
   };
 

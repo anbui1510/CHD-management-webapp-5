@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Operation, Patient, findPatientByKey, formatVNTime, removeDiacritics } from '../types';
 import { SearchTextInput } from './SearchTextInput';
+import { compareFormattedDates } from '../utils/patientFormValidation';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
 interface SurgeryRoomViewProps {
@@ -54,9 +55,8 @@ export default function SurgeryRoomView({
       });
     }
     list.sort((a, b) => {
-      const da = new Date(a.SurgDate || '1970-01-01').getTime();
-      const db = new Date(b.SurgDate || '1970-01-01').getTime();
-      return sortAsc ? da - db : db - da;
+      const cmp = compareFormattedDates(a.SurgDate, b.SurgDate);
+      return sortAsc ? cmp : -cmp;
     });
     return list;
   }, [operations, patients, searchTerm, sortAsc]);

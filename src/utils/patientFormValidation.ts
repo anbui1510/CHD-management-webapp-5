@@ -24,6 +24,11 @@ export function getFormattedDateKey(str?: string): string {
   return trimmed;
 }
 
+/** So sánh ngày (hỗ trợ dd/mm/yyyy và yyyy-mm-dd). */
+export function compareFormattedDates(a?: string, b?: string): number {
+  return getFormattedDateKey(a).localeCompare(getFormattedDateKey(b));
+}
+
 export const PATIENT_VALIDATION_MSG = {
   missingIdAndName: 'Vui lòng nhập Mã bệnh nhi (ID1) và Họ tên bệnh nhi!',
   selectExistingOrCreate: 'Vui lòng tìm và chọn bệnh nhi sẵn có hoặc đổi sang chế độ tạo mới!',

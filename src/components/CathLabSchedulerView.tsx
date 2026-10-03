@@ -26,7 +26,7 @@ import { SortColumnIcon } from './SortColumnIcon';
 import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
-import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG } from '../utils/patientFormValidation';
+import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG, getFormattedDateKey, compareFormattedDates } from '../utils/patientFormValidation';
 import {
   buildOverrideSchedulingConsultNote,
   buildOverrideSchedulingScar,
@@ -171,7 +171,7 @@ type WaitlistTab =
   | 'delayRedFilled'
   | 'delayBlack';
 
-type WaitlistSortField = 'default' | 'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'date' | 'plannedDate';
+type WaitlistSortField = 'default' | 'name' | 'id' | 'dob' | 'diagnosis' | 'requestBy' | 'ptv' | 'date' | 'plannedDate' | 'checkDevice';
 
 type FilterListSortField =
   | 'default'
@@ -480,7 +480,13 @@ export default function CathLabSchedulerView({
     setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
     setWaitlistSortField('default');
     waitlistScrollRef.current?.scrollTo({ top: 0 });
-  }, [activeTab, searchQuery]);
+  }, [activeTab]);
+
+  useEffect(() => {
+    setWaitlistCurrentPage(1);
+    setMobileWaitlistVisibleCount(MOBILE_WAITLIST_BATCH);
+    waitlistScrollRef.current?.scrollTo({ top: 0 });
+  }, [searchQuery]);
 
   useEffect(() => {
     setWaitlistCurrentPage(1);
@@ -981,7 +987,7 @@ Xin cảm ơn!`;
     return [...allEligibleWaitlist].filter(c => {
       if (!c.PlannedCathLabDate) return false;
       return c.PlannedCathLabDate >= exportStartDate && c.PlannedCathLabDate <= exportEndDateStr;
-    }).sort((a, b) => (a.PlannedCathLabDate || '').localeCompare(b.PlannedCathLabDate || ''));
+    }).sort((a, b) => compareFormattedDates(a.PlannedCathLabDate, b.PlannedCathLabDate));
   }, [allEligibleWaitlist, exportStartDate, exportEndDateStr]);
 
   const deviceFilteredConsults = useMemo(() => {
@@ -1017,7 +1023,7 @@ Xin cảm ơn!`;
         if (c.ConsultDate < start || c.ConsultDate > end) return false;
       }
       return true;
-    }).sort((a, b) => (a.ConsultDate || '').localeCompare(b.ConsultDate || ''));
+    }).sort((a, b) => compareFormattedDates(a.ConsultDate, b.ConsultDate));
   }, [allEligibleWaitlist, deviceCheckFilter, deviceDateType, deviceStartDate, deviceEndDate, deviceGroupType, deviceGroupValue, currentYear]);
 
   const sortFilterList = useCallback((list: Consult[]) => {
@@ -1025,7 +1031,7 @@ Xin cảm ơn!`;
     return [...list].sort((a, b) => {
       let comparison = 0;
       if (filterListSortField === 'plannedDate') {
-        comparison = (a.PlannedCathLabDate || '').localeCompare(b.PlannedCathLabDate || '');
+        comparison = compareFormattedDates(a.PlannedCathLabDate, b.PlannedCathLabDate);
       } else if (filterListSortField === 'name') {
         const patA = findPatientByKey(patients, a.PatientKey);
         const patB = findPatientByKey(patients, b.PatientKey);
@@ -1035,7 +1041,7 @@ Xin cảm ơn!`;
       } else if (filterListSortField === 'dob') {
         const patA = findPatientByKey(patients, a.PatientKey);
         const patB = findPatientByKey(patients, b.PatientKey);
-        comparison = (patA?.PatientDOB || '').localeCompare(patB?.PatientDOB || '');
+        comparison = compareFormattedDates(patA?.PatientDOB, patB?.PatientDOB);
       } else if (filterListSortField === 'diagnosis') {
         const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
         const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
@@ -1681,11 +1687,9 @@ Xin cảm ơn!`;
     return [...result].sort((a, b) => {
       let comparison = 0;
       if (waitlistSortField === 'date') {
-        comparison = (a.ConsultDate || '').localeCompare(b.ConsultDate || '');
+        comparison = compareFormattedDates(a.ConsultDate, b.ConsultDate);
       } else if (waitlistSortField === 'plannedDate') {
-        const da = a.PlannedCathLabDate ? new Date(a.PlannedCathLabDate).getTime() : 0;
-        const db = b.PlannedCathLabDate ? new Date(b.PlannedCathLabDate).getTime() : 0;
-        comparison = da - db;
+        comparison = compareFormattedDates(a.PlannedCathLabDate, b.PlannedCathLabDate);
       } else if (waitlistSortField === 'name') {
         const patA = findPatientByKey(patients, a.PatientKey);
         const patB = findPatientByKey(patients, b.PatientKey);
@@ -1701,9 +1705,7 @@ Xin cảm ơn!`;
       } else if (waitlistSortField === 'dob') {
         const patA = findPatientByKey(patients, a.PatientKey);
         const patB = findPatientByKey(patients, b.PatientKey);
-        const dobA = patA?.PatientDOB ? new Date(patA.PatientDOB).getTime() : 0;
-        const dobB = patB?.PatientDOB ? new Date(patB.PatientDOB).getTime() : 0;
-        comparison = dobA - dobB;
+        comparison = compareFormattedDates(patA?.PatientDOB, patB?.PatientDOB);
       } else if (waitlistSortField === 'diagnosis') {
         const diagA = a.DiagnosisID ? removeDiacritics(a.DiagnosisID).toLowerCase() : '';
         const diagB = b.DiagnosisID ? removeDiacritics(b.DiagnosisID).toLowerCase() : '';
@@ -1712,6 +1714,18 @@ Xin cảm ơn!`;
         const reqA = a.RequestBy ? removeDiacritics(a.RequestBy).toLowerCase() : '';
         const reqB = b.RequestBy ? removeDiacritics(b.RequestBy).toLowerCase() : '';
         comparison = reqA.localeCompare(reqB, 'vi');
+      } else if (waitlistSortField === 'ptv') {
+        const ptvA = removeDiacritics(
+          String(a.Scheduled2ndInterventionist || getAutoScheduled2nd(a.RequestBy || '') || '')
+        ).toLowerCase();
+        const ptvB = removeDiacritics(
+          String(b.Scheduled2ndInterventionist || getAutoScheduled2nd(b.RequestBy || '') || '')
+        ).toLowerCase();
+        comparison = ptvA.localeCompare(ptvB, 'vi');
+      } else if (waitlistSortField === 'checkDevice') {
+        const devA = removeDiacritics(String(a.CheckDevice || '')).toLowerCase();
+        const devB = removeDiacritics(String(b.CheckDevice || '')).toLowerCase();
+        comparison = devA.localeCompare(devB, 'vi');
       }
       return waitlistSortOrder === 'asc' ? comparison : -comparison;
     });
@@ -3335,7 +3349,26 @@ Xin cảm ơn!`;
                         </div>
                       </th>
                     )}
-                    {visibleColumns.ptvPhu1 && <th className="py-3 px-2 border-b border-slate-200">PTV Phụ 1</th>}
+                    {visibleColumns.ptvPhu1 && (
+                      <th
+                        onClick={() => {
+                          if (waitlistSortField === 'ptv') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('ptv');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>PTV Phụ 1</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            <SortColumnIcon active={waitlistSortField === 'ptv'} order={waitlistSortOrder} />
+                          </span>
+                        </div>
+                      </th>
+                    )}
                     {visibleColumns.consultDate && (
                       <th 
                         onClick={() => {
@@ -3377,7 +3410,26 @@ Xin cảm ơn!`;
                         </div>
                       </th>
                     )}
-                    {visibleColumns.checkDevice && <th className="py-3 px-2 border-b border-slate-200 text-center">Kiểm dụng cụ</th>}
+                    {visibleColumns.checkDevice && (
+                      <th
+                        onClick={() => {
+                          if (waitlistSortField === 'checkDevice') {
+                            setWaitlistSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setWaitlistSortField('checkDevice');
+                            setWaitlistSortOrder('asc');
+                          }
+                        }}
+                        className="py-3 px-2 border-b border-slate-200 text-center cursor-pointer select-none hover:bg-slate-100 transition duration-150"
+                      >
+                        <div className="flex items-center gap-1 justify-center">
+                          <span>Kiểm dụng cụ</span>
+                          <span className="text-[10px] text-slate-450 font-bold">
+                            <SortColumnIcon active={waitlistSortField === 'checkDevice'} order={waitlistSortOrder} />
+                          </span>
+                        </div>
+                      </th>
+                    )}
                     {visibleColumns.callStatus && <th className="py-3 px-2 border-b border-slate-200">Trạng thái gọi</th>}
                     {visibleColumns.missSchedule && <th className="py-3 px-2 border-b border-slate-200 text-center">Trễ xếp lịch</th>}
                   </tr>
