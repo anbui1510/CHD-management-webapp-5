@@ -16,6 +16,7 @@ import {
 } from '../utils/repeatInterventionConsult';
 import { MODAL_TITLE } from '../utils/modalTitles';
 import { useViewSubheader } from '../hooks/useViewSubheader';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
 import { getFormattedDateKey } from '../utils/patientFormValidation';
 import { compareByPatientSearchScore, matchesPatientIdentitySearch } from '../utils/listSearch';
@@ -454,6 +455,9 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const [selectedPending, setSelectedPending] = useState<{c: Consult, p: Patient} | null>(null);
   const [selectedDone, setSelectedDone] = useState<{p: Patient, cath: CathLab} | null>(null);
   const [isAdHocModalOpen, setIsAdHocModalOpen] = useState(false);
+  const [adHocMobileMenuOpen, setAdHocMobileMenuOpen] = useState(false);
+  const adHocMobileMenuRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Form State
   const [formData, setFormData] = useState<Partial<CathLab>>(INIT_CATHLAB);
@@ -534,6 +538,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     setSelectedPending(null);
     setSelectedDone(null);
     setIsAdHocModalOpen(false);
+    setAdHocMobileMenuOpen(false);
     setAdHocPriorityOrder('Cấp cứu');
     setFormSnapshot(null);
   };
@@ -571,28 +576,47 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     action?.();
   };
 
-  const openAdHocForm = () => {
-    cathPlanManuallySetRef.current = false;
-    setFormData({
-      ...INIT_CATHLAB,
-      CathDate: new Date().toISOString().split('T')[0],
-      _1stInterventionist: '',
-      _2ndInterventionist: loggedInStaffNameShort || '',
-      _3rdInterventionist: ''
-    });
-    setAdHocPatientMode('existing');
-    setAdHocSearchQuery('');
-    setAdHocSelectedPatientKey('');
-    setAdHocPatientID1('');
-    setAdHocPatientID2('');
-    setAdHocPatientName('');
-    setAdHocPatientDOB('');
-    setAdHocPatientAddress('');
-    setAdHocPatientPhone1('');
-    setAdHocPatientPhone2('');
-    setAdHocPriorityOrder('Cấp cứu');
-    setIsAdHocModalOpen(true);
-  };
+  const openAdHocForm = useCallback(
+    (priority: 'Cấp cứu' | 'Chương trình' = 'Cấp cứu') => {
+      cathPlanManuallySetRef.current = false;
+      setFormData({
+        ...INIT_CATHLAB,
+        CathDate: new Date().toISOString().split('T')[0],
+        _1stInterventionist: '',
+        _2ndInterventionist: loggedInStaffNameShort || '',
+        _3rdInterventionist: ''
+      });
+      setAdHocPatientMode('existing');
+      setAdHocSearchQuery('');
+      setAdHocSelectedPatientKey('');
+      setAdHocPatientID1('');
+      setAdHocPatientID2('');
+      setAdHocPatientName('');
+      setAdHocPatientDOB('');
+      setAdHocPatientAddress('');
+      setAdHocPatientPhone1('');
+      setAdHocPatientPhone2('');
+      setAdHocPriorityOrder(priority);
+      setAdHocMobileMenuOpen(false);
+      setIsAdHocModalOpen(true);
+    },
+    [loggedInStaffNameShort]
+  );
+
+  useEffect(() => {
+    if (!adHocMobileMenuOpen) return;
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (adHocMobileMenuRef.current?.contains(target)) return;
+      setAdHocMobileMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, [adHocMobileMenuOpen]);
 
   const activateEmergencyTransferFromScheduling = async (consult: Consult, patient: Patient) => {
     const today = new Date().toISOString().split('T')[0];
@@ -1262,7 +1286,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     () => (
       <button
         type="button"
-        onClick={openAdHocForm}
+        onClick={() => openAdHocForm('Cấp cứu')}
         className="font-extrabold text-[11px] px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 bg-rose-600 text-white shadow-sm hover:bg-rose-700"
       >
         <Plus className="w-3.5 h-3.5 shrink-0" />
@@ -1316,14 +1340,47 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                     className="mobile-view-search-input bg-transparent border-none outline-none text-[12px] sm:text-[13px] text-slate-700 w-full sm:w-56 font-bold placeholder:font-medium placeholder:text-slate-400"
                  />
               </div>
-              <button
-                 onClick={openAdHocForm}
-                 className="mobile-tab-pill font-extrabold text-[11px] sm:text-[13px] sm:px-5 sm:py-2.5 sm:rounded-2xl transition flex items-center gap-1.5 sm:gap-2 bg-rose-600 text-white shadow-md hover:bg-rose-700 sm:ml-2"
-              >
-                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                 <span className="hidden sm:inline">Nhập TT cấp cứu</span>
-                 <span className="sm:hidden">Cấp cứu</span>
-              </button>
+              {isMobile ? (
+                <div className="relative shrink-0" ref={adHocMobileMenuRef}>
+                  <button
+                    type="button"
+                    aria-label="Thêm ca thông tim"
+                    aria-expanded={adHocMobileMenuOpen}
+                    onClick={() => setAdHocMobileMenuOpen((open) => !open)}
+                    className="mobile-tab-pill font-extrabold text-[11px] transition flex items-center justify-center bg-rose-600 text-white shadow-md hover:bg-rose-700 w-9 h-9 p-0 rounded-xl"
+                  >
+                    <Plus className="w-5 h-5 shrink-0" />
+                  </button>
+                  {adHocMobileMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50 min-w-[9.5rem] rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => openAdHocForm('Cấp cứu')}
+                        className="w-full px-3 py-2 text-left text-[12px] font-extrabold text-rose-700 hover:bg-rose-50"
+                      >
+                        Cấp cứu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openAdHocForm('Chương trình')}
+                        className="w-full px-3 py-2 text-left text-[12px] font-extrabold text-indigo-700 hover:bg-indigo-50 border-t border-slate-100"
+                      >
+                        Chương trình
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openAdHocForm('Cấp cứu')}
+                  className="mobile-tab-pill font-extrabold text-[11px] sm:text-[13px] sm:px-5 sm:py-2.5 sm:rounded-2xl transition flex items-center gap-1.5 sm:gap-2 bg-rose-600 text-white shadow-md hover:bg-rose-700 sm:ml-2"
+                >
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="hidden sm:inline">Nhập TT cấp cứu</span>
+                  <span className="sm:hidden">Cấp cứu</span>
+                </button>
+              )}
            </div>
         </div>
 
