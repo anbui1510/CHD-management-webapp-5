@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback, startTransition, useDeferredValue } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, startTransition } from 'react';
 import { Patient, Consult, Staff, CathLab, Source, findPatientByKey, formatVNTime, removeDiacritics, normalizePatientKey } from '../types';
 import { Search, Plus, Undo2, Stethoscope, Save, Archive, Ban, CalendarDays, Activity, ArrowUpDown, X, User, AlertTriangle } from 'lucide-react';
 import { SOURCE_CATH_METHOD, SOURCE_PROVINCE, getSourceDiagnosisOptions, normalizeDiagnosisID, getSourceProvinceOptions, getSourceCathMethodOptions } from '../data/source';
@@ -18,6 +18,7 @@ import { MODAL_TITLE } from '../utils/modalTitles';
 import { useViewSubheader } from '../hooks/useViewSubheader';
 import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
 import { getFormattedDateKey } from '../utils/patientFormValidation';
+import { matchesListSearchQuery } from '../utils/listSearch';
 import {
   buildEmergProgCaseAScar,
   buildEmergProgCaseBHieuScar,
@@ -247,7 +248,6 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
-  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [pendingSortField, setPendingSortField] = useState<PendingSortField>('date');
   const [pendingSortOrder, setPendingSortOrder] = useState<'asc' | 'desc'>('asc');
   const [doneSortField, setDoneSortField] = useState<DoneSortField>('date');
@@ -257,7 +257,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, deferredSearchTerm]);
+  }, [activeTab, searchTerm]);
   const diagnosisOptions = useMemo(() => getSourceDiagnosisOptions(sources), [sources]);
   const provinceOptions = useMemo(() => getSourceProvinceOptions(sources), [sources]);
   const cathMethodOptions = useMemo(() => getSourceCathMethodOptions(sources), [sources]);
@@ -340,13 +340,15 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   }, [cathlabs, getPatientCached]);
 
   const pendingConsults = useMemo(() => {
-    const lowerSearch = removeVietnameseTones(deferredSearchTerm).toLowerCase().trim();
-    let list = lowerSearch
+    let list = searchTerm.trim()
       ? pendingBase.filter((row) =>
-          row.nameKey.includes(lowerSearch) ||
-          row.id1Key.includes(lowerSearch) ||
-          row.id2Key.includes(lowerSearch) ||
-          row.diagKey.includes(lowerSearch)
+          matchesListSearchQuery(searchTerm, [
+            row.patient?.PatientName,
+            row.patient?.PatientID1,
+            row.patient?.PatientID2,
+            row.consult.DiagnosisID,
+            row.consult.DetailDiagnosis,
+          ])
         )
       : pendingBase;
 
@@ -373,19 +375,19 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     });
 
     return list.map((row) => row.consult);
-  }, [pendingBase, deferredSearchTerm, pendingSortField, pendingSortOrder]);
+  }, [pendingBase, searchTerm, pendingSortField, pendingSortOrder]);
 
   const doneCathlabs = useMemo(() => {
-    const lowerSearch = removeVietnameseTones(deferredSearchTerm).toLowerCase().trim();
-    let list = lowerSearch
+    let list = searchTerm.trim()
       ? doneBase.filter((row) =>
-          row.nameKey.includes(lowerSearch) ||
-          row.id1Key.includes(lowerSearch) ||
-          row.id2Key.includes(lowerSearch) ||
-          row.postDiagKey.includes(lowerSearch) ||
-          row.postDiagTextKey.includes(lowerSearch) ||
-          row.methodKey.includes(lowerSearch) ||
-          row.ptvKey.includes(lowerSearch)
+          matchesListSearchQuery(searchTerm, [
+            row.patient?.PatientName,
+            row.patient?.PatientID1,
+            row.patient?.PatientID2,
+            row.cath.PostDiagnosisID,
+            row.cath.PostDiagnosis,
+            row.cath.CathMethod,
+          ])
         )
       : doneBase;
 
@@ -418,7 +420,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
     });
 
     return list.map((row) => row.cath);
-  }, [doneBase, deferredSearchTerm, doneSortField, doneSortOrder]);
+  }, [doneBase, searchTerm, doneSortField, doneSortOrder]);
 
   useEffect(() => {
     const q = removeVietnameseTones(searchTerm).toLowerCase().trim();

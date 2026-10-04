@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, formatVNTime, Staff, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, restoreWeightFromDate } from '../types';
 import { ClipboardList, Stethoscope, Clock, CheckCircle, Scissors, Search, X, Plus, AlertTriangle, CheckCircle2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
@@ -17,6 +17,7 @@ import {
   getFormattedDateKey,
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
+import { matchesListSearchQuery } from '../utils/listSearch';
 import { MODAL_TITLE } from '../utils/modalTitles';
 import { useViewSubheader } from '../hooks/useViewSubheader';
 import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
@@ -467,7 +468,6 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   // Combined state variables for filter and pagination
   const [staffType, setStaffType] = useState<'cath' | 'surg'>('cath');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [statusTab, setStatusTab] = useState<'all' | 'pending' | 'completed'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortField, setSortField] = useState<'name' | 'id' | 'dob' | 'diagnosis' | 'date'>('date');
@@ -655,17 +655,15 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
   }, [activeConsults, getPatientByKey, isPendingStaffResult]);
 
   const filteredConsultsAll = useMemo(() => {
-    const q = removeDiacritics(deferredSearchTerm).toLowerCase().trim();
     let list = activeConsultIndex.filter((row) => {
       if (statusTab === 'pending' && !row.pending) return false;
       if (statusTab === 'completed' && row.pending) return false;
-      if (!q) return true;
-      return (
-        row.nameKey.includes(q) ||
-        row.id1Key.includes(q) ||
-        row.id2Key.includes(q) ||
-        row.diagKey.includes(q)
-      );
+      return matchesListSearchQuery(searchTerm, [
+        row.nameKey,
+        row.id1Key,
+        row.id2Key,
+        row.diagKey,
+      ]);
     });
 
     list = [...list].sort((a, b) => {
@@ -685,7 +683,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     });
 
     return list.map((row) => row.consult);
-  }, [activeConsultIndex, statusTab, deferredSearchTerm, sortField, sortOrder]);
+  }, [activeConsultIndex, statusTab, searchTerm, sortField, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filteredConsultsAll.length / ITEMS_PER_PAGE));
   const displayedConsults = useMemo(() => {

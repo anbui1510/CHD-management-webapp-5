@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -44,6 +44,7 @@ import {
   getFormattedDateKey,
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
+import { matchesListSearchQuery } from '../utils/listSearch';
 import { MODAL_TITLE } from '../utils/modalTitles';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
@@ -113,7 +114,6 @@ export default function MRIRegisterView({
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [activeTab, setActiveTab] = useState<RegisterTab>('pending');
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Preview / edit-registration popup states
@@ -215,29 +215,27 @@ export default function MRIRegisterView({
 
   const displayItems = useMemo(() => {
     const source = activeTab === 'pending' ? segmented.pending : segmented.done;
-    const q = removeDiacritics(deferredSearchQuery).toLowerCase().trim();
-    const filtered = !q
-      ? source
-      : source.filter(item => {
-          const patient = item.__patient;
-          return [
-            patient?.PatientName,
-            patient?.PatientID1,
-            item['Họ và tên'],
-            item.MBN,
-            item.CMRDiagnosisID,
-            item.CMRDiagnosis,
-            item.CMRRequest,
-            item.CMRCallStatus
-          ].some(value => removeDiacritics(String(value || '')).toLowerCase().includes(q));
-        });
+    const filtered = source.filter((item) => {
+      const patient = item.__patient;
+      return matchesListSearchQuery(searchQuery, [
+        patient?.PatientName,
+        patient?.PatientID1,
+        patient?.PatientID2,
+        item['Họ và tên'],
+        item.MBN,
+        item.CMRDiagnosisID,
+        item.CMRDiagnosis,
+        item.CMRRequest,
+        item.CMRCallStatus,
+      ]);
+    });
 
     return [...filtered].sort((a, b) => {
       const da = getFormattedDateKey(a.CMRScheduledDate);
       const db = getFormattedDateKey(b.CMRScheduledDate);
       return sortOrder === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
     });
-  }, [activeTab, segmented, deferredSearchQuery, sortOrder]);
+  }, [activeTab, segmented, searchQuery, sortOrder]);
 
   const resetForm = () => {
     setPatientMode('select');

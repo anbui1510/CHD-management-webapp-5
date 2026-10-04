@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { Patient, Consult, CathLab, Source, DeviceTemplate, Staff, formatVNTime, removeDiacritics, findPatientByKey, normalizePatientKey, PriorityOrderEnum, PRIORITY_OPTIONS, normalizePriorityOrder, restoreWeightFromDate } from '../types';
 import { getLatestPriorDetailDiagnosis } from '../utils/getLatestPriorDetailDiagnosis';
@@ -27,6 +27,7 @@ import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG, getFormattedDateKey, compareFormattedDates } from '../utils/patientFormValidation';
+import { matchesListSearchQuery } from '../utils/listSearch';
 import {
   buildOverrideSchedulingConsultNote,
   buildOverrideSchedulingScar,
@@ -433,7 +434,6 @@ export default function CathLabSchedulerView({
   const [activeTab, setActiveTab] = useState<WaitlistTab>('unscheduled');
   // Search and Sort query
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [waitlistSortField, setWaitlistSortField] = useState<WaitlistSortField>('default');
   const [waitlistSortOrder, setWaitlistSortOrder] = useState<'desc' | 'asc'>('desc');
   const [filterListSortField, setFilterListSortField] = useState<FilterListSortField>('default');
@@ -1668,16 +1668,17 @@ Xin cảm ơn!`;
             : segmentedWaitlist[activeTab];
     let result = activeList;
     
-    const q = removeDiacritics(deferredSearchQuery).toLowerCase().trim();
-    if (q) {
-      result = activeList.filter(c => {
+    if (searchQuery.trim()) {
+      result = activeList.filter((c) => {
         const pat = findPatientByKey(patients, c.PatientKey);
         if (!pat) return false;
-        return (
-          removeDiacritics(String(pat.PatientName || '')).toLowerCase().includes(q) ||
-          removeDiacritics(String(pat.PatientID1 || '')).toLowerCase().includes(q) ||
-          (pat.PatientID2 && removeDiacritics(String(pat.PatientID2)).toLowerCase().includes(q))
-        );
+        return matchesListSearchQuery(searchQuery, [
+          pat.PatientName,
+          pat.PatientID1,
+          pat.PatientID2,
+          c.DiagnosisID,
+          c.DetailDiagnosis,
+        ]);
       });
     }
 
@@ -1730,7 +1731,7 @@ Xin cảm ơn!`;
       }
       return waitlistSortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [segmentedWaitlist, activeTab, deferredSearchQuery, patients, waitlistSortOrder, waitlistSortField]);
+  }, [segmentedWaitlist, activeTab, searchQuery, patients, waitlistSortOrder, waitlistSortField]);
 
   const totalWaitlistPages = Math.ceil(displayWaitlist.length / rowsPerWaitlistPage) || 1;
   const paginatedWaitlist = useMemo(() => {

@@ -85,6 +85,7 @@ import {
   createLatestDiagnosisResolver,
 } from './utils/latestDiagnosis';
 import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
+import { matchesListSearchQuery, normalizeListSearchQuery } from './utils/listSearch';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { MobileAutoExpandTextarea } from './components/MobileAutoExpandTextarea';
@@ -1906,6 +1907,9 @@ export default function App() {
     );
   };
 
+  const deferredPatientSearch = useDeferredValue(patientSearch);
+  const deferredConsultListSearch = useDeferredValue(consultListSearch);
+
   // Query Filters Handler (Relocated to prevent conditional hook errors)
   const getFilteredConsults = () => {
     const list = consults.filter(c => {
@@ -1916,20 +1920,13 @@ export default function App() {
       const pat = getPatientByKey(c.PatientKey);
       if (!pat) return false; // Ẩn bệnh nhân không tìm thấy hồ sơ (tránh mismatch đếm ca)
 
-      let searchMatch = true;
-      const q = consultListSearch.toLowerCase().trim();
-      if (q) {
-        const qRaw = removeDiacritics(q);
-        const nameRaw = removeDiacritics(String(pat.PatientName || '')).toLowerCase();
-        const id1 = String(pat.PatientID1 || '').toLowerCase();
-        const id2 = pat.PatientID2 ? String(pat.PatientID2).toLowerCase() : '';
-        
-        searchMatch = (
-          nameRaw.includes(qRaw) ||
-          id1.includes(q) ||
-          id2.includes(q)
-        );
-      }
+      const searchMatch = matchesListSearchQuery(deferredConsultListSearch, [
+        pat.PatientName,
+        pat.PatientID1,
+        pat.PatientID2,
+        c.DiagnosisID,
+        c.DetailDiagnosis,
+      ]);
 
       return typeMatch && dateMatch && notConsultedYet && searchMatch;
     });
@@ -1960,17 +1957,17 @@ export default function App() {
     }));
   }, [patients]);
 
-  const deferredPatientSearch = useDeferredValue(patientSearch);
-
   const filteredPatients = useMemo(() => {
-    const q = removeDiacritics(deferredPatientSearch || '').toLowerCase().trim();
-    if (!q) return patients;
+    const q = deferredPatientSearch || '';
+    if (!normalizeListSearchQuery(q)) return patients;
     return patientSearchIndex
       .filter((row) =>
-        row.nameKey.includes(q) ||
-        row.id1Key.includes(q) ||
-        row.id2Key.includes(q) ||
-        row.addrKey.includes(q)
+        matchesListSearchQuery(q, [
+          row.patient.PatientName,
+          row.patient.PatientID1,
+          row.patient.PatientID2,
+          row.patient.PatientAddress,
+        ])
       )
       .map((row) => row.patient);
   }, [patients, patientSearchIndex, deferredPatientSearch]);
@@ -2008,7 +2005,7 @@ export default function App() {
   const CONSULTS_PER_PAGE = 100;
   const filteredConsultsList = useMemo(() => {
     return getFilteredConsults();
-  }, [consults, patientsMap, filterType, filterDate, consultListSearch, consultSortField, consultSortOrder, isPendingStaffConsult]);
+  }, [consults, patientsMap, filterType, filterDate, deferredConsultListSearch, consultSortField, consultSortOrder, isPendingStaffConsult]);
   const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
   const displayedConsults = useMemo(() => {
     if (isMobile) return filteredConsultsList;

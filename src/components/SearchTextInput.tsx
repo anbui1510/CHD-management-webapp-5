@@ -5,20 +5,17 @@ export interface SearchTextInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
   value: string;
   onChange: (value: string) => void;
-  /** Debounce trước khi đẩy giá trị lên parent (lọc nặng). Mặc định 80ms. */
+  /** Debounce trước khi đẩy giá trị lên parent. Mặc định 0 — cập nhật ngay như Hồ sơ bệnh án. */
   debounceMs?: number;
 }
 
 /**
- * Ô tìm kiếm:
- * - Gõ trên state local để IME tiếng Việt không bị cắt
- * - Vẫn báo parent cả khi đang composition, để bộ lọc chạy
- * - Chỉ nhận value từ parent khi ô không focus (nút Xóa)
+ * Ô tìm kiếm: state local cho IME, parent nhận giá trị ngay để lọc danh sách.
  */
 export function SearchTextInput({
   value,
   onChange,
-  debounceMs = 80,
+  debounceMs = 0,
   onBlur,
   onFocus,
   ...rest
@@ -40,23 +37,27 @@ export function SearchTextInput({
     };
   }, []);
 
+  const pushToParent = (next: string) => {
+    onChangeRef.current(next);
+  };
+
   const emit = (next: string) => {
     if (timerRef.current != null) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    onChangeRef.current(next);
+    pushToParent(next);
   };
 
   const schedule = (next: string) => {
-    if (timerRef.current != null) window.clearTimeout(timerRef.current);
     if (debounceMs <= 0) {
-      emit(next);
+      pushToParent(next);
       return;
     }
+    if (timerRef.current != null) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-      onChangeRef.current(next);
+      pushToParent(next);
     }, debounceMs);
   };
 
@@ -82,7 +83,9 @@ export function SearchTextInput({
       onBlur={(event) => {
         focusedRef.current = false;
         setMobileKeyboardOpen(false);
-        emit(localValue);
+        const next = event.currentTarget.value;
+        setLocalValue(next);
+        emit(next);
         onBlur?.(event);
       }}
     />
