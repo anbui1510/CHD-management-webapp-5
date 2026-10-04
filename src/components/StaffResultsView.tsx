@@ -17,7 +17,7 @@ import {
   getFormattedDateKey,
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
-import { matchesListSearchQuery } from '../utils/listSearch';
+import { compareByPatientSearchScore, matchesPatientIdentitySearch } from '../utils/listSearch';
 import { MODAL_TITLE } from '../utils/modalTitles';
 import { useViewSubheader } from '../hooks/useViewSubheader';
 import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
@@ -643,6 +643,9 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       const pat = getPatientByKey(c.PatientKey);
       return {
         consult: c,
+        patientName: String(pat?.PatientName || ''),
+        patientId1: String(pat?.PatientID1 || ''),
+        patientId2: String(pat?.PatientID2 || ''),
         nameKey: removeDiacritics(String(pat?.PatientName || '')).toLowerCase(),
         id1Key: String(pat?.PatientID1 || '').toLowerCase(),
         id2Key: String(pat?.PatientID2 || '').toLowerCase(),
@@ -658,15 +661,24 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
     let list = activeConsultIndex.filter((row) => {
       if (statusTab === 'pending' && !row.pending) return false;
       if (statusTab === 'completed' && row.pending) return false;
-      return matchesListSearchQuery(searchTerm, [
-        row.nameKey,
-        row.id1Key,
-        row.id2Key,
-        row.diagKey,
-      ]);
+      return matchesPatientIdentitySearch(searchTerm, {
+        PatientName: row.patientName,
+        PatientID1: row.patientId1,
+        PatientID2: row.patientId2,
+      });
     });
 
     list = [...list].sort((a, b) => {
+      if (searchTerm.trim()) {
+        const byScore = compareByPatientSearchScore(
+          searchTerm,
+          a.patientName,
+          b.patientName,
+          [a.patientId1, a.patientId2],
+          [b.patientId1, b.patientId2]
+        );
+        if (byScore !== 0) return byScore;
+      }
       let comparison = 0;
       if (sortField === 'date') {
         comparison = a.dateKey.localeCompare(b.dateKey);

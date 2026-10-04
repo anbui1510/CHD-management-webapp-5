@@ -18,7 +18,7 @@ import { MODAL_TITLE } from '../utils/modalTitles';
 import { useViewSubheader } from '../hooks/useViewSubheader';
 import { getViewSubheaderTitle } from '../config/viewSubheaderTitles';
 import { getFormattedDateKey } from '../utils/patientFormValidation';
-import { matchesListSearchQuery } from '../utils/listSearch';
+import { compareByPatientSearchScore, matchesPatientIdentitySearch } from '../utils/listSearch';
 import {
   buildEmergProgCaseAScar,
   buildEmergProgCaseBHieuScar,
@@ -342,17 +342,25 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const pendingConsults = useMemo(() => {
     let list = searchTerm.trim()
       ? pendingBase.filter((row) =>
-          matchesListSearchQuery(searchTerm, [
-            row.patient?.PatientName,
-            row.patient?.PatientID1,
-            row.patient?.PatientID2,
-            row.consult.DiagnosisID,
-            row.consult.DetailDiagnosis,
-          ])
+          matchesPatientIdentitySearch(searchTerm, {
+            PatientName: row.patient?.PatientName,
+            PatientID1: row.patient?.PatientID1,
+            PatientID2: row.patient?.PatientID2,
+          })
         )
       : pendingBase;
 
     list = [...list].sort((a, b) => {
+      if (searchTerm.trim()) {
+        const byScore = compareByPatientSearchScore(
+          searchTerm,
+          a.patient?.PatientName || '',
+          b.patient?.PatientName || '',
+          [a.patient?.PatientID1, a.patient?.PatientID2].filter(Boolean) as string[],
+          [b.patient?.PatientID1, b.patient?.PatientID2].filter(Boolean) as string[]
+        );
+        if (byScore !== 0) return byScore;
+      }
       let comparison = 0;
       switch (pendingSortField) {
         case 'name':
@@ -380,18 +388,25 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
   const doneCathlabs = useMemo(() => {
     let list = searchTerm.trim()
       ? doneBase.filter((row) =>
-          matchesListSearchQuery(searchTerm, [
-            row.patient?.PatientName,
-            row.patient?.PatientID1,
-            row.patient?.PatientID2,
-            row.cath.PostDiagnosisID,
-            row.cath.PostDiagnosis,
-            row.cath.CathMethod,
-          ])
+          matchesPatientIdentitySearch(searchTerm, {
+            PatientName: row.patient?.PatientName,
+            PatientID1: row.patient?.PatientID1,
+            PatientID2: row.patient?.PatientID2,
+          })
         )
       : doneBase;
 
     list = [...list].sort((a, b) => {
+      if (searchTerm.trim()) {
+        const byScore = compareByPatientSearchScore(
+          searchTerm,
+          a.patient?.PatientName || '',
+          b.patient?.PatientName || '',
+          [a.patient?.PatientID1, a.patient?.PatientID2].filter(Boolean) as string[],
+          [b.patient?.PatientID1, b.patient?.PatientID2].filter(Boolean) as string[]
+        );
+        if (byScore !== 0) return byScore;
+      }
       let comparison = 0;
       switch (doneSortField) {
         case 'name':

@@ -85,7 +85,12 @@ import {
   createLatestDiagnosisResolver,
 } from './utils/latestDiagnosis';
 import { getPatientAgeDescriptionParen } from './utils/patientDisplay';
-import { matchesListSearchQuery, normalizeListSearchQuery } from './utils/listSearch';
+import {
+  compareByPatientSearchScore,
+  matchesListSearchQuery,
+  matchesPatientIdentitySearch,
+  normalizeListSearchQuery,
+} from './utils/listSearch';
 import { SearchableEnumSelect } from './components/SearchableEnumSelect';
 import { VNDateInput } from './components/VNDateInput';
 import { MobileAutoExpandTextarea } from './components/MobileAutoExpandTextarea';
@@ -1920,13 +1925,13 @@ export default function App() {
       const pat = getPatientByKey(c.PatientKey);
       if (!pat) return false; // Ẩn bệnh nhân không tìm thấy hồ sơ (tránh mismatch đếm ca)
 
-      const searchMatch = matchesListSearchQuery(deferredConsultListSearch, [
-        pat.PatientName,
-        pat.PatientID1,
-        pat.PatientID2,
-        c.DiagnosisID,
-        c.DetailDiagnosis,
-      ]);
+      const searchMatch =
+        matchesPatientIdentitySearch(deferredConsultListSearch, {
+          PatientName: pat.PatientName,
+          PatientID1: pat.PatientID1,
+          PatientID2: pat.PatientID2,
+        }) ||
+        matchesListSearchQuery(deferredConsultListSearch, [c.DiagnosisID, c.DetailDiagnosis]);
 
       return typeMatch && dateMatch && notConsultedYet && searchMatch;
     });
@@ -1962,12 +1967,21 @@ export default function App() {
     if (!normalizeListSearchQuery(q)) return patients;
     return patientSearchIndex
       .filter((row) =>
-        matchesListSearchQuery(q, [
-          row.patient.PatientName,
-          row.patient.PatientID1,
-          row.patient.PatientID2,
-          row.patient.PatientAddress,
-        ])
+        matchesPatientIdentitySearch(q, {
+          PatientName: row.patient.PatientName,
+          PatientID1: row.patient.PatientID1,
+          PatientID2: row.patient.PatientID2,
+        }) ||
+        matchesListSearchQuery(q, [row.patient.PatientAddress])
+      )
+      .sort((a, b) =>
+        compareByPatientSearchScore(
+          q,
+          a.patient.PatientName || '',
+          b.patient.PatientName || '',
+          [a.patient.PatientID1, a.patient.PatientID2].filter(Boolean) as string[],
+          [b.patient.PatientID1, b.patient.PatientID2].filter(Boolean) as string[]
+        )
       )
       .map((row) => row.patient);
   }, [patients, patientSearchIndex, deferredPatientSearch]);
@@ -2004,7 +2018,20 @@ export default function App() {
 
   const CONSULTS_PER_PAGE = 100;
   const filteredConsultsList = useMemo(() => {
-    return getFilteredConsults();
+    const list = getFilteredConsults();
+    const q = normalizeListSearchQuery(deferredConsultListSearch);
+    if (!q) return list;
+    return [...list].sort((a, b) => {
+      const patA = getPatientByKey(a.PatientKey);
+      const patB = getPatientByKey(b.PatientKey);
+      return compareByPatientSearchScore(
+        deferredConsultListSearch,
+        patA?.PatientName || '',
+        patB?.PatientName || '',
+        [patA?.PatientID1, patA?.PatientID2].filter(Boolean) as string[],
+        [patB?.PatientID1, patB?.PatientID2].filter(Boolean) as string[]
+      );
+    });
   }, [consults, patientsMap, filterType, filterDate, deferredConsultListSearch, consultSortField, consultSortOrder, isPendingStaffConsult]);
   const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
   const displayedConsults = useMemo(() => {

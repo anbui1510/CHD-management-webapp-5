@@ -44,7 +44,7 @@ import {
   getFormattedDateKey,
   PATIENT_VALIDATION_MSG,
 } from '../utils/patientFormValidation';
-import { matchesListSearchQuery } from '../utils/listSearch';
+import { compareByPatientSearchScore, matchesPatientIdentitySearch } from '../utils/listSearch';
 import { MODAL_TITLE } from '../utils/modalTitles';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 
@@ -217,20 +217,26 @@ export default function MRIRegisterView({
     const source = activeTab === 'pending' ? segmented.pending : segmented.done;
     const filtered = source.filter((item) => {
       const patient = item.__patient;
-      return matchesListSearchQuery(searchQuery, [
-        patient?.PatientName,
-        patient?.PatientID1,
-        patient?.PatientID2,
-        item['Họ và tên'],
-        item.MBN,
-        item.CMRDiagnosisID,
-        item.CMRDiagnosis,
-        item.CMRRequest,
-        item.CMRCallStatus,
-      ]);
+      return matchesPatientIdentitySearch(searchQuery, {
+        PatientName: patient?.PatientName || item['Họ và tên'],
+        PatientID1: patient?.PatientID1 || item.MBN,
+        PatientID2: patient?.PatientID2,
+      });
     });
 
     return [...filtered].sort((a, b) => {
+      if (searchQuery.trim()) {
+        const nameA = a.__patient?.PatientName || a['Họ và tên'] || '';
+        const nameB = b.__patient?.PatientName || b['Họ và tên'] || '';
+        const byScore = compareByPatientSearchScore(
+          searchQuery,
+          nameA,
+          nameB,
+          [a.__patient?.PatientID1 || a.MBN, a.__patient?.PatientID2].filter(Boolean) as string[],
+          [b.__patient?.PatientID1 || b.MBN, b.__patient?.PatientID2].filter(Boolean) as string[]
+        );
+        if (byScore !== 0) return byScore;
+      }
       const da = getFormattedDateKey(a.CMRScheduledDate);
       const db = getFormattedDateKey(b.CMRScheduledDate);
       return sortOrder === 'asc' ? da.localeCompare(db) : db.localeCompare(da);

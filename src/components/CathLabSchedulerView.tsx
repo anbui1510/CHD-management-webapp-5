@@ -27,7 +27,7 @@ import { SearchTextInput } from './SearchTextInput';
 import { useSheetsSyncFeedback } from '../context/SheetsSyncFeedbackContext';
 import { buildSyncContext, persistWithSheetsSync } from '../utils/sheetsSyncMutation';
 import { findDuplicatePatientById1, PATIENT_VALIDATION_MSG, getFormattedDateKey, compareFormattedDates } from '../utils/patientFormValidation';
-import { matchesListSearchQuery } from '../utils/listSearch';
+import { compareByPatientSearchScore, matchesPatientIdentitySearch } from '../utils/listSearch';
 import {
   buildOverrideSchedulingConsultNote,
   buildOverrideSchedulingScar,
@@ -1672,13 +1672,25 @@ Xin cảm ơn!`;
       result = activeList.filter((c) => {
         const pat = findPatientByKey(patients, c.PatientKey);
         if (!pat) return false;
-        return matchesListSearchQuery(searchQuery, [
-          pat.PatientName,
-          pat.PatientID1,
-          pat.PatientID2,
-          c.DiagnosisID,
-          c.DetailDiagnosis,
-        ]);
+        return matchesPatientIdentitySearch(searchQuery, {
+          PatientName: pat.PatientName,
+          PatientID1: pat.PatientID1,
+          PatientID2: pat.PatientID2,
+        });
+      });
+    }
+
+    if (searchQuery.trim()) {
+      result = [...result].sort((a, b) => {
+        const patA = findPatientByKey(patients, a.PatientKey);
+        const patB = findPatientByKey(patients, b.PatientKey);
+        return compareByPatientSearchScore(
+          searchQuery,
+          patA?.PatientName || '',
+          patB?.PatientName || '',
+          [patA?.PatientID1, patA?.PatientID2].filter(Boolean) as string[],
+          [patB?.PatientID1, patB?.PatientID2].filter(Boolean) as string[]
+        );
       });
     }
 
