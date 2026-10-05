@@ -4017,9 +4017,9 @@ Xin cảm ơn!`;
                               searchPlaceholder="Gõ tên BS..."
                             />
                           </div>
-                          <div className="col-span-2 grid grid-cols-3 gap-1.5 min-w-0">
+                          <div className="col-span-2 grid grid-cols-[minmax(3.75rem,0.38fr)_minmax(3.75rem,0.38fr)_minmax(0,1.24fr)] gap-1.5 min-w-0">
                             <div className="min-w-0">
-                              <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Cân nặng (kg)</label>
+                              <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0 truncate" title="Cân nặng (kg)">CN (kg)</label>
                               <input
                                 type="text"
                                 placeholder="12.5"
@@ -4029,7 +4029,7 @@ Xin cảm ơn!`;
                               />
                             </div>
                             <div className="min-w-0">
-                              <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chiều cao (cm)</label>
+                              <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0 truncate" title="Chiều cao (cm)">CC (cm)</label>
                               <input
                                 type="text"
                                 placeholder="95"
