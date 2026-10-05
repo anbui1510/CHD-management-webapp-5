@@ -21,7 +21,7 @@ import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useIsMobile } from '../hooks/useMediaQuery';
-import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
+import { usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
 import { useMobileInlineEditorViewport } from '../hooks/useMobileInlineEditorViewport';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 import { SortColumnIcon } from './SortColumnIcon';
@@ -513,7 +513,6 @@ export default function CathLabSchedulerView({
     scrollRef: mobileEditorScrollRef,
     footerSelector: '[data-schedule-mobile-footer]',
   });
-  useLockBodyScroll(mobileEditorActive);
   usePreventBackgroundTouchScroll(mobileEditorScrollRef, mobileEditorActive);
 
   // Automatically switch tab on mobile when a patient is selected or deselected
@@ -3649,7 +3648,7 @@ Xin cảm ơn!`;
         <div
           ref={mobileEditorShellRef}
           style={
-            mobileEditorActive && mobileEditorPanelMaxHeight
+            mobileEditorActive && mobileEditorPanelMaxHeight != null
               ? { maxHeight: `${mobileEditorPanelMaxHeight}px` }
               : undefined
           }

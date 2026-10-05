@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { removeDiacritics } from '../types';
+import { setMobileKeyboardOpen } from '../bootstrap/mobileViewport';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 interface SearchableEnumSelectProps {
@@ -49,15 +51,23 @@ export function SearchableEnumSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const mobilePanelRef = useRef<HTMLDivElement>(null);
+  const [mobileSheetStyle, setMobileSheetStyle] = useState<React.CSSProperties>({});
+  const [mobileBackdropStyle, setMobileBackdropStyle] = useState<React.CSSProperties>({});
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (mobilePanelRef.current?.contains(target)) return;
+      setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   const normalizedOptions = useMemo(() => {
@@ -100,12 +110,47 @@ export function SearchableEnumSelect({
 
   useEffect(() => {
     if (!isOpen) return;
-    searchInputRef.current?.focus();
-    if (isMobile && triggerRef.current) {
-      window.requestAnimationFrame(() => {
-        triggerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    searchInputRef.current?.focus({ preventScroll: true });
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !isMobile) return;
+
+    const updateSheetPosition = () => {
+      const vv = window.visualViewport;
+      const layoutH = window.innerHeight;
+      const offsetTop = vv?.offsetTop ?? 0;
+      const vh = vv?.height ?? layoutH;
+      const bottomInset = Math.max(0, layoutH - offsetTop - vh);
+
+      setMobileBackdropStyle({
+        position: 'fixed',
+        top: offsetTop,
+        left: 0,
+        right: 0,
+        height: vh,
+        zIndex: 9998,
       });
-    }
+      setMobileSheetStyle({
+        position: 'fixed',
+        left: 8,
+        right: 8,
+        bottom: bottomInset + 8,
+        maxHeight: Math.min(360, Math.round(vh * 0.52)),
+        zIndex: 9999,
+      });
+    };
+
+    updateSheetPosition();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', updateSheetPosition);
+    vv?.addEventListener('scroll', updateSheetPosition);
+    window.addEventListener('resize', updateSheetPosition);
+    return () => {
+      vv?.removeEventListener('resize', updateSheetPosition);
+      vv?.removeEventListener('scroll', updateSheetPosition);
+      window.removeEventListener('resize', updateSheetPosition);
+    };
   }, [isOpen, isMobile]);
 
   useEffect(() => {
@@ -118,7 +163,8 @@ export function SearchableEnumSelect({
     setIsOpen(false);
     setSearchTerm('');
     setHighlightedIndex(0);
-  }, []);
+    if (isMobile) setMobileKeyboardOpen(false);
+  }, [isMobile]);
 
   const openDropdown = useCallback(() => {
     setIsOpen(true);
@@ -214,8 +260,111 @@ export function SearchableEnumSelect({
 
   let navCursor = 0;
 
+  const dropdownPanelClass = `w-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden ${
+    isMobile ? 'max-h-full' : 'max-h-[260px]'
+  }`;
+
+  const dropdownInner = (
+    <>
+      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
+        <Search className="w-3.5 h-3.5 text-slate-400" />
+        <input
+          ref={searchInputRef}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          onClick={(e) => e.stopPropagation()}
+          onFocus={() => isMobile && setMobileKeyboardOpen(true)}
+          onBlur={() => {
+            if (!isMobile) return;
+            window.setTimeout(() => {
+              const active = document.activeElement;
+              if (mobilePanelRef.current?.contains(active)) return;
+              setMobileKeyboardOpen(false);
+            }, 120);
+          }}
+          placeholder={searchPlaceholder}
+          className="w-full bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400"
+        />
+        {searchTerm && (
+          <button type="button" onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600">
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      <div ref={listRef} role="listbox" className="overflow-y-auto py-1 custom-scrollbar min-h-0 flex-1">
+        {!multiple && (() => {
+          const idx = navCursor++;
+          const highlighted = highlightedIndex === idx;
+          return (
+            <div
+              key="__clear__"
+              data-nav-index={idx}
+              role="option"
+              aria-selected={!value}
+              onMouseEnter={() => setHighlightedIndex(idx)}
+              onClick={() => selectSingleValue('')}
+              className={`px-3.5 py-2 text-xs font-semibold cursor-pointer flex items-center justify-between ${
+                highlighted ? 'bg-[#d2145a]/10 text-[#d2145a]' : 'text-slate-400 hover:bg-slate-50'
+              }`}
+            >
+              <span>{placeholder}</span>
+              {!value && <Check className="w-4 h-4 text-[#d2145a]" />}
+            </div>
+          );
+        })()}
+        {filteredOptions.length === 0 && !canCreate ? (
+          <div className="px-4 py-5 text-center text-xs italic text-slate-400">Không tìm thấy lựa chọn phù hợp</div>
+        ) : filteredOptions.map(option => {
+          const selected = selectedValues.includes(option);
+          const idx = navCursor++;
+          const highlighted = highlightedIndex === idx;
+          return (
+            <div
+              key={option}
+              data-nav-index={idx}
+              role="option"
+              aria-selected={selected}
+              onMouseEnter={() => setHighlightedIndex(idx)}
+              onClick={() => (multiple ? toggleMultiValue(option) : selectSingleValue(option))}
+              className={`px-3.5 py-2 text-xs font-bold cursor-pointer transition flex items-center justify-between gap-2 ${
+                highlighted
+                  ? 'bg-[#d2145a]/10 text-[#d2145a]'
+                  : selected
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="leading-snug">{option}</span>
+              {selected && <Check className="w-4 h-4 text-[#d2145a] shrink-0" />}
+            </div>
+          );
+        })}
+        {canCreate && (() => {
+          const idx = navCursor++;
+          const highlighted = highlightedIndex === idx;
+          return (
+            <button
+              key="__create__"
+              type="button"
+              data-nav-index={idx}
+              onMouseEnter={() => setHighlightedIndex(idx)}
+              onClick={() => void createOption()}
+              className={`w-full px-3.5 py-2 text-left text-xs font-extrabold border-t border-slate-100 ${
+                highlighted ? 'bg-emerald-100 text-emerald-800' : 'text-emerald-700 hover:bg-emerald-50'
+              }`}
+            >
+              {createLabel ? createLabel(searchTerm.trim()) : `Thêm "${searchTerm.trim()}"`}
+            </button>
+          );
+        })()}
+      </div>
+    </>
+  );
+
   return (
-    <div ref={rootRef} className={`relative w-full text-left ${className}`}>
+    <div ref={rootRef} data-searchable-enum-root className={`relative w-full text-left ${className}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -252,97 +401,35 @@ export function SearchableEnumSelect({
         <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {isOpen && (
-        <div
-          className={`absolute z-[80] w-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden ${
-            isMobile ? 'max-h-[min(45dvh,320px)]' : 'max-h-[260px]'
-          } ${direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'}`}
-        >
-          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
-            <Search className="w-3.5 h-3.5 text-slate-400" />
-            <input
-              ref={searchInputRef}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              onClick={(e) => e.stopPropagation()}
-              placeholder={searchPlaceholder}
-              className="w-full bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400"
-            />
-            {searchTerm && (
-              <button type="button" onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600">
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+      {isOpen && isMobile && typeof document !== 'undefined'
+        ? createPortal(
+            <>
+              <div
+                style={mobileBackdropStyle}
+                className="bg-slate-900/20"
+                aria-hidden
+                onClick={() => closeDropdown()}
+              />
+              <div
+                ref={mobilePanelRef}
+                data-enum-select-dropdown
+                data-touch-scroll-container
+                style={mobileSheetStyle}
+                className={`${dropdownPanelClass} animate-in slide-in-from-bottom-2 duration-150`}
+              >
+                {dropdownInner}
+              </div>
+            </>,
+            document.body
+          )
+        : null}
 
-          <div ref={listRef} role="listbox" className="overflow-y-auto py-1 custom-scrollbar">
-            {!multiple && (() => {
-              const idx = navCursor++;
-              const highlighted = highlightedIndex === idx;
-              return (
-                <div
-                  key="__clear__"
-                  data-nav-index={idx}
-                  role="option"
-                  aria-selected={!value}
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  onClick={() => selectSingleValue('')}
-                  className={`px-3.5 py-2 text-xs font-semibold cursor-pointer flex items-center justify-between ${
-                    highlighted ? 'bg-[#d2145a]/10 text-[#d2145a]' : 'text-slate-400 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{placeholder}</span>
-                  {!value && <Check className="w-4 h-4 text-[#d2145a]" />}
-                </div>
-              );
-            })()}
-            {filteredOptions.length === 0 && !canCreate ? (
-              <div className="px-4 py-5 text-center text-xs italic text-slate-400">Không tìm thấy lựa chọn phù hợp</div>
-            ) : filteredOptions.map(option => {
-              const selected = selectedValues.includes(option);
-              const idx = navCursor++;
-              const highlighted = highlightedIndex === idx;
-              return (
-                <div
-                  key={option}
-                  data-nav-index={idx}
-                  role="option"
-                  aria-selected={selected}
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  onClick={() => (multiple ? toggleMultiValue(option) : selectSingleValue(option))}
-                  className={`px-3.5 py-2 text-xs font-bold cursor-pointer transition flex items-center justify-between gap-2 ${
-                    highlighted
-                      ? 'bg-[#d2145a]/10 text-[#d2145a]'
-                      : selected
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="leading-snug">{option}</span>
-                  {selected && <Check className="w-4 h-4 text-[#d2145a] shrink-0" />}
-                </div>
-              );
-            })}
-            {canCreate && (() => {
-              const idx = navCursor++;
-              const highlighted = highlightedIndex === idx;
-              return (
-                <button
-                  key="__create__"
-                  type="button"
-                  data-nav-index={idx}
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  onClick={() => void createOption()}
-                  className={`w-full px-3.5 py-2 text-left text-xs font-extrabold border-t border-slate-100 ${
-                    highlighted ? 'bg-emerald-100 text-emerald-800' : 'text-emerald-700 hover:bg-emerald-50'
-                  }`}
-                >
-                  {createLabel ? createLabel(searchTerm.trim()) : `Thêm "${searchTerm.trim()}"`}
-                </button>
-              );
-            })()}
-          </div>
+      {isOpen && !isMobile && (
+        <div
+          data-enum-select-dropdown
+          className={`absolute z-[80] ${dropdownPanelClass} ${direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+        >
+          {dropdownInner}
         </div>
       )}
     </div>
