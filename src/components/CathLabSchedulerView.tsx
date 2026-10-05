@@ -3954,7 +3954,7 @@ Xin cảm ơn!`;
               <div
                 ref={mobileEditorScrollRef}
                 data-touch-scroll-container
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2"
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pt-4 pb-2 lg:p-4 space-y-2"
               >
                 
                 {(() => {
@@ -4017,8 +4017,8 @@ Xin cảm ơn!`;
                               searchPlaceholder="Gõ tên BS..."
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-1.5 sm:col-span-2">
-                            <div>
+                          <div className="col-span-2 grid grid-cols-3 gap-1.5 min-w-0">
+                            <div className="min-w-0">
                               <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Cân nặng (kg)</label>
                               <input
                                 type="text"
@@ -4028,7 +4028,7 @@ Xin cảm ơn!`;
                                 className={`${schedInputCls} font-mono font-bold`}
                               />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chiều cao (cm)</label>
                               <input
                                 type="text"
@@ -4038,22 +4038,22 @@ Xin cảm ơn!`;
                                 className={`${schedInputCls} font-mono`}
                               />
                             </div>
+                            <div className="min-w-0">
+                              <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Bệnh chính</label>
+                              <SearchableEnumSelect
+                                options={diagnosisOptions}
+                                value={schedDiagnosisID}
+                                onChange={(value) => setSchedDiagnosisID(normalizeDiagnosisID(value))}
+                                allowCreate
+                                createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
+                                onCreateOption={createDiagnosisSource}
+                                placeholder="— ICD —"
+                                searchPlaceholder="Gõ ICD..."
+                              />
+                            </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-1 gap-1.5 pt-0.5">
-                          <div>
-                            <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Bệnh chính</label>
-                            <SearchableEnumSelect
-                              options={diagnosisOptions}
-                              value={schedDiagnosisID}
-                              onChange={(value) => setSchedDiagnosisID(normalizeDiagnosisID(value))}
-                              allowCreate
-                              createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`}
-                              onCreateOption={createDiagnosisSource}
-                              placeholder="— Chọn ICD —"
-                              searchPlaceholder="Gõ ICD..."
-                            />
-                          </div>
                           <div>
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Chẩn đoán chi tiết</label>
                             <MobileAutoExpandTextarea
@@ -4399,7 +4399,7 @@ Xin cảm ơn!`;
                 data-schedule-mobile-footer
                 data-mobile-editor-footer
                 data-touch-scroll-container
-                className="flex lg:hidden flex-col gap-1.5 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 shrink-0"
+                className="flex lg:hidden flex-col gap-1 px-2 py-1.5 bg-slate-50 border-t border-slate-200 shrink-0"
               >
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button
@@ -4463,14 +4463,14 @@ Xin cảm ơn!`;
                   <button
                     type="button"
                     onClick={handleActionLoai}
-                    className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10.5px] px-3 py-2 rounded-xl transition shadow-xs cursor-pointer w-full text-center"
+                    className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10.5px] px-3 py-1.5 rounded-xl transition shadow-xs cursor-pointer w-full text-center"
                   >
                     Loại
                   </button>
                   <button
                     type="button"
                     onClick={handleActionTransfer}
-                    className="bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3 py-2 rounded-xl transition shadow-xs hover:bg-sky-100 cursor-pointer w-full text-center"
+                    className="bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3 py-1.5 rounded-xl transition shadow-xs hover:bg-sky-100 cursor-pointer w-full text-center"
                   >
                     Chuyển phòng TT
                   </button>
