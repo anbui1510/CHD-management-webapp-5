@@ -3999,12 +3999,12 @@ Xin cảm ơn!`;
                         <span className="text-indigo-900 font-black uppercase text-[10px] tracking-wider block border-b border-indigo-100 pb-1 mb-0.5">
                           Kết quả Hội chẩn
                         </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          <div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="min-w-0">
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Ngày staff</label>
                             <VNDateInput value={schedConsultDate} onChange={setSchedConsultDate} className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800" />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <label className="text-slate-500 font-bold text-[8px] uppercase block mb-0">Người đăng ký</label>
                             <SearchableEnumSelect
                               options={requestByDoctorOptions}
@@ -4270,26 +4270,25 @@ Xin cảm ơn!`;
                       {/* Show scheduling controls ONLY if callStatus === 'Đồng ý' */}
                       {(isMobile || callStatus === 'Đồng ý') && (
                         <>
-                          {/* Planned Cath Date (type="date") */}
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày thông dự kiến</label>
-                            <VNDateInput
-                              value={plannedCathLabDate}
-                              onChange={setPlannedCathLabDate}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800"
-                            />
-                          </div>
-
-                          {/* Post Cath Department */}
-                          <div>
-                            <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nằm sau thông tim</label>
-                            <SearchableEnumSelect
-                              options={DEPARTMENTS_LIST}
-                              value={postCathDepart}
-                              onChange={setPostCathDepart}
-                              placeholder="— Hãy chọn khoa —"
-                              searchPlaceholder="Gõ tên khoa..."
-                            />
+                          <div className="md:col-span-2 grid grid-cols-2 gap-1.5">
+                            <div className="min-w-0">
+                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Ngày thông dự kiến</label>
+                              <VNDateInput
+                                value={plannedCathLabDate}
+                                onChange={setPlannedCathLabDate}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none text-xs text-slate-800"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nằm sau thông tim</label>
+                              <SearchableEnumSelect
+                                options={DEPARTMENTS_LIST}
+                                value={postCathDepart}
+                                onChange={setPostCathDepart}
+                                placeholder="— Hãy chọn khoa —"
+                                searchPlaceholder="Gõ tên khoa..."
+                              />
+                            </div>
                           </div>
 
                           {/* Cath Methods */}
@@ -4399,83 +4398,83 @@ Xin cảm ơn!`;
               <div
                 data-schedule-mobile-footer
                 data-mobile-editor-footer
-                className="flex lg:hidden items-center gap-1.5 p-2 bg-slate-50 border-t border-slate-200 overflow-x-auto whitespace-nowrap shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                data-touch-scroll-container
+                className="flex lg:hidden flex-col gap-1.5 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 shrink-0"
               >
-                <button
-                  type="button"
-                  onClick={handleCloseSchedulingView}
-                  className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
-                >
-                  Đóng
-                </button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleCloseSchedulingView}
+                    className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                  >
+                    Đóng
+                  </button>
 
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10.5px] px-4 py-1.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
-                >
-                  {saving ? 'Đang lưu...' : 'Lưu'}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10.5px] px-4 py-1.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1 shrink-0 disabled:opacity-50 cursor-pointer"
+                  >
+                    {saving ? 'Đang lưu...' : 'Lưu'}
+                  </button>
 
-                {(() => {
-                  const pat = findPatientByKey(patients, selectedConsult.PatientKey);
-                  if (!pat) return null;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onViewPatientRecord) {
-                          onViewPatientRecord(pat);
-                        }
-                      }}
-                      className="bg-indigo-50 hover:bg-indigo-100 text-[#d2145a] border border-indigo-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
-                    >
-                      <Heart className="w-3.5 h-3.5" /> Hồ sơ
-                    </button>
-                  );
-                })()}
+                  {(() => {
+                    const pat = findPatientByKey(patients, selectedConsult.PatientKey);
+                    if (!pat) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onViewPatientRecord) {
+                            onViewPatientRecord(pat);
+                          }
+                        }}
+                        className="bg-indigo-50 hover:bg-indigo-100 text-[#d2145a] border border-indigo-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                      >
+                        <Heart className="w-3.5 h-3.5" /> Hồ sơ
+                      </button>
+                    );
+                  })()}
 
-                {/* 3. Tóm tắt */}
-                <button
-                  type="button"
-                  onClick={() => setShowSummaryModal(true)}
-                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-250 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
-                >
-                  <Clipboard className="w-3.5 h-3.5 text-emerald-700" /> Tóm tắt
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSummaryModal(true)}
+                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-250 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                  >
+                    <Clipboard className="w-3.5 h-3.5 text-emerald-700" /> Tóm tắt
+                  </button>
 
-                {/* 4. SMS */}
-                {(() => {
-                  const pat = findPatientByKey(patients, selectedConsult.PatientKey);
-                  if (!pat) return null;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenSmsModal(pat)}
-                      className="bg-rose-50 hover:bg-rose-100 text-[#d2145a] border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
-                    >
-                      <PhoneCall className="w-3.5 h-3.5" /> SMS
-                    </button>
-                  );
-                })()}
+                  {(() => {
+                    const pat = findPatientByKey(patients, selectedConsult.PatientKey);
+                    if (!pat) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSmsModal(pat)}
+                        className="bg-rose-50 hover:bg-rose-100 text-[#d2145a] border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" /> SMS
+                      </button>
+                    );
+                  })()}
+                </div>
 
-                {/* 5. Loại */}
-                <button
-                  type="button"
-                  onClick={handleActionLoai}
-                  className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
-                >
-                  Loại
-                </button>
-
-                {/* 6. Chuyển phòng TT */}
-                <button
-                  type="button"
-                  onClick={handleActionTransfer}
-                  className="bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs hover:bg-sky-100 cursor-pointer"
-                >
-                  Chuyển phòng TT
-                </button>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleActionLoai}
+                    className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10.5px] px-3 py-2 rounded-xl transition shadow-xs cursor-pointer w-full text-center"
+                  >
+                    Loại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleActionTransfer}
+                    className="bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10.5px] px-3 py-2 rounded-xl transition shadow-xs hover:bg-sky-100 cursor-pointer w-full text-center"
+                  >
+                    Chuyển phòng TT
+                  </button>
+                </div>
               </div>
 
               {/* Desktop Save Footer Bar */}
