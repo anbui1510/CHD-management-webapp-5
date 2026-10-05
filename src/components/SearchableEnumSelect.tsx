@@ -114,8 +114,12 @@ export function SearchableEnumSelect({
 
   useEffect(() => {
     if (!isOpen) return;
-    searchInputRef.current?.focus({ preventScroll: true });
-  }, [isOpen]);
+    const delay = isMobile ? 80 : 0;
+    const id = window.setTimeout(() => {
+      searchInputRef.current?.focus({ preventScroll: true });
+    }, delay);
+    return () => window.clearTimeout(id);
+  }, [isOpen, isMobile]);
 
   useEffect(() => {
     if (!isOpen || !isMobile) return;
@@ -126,15 +130,8 @@ export function SearchableEnumSelect({
       const offsetTop = vv?.offsetTop ?? 0;
       const vh = vv?.height ?? layoutH;
       const bottomInset = Math.max(0, layoutH - offsetTop - vh);
-
-      const labelEl = rootRef.current?.parentElement?.querySelector('label');
-      const labelTop = labelEl?.getBoundingClientRect().top;
-      const triggerTop = triggerRef.current?.getBoundingClientRect().top;
-      const anchorTop = Math.max(
-        offsetTop + 4,
-        (labelTop ?? triggerTop ?? offsetTop + 48) - 2
-      );
-      const sheetBottom = bottomInset + 8;
+      // Bottom sheet: luôn bám mé trên bàn phím — tránh neo theo ô thấp làm top > bottom (panel biến mất).
+      const sheetHeight = Math.min(520, Math.max(240, Math.round(vh * 0.78)));
 
       setMobileBackdropStyle({
         position: 'fixed',
@@ -146,11 +143,11 @@ export function SearchableEnumSelect({
       });
       setMobileSheetStyle({
         position: 'fixed',
-        left: 8,
-        right: 8,
-        top: anchorTop,
-        bottom: sheetBottom,
-        maxHeight: Math.max(160, layoutH - anchorTop - sheetBottom),
+        left: 0,
+        right: 0,
+        bottom: bottomInset,
+        height: sheetHeight,
+        maxHeight: sheetHeight,
         zIndex: 9999,
       });
     };
@@ -205,6 +202,7 @@ export function SearchableEnumSelect({
   const openDropdown = useCallback(() => {
     if (isMobile) {
       setMobileContextLabel(resolveContextLabel());
+      // Chỉ cuộn lên nếu label/ô bị khuất phía trên — không cuộn khi ô đã nằm thấp (tránh đẩy layout).
       scrollTriggerIntoEditor();
     }
     setIsOpen(true);
@@ -332,8 +330,8 @@ export function SearchableEnumSelect({
     </span>
   );
 
-  const dropdownPanelClass = `w-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden min-h-0 ${
-    isMobile ? 'max-h-full h-full' : 'max-h-[260px]'
+  const dropdownPanelClass = `w-full bg-white border border-slate-200 shadow-xl flex flex-col overflow-hidden min-h-0 ${
+    isMobile ? 'h-full max-h-full rounded-t-2xl border-b-0' : 'max-h-[260px] rounded-2xl'
   }`;
 
   const mobileSheetHeader = (
