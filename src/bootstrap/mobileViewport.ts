@@ -54,8 +54,8 @@ export function applyMobileViewportMetrics(): void {
   const isPortrait = layoutInnerH >= window.innerWidth;
   let bottomGap = 0;
 
-  // Khi bàn phím mở: giữ chiều cao layout (innerHeight) để header/ô tìm không bị ép mất.
-  let layoutVh = keyboardOpen ? layoutInnerH : visibleH;
+  // Khi bàn phím mở: co shell theo vùng viewport thực (tránh khoảng trắng dưới phần nhìn thấy).
+  let layoutVh = keyboardOpen ? Math.max(visibleH + offsetTop, visibleH) : visibleH;
 
   if (!keyboardOpen && isStandaloneDisplayMode() && isPortrait) {
     const physicalH = Math.round(Math.max(window.screen.height || 0, window.screen.width || 0));

@@ -40,7 +40,8 @@ export function useMobileInlineEditorViewport({
       const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
       const top = anchor.getBoundingClientRect().top;
       const next = Math.floor(visibleBottom - top - 2);
-      setPanelMaxHeight(keyboardOpen ? Math.max(next, 160) : undefined);
+      // Luôn khớp vùng nhìn thấy (kể cả lúc bàn phím đang mở) — tránh flex-1 tạo khoảng trắng.
+      setPanelMaxHeight(Math.max(next, 160));
     };
 
     measure();
@@ -53,7 +54,7 @@ export function useMobileInlineEditorViewport({
       vv?.removeEventListener('scroll', measure);
       window.removeEventListener('resize', measure);
     };
-  }, [active, anchorRef, keyboardOpen, viewportHeight]);
+  }, [active, anchorRef, viewportHeight]);
 
   useEffect(() => {
     if (!active) return;
@@ -64,6 +65,7 @@ export function useMobileInlineEditorViewport({
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
       if (!target.matches('input, textarea, select')) return;
+      if (target.closest('[data-enum-select-dropdown]')) return;
 
       setMobileKeyboardOpen(true);
 
