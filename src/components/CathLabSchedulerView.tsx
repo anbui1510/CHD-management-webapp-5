@@ -21,6 +21,8 @@ import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { PlannedDeviceSuggestBox } from './PlannedDeviceSuggestBox';
 import { MobileAutoExpandTextarea } from './MobileAutoExpandTextarea';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
+import { useMobileInlineEditorViewport } from '../hooks/useMobileInlineEditorViewport';
 import { useModuleSubheader } from '../hooks/useModuleSubheader';
 import { SortColumnIcon } from './SortColumnIcon';
 import { SearchTextInput } from './SearchTextInput';
@@ -500,6 +502,19 @@ export default function CathLabSchedulerView({
   
   // Tab state for mobile layout
   const [mobileTab, setMobileTab] = useState<'waitlist' | 'calendar' | 'editor'>('waitlist');
+
+  const mobileEditorActive =
+    isMobile && mobileTab === 'editor' && !!selectedConsult && !pureCalendarMode;
+  const mobileEditorShellRef = useRef<HTMLDivElement>(null);
+  const mobileEditorScrollRef = useRef<HTMLDivElement>(null);
+  const { panelMaxHeight: mobileEditorPanelMaxHeight } = useMobileInlineEditorViewport({
+    active: mobileEditorActive,
+    anchorRef: mobileEditorShellRef,
+    scrollRef: mobileEditorScrollRef,
+    footerSelector: '[data-schedule-mobile-footer]',
+  });
+  useLockBodyScroll(mobileEditorActive);
+  usePreventBackgroundTouchScroll(mobileEditorScrollRef, mobileEditorActive);
 
   // Automatically switch tab on mobile when a patient is selected or deselected
   useEffect(() => {
@@ -3631,7 +3646,17 @@ Xin cảm ơn!`;
         </div>
 
         {/* RIGHT COLUMN: Selection Detailed Form Editor OR Preview List */}
-        <div className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm overflow-y-auto lg:overflow-hidden min-h-0 ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : isDeviceFilterExpanded ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor' || isDeviceFilterExpanded) ? 'flex' : 'hidden lg:flex'}`}>
+        <div
+          ref={mobileEditorShellRef}
+          style={
+            mobileEditorActive && mobileEditorPanelMaxHeight
+              ? { maxHeight: `${mobileEditorPanelMaxHeight}px` }
+              : undefined
+          }
+          className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm min-h-0 ${
+            mobileEditorActive ? 'overflow-hidden' : 'overflow-y-auto lg:overflow-hidden'
+          } ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : isDeviceFilterExpanded ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor' || isDeviceFilterExpanded) ? 'flex' : 'hidden lg:flex'}`}
+        >
           {!isAnyFilterExpanded ? (
             <>
               {(!selectedConsult || pureCalendarMode || mobileTab !== 'editor') ? (
@@ -3904,7 +3929,7 @@ Xin cảm ơn!`;
 
             </div>
           ) : (
-            <form onSubmit={handleSave} className="flex-1 flex flex-col justify-between h-full min-h-0 bg-white">
+            <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
               
               {/* STICKY TOP HEADER CONTROL BAR */}
               <div className="hidden lg:flex p-4 border-b border-indigo-100 bg-indigo-50/20 flex-wrap items-center justify-between gap-2 shrink-0">
@@ -3927,7 +3952,11 @@ Xin cảm ơn!`;
               </div>
 
               {/* SINGLE UNIFIED SCROLLABLE AREA */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-full">
+              <div
+                ref={mobileEditorScrollRef}
+                data-touch-scroll-container
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2"
+              >
                 
                 {(() => {
                   const pat = findPatientByKey(patients, selectedConsult.PatientKey);
@@ -4368,7 +4397,11 @@ Xin cảm ơn!`;
               </div>
 
               {/* Mobile Save Footer Bar (Single scrollable row) */}
-              <div className="flex lg:hidden items-center gap-1.5 p-2 bg-slate-50 border-t border-slate-200 overflow-x-auto whitespace-nowrap shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div
+                data-schedule-mobile-footer
+                data-mobile-editor-footer
+                className="flex lg:hidden items-center gap-1.5 p-2 bg-slate-50 border-t border-slate-200 overflow-x-auto whitespace-nowrap shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              >
                 <button
                   type="button"
                   onClick={handleCloseSchedulingView}
