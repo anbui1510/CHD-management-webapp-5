@@ -20,6 +20,8 @@ interface SearchableEnumSelectProps {
   allowCreate?: boolean;
   createLabel?: (value: string) => string;
   onCreateOption?: (value: string) => void | Promise<void>;
+  /** Tiêu đề hiển thị trên sheet mobile (mặc định: lấy từ `<label>` cùng cột). */
+  fieldLabel?: string;
 }
 
 type NavItem =
@@ -41,7 +43,8 @@ export function SearchableEnumSelect({
   className = '',
   allowCreate = false,
   createLabel,
-  onCreateOption
+  onCreateOption,
+  fieldLabel
 }: SearchableEnumSelectProps) {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
@@ -54,6 +57,7 @@ export function SearchableEnumSelect({
   const mobilePanelRef = useRef<HTMLDivElement>(null);
   const [mobileSheetStyle, setMobileSheetStyle] = useState<React.CSSProperties>({});
   const [mobileBackdropStyle, setMobileBackdropStyle] = useState<React.CSSProperties>({});
+  const [mobileContextLabel, setMobileContextLabel] = useState('');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -123,6 +127,15 @@ export function SearchableEnumSelect({
       const vh = vv?.height ?? layoutH;
       const bottomInset = Math.max(0, layoutH - offsetTop - vh);
 
+      const labelEl = rootRef.current?.parentElement?.querySelector('label');
+      const labelTop = labelEl?.getBoundingClientRect().top;
+      const triggerTop = triggerRef.current?.getBoundingClientRect().top;
+      const anchorTop = Math.max(
+        offsetTop + 4,
+        (labelTop ?? triggerTop ?? offsetTop + 48) - 2
+      );
+      const sheetBottom = bottomInset + 8;
+
       setMobileBackdropStyle({
         position: 'fixed',
         top: offsetTop,
@@ -135,8 +148,9 @@ export function SearchableEnumSelect({
         position: 'fixed',
         left: 8,
         right: 8,
-        bottom: bottomInset + 8,
-        maxHeight: Math.min(360, Math.round(vh * 0.52)),
+        top: anchorTop,
+        bottom: sheetBottom,
+        maxHeight: Math.max(160, layoutH - anchorTop - sheetBottom),
         zIndex: 9999,
       });
     };
@@ -166,10 +180,36 @@ export function SearchableEnumSelect({
     if (isMobile) setMobileKeyboardOpen(false);
   }, [isMobile]);
 
+  const resolveContextLabel = useCallback(() => {
+    if (fieldLabel?.trim()) return fieldLabel.trim();
+    const labelEl = rootRef.current?.parentElement?.querySelector('label');
+    const fromDom = labelEl?.textContent?.trim();
+    if (fromDom) return fromDom;
+    return placeholder;
+  }, [fieldLabel, placeholder]);
+
+  const scrollTriggerIntoEditor = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const container = trigger.closest('[data-touch-scroll-container]');
+    if (!(container instanceof HTMLElement)) return;
+    const labelEl = trigger.parentElement?.querySelector('label');
+    const anchor = labelEl ?? trigger;
+    const anchorRect = anchor.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    if (anchorRect.top < containerRect.top + 4) {
+      container.scrollTop -= containerRect.top - anchorRect.top + 8;
+    }
+  }, []);
+
   const openDropdown = useCallback(() => {
+    if (isMobile) {
+      setMobileContextLabel(resolveContextLabel());
+      scrollTriggerIntoEditor();
+    }
     setIsOpen(true);
     setHighlightedIndex(0);
-  }, []);
+  }, [isMobile, resolveContextLabel, scrollTriggerIntoEditor]);
 
   const toggleMultiValue = (option: string) => {
     const next = selectedValues.includes(option)
@@ -260,9 +300,66 @@ export function SearchableEnumSelect({
 
   let navCursor = 0;
 
-  const dropdownPanelClass = `w-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden ${
-    isMobile ? 'max-h-full' : 'max-h-[260px]'
+  const triggerBorderClass =
+    required && selectedValues.length === 0
+      ? 'border-rose-200'
+      : 'border-slate-200';
+
+  const renderSelectedFace = (interactiveChips: boolean) => (
+    <span className="flex-1 flex flex-wrap items-center gap-1.5 text-left min-w-0">
+      {selectedValues.length === 0 ? (
+        <span className="text-slate-400">{placeholder}</span>
+      ) : (
+        selectedValues.map(item => (
+          <span
+            key={item}
+            className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-lg text-[11px] font-bold max-w-full"
+          >
+            <span className="truncate">{item}</span>
+            {interactiveChips && (
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => removeSelected(e, item)}
+                className="hover:text-indigo-950 rounded-full p-0.5 shrink-0"
+              >
+                <X className="w-2.5 h-2.5" />
+              </span>
+            )}
+          </span>
+        ))
+      )}
+    </span>
+  );
+
+  const dropdownPanelClass = `w-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden min-h-0 ${
+    isMobile ? 'max-h-full h-full' : 'max-h-[260px]'
   }`;
+
+  const mobileSheetHeader = (
+    <div className="shrink-0 px-3 pt-2.5 pb-2 border-b border-slate-100 bg-white">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <p className="text-[10px] font-bold uppercase text-slate-500 leading-snug flex-1">
+          {mobileContextLabel || resolveContextLabel()}
+        </p>
+        <button
+          type="button"
+          onClick={() => closeDropdown()}
+          className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          aria-label="Đóng danh sách"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div
+        className={`w-full min-h-[38px] bg-slate-50 border rounded-xl px-2.5 py-1.5 text-xs font-semibold flex items-center justify-between gap-2 ${triggerBorderClass}`}
+        aria-hidden
+      >
+        {renderSelectedFace(true)}
+        <ChevronDown className="w-4 h-4 text-[#d2145a] shrink-0 rotate-180" />
+      </div>
+    </div>
+  );
 
   const dropdownInner = (
     <>
@@ -373,31 +470,11 @@ export function SearchableEnumSelect({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         className={`w-full min-h-[38px] bg-white border rounded-xl px-2.5 py-1.5 text-xs font-semibold flex items-center justify-between gap-2 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#d2145a]/30 ${
-          required && selectedValues.length === 0
-            ? 'border-rose-200'
-            : 'border-slate-200 hover:border-[#d2145a]/40'
-        }`}
+          triggerBorderClass
+        } ${isOpen && isMobile ? 'ring-2 ring-[#d2145a]/35 border-[#d2145a]/30' : 'hover:border-[#d2145a]/40'}`}
+        aria-label={mobileContextLabel || fieldLabel || placeholder}
       >
-        <span className="flex-1 flex flex-wrap items-center gap-1.5 text-left">
-          {selectedValues.length === 0 ? (
-            <span className="text-slate-400">{placeholder}</span>
-          ) : selectedValues.map(item => (
-            <span
-              key={item}
-              className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-lg text-[11px] font-bold"
-            >
-              {item}
-              <span
-                role="button"
-                tabIndex={-1}
-                onClick={(e) => removeSelected(e, item)}
-                className="hover:text-indigo-950 rounded-full p-0.5"
-              >
-                <X className="w-2.5 h-2.5" />
-              </span>
-            </span>
-          ))}
-        </span>
+        {renderSelectedFace(true)}
         <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
@@ -417,6 +494,7 @@ export function SearchableEnumSelect({
                 style={mobileSheetStyle}
                 className={`${dropdownPanelClass} animate-in slide-in-from-bottom-2 duration-150`}
               >
+                {mobileSheetHeader}
                 {dropdownInner}
               </div>
             </>,
