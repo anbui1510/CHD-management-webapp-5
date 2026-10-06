@@ -234,8 +234,8 @@ export function ConsultSummaryModal({
         right: 0,
         bottom: 0,
         width: '100%',
-        height: '100dvh',
-        maxHeight: '100dvh',
+        height: '100%',
+        maxHeight: '100%',
       } : undefined}
       onClick={isMobile ? undefined : onClose}
       role="dialog"
@@ -307,7 +307,7 @@ export function ConsultSummaryModal({
           </div>
         </div>
 
-        <div className={`border-t border-slate-200 bg-white shrink-0 ${isMobile ? 'px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]' : 'p-4 rounded-b-3xl flex flex-col sm:flex-row items-center justify-between gap-3'}`}>
+        <div className={`border-t border-slate-200 bg-white shrink-0 ${isMobile ? 'px-3 pt-2 pb-2 mobile-modal-footer' : 'p-4 rounded-b-3xl flex flex-col sm:flex-row items-center justify-between gap-3'}`}>
           {!isMobile && (
             <span className="text-[9.5px] text-slate-400 font-semibold italic text-center sm:text-left leading-normal px-1">
               Mẹo: Bấm Sao chép hình ảnh rồi dùng Ctrl+V dán trực tiếp gửi nhóm Zalo vô cùng nhanh chóng!

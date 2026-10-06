@@ -1697,8 +1697,8 @@ export default function MRISchedulerView({
 
       {/* XẾP BỔ SUNG MRI MODAL */}
       {showAdHoc && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[96vh] md:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 mobile-modal-overlay">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[78dvh] md:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative mobile-modal-panel mobile-modal-panel-compact">
 
             <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
               <div className="flex items-center gap-2">
@@ -2000,7 +2000,7 @@ export default function MRISchedulerView({
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
+              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0 mobile-modal-footer">
                 <button
                   type="button"
                   onClick={() => { setShowAdHoc(false); resetAdHoc(); }}

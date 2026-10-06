@@ -716,7 +716,7 @@ export default function ResultStaffDrawer({
                 </div>
 
                       {/* Action buttons area — sticky footer */}
-                      <div className={`pt-2 border-t border-slate-100 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'px-4 md:px-6'}`}>
+                      <div className={`pt-2 border-t border-slate-100 shrink-0 pb-4 mobile-modal-footer md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'px-4 md:px-6'}`}>
                         {!autoEdit && !isFormEditing ? (
                           <div className="w-full grid grid-cols-2 gap-2">
                             <button
@@ -851,13 +851,11 @@ export default function ResultStaffDrawer({
 
   const modalOverlayStyle: React.CSSProperties | undefined = isMobile && keyboardOpen
     ? { paddingBottom: `${keyboardInset}px` }
-    : isMobile
-      ? { paddingBottom: 'var(--mobile-bottom-nav-offset)' }
-      : undefined;
+    : undefined;
 
   const mobilePanelMaxHeight = keyboardOpen
     ? `${Math.max(viewportHeight - 8, 320)}px`
-    : 'calc(100dvh - var(--mobile-bottom-nav-offset))';
+    : 'var(--mobile-modal-max-h)';
   const modalPanelStyle: React.CSSProperties | undefined = isMobile
     ? {
         maxHeight: mobilePanelMaxHeight,
@@ -870,7 +868,7 @@ export default function ResultStaffDrawer({
       {consultKey && (
           <div
             className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
-              isMobile ? 'items-end justify-center p-0' : 'items-center justify-center p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4'
+              isMobile ? 'items-end justify-center p-0 mobile-modal-overlay' : 'items-center justify-center p-4 md:pb-4'
             }`}
             style={modalOverlayStyle}
           >
@@ -880,7 +878,7 @@ export default function ResultStaffDrawer({
             ></div>
             <div
               className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden min-h-0 ${
-                isMobile ? 'rounded-t-3xl rounded-b-none' : 'rounded-3xl max-h-[96vh]'
+                isMobile ? 'rounded-t-3xl rounded-b-none mobile-modal-panel' : 'rounded-3xl max-h-[96vh]'
               }`}
               style={modalPanelStyle}
             >

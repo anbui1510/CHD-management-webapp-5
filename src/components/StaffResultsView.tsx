@@ -1164,8 +1164,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
       {/* COMBINED STAFF BỔ SUNG MODAL */}
       {showCombinedForm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative font-sans">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 mobile-modal-overlay">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[78dvh] md:max-h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative font-sans mobile-modal-panel mobile-modal-panel-compact">
             
             {/* Header */}
             <div className="flex items-center justify-between gap-2 border-b border-slate-150 px-4 md:px-6 py-3 md:py-4 bg-indigo-50/50 text-[#d2145a] shrink-0">
@@ -1190,7 +1190,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               </button>
             </div>
 
-            {/* Form */}
+            {/* Form — panel uses height:fit-content so flex-1 does not stretch short forms */}
             <form onSubmit={handleCombinedSubmit} className="flex-1 flex flex-col overflow-hidden min-h-0">
               
               {/* Success Screen Banner Overlay */}
@@ -1218,7 +1218,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               )}
 
               {/* Scrollable Body split into 2 visual columns */}
-              <div className="flex-1 overflow-y-auto px-4 py-2 md:py-3 grid grid-cols-1 md:grid-cols-2 gap-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 bg-slate-50/50">
+              <div className="flex-1 overflow-y-auto min-h-0 px-4 py-2 md:py-3 grid grid-cols-1 md:grid-cols-2 gap-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 bg-slate-50/50">
                 
                 {/* COLUMN 1: Patients & Registration */}
                 <div className="space-y-2 pr-0 md:pr-3">
@@ -1723,7 +1723,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               </div>
 
               {/* Footer */}
-              <div className="border-t border-slate-200 px-4 md:px-5 py-3 bg-slate-100 flex justify-end gap-3 shrink-0 rounded-b-3xl pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3">
+              <div className="border-t border-slate-200 px-4 md:px-5 py-3 bg-slate-100 flex justify-end gap-3 shrink-0 rounded-b-3xl pb-3 mobile-modal-footer md:pb-3">
                 <button
                   type="button"
                   disabled={submitLoading}

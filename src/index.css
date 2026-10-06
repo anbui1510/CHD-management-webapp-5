@@ -23,6 +23,16 @@
     var(--mobile-bottom-nav-content) + var(--mobile-safe-bottom)
   );
   --app-vh: 100dvh;
+  /*
+   * Modals sit above the tab bar (z > nav). Cap height so sheets leave a
+   * small top peek; footers only clear the home-indicator (not ios-gap /
+   * nav offset — those caused the empty white chin under popup buttons).
+   */
+  --mobile-modal-max-h: min(
+    85dvh,
+    calc(100dvh - env(safe-area-inset-top, 0px) - 0.5rem)
+  );
+  --mobile-modal-footer-pb: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
 html,
@@ -85,11 +95,46 @@ body,
   /*
    * iOS PWA (viewport-fit=cover): modal overlays use fixed inset-0 and were
    * drawing under the status bar / notch, making headers untappable.
+   * Keep bottom at 0 so sheets can sit flush (over the tab bar).
    */
   .fixed.inset-0 {
     top: env(safe-area-inset-top, 0px);
     left: env(safe-area-inset-left, 0px);
     right: env(safe-area-inset-right, 0px);
+    bottom: 0;
+  }
+
+  /*
+   * Mobile modal shell: overlays ignore bottom-nav offset (modals are z > nav).
+   * Panels dock to the bottom as sheets; height follows content up to max-h
+   * (height:fit-content avoids flex-1 children stretching to max-h).
+   */
+  .mobile-modal-overlay {
+    align-items: flex-end !important;
+    justify-content: center !important;
+    /* Top peek only — full-bleed sides/bottom so sheets sit flush (no side gutter gap). */
+    padding: 0.5rem 0 0 !important;
+  }
+
+  .mobile-modal-panel {
+    width: 100% !important;
+    /* fit-content: avoid flex-1 stretching short sheets to max-h.
+       No !important so drawers may still set an explicit height (keyboard). */
+    height: fit-content;
+    max-height: var(--mobile-modal-max-h) !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    margin-bottom: 0 !important;
+    flex: 0 1 auto !important;
+  }
+
+  .mobile-modal-footer {
+    padding-bottom: var(--mobile-modal-footer-pb) !important;
+  }
+
+  /* Tall supplemental forms: still content-sized, but lower ceiling */
+  .mobile-modal-panel-compact {
+    max-height: min(78dvh, var(--mobile-modal-max-h)) !important;
   }
 
   /*
