@@ -4056,9 +4056,9 @@ export default function App() {
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 p-4 md:p-6">
                         
                         {/* Left Column: Administrative block */}
-                        <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-4.5 space-y-3 shadow-sm self-start">
-                          <div className="flex items-center justify-between border-b border-slate-150 pb-2">
-                            <span className="text-[9px] uppercase tracking-wider font-mono font-black text-rose-500">THÔNG TIN HÀNH CHÍNH</span>
+                        <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-3 md:p-4 space-y-1.5 shadow-sm self-start">
+                          <div className="flex items-center justify-between pb-0.5">
+                            <span className="text-[10px] uppercase tracking-wider font-mono font-black text-rose-500">THÔNG TIN HÀNH CHÍNH</span>
                             
                             {/* Sửa hành chính button */}
                             <PatientAdminEditButton
@@ -4081,36 +4081,52 @@ export default function App() {
                             />
                           </div>
 
-                          <div className="flex flex-col gap-1.5 md:grid md:grid-cols-2 md:gap-x-3 md:gap-y-2.5 text-[11px] text-slate-500 font-bold">
+                          {(() => {
+                            const patientPhone2 = String(edp.PatientPhone2 || '').trim();
+                            return (
+                          <div className="flex flex-col gap-1.5 md:grid md:grid-cols-2 md:gap-x-3 md:gap-y-2 text-xs text-slate-500 font-bold">
                             <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
-                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Họ và tên:</span>
-                              <span className="text-neutral-950 font-black uppercase text-xs truncate">{edp.PatientName}</span>
+                              <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Họ và tên:</span>
+                              <span className="text-neutral-950 font-black uppercase text-sm truncate">{edp.PatientName}</span>
                             </div>
-                            <div className="flex items-baseline gap-2 min-w-0 md:block">
-                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Ngày sinh:</span>
-                              <span className="text-slate-800 font-bold font-mono">{formatVNTime(edp.PatientDOB)}</span>
-                            </div>
-                            <div className="flex items-baseline gap-2 min-w-0 md:block">
-                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Giới tính:</span>
-                              <span className="text-slate-800 font-bold">{edp.PatientSex}</span>
+                            <div className="grid grid-cols-2 gap-x-3 min-w-0 md:contents">
+                              <div className="flex items-baseline gap-2 min-w-0 md:block">
+                                <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Ngày sinh:</span>
+                                <span className="text-slate-800 font-bold font-mono text-xs">{formatVNTime(edp.PatientDOB)}</span>
+                              </div>
+                              <div className="flex items-baseline gap-2 min-w-0 md:block">
+                                <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Giới tính:</span>
+                                <span className="text-slate-800 font-bold text-xs">{edp.PatientSex}</span>
+                              </div>
                             </div>
                             <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
-                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Mã người bệnh:</span>
-                              <span className="text-slate-850 font-extrabold font-mono text-[10px] bg-slate-200/50 border border-slate-300 rounded px-1.5 py-0.5 md:mt-0.5 md:block md:w-max">{edp.PatientID1} {edp.PatientID2 ? `| ${edp.PatientID2}` : ''}</span>
+                              <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Mã người bệnh:</span>
+                              <span className="text-slate-850 font-extrabold font-mono text-[11px] bg-slate-200/50 border border-slate-300 rounded px-1.5 py-0.5 md:mt-0.5 md:block md:w-max">{edp.PatientID1} {edp.PatientID2 ? `| ${edp.PatientID2}` : ''}</span>
                             </div>
-                            <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2 md:border-t md:border-slate-150 md:pt-2 border-t border-slate-150 pt-1.5">
-                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Địa chỉ:</span>
-                              <span className="text-slate-700 font-semibold truncate">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
+                            <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
+                              <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Địa chỉ:</span>
+                              <span className="text-slate-700 font-semibold text-xs truncate">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
                             </div>
-                            <div className="flex items-baseline gap-2 min-w-0 md:block">
-                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Số ĐT 1:</span>
-                              <span className="text-slate-850 font-mono font-bold text-slate-850">{edp.PatientPhone1 || '—'}</span>
-                            </div>
-                            <div className="flex items-baseline gap-2 min-w-0 md:block">
-                              <span className="text-slate-400 font-medium text-[9px] uppercase shrink-0 md:block">Số ĐT 2:</span>
-                              <span className="text-slate-850 font-mono font-bold text-slate-850">{edp.PatientPhone2 || '—'}</span>
-                            </div>
+                            {patientPhone2 ? (
+                              <div className="grid grid-cols-2 gap-x-3 min-w-0 md:col-span-2">
+                                <div className="flex items-baseline gap-2 min-w-0 md:block">
+                                  <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Số ĐT 1:</span>
+                                  <span className="text-slate-850 font-mono font-bold text-xs">{edp.PatientPhone1 || '—'}</span>
+                                </div>
+                                <div className="flex items-baseline gap-2 min-w-0 md:block">
+                                  <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Số ĐT 2:</span>
+                                  <span className="text-slate-850 font-mono font-bold text-xs">{patientPhone2}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
+                                <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Số ĐT 1:</span>
+                                <span className="text-slate-850 font-mono font-bold text-xs">{edp.PatientPhone1 || '—'}</span>
+                              </div>
+                            )}
                           </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Right Column: Interactive form fields */}
@@ -4191,66 +4207,24 @@ export default function App() {
                           {/* RequestBy and Department Section */}
                           <div className="grid grid-cols-2 gap-3">
                             
-                            {/* RequestBy Select */}
-                            <div>
+                            {/* RequestBy — searchable (mobile bottom sheet) */}
+                            <div className="min-w-0">
                               <label className="block text-slate-500 font-bold uppercase text-[10px] mb-1">Người đăng ký *</label>
-                              <select
-                                required={!showEditAddDocInput}
-                                value={showEditAddDocInput ? 'ADD_NEW' : (editConsultData.RequestBy || '')}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === 'ADD_NEW') {
-                                    setShowEditAddDocInput(true);
-                                    setEditConsultData(prev => ({ ...prev, RequestBy: '' }));
-                                  } else {
-                                    setShowEditAddDocInput(false);
-                                    setEditConsultData(prev => ({ ...prev, RequestBy: val }));
-                                  }
+                              <SearchableEnumSelect
+                                required
+                                options={registrationDoctorOptions}
+                                value={editConsultData.RequestBy || ''}
+                                onChange={(val) => {
+                                  setShowEditAddDocInput(false);
+                                  setCustomEditDocVal('');
+                                  setEditConsultData(prev => ({ ...prev, RequestBy: val }));
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold focus:outline-none text-[#d2145a] font-bold"
-                              >
-                                <option value="">-- Chọn BS --</option>
-                                {staffList.map(s => {
-                                  const displayName = getShortStaffName(s.StaffName, staffList);
-                                  return (
-                                    <option key={s.StaffKey} value={displayName}>
-                                      {displayName}
-                                    </option>
-                                  );
-                                })}
-                                {Array.from(new Set(consults.map(c => String(c.RequestBy || '')))).filter((d: string) => d && !staffList.some(s => getShortStaffName(s.StaffName, staffList) === d)).map((d: string) => (
-                                  <option key={d} value={d}>{d}</option>
-                                ))}
-                                <option value="ADD_NEW" className="text-rose-500 font-bold">+ Thêm bác sĩ mới...</option>
-                              </select>
-
-                              {showEditAddDocInput && (
-                                <div className="mt-1.5 flex gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                                  <input
-                                    type="text"
-                                    required
-                                    placeholder="Nhập tên bác sĩ..."
-                                    value={customEditDocVal}
-                                    onChange={(e) => {
-                                      setCustomEditDocVal(e.target.value);
-                                      setEditConsultData(prev => ({ ...prev, RequestBy: e.target.value }));
-                                    }}
-                                    className="flex-1 bg-white border border-rose-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setShowEditAddDocInput(false);
-                                      setCustomEditDocVal('');
-                                      setEditConsultData(prev => ({ ...prev, RequestBy: '' }));
-                                    }}
-                                    className="text-slate-400 hover:text-[#d2145a] px-2 text-xs font-bold"
-                                    title="Quay lại"
-                                  >
-                                    Quay lại
-                                  </button>
-                                </div>
-                              )}
+                                allowCreate
+                                createLabel={(val) => `Thêm BS "${val}"`}
+                                placeholder="-- Chọn BS --"
+                                searchPlaceholder="Gõ tên BS..."
+                                className="min-w-0"
+                              />
                             </div>
 
                             {/* Department */}
