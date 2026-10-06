@@ -258,31 +258,35 @@ export default function WorkspaceDashboard({
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 p-2 sm:p-4">
+    <div className="space-y-5 md:space-y-8 animate-in fade-in duration-300 p-2 sm:p-4">
       {sections.map(section => (
         <div key={section.title}>
-          <h2 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#d2145a]" /> {section.title}
+          <h2 className="text-[10px] md:text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2 md:mb-4 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#d2145a] shrink-0" /> {section.title}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
             {section.tiles.map(tile => (
               <button
                 key={`${tile.module}-${tile.target || tile.label}`}
                 type="button"
                 onClick={() => onNavigate(tile.target || tile.module)}
-                className={`bg-white border rounded-2xl p-5 hover:shadow-md transition text-left group ${
+                className={`bg-white border rounded-2xl p-3 sm:p-5 hover:shadow-md transition text-left group flex flex-col min-h-0 aspect-square lg:aspect-auto ${
                   tile.highlight
                     ? 'border-pink-500 shadow-sm hover:bg-pink-50'
                     : 'hover:border-pink-300'
                 }`}
               >
                 <div
-                  className={`w-12 h-12 ${tile.iconBg} rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}
+                  className={`w-10 h-10 sm:w-12 sm:h-12 ${tile.iconBg} rounded-xl flex items-center justify-center mb-2 sm:mb-4 shrink-0 group-hover:scale-105 transition-transform [&_svg]:w-5 [&_svg]:h-5 sm:[&_svg]:w-6 sm:[&_svg]:h-6`}
                 >
                   {tile.icon}
                 </div>
-                <h3 className="font-extrabold text-sm text-[#d2145a] mb-1">{tile.label}</h3>
-                <p className="text-xs text-slate-500">{tile.description}</p>
+                <h3 className="font-extrabold text-[11px] sm:text-sm text-[#d2145a] mb-0.5 sm:mb-1 leading-snug line-clamp-2">
+                  {tile.label}
+                </h3>
+                <p className="text-[10px] sm:text-xs text-slate-500 leading-snug line-clamp-2 mt-auto">
+                  {tile.description}
+                </p>
               </button>
             ))}
           </div>
