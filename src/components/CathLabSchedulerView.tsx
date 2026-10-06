@@ -3875,7 +3875,7 @@ Xin cảm ơn!`;
                             setActiveDate(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
                           }
                         }}
-                        className="bg-white text-xs border border-slate-250 rounded-xl px-2.5 py-1 font-bold text-slate-700 w-[120px] focus:outline-none" 
+                        className="bg-white text-xs border border-slate-200 rounded-xl px-2.5 py-1 font-bold text-slate-700 w-[120px] focus:outline-none" 
                       />
                     </div>
 
@@ -4176,7 +4176,7 @@ Xin cảm ơn!`;
                         placeholder="Ghi chú dụng cụ đặc thù, vật tư phản hồi..."
                         value={supplyDepFeedback}
                         onChange={(e) => setSupplyDepFeedback(e.target.value)}
-                        className="w-full bg-white border border-slate-250 rounded-xl px-2.5 py-1 focus:outline-none text-xs text-slate-800 font-semibold"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none text-xs text-slate-800 font-semibold"
                       />
                     </div>
 
@@ -5174,7 +5174,7 @@ Xin cảm ơn!`;
             if (!pat) return null;
             const hasPhone = Boolean(pat.PatientPhone1 || pat.PatientPhone2);
             return (
-              <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-250 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-4 border-b border-slate-200 bg-rose-50/60 flex items-center justify-between text-[#d2145a] shrink-0">
                   <div className="flex items-center gap-2.5">
                     <div className="bg-white text-[#d2145a] rounded-xl p-2 border border-rose-100 shadow-xs">
@@ -5228,7 +5228,7 @@ Xin cảm ơn!`;
                       rows={11}
                       value={smsMessage}
                       onChange={(e) => setSmsMessage(e.target.value)}
-                      className="w-full bg-white border border-slate-250 rounded-2xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200 text-xs text-slate-850 font-semibold leading-relaxed resize-y shadow-inner"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200 text-xs text-slate-850 font-semibold leading-relaxed resize-y shadow-inner"
                     />
                   </div>
                 </div>
@@ -5334,7 +5334,7 @@ Xin cảm ơn!`;
 
                               {/* Search Dropdown Result List */}
                               {adHocSearchQuery.trim() && filteredSearchPatients.length > 0 && (
-                                <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-sm z-50">
+                                <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto border border-slate-200 rounded-xl bg-white divide-y divide-slate-100 shadow-sm z-50">
                                   {filteredSearchPatients.slice(0, 15).map((pat) => (
                                     <button
                                       key={pat.PatientKey}

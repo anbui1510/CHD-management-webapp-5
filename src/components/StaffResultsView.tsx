@@ -1281,7 +1281,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         )}
 
                         {!selectedPatKey && searchPatQuery.trim().length > 0 && (
-                          <div className="max-h-32 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-lg animate-in fade-in-50 duration-150">
+                          <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-xl bg-white divide-y divide-slate-100 shadow-lg animate-in fade-in-50 duration-150">
                             {(() => {
                               const trimmed = removeDiacritics(searchPatQuery).trim().toLowerCase();
                               const matched = patients.filter(p => {
@@ -1731,7 +1731,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     setShowCombinedForm(false);
                     resetForm();
                   }}
-                  className="bg-white hover:bg-slate-200 border border-slate-250 text-slate-700 font-extrabold uppercase px-6 py-2.5 rounded-xl transition cursor-pointer"
+                  className="bg-white hover:bg-slate-200 border border-slate-200 text-slate-700 font-extrabold uppercase px-6 py-2.5 rounded-xl transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
@@ -1823,7 +1823,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                 <button
                   type="button"
                   onClick={() => setConfirmDeleteKeys(null)}
-                  className="bg-white hover:bg-slate-100 border border-slate-250 text-slate-700 px-4 py-2 rounded-xl transition cursor-pointer"
+                  className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2 rounded-xl transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>

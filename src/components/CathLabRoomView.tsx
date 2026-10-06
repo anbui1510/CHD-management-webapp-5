@@ -1571,7 +1571,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
                          {/* Filtered list dropdown simulator */}
                          {adHocPatientMode === 'existing' && !adHocSelectedPatientKey && adHocSearchQuery.trim().length > 0 && (
-                            <div className="max-h-48 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-sm mt-2">
+                            <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl bg-white divide-y divide-slate-100 shadow-sm mt-2">
                               {(() => {
                                 const trimmedQuery = removeVietnameseTones(adHocSearchQuery).toLowerCase().trim();
                                 const matched = (patients || []).filter(p => {

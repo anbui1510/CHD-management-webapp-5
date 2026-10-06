@@ -765,7 +765,7 @@ export default function MRIRegisterView({
                       )}
 
                       {!selectedPatKey && searchPatQuery.trim().length > 0 && (
-                        <div className="max-h-32 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-lg">
+                        <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-xl bg-white divide-y divide-slate-100 shadow-lg">
                           {(() => {
                             const trimmed = removeDiacritics(searchPatQuery).trim().toLowerCase();
                             const matched = patients.filter(p => {

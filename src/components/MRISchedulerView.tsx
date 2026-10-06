@@ -1112,7 +1112,7 @@ export default function MRISchedulerView({
                <button
                  type="button"
                  onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-                 className={`w-8 h-8 rounded-full border border-slate-250 flex items-center justify-center transition shrink-0 cursor-pointer ${
+                 className={`w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center transition shrink-0 cursor-pointer ${
                    isFilterExpanded ? 'bg-[#b31448] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
                  }`}
                  title="Bộ lọc"
@@ -1780,7 +1780,7 @@ export default function MRISchedulerView({
                       )}
 
                       {!adHocSelectedPatKey && adHocSearchPat.trim().length > 0 && (
-                        <div className="max-h-32 overflow-y-auto border border-slate-250 rounded-xl bg-white divide-y divide-slate-100 shadow-lg">
+                        <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-xl bg-white divide-y divide-slate-100 shadow-lg">
                           {(() => {
                             const trimmed = removeDiacritics(adHocSearchPat).trim().toLowerCase();
                             const matched = patients.filter(p => {
