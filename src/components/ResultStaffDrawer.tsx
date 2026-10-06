@@ -172,7 +172,9 @@ export default function ResultStaffDrawer({
   }, [consultKey, consult?.ConsultKey, autoEdit]);
 
   const isFormEditing = autoEdit || isEditing;
-  const mobilePanelUsesFullHeight = isMobile && (keyboardOpen || isFormEditing);
+  const isMobileModal = isMobile && layout === 'modal';
+  /** Mobile bottom sheet: always flex-fill so header/footer stay visible and body scrolls. */
+  const mobileSheetStretch = isMobileModal;
 
   const formStatesEqual = (a: ResultFormState, b: ResultFormState) =>
     JSON.stringify(a) === JSON.stringify(b);
@@ -363,11 +365,11 @@ export default function ResultStaffDrawer({
   const drawerForm = (
               <form 
                 onSubmit={submitResultUpdate} 
-                className={`flex flex-col min-h-0 overflow-hidden max-md:text-sm md:text-xs text-slate-700 leading-relaxed font-sans${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
+                className={`flex flex-col min-h-0 overflow-hidden max-md:text-sm md:text-xs text-slate-700 leading-relaxed font-sans${mobileSheetStretch || !isMobile ? ' flex-1' : ''}`}
               >
                 <div
                   ref={scrollContainerRef}
-                  className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${formScrollPadding}${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
+                  className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${formScrollPadding}${mobileSheetStretch || !isMobile ? ' flex-1' : ''}`}
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                 <div className={formSectionSpacing}>
@@ -733,9 +735,11 @@ export default function ResultStaffDrawer({
                               className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer max-md:text-sm md:text-xs flex items-center justify-center gap-1.5 font-sans"
                             >
                               <ClipboardList className="w-4 h-4 shrink-0" />
-                              {consult.ConsultResultID
-                                ? (isMobile ? 'Cập nhật' : 'Sửa kết quả hội chẩn')
-                                : 'Điền kết quả hội chẩn'}
+                              {isMobile
+                                ? 'Cập nhật'
+                                : consult.ConsultResultID
+                                  ? 'Sửa kết quả hội chẩn'
+                                  : 'Điền kết quả hội chẩn'}
                             </button>
                           </div>
                         ) : (
@@ -857,13 +861,13 @@ export default function ResultStaffDrawer({
       ? { paddingBottom: 'var(--mobile-bottom-nav-offset)' }
       : undefined;
 
-  const mobilePanelMaxHeight = keyboardOpen
+  const mobileSheetMaxHeight = keyboardOpen
     ? `${Math.max(viewportHeight - 8, 320)}px`
-    : 'calc(100dvh - var(--mobile-bottom-nav-offset))';
-  const modalPanelStyle: React.CSSProperties | undefined = isMobile
+    : 'calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-bottom-nav-offset))';
+  const modalPanelStyle: React.CSSProperties | undefined = isMobileModal
     ? {
-        maxHeight: mobilePanelMaxHeight,
-        ...(mobilePanelUsesFullHeight ? { height: mobilePanelMaxHeight } : {}),
+        maxHeight: mobileSheetMaxHeight,
+        ...(keyboardOpen ? { height: mobileSheetMaxHeight } : {}),
       }
     : undefined;
 
@@ -881,8 +885,10 @@ export default function ResultStaffDrawer({
               onClick={requestClose}
             ></div>
             <div
-              className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-200 overflow-hidden min-h-0 ${
-                isMobile ? 'rounded-t-3xl rounded-b-none' : 'rounded-3xl max-h-[96vh]'
+              className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 overflow-hidden min-h-0 ${
+                isMobileModal
+                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 max-h-[calc(100dvh-env(safe-area-inset-top,0px)-var(--mobile-bottom-nav-offset))]'
+                  : 'rounded-3xl max-h-[96vh] animate-in zoom-in-95 duration-200'
               }`}
               style={modalPanelStyle}
             >
