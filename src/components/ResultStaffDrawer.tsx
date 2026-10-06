@@ -193,14 +193,40 @@ export default function ResultStaffDrawer({
     onClose();
   };
 
+  const openExitConfirm = (onConfirm: () => void) => {
+    setExitConfirmError('');
+    setPendingExitAction(() => onConfirm);
+    setExitConfirmOpen(true);
+  };
+
   const requestClose = () => {
+    if (isMobileModal && isFormEditing) {
+      openExitConfirm(forceClose);
+      return;
+    }
     if (!hasUnsavedChanges()) {
       forceClose();
       return;
     }
-    setExitConfirmError('');
-    setPendingExitAction(() => forceClose);
-    setExitConfirmOpen(true);
+    openExitConfirm(forceClose);
+  };
+
+  const requestRevertEdit = () => {
+    if (!consult) return;
+    const revert = () => {
+      setFormData(buildFormState(consult));
+      setIsEditing(false);
+      if (autoEdit) forceClose();
+    };
+    if (isMobileModal && isFormEditing) {
+      openExitConfirm(revert);
+      return;
+    }
+    if (hasUnsavedChanges()) {
+      openExitConfirm(revert);
+      return;
+    }
+    revert();
   };
 
   const handleExitCancel = () => {
@@ -754,21 +780,7 @@ export default function ResultStaffDrawer({
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (hasUnsavedChanges()) {
-                                  setExitConfirmError('');
-                                  setPendingExitAction(() => {
-                                    setFormData(buildFormState(consult));
-                                    setIsEditing(false);
-                                    if (autoEdit) forceClose();
-                                  });
-                                  setExitConfirmOpen(true);
-                                  return;
-                                }
-                                setFormData(buildFormState(consult));
-                                setIsEditing(false);
-                                if (autoEdit) forceClose();
-                              }}
+                              onClick={requestRevertEdit}
                               className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl transition cursor-pointer max-md:text-xs md:text-[10px] font-sans text-center"
                             >
                               {autoEdit ? 'Đóng' : 'Hủy'}
