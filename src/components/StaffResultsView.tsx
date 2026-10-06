@@ -1495,8 +1495,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   {/* Medical Registration parameters fields */}
                   <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2">
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
+                    <div className="grid grid-cols-2 gap-2 max-md:gap-1.5">
+                      <div className="min-w-0">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Kiểu staff *</label>
                         <SearchableEnumSelect
                           required
@@ -1508,7 +1508,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         />
                       </div>
 
-                      <div>
+                      <div className="min-w-0">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5 font-sans">Ngày Hội Chẩn *</label>
                         <VNDateInput
                           required
@@ -1519,8 +1519,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
+                    <div className="grid grid-cols-2 gap-2 max-md:gap-1.5">
+                      <div className="min-w-0">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Cân nặng (kg) *</label>
                         <input
                           type="text"
@@ -1532,7 +1532,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         />
                       </div>
 
-                      <div>
+                      <div className="min-w-0">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Chiều cao (cm)</label>
                         <input
                           type="text"
@@ -1544,8 +1544,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
+                    <div className="grid grid-cols-2 gap-2 max-md:gap-1.5">
+                      <div className="min-w-0">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">BS đăng ký *</label>
                         <SearchableEnumSelect
                           required
@@ -1560,7 +1560,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         />
                       </div>
 
-                      <div>
+                      <div className="min-w-0">
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-0.5">Khoa nội trú</label>
                         <SearchableEnumSelect
                           options={departmentOptions}
@@ -1692,8 +1692,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100">
-                      <div>
+                    <div className="grid grid-cols-2 gap-2 max-md:gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                      <div className="min-w-0">
                         <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase text-left">Người điền KQ</label>
                         <input
                           type="text"
@@ -1705,7 +1705,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                           className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold"
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default text-left" title="ConsultResultUpdatedTime">Điền lúc</label>
                         <input
                           type="text"

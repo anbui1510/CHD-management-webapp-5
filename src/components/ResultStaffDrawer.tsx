@@ -347,7 +347,7 @@ export default function ResultStaffDrawer({
     <div className="bg-[#d2145a] text-white px-4 md:px-5 py-3.5 md:py-2 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
       <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
         <Stethoscope className="w-5 h-5 md:w-4 md:h-4 text-white shrink-0" />
-        <span className="truncate">Điền kết quả staff</span>
+        <span className="truncate max-md:text-base md:text-sm">Điền kết quả staff</span>
       </h3>
       <button
         type="button"
@@ -363,7 +363,7 @@ export default function ResultStaffDrawer({
   const drawerForm = (
               <form 
                 onSubmit={submitResultUpdate} 
-                className={`flex flex-col min-h-0 overflow-hidden text-xs text-slate-700 leading-relaxed font-sans${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
+                className={`flex flex-col min-h-0 overflow-hidden max-md:text-sm md:text-xs text-slate-700 leading-relaxed font-sans${mobilePanelUsesFullHeight || !isMobile ? ' flex-1' : ''}`}
               >
                 <div
                   ref={scrollContainerRef}
@@ -382,9 +382,9 @@ export default function ResultStaffDrawer({
                             <div>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <h4 className={`font-black text-[#d2145a] uppercase leading-tight ${isPanelLayout ? 'text-sm xl:text-base 2xl:text-lg' : 'text-sm lg:text-lg'}`}>{patient.PatientName}</h4>
+                                  <h4 className={`font-black text-[#d2145a] uppercase leading-tight max-md:text-base ${isPanelLayout ? 'md:text-sm xl:text-base 2xl:text-lg' : 'md:text-sm lg:text-lg'}`}>{patient.PatientName}</h4>
                                   {patient.OtherPatientName && (
-                                    <p className="text-[10px] text-slate-400 font-medium italic mt-0.5 md:mt-1">Tên khác: {patient.OtherPatientName}</p>
+                                    <p className="max-md:text-[11px] md:text-[10px] text-slate-400 font-medium italic mt-0.5 md:mt-1">Tên khác: {patient.OtherPatientName}</p>
                                   )}
                                 </div>
                                 <PatientAdminEditButton
@@ -396,7 +396,7 @@ export default function ResultStaffDrawer({
                                 />
                               </div>
                               
-                              <div className="grid grid-cols-1 gap-y-0.5 text-[11px] text-slate-600 font-medium pt-0.5 border-t border-slate-100">
+                              <div className="grid grid-cols-1 gap-y-0.5 max-md:text-xs md:text-[11px] text-slate-600 font-medium pt-0.5 border-t border-slate-100">
                                 <p><span className="text-slate-400">Mã BN 1:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientID1 || ''}</span></p>
                                 {patient.PatientID2 && <p><span className="text-slate-400">Mã BN 2:</span> <span className="font-bold text-slate-800 font-mono">{patient.PatientID2}</span></p>}
                                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
@@ -420,29 +420,29 @@ export default function ResultStaffDrawer({
                                <div className="grid grid-cols-2 gap-2 pt-0.5 border-t border-slate-100">
                                   {!isFormEditing ? (
                                     <>
-                                      {formData.PatientHeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Chiều cao:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientHeight} cm</span></p>}
-                                      {formData.PatientWeight && <p className="text-[11px]"><span className="text-slate-400 block mb-0.5">Cân nặng:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientWeight} kg</span></p>}
+                                      {formData.PatientHeight && <p className="max-md:text-xs md:text-[11px]"><span className="text-slate-400 block mb-0.5">Chiều cao:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientHeight} cm</span></p>}
+                                      {formData.PatientWeight && <p className="max-md:text-xs md:text-[11px]"><span className="text-slate-400 block mb-0.5">Cân nặng:</span> <span className="font-bold text-slate-800 font-mono">{formData.PatientWeight} kg</span></p>}
                                     </>
                                   ) : (
                                     <>
                                       <div>
-                                        <label className="block text-slate-500 font-bold text-[10px] mb-1">Chiều cao (cm)</label>
+                                        <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Chiều cao (cm)</label>
                                         <input
                                           type="text"
                                           placeholder="vd: 110"
                                           value={formData.PatientHeight}
                                           onChange={(e) => setFormData(prev => ({ ...prev, PatientHeight: e.target.value }))}
-                                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium"
+                                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 max-md:text-sm md:text-xs font-medium"
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-slate-500 font-bold text-[10px] mb-1">Cân nặng (kg)</label>
+                                        <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Cân nặng (kg)</label>
                                         <input
                                           type="text"
                                           placeholder="vd: 12"
                                           value={formData.PatientWeight}
                                           onChange={(e) => setFormData(prev => ({ ...prev, PatientWeight: e.target.value }))}
-                                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium"
+                                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 max-md:text-sm md:text-xs font-medium"
                                         />
                                       </div>
                                     </>
@@ -456,7 +456,7 @@ export default function ResultStaffDrawer({
                         <div className="flex flex-col flex-1 min-h-0">
                           <div className={`bg-slate-50 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
                             {!isFormEditing ? (
-                              <div className="grid grid-cols-1 gap-y-1.5 text-[11px] text-slate-600 font-medium">
+                              <div className="grid grid-cols-1 gap-y-1.5 max-md:text-xs md:text-[11px] text-slate-600 font-medium">
                                 <div className="flex flex-wrap items-baseline gap-x-2 xl:gap-x-3 gap-y-0">
                                   <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(formData.ConsultDate)}</span></p>
                                   <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{formData.RequestBy || ''}</span></p>
@@ -475,16 +475,16 @@ export default function ResultStaffDrawer({
                               <div className="space-y-3 flex-1">
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">Ngày hội chẩn</label>
+                                    <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Ngày hội chẩn</label>
                                     <VNDateInput
                                       required
                                       value={formData.ConsultDate}
                                       onChange={(val) => setFormData(prev => ({ ...prev, ConsultDate: val }))}
-                                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-medium font-sans"
+                                      className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 max-md:text-sm md:text-xs font-medium font-sans"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">BS đăng ký</label>
+                                    <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">BS đăng ký</label>
                                     <SearchableEnumSelect
                                       required
                                       options={doctorOptions}
@@ -498,7 +498,7 @@ export default function ResultStaffDrawer({
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Kiểu staff</label>
+                                  <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Kiểu staff</label>
                                   <div className="grid grid-cols-2 gap-2">
                                     {(['Staff thông', 'Staff mổ'] as ConsultTypeEnum[]).map(type => (
                                       <button
@@ -518,13 +518,13 @@ export default function ResultStaffDrawer({
                                 </div>
 
                                 <div className="pb-2">
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Thành viên hội chẩn</label>
+                                  <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Thành viên hội chẩn</label>
                                   <MobileAutoExpandTextarea
                                     minRows={2}
                                     value={formData.ConsultMember || ''}
                                     onChange={(e) => setFormData(prev => ({ ...prev, ConsultMember: e.target.value }))}
                                     placeholder="Ví dụ: BS. Tài, BS. Ân, BS. Phụng"
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 text-xs font-semibold"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 max-md:text-sm md:text-xs font-semibold"
                                   />
                                 </div>
 
@@ -537,10 +537,10 @@ export default function ResultStaffDrawer({
                         {/* Cột phải: Kết quả hội chẩn */}
                         <div className={rightFormColClass}>
                           <div className={`bg-indigo-50/20 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
-                            <span className="text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2 shrink-0">Kết quả hội chẩn</span>
+                            <span className="max-md:text-[10px] md:text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2 shrink-0">Kết quả hội chẩn</span>
                             
                             {!isFormEditing ? (
-                              <div className="space-y-3 text-[11px] text-slate-600 font-medium pt-1">
+                              <div className="space-y-3 max-md:text-xs md:text-[11px] text-slate-600 font-medium pt-1">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3.5">
                                   <p className="flex items-baseline gap-2 flex-wrap">
                                     <span className="text-slate-400 shrink-0">ICD:</span>
@@ -586,7 +586,7 @@ export default function ResultStaffDrawer({
                               <div className="space-y-3.5 pt-1">
                                 <div className={`grid grid-cols-1 gap-2.5 xl:gap-3.5 ${isPanelLayout ? 'xl:grid-cols-3' : 'md:grid-cols-3'}`}>
                                   <div className={isPanelLayout ? 'xl:col-span-1' : 'md:col-span-1'}>
-                                    <label className="block text-slate-500 font-bold text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
+                                    <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">ICD <span className="text-red-500">*</span></label>
                                     <SearchableEnumSelect
                                       required
                                       options={diagnosisOptions}
@@ -600,7 +600,7 @@ export default function ResultStaffDrawer({
                                     />
                                   </div>
                                   <div className={isPanelLayout ? 'xl:col-span-2' : 'md:col-span-2'}>
-                                    <label className="block md:mb-1 text-slate-500 font-bold text-[10px] mb-1 font-sans">
+                                    <label className="block md:mb-1 text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1 font-sans">
                                       <span className="md:hidden inline mr-1">Kết luận chính</span>
                                       <span className="hidden md:inline">Kết luận chính </span>
                                       <span className="text-red-500">*</span>
@@ -617,7 +617,7 @@ export default function ResultStaffDrawer({
                                 </div>
 
                                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
-                                  <label className="block md:mb-0 text-slate-500 font-bold text-[10px] md:shrink-0">Ưu tiên</label>
+                                  <label className="block md:mb-0 text-slate-500 font-bold max-md:text-[11px] md:text-[10px] md:shrink-0">Ưu tiên</label>
                                   <div className="flex gap-2 flex-1 min-w-0">
                                     {PRIORITY_OPTIONS.map((opt) => {
                                       const isSel = formData.PriorityOrder === opt;
@@ -626,7 +626,7 @@ export default function ResultStaffDrawer({
                                           key={opt}
                                           type="button"
                                           onClick={() => setFormData(prev => ({ ...prev, PriorityOrder: opt }))}
-                                          className={`flex-1 py-1.5 px-2 rounded-xl border text-[11px] font-bold transition text-center cursor-pointer ${
+                                          className={`flex-1 py-1.5 px-2 rounded-xl border max-md:text-xs md:text-[11px] font-bold transition text-center cursor-pointer ${
                                             isSel
                                               ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm font-extrabold ring-1 ring-indigo-400'
                                               : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -640,24 +640,24 @@ export default function ResultStaffDrawer({
                                 </div>
 
                                 <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Chẩn đoán chi tiết</label>
+                                  <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Chẩn đoán chi tiết</label>
                                   <MobileAutoExpandTextarea
                                     minRows={2}
                                     value={formData.DetailDiagnosis}
                                     onChange={(e) => setFormData(prev => ({ ...prev, DetailDiagnosis: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs italic font-semibold leading-relaxed"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-md:text-sm md:text-xs italic font-semibold leading-relaxed"
                                   />
                                 </div>
 
                                 <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Kết luận hội chẩn chi tiết</label>
+                                  <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Kết luận hội chẩn chi tiết</label>
                                   <MobileAutoExpandTextarea
                                     minRows={2}
                                     required
                                     placeholder="vd: Thống nhất chỉ định mổ tim hở..."
                                     value={formData.DetailConsultResult}
                                     onChange={(e) => setFormData(prev => ({ ...prev, DetailConsultResult: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-bold leading-relaxed"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-md:text-sm md:text-xs font-bold leading-relaxed"
                                   />
                                 </div>
 
@@ -669,22 +669,22 @@ export default function ResultStaffDrawer({
                                   consults={consults}
                                   rows={2}
                                   placeholder="vd: Vá thông liên thất..."
-                                  textareaClassName="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold leading-relaxed"
+                                  textareaClassName="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-md:text-sm md:text-xs font-semibold leading-relaxed"
                                 />
 
                                 <div>
-                                  <label className="block text-slate-500 font-bold text-[10px] mb-1">Số tiền dự kiến (VND / text)</label>
+                                  <label className="block text-slate-500 font-bold max-md:text-[11px] md:text-[10px] mb-1">Số tiền dự kiến (VND / text)</label>
                                   <MobileAutoExpandTextarea
                                     minRows={2}
                                     placeholder="vd: 45.000.000đ"
                                     value={formData.PlannedPrice}
                                     onChange={(e) => setFormData(prev => ({ ...prev, PlannedPrice: e.target.value }))}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-bold font-mono"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-md:text-sm md:text-xs font-bold font-mono"
                                   />
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-indigo-100">
                                   <div>
-                                    <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase">Người điền KQ</label>
+                                    <label className="block text-slate-400 font-bold max-md:text-[10px] md:text-[9px] mb-1 uppercase">Người điền KQ</label>
                                     <input
                                       type="text"
                                       disabled
@@ -692,16 +692,16 @@ export default function ResultStaffDrawer({
                                         const editorId = currentStaff?.StaffKey;
                                         return staffList.find(s => s.StaffKey === editorId)?.StaffName || editorId || '01378';
                                       })()}
-                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold"
+                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 max-md:text-[11px] md:text-[10px] font-bold"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block text-slate-400 font-bold text-[9px] mb-1 uppercase cursor-default" title="ConsultResultUpdatedTime">Điền lúc</label>
+                                    <label className="block text-slate-400 font-bold max-md:text-[10px] md:text-[9px] mb-1 uppercase cursor-default" title="ConsultResultUpdatedTime">Điền lúc</label>
                                     <input
                                       type="text"
                                       disabled
                                       value={formatDateTime(new Date().toISOString())}
-                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-mono cursor-default"
+                                      className="w-full bg-slate-50 text-slate-400 border border-slate-200 rounded-lg px-2 py-1 max-md:text-[11px] md:text-[10px] font-mono cursor-default"
                                     />
                                   </div>
                                 </div>
@@ -722,7 +722,7 @@ export default function ResultStaffDrawer({
                             <button
                               type="button"
                               onClick={() => setShowSummaryModal(true)}
-                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 text-[11px]"
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 max-md:text-xs md:text-[11px]"
                             >
                               <Clipboard className="w-4 h-4 shrink-0" />
                               Tóm tắt
@@ -730,10 +730,12 @@ export default function ResultStaffDrawer({
                             <button
                               type="button"
                               onClick={() => setIsEditing(true)}
-                              className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer text-xs flex items-center justify-center gap-1.5 font-sans"
+                              className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer max-md:text-sm md:text-xs flex items-center justify-center gap-1.5 font-sans"
                             >
                               <ClipboardList className="w-4 h-4 shrink-0" />
-                              {consult.ConsultResultID ? 'Sửa kết quả hội chẩn' : 'Điền kết quả hội chẩn'}
+                              {consult.ConsultResultID
+                                ? (isMobile ? 'Cập nhật' : 'Sửa kết quả hội chẩn')
+                                : 'Điền kết quả hội chẩn'}
                             </button>
                           </div>
                         ) : (
@@ -741,7 +743,7 @@ export default function ResultStaffDrawer({
                             <button
                               type="button"
                               onClick={() => setShowSummaryModal(true)}
-                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 text-[10px] md:text-[11px]"
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 max-md:text-xs md:text-[11px]"
                             >
                               <Clipboard className="w-4 h-4 shrink-0" />
                               Tóm tắt
@@ -763,14 +765,14 @@ export default function ResultStaffDrawer({
                                 setIsEditing(false);
                                 if (autoEdit) forceClose();
                               }}
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl transition cursor-pointer text-[10px] md:text-xs font-sans text-center"
+                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl transition cursor-pointer max-md:text-xs md:text-[10px] font-sans text-center"
                             >
                               {autoEdit ? 'Đóng' : 'Hủy'}
                             </button>
                             <button
                               type="submit"
                               disabled={saving}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-md transition cursor-pointer text-[10px] md:text-xs font-sans text-center font-bold disabled:opacity-50"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-md transition cursor-pointer max-md:text-xs md:text-[10px] font-sans text-center font-bold disabled:opacity-50"
                             >
                               {saving ? 'Đang lưu...' : '✓ Lưu kết quả'}
                             </button>
