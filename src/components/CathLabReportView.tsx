@@ -672,7 +672,7 @@ function CathLabReportViewInner({
         <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
           <table className="w-full text-left text-xs border-collapse min-w-[1200px]">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-slate-50 border-b border-slate-250 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
                 <th className="py-3 px-4 text-center w-12 bg-slate-50">STT</th>
                 <th className="py-3 px-4 sticky left-0 z-20 bg-slate-50 min-w-[200px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]">Họ và tên bệnh nhi</th>
                 <th className="py-3 px-4">Ngày thông tim</th>

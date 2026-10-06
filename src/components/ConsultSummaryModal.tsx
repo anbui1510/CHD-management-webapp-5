@@ -222,7 +222,7 @@ export function ConsultSummaryModal({
 
   const modalPanelClass = isMobile
     ? 'flex flex-col flex-1 min-h-0 w-full overflow-hidden'
-    : 'bg-slate-50/95 backdrop-blur-md w-full max-w-3xl max-h-[95vh] rounded-3xl border border-slate-250 shadow-2xl flex flex-col min-h-0 overflow-hidden font-sans text-xs animate-in zoom-in-95 duration-200';
+    : 'bg-slate-50/95 backdrop-blur-md w-full max-w-3xl max-h-[95vh] rounded-3xl border border-slate-200 shadow-2xl flex flex-col min-h-0 overflow-hidden font-sans text-xs animate-in zoom-in-95 duration-200';
 
   const modal = (
     <div
