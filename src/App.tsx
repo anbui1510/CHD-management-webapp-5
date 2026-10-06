@@ -160,7 +160,7 @@ import {
   LayoutDashboard,
   UserCog,
   Activity,
-  ArrowUpDown
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -581,6 +581,9 @@ export default function App() {
 
   // Bot Trigger PDF simulation State
   const [pdfBotRunning, setPdfBotRunning] = useState<string | null>(null);
+
+  const [consultListConfirmDeleteKey, setConsultListConfirmDeleteKey] = useState<string | null>(null);
+  const [consultListDeletingKey, setConsultListDeletingKey] = useState<string | null>(null);
 
   // Custom alerts and confirms to replace browser native window.alert/confirm (which fails inside sandboxed iframe previews)
   const [customAlert, setCustomAlert] = useState<{ message: string; title?: string } | null>(null);
@@ -1643,6 +1646,62 @@ export default function App() {
         refreshConsultData();
       });
   };
+
+  const parseConsultDeleteErrorMessage = (raw: string, status: number): string => {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return `HTTP ${status}`;
+    try {
+      const parsed = JSON.parse(trimmed) as { error?: string; message?: string };
+      return parsed.error || parsed.message || trimmed;
+    } catch {
+      return trimmed;
+    }
+  };
+
+  const executeDeleteConsultFromList = useCallback(async (consultKey: string) => {
+    const key = consultKey.trim();
+    if (!key) return;
+
+    setConsultListConfirmDeleteKey(null);
+    setConsultListDeletingKey(key);
+
+    const consult = consults.find(c => c.ConsultKey === key);
+    const patient = consult ? findPatientByKey(patients, consult.PatientKey) : undefined;
+    const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('CHD_AUTH_TOKEN') || '' : '';
+
+    try {
+      const res = await fetch(`/api/consults/${encodeURIComponent(key)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify(withSyncContext({}, buildSyncContext('consult-list', {
+          patientName: patient?.PatientName,
+          patientKey: consult?.PatientKey,
+        }))),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(parseConsultDeleteErrorMessage(errText, res.status));
+      }
+      await res.json().catch(() => ({}));
+      removeConsult(key);
+      if (editingRegConsultKey === key) {
+        setEditingRegConsultKey(null);
+      }
+      showSuccessBanner('Đã xóa lượt hội chẩn thành công.');
+    } catch (err) {
+      console.error(err);
+      triggerAlert(
+        err instanceof Error ? err.message : 'Không thể xoá lượt hội chẩn',
+        MODAL_TITLE.warning
+      );
+      void refreshConsultData(true);
+    } finally {
+      setConsultListDeletingKey(null);
+    }
+  }, [consults, editingRegConsultKey, patients, refreshConsultData, removeConsult, triggerAlert]);
 
   // Emulate AppSheet Google Cloud Bot A4 PDF Generation Task
   const triggerPDFBotBuild = (consultKey: string) => {
@@ -3087,7 +3146,6 @@ export default function App() {
                       <ClipboardCheck className="w-5 h-5 text-teal-600" />
                       Đăng ký hội chẩn
                     </h3>
-                    <p className="text-[10px] text-slate-400">Đăng ký + báo cáo danh sách hội chẩn thông tim - mổ tim</p>
                   </div>
 
                   <div className="flex items-center gap-1.5 md:hidden">
@@ -3115,18 +3173,6 @@ export default function App() {
                         </button>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConsultSortField('name');
-                        setConsultSortOrder(prev => (consultSortField === 'name' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
-                      }}
-                      className="lg:hidden w-10 h-10 shrink-0 rounded-full bg-white border border-slate-200 text-slate-600 shadow-sm flex items-center justify-center"
-                      title="Sắp xếp tên bệnh nhi A-Z / Z-A"
-                      aria-label="Sắp xếp tên bệnh nhi"
-                    >
-                      <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${consultSortField === 'name' && consultSortOrder === 'asc' ? 'rotate-180' : ''}`} />
-                    </button>
                     <button
                       type="button"
                       onClick={() => setIsFilterExpanded(true)}
@@ -3161,7 +3207,7 @@ export default function App() {
                   onScroll={handleBottomScroll}
                   className="flex-1 min-h-0 overflow-x-auto overflow-y-auto custom-scrollbar"
                 >
-                  <table className="w-full text-left text-xs border-collapse min-w-[620px] md:min-w-[850px]">
+                  <table className="w-full text-left text-xs border-collapse min-w-[360px] md:min-w-[850px]">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
                         <th
@@ -3177,8 +3223,8 @@ export default function App() {
                             <SortColumnIcon active={consultSortField === 'name'} order={consultSortOrder} />
                           </div>
                         </th>
-                        <th className="py-2.5 px-3">Kiểu staff</th>
-                        <th className="py-2.5 px-3">Chẩn đoán</th>
+                        <th className="hidden md:table-cell py-2.5 px-3">Kiểu staff</th>
+                        <th className="hidden md:table-cell py-2.5 px-3">Chẩn đoán</th>
                         <th
                           className="py-2.5 px-3 cursor-pointer hover:text-[#d2145a] select-none transition-colors duration-150"
                           onClick={() => {
@@ -3193,13 +3239,14 @@ export default function App() {
                           </div>
                         </th>
                         <th className="py-2.5 px-3">BS đăng ký</th>
+                        <th className="md:hidden py-2.5 px-2 text-center w-10">Xóa</th>
                         <th className="hidden md:table-cell py-2.5 px-3 text-right">Biên bản PDF / Kịch bản</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {filteredConsultsList.length === 0 ? (
                         <tr>
-                          <td colSpan={isMobile ? 5 : 6} className="text-center py-8 italic text-slate-400">
+                          <td colSpan={isMobile ? 4 : 6} className="text-center py-8 italic text-slate-400">
                             Hộp thư rỗng. Không tìm thấy đợt hội chẩn nào khớp với bộ lọc dữ liệu.
                           </td>
                         </tr>
@@ -3218,8 +3265,8 @@ export default function App() {
                                 <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat.PatientName}</p>
                                 <p className="text-[10px] text-slate-500 font-mono">MNB: {pat.PatientID1}</p>
                               </td>
-                              <td className="py-3 px-3 uppercase tracking-wide font-extrabold font-mono text-[10px] text-[#d2145a]">{item.ConsultType}</td>
-                              <td className="py-3 px-3">
+                              <td className="hidden md:table-cell py-3 px-3 uppercase tracking-wide font-extrabold font-mono text-[10px] text-[#d2145a]">{item.ConsultType}</td>
+                              <td className="hidden md:table-cell py-3 px-3">
                                 <div className="flex flex-col">
                                   <span className="text-red-700 bg-red-50 border border-red-200 font-bold px-1.5 py-0.5 rounded text-[10px] font-mono w-max">{item.DiagnosisID}</span>
                                   {item.DetailDiagnosis && (
@@ -3232,6 +3279,18 @@ export default function App() {
                               </td>
                               <td className="py-3 px-3 font-semibold text-slate-700 text-xs">
                                 {item.RequestBy || '—'}
+                              </td>
+                              <td className="md:hidden py-2 px-2 text-center align-middle" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  disabled={consultListDeletingKey === item.ConsultKey}
+                                  onClick={() => setConsultListConfirmDeleteKey(item.ConsultKey)}
+                                  className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-red-100 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 cursor-pointer transition"
+                                  title="Xoá đăng ký hội chẩn"
+                                  aria-label="Xoá đăng ký hội chẩn"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </td>
                               <td className="hidden md:table-cell py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
@@ -3280,6 +3339,78 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+
+                {consultListConfirmDeleteKey && (() => {
+                  const consultToDelete = consults.find(c => c.ConsultKey === consultListConfirmDeleteKey);
+                  const pat = consultToDelete ? getPatientByKey(consultToDelete.PatientKey) : null;
+                  const keyToDelete = consultListConfirmDeleteKey;
+                  return (
+                    <div className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                      <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 animate-in zoom-in-95 duration-150 text-slate-700 text-xs">
+                        <div className="flex items-center gap-3 text-red-650 mb-3.5">
+                          <div className="bg-red-50 p-2 rounded-full border border-red-150">
+                            <AlertTriangle className="w-6 h-6 text-red-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-sm uppercase font-sans tracking-wide text-red-600">
+                              Xác nhận xoá
+                            </h4>
+                            <p className="text-[10px] text-slate-500 font-semibold normal-case">Hành động này không thể hoàn tác</p>
+                          </div>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 mb-4 space-y-1.5">
+                          {pat && (
+                            <p className="font-bold text-slate-800">
+                              Bệnh nhi: <span className="font-extrabold text-[#d2145a] uppercase">{pat.PatientName}</span>
+                            </p>
+                          )}
+                          {consultToDelete && (
+                            <>
+                              <p className="font-semibold text-slate-650">
+                                Mã bệnh nhân: <span className="font-bold font-mono text-slate-800">{pat?.PatientID1 || '—'}</span>
+                              </p>
+                              <p className="font-semibold text-slate-650">
+                                Loại hội chẩn: <span className="font-bold text-slate-800">{consultToDelete.ConsultType}</span>
+                              </p>
+                              <p className="font-semibold text-slate-650">
+                                Ngày hội chẩn: <span className="font-bold font-mono text-slate-800">{formatVNTime(consultToDelete.ConsultDate)}</span>
+                              </p>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-slate-600 leading-relaxed mb-5 font-medium">
+                          Bạn có chắc chắn muốn xoá lượt hội chẩn này khỏi hệ thống không?
+                        </p>
+                        <div className="flex justify-end gap-3 font-extrabold uppercase">
+                          <button
+                            type="button"
+                            onClick={() => setConsultListConfirmDeleteKey(null)}
+                            className="bg-white hover:bg-slate-100 border border-slate-250 text-slate-700 px-4 py-2 rounded-xl transition cursor-pointer"
+                          >
+                            Hủy bỏ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void executeDeleteConsultFromList(keyToDelete)}
+                            className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl transition shadow-md hover:shadow-lg cursor-pointer"
+                          >
+                            Xoá ca
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {consultListDeletingKey && (
+                  <div className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-3 animate-in zoom-in-95 duration-150">
+                      <div className="mx-auto w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
+                      <h4 className="font-extrabold text-sm uppercase text-slate-800">Đang xóa...</h4>
+                      <p className="text-[11px] text-slate-500 font-medium">Vui lòng chờ trong giây lát</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Pagination footer — desktop only */}
                 <div className="hidden lg:flex shrink-0 bg-slate-50 border border-slate-200 mt-4 rounded-2xl p-4 flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
