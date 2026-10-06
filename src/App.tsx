@@ -4056,9 +4056,9 @@ export default function App() {
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 p-4 md:p-6">
                         
                         {/* Left Column: Administrative block */}
-                        <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-3 md:p-4 space-y-1.5 shadow-sm self-start">
-                          <div className="flex items-center justify-between pb-0.5">
-                            <span className="text-[10px] uppercase tracking-wider font-mono font-black text-rose-500">THÔNG TIN HÀNH CHÍNH</span>
+                        <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-2.5 md:p-3 space-y-1 shadow-sm self-start">
+                          <div className="flex items-center justify-between gap-2 -mt-0.5 mb-0">
+                            <span className="text-xs uppercase tracking-wide font-mono font-black text-rose-500 leading-tight">THÔNG TIN HÀNH CHÍNH</span>
                             
                             {/* Sửa hành chính button */}
                             <PatientAdminEditButton
@@ -4084,44 +4084,44 @@ export default function App() {
                           {(() => {
                             const patientPhone2 = String(edp.PatientPhone2 || '').trim();
                             return (
-                          <div className="flex flex-col gap-1.5 md:grid md:grid-cols-2 md:gap-x-3 md:gap-y-2 text-xs text-slate-500 font-bold">
+                          <div className="flex flex-col gap-1 md:grid md:grid-cols-2 md:gap-x-3 md:gap-y-1.5 text-sm text-slate-500 font-bold leading-snug">
                             <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
-                              <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Họ và tên:</span>
-                              <span className="text-neutral-950 font-black uppercase text-sm truncate">{edp.PatientName}</span>
+                              <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Họ và tên:</span>
+                              <span className="text-neutral-950 font-black uppercase text-base truncate">{edp.PatientName}</span>
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 min-w-0 md:contents">
                               <div className="flex items-baseline gap-2 min-w-0 md:block">
-                                <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Ngày sinh:</span>
-                                <span className="text-slate-800 font-bold font-mono text-xs">{formatVNTime(edp.PatientDOB)}</span>
+                                <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Ngày sinh:</span>
+                                <span className="text-slate-800 font-bold font-mono text-sm">{formatVNTime(edp.PatientDOB)}</span>
                               </div>
                               <div className="flex items-baseline gap-2 min-w-0 md:block">
-                                <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Giới tính:</span>
-                                <span className="text-slate-800 font-bold text-xs">{edp.PatientSex}</span>
+                                <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Giới tính:</span>
+                                <span className="text-slate-800 font-bold text-sm">{edp.PatientSex}</span>
                               </div>
                             </div>
                             <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
-                              <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Mã người bệnh:</span>
-                              <span className="text-slate-850 font-extrabold font-mono text-[11px] bg-slate-200/50 border border-slate-300 rounded px-1.5 py-0.5 md:mt-0.5 md:block md:w-max">{edp.PatientID1} {edp.PatientID2 ? `| ${edp.PatientID2}` : ''}</span>
+                              <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Mã người bệnh:</span>
+                              <span className="text-slate-850 font-extrabold font-mono text-xs bg-slate-200/50 border border-slate-300 rounded px-1.5 py-0.5 md:mt-0.5 md:block md:w-max">{edp.PatientID1} {edp.PatientID2 ? `| ${edp.PatientID2}` : ''}</span>
                             </div>
                             <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
-                              <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Địa chỉ:</span>
-                              <span className="text-slate-700 font-semibold text-xs truncate">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
+                              <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Địa chỉ:</span>
+                              <span className="text-slate-700 font-semibold text-sm truncate">{edp.PatientAddress || (edp as any).PatientAddress || '—'}</span>
                             </div>
                             {patientPhone2 ? (
                               <div className="grid grid-cols-2 gap-x-3 min-w-0 md:col-span-2">
                                 <div className="flex items-baseline gap-2 min-w-0 md:block">
-                                  <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Số ĐT 1:</span>
-                                  <span className="text-slate-850 font-mono font-bold text-xs">{edp.PatientPhone1 || '—'}</span>
+                                  <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Số ĐT 1:</span>
+                                  <span className="text-slate-850 font-mono font-bold text-sm">{edp.PatientPhone1 || '—'}</span>
                                 </div>
                                 <div className="flex items-baseline gap-2 min-w-0 md:block">
-                                  <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Số ĐT 2:</span>
-                                  <span className="text-slate-850 font-mono font-bold text-xs">{patientPhone2}</span>
+                                  <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Số ĐT 2:</span>
+                                  <span className="text-slate-850 font-mono font-bold text-sm">{patientPhone2}</span>
                                 </div>
                               </div>
                             ) : (
                               <div className="flex items-baseline gap-2 min-w-0 md:block md:col-span-2">
-                                <span className="text-slate-400 font-medium text-[10px] uppercase shrink-0 md:block">Số ĐT 1:</span>
-                                <span className="text-slate-850 font-mono font-bold text-xs">{edp.PatientPhone1 || '—'}</span>
+                                <span className="text-slate-400 font-medium text-xs uppercase shrink-0 md:block">Số ĐT 1:</span>
+                                <span className="text-slate-850 font-mono font-bold text-sm">{edp.PatientPhone1 || '—'}</span>
                               </div>
                             )}
                           </div>
