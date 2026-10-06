@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue, useTransition } from 'react';
 import { 
   Staff, 
   Patient, 
@@ -297,6 +297,7 @@ export default function App() {
 
   // Refs for synchronized double scrollbar in consult log list
   const MOBILE_PATIENTS_BATCH = 50;
+  const MOBILE_CONSULTS_BATCH = 50;
   const topScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const patientTableScrollRef = useRef<HTMLDivElement>(null);
@@ -354,6 +355,8 @@ export default function App() {
   const [consultListSearch, setConsultListSearch] = useState<string>('');
   const [patientCurrentPage, setPatientCurrentPage] = useState<number>(1);
   const [mobilePatientVisibleCount, setMobilePatientVisibleCount] = useState(MOBILE_PATIENTS_BATCH);
+  const [mobileConsultVisibleCount, setMobileConsultVisibleCount] = useState(MOBILE_CONSULTS_BATCH);
+  const [, startConsultListSearchTransition] = useTransition();
   const [consultCurrentPage, setConsultCurrentPage] = useState<number>(1);
   const [searchPatientQuery, setSearchPatientQuery] = useState<string>('');
 
@@ -1974,42 +1977,14 @@ export default function App() {
   const deferredPatientSearch = useDeferredValue(patientSearch);
   const deferredConsultListSearch = useDeferredValue(consultListSearch);
 
-  // Query Filters Handler (Relocated to prevent conditional hook errors)
-  const getFilteredConsults = () => {
-    const list = consults.filter(c => {
-      const typeMatch = filterType === 'Tất cả' || c.ConsultType === filterType;
-      const dateMatch = !filterDate || c.ConsultDate === filterDate;
-      const notConsultedYet = isPendingStaffConsult(c);
-      
-      const pat = getPatientByKey(c.PatientKey);
-      if (!pat) return false; // Ẩn bệnh nhân không tìm thấy hồ sơ (tránh mismatch đếm ca)
-
-      const searchMatch =
-        matchesPatientIdentitySearch(deferredConsultListSearch, {
-          PatientName: pat.PatientName,
-          PatientID1: pat.PatientID1,
-          PatientID2: pat.PatientID2,
-        }) ||
-        matchesListSearchQuery(deferredConsultListSearch, [c.DiagnosisID, c.DetailDiagnosis]);
-
-      return typeMatch && dateMatch && notConsultedYet && searchMatch;
-    });
-
-    return list.sort((a, b) => {
-      if (consultSortField === 'name') {
-        const patA = getPatientByKey(a.PatientKey);
-        const patB = getPatientByKey(b.PatientKey);
-        const nameA = removeDiacritics(String(patA?.PatientName || '')).toLowerCase();
-        const nameB = removeDiacritics(String(patB?.PatientName || '')).toLowerCase();
-        const cmp = nameA.localeCompare(nameB, 'vi');
-        return consultSortOrder === 'asc' ? cmp : -cmp;
-      }
-
-      const cmp = dateSortNumber(a.ConsultDate) - dateSortNumber(b.ConsultDate);
-      if (cmp !== 0) return consultSortOrder === 'asc' ? cmp : -cmp;
-      return String(a.ConsultKey || '').localeCompare(String(b.ConsultKey || ''));
-    });
-  };
+  const patientByPatientKey = useMemo(() => {
+    const map = new Map<string, Patient>();
+    for (const p of patients) {
+      const pk = normalizePatientKey(p.PatientKey);
+      if (pk) map.set(pk, p);
+    }
+    return map;
+  }, [patients]);
 
   const patientSearchIndex = useMemo(() => {
     return patients.map((p) => ({
@@ -2077,29 +2052,100 @@ export default function App() {
 
   const CONSULTS_PER_PAGE = 100;
   const filteredConsultsList = useMemo(() => {
-    const list = getFilteredConsults();
-    const q = normalizeListSearchQuery(deferredConsultListSearch);
-    if (!q) return list;
-    return [...list].sort((a, b) => {
-      const patA = getPatientByKey(a.PatientKey);
-      const patB = getPatientByKey(b.PatientKey);
-      return compareByPatientSearchScore(
-        deferredConsultListSearch,
-        patA?.PatientName || '',
-        patB?.PatientName || '',
-        [patA?.PatientID1, patA?.PatientID2].filter(Boolean) as string[],
-        [patB?.PatientID1, patB?.PatientID2].filter(Boolean) as string[]
+    const q = deferredConsultListSearch;
+    const qNorm = normalizeListSearchQuery(q);
+
+    const list = consults.filter(c => {
+      const typeMatch = filterType === 'Tất cả' || c.ConsultType === filterType;
+      const dateMatch = !filterDate || c.ConsultDate === filterDate;
+      if (!typeMatch || !dateMatch || !isPendingStaffConsult(c)) return false;
+
+      const pat = patientByPatientKey.get(normalizePatientKey(c.PatientKey));
+      if (!pat) return false;
+
+      if (!qNorm) return true;
+      return (
+        matchesPatientIdentitySearch(q, {
+          PatientName: pat.PatientName,
+          PatientID1: pat.PatientID1,
+          PatientID2: pat.PatientID2,
+        }) ||
+        matchesListSearchQuery(q, [c.DiagnosisID, c.DetailDiagnosis])
       );
     });
-  }, [consults, patientsMap, filterType, filterDate, deferredConsultListSearch, consultSortField, consultSortOrder, isPendingStaffConsult]);
+
+    list.sort((a, b) => {
+      if (consultSortField === 'name') {
+        const patA = patientByPatientKey.get(normalizePatientKey(a.PatientKey));
+        const patB = patientByPatientKey.get(normalizePatientKey(b.PatientKey));
+        const nameA = removeDiacritics(String(patA?.PatientName || '')).toLowerCase();
+        const nameB = removeDiacritics(String(patB?.PatientName || '')).toLowerCase();
+        const cmp = nameA.localeCompare(nameB, 'vi');
+        return consultSortOrder === 'asc' ? cmp : -cmp;
+      }
+
+      const cmp = dateSortNumber(a.ConsultDate) - dateSortNumber(b.ConsultDate);
+      if (cmp !== 0) return consultSortOrder === 'asc' ? cmp : -cmp;
+      return String(a.ConsultKey || '').localeCompare(String(b.ConsultKey || ''));
+    });
+
+    if (qNorm) {
+      list.sort((a, b) => {
+        const patA = patientByPatientKey.get(normalizePatientKey(a.PatientKey));
+        const patB = patientByPatientKey.get(normalizePatientKey(b.PatientKey));
+        return compareByPatientSearchScore(
+          q,
+          patA?.PatientName || '',
+          patB?.PatientName || '',
+          [patA?.PatientID1, patA?.PatientID2].filter(Boolean) as string[],
+          [patB?.PatientID1, patB?.PatientID2].filter(Boolean) as string[]
+        );
+      });
+    }
+
+    return list;
+  }, [
+    consults,
+    patientByPatientKey,
+    filterType,
+    filterDate,
+    deferredConsultListSearch,
+    consultSortField,
+    consultSortOrder,
+    isPendingStaffConsult,
+  ]);
   const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
   const displayedConsults = useMemo(() => {
-    if (isMobile) return filteredConsultsList;
+    if (isMobile) return filteredConsultsList.slice(0, mobileConsultVisibleCount);
     return filteredConsultsList.slice(
       (consultCurrentPage - 1) * CONSULTS_PER_PAGE,
       consultCurrentPage * CONSULTS_PER_PAGE
     );
-  }, [filteredConsultsList, isMobile, consultCurrentPage]);
+  }, [filteredConsultsList, isMobile, consultCurrentPage, mobileConsultVisibleCount]);
+
+  useEffect(() => {
+    setMobileConsultVisibleCount(MOBILE_CONSULTS_BATCH);
+  }, [consultListSearch, activeMenu, filterType, filterDate]);
+
+  const handleConsultListTableScroll = useCallback(() => {
+    handleBottomScroll();
+    if (!isMobile || activeMenu !== 'consult-list') return;
+    const el = bottomScrollRef.current;
+    if (!el || mobileConsultVisibleCount >= filteredConsultsList.length) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
+      setMobileConsultVisibleCount(prev =>
+        Math.min(prev + MOBILE_CONSULTS_BATCH, filteredConsultsList.length)
+      );
+    }
+  }, [activeMenu, filteredConsultsList.length, isMobile, mobileConsultVisibleCount]);
+
+  const applyConsultListSearch = useCallback((value: string) => {
+    startConsultListSearchTransition(() => {
+      setConsultListSearch(value);
+      setConsultCurrentPage(1);
+      setMobileConsultVisibleCount(MOBILE_CONSULTS_BATCH);
+    });
+  }, [startConsultListSearchTransition]);
 
   const primarySideMenus = useMemo(
     () => SIDEBAR_MENU_ITEMS.filter(menu => canAccessModule(currentStaff, menu.id as AppModule)),
@@ -2161,10 +2207,7 @@ export default function App() {
     setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
   }, []);
 
-  const handleConsultSubheaderSearch = useCallback((value: string) => {
-    setConsultListSearch(value);
-    setConsultCurrentPage(1);
-  }, []);
+  const handleConsultSubheaderSearch = applyConsultListSearch;
 
   // Return Login screen if not authenticated
   if (!currentStaff) {
@@ -3154,18 +3197,15 @@ export default function App() {
                       <SearchTextInput
                         type="text"
                         placeholder="Tìm tên, ID1 bệnh nhi..."
+                        debounceMs={280}
                         value={consultListSearch}
-                        onChange={(value) => {
-                          setConsultListSearch(value);
-                          setConsultCurrentPage(1);
-                        }}
+                        onChange={applyConsultListSearch}
                         className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0 font-sans"
                       />
                       {consultListSearch && (
                         <button 
                           onClick={() => {
-                            setConsultListSearch('');
-                            setConsultCurrentPage(1);
+                            applyConsultListSearch('');
                           }}
                           className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                         >
@@ -3204,7 +3244,7 @@ export default function App() {
 
                 <div 
                   ref={bottomScrollRef} 
-                  onScroll={handleBottomScroll}
+                  onScroll={handleConsultListTableScroll}
                   className="flex-1 min-h-0 overflow-x-auto overflow-y-auto custom-scrollbar"
                 >
                   <table className="w-full text-left text-xs border-collapse min-w-[360px] md:min-w-[850px]">
