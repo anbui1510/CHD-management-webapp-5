@@ -270,21 +270,21 @@ export default function WorkspaceDashboard({
                 key={`${tile.module}-${tile.target || tile.label}`}
                 type="button"
                 onClick={() => onNavigate(tile.target || tile.module)}
-                className={`bg-white border rounded-2xl p-3 sm:p-5 hover:shadow-md transition text-left group flex flex-col min-h-0 aspect-square lg:aspect-auto ${
+                className={`bg-white border rounded-2xl p-3.5 sm:p-5 hover:shadow-md transition text-left group flex flex-col min-h-0 max-lg:aspect-[4/3] lg:aspect-auto ${
                   tile.highlight
                     ? 'border-pink-500 shadow-sm hover:bg-pink-50'
                     : 'hover:border-pink-300'
                 }`}
               >
                 <div
-                  className={`w-10 h-10 sm:w-12 sm:h-12 ${tile.iconBg} rounded-xl flex items-center justify-center mb-2 sm:mb-4 shrink-0 group-hover:scale-105 transition-transform [&_svg]:w-5 [&_svg]:h-5 sm:[&_svg]:w-6 sm:[&_svg]:h-6`}
+                  className={`w-11 h-11 sm:w-12 sm:h-12 ${tile.iconBg} rounded-xl flex items-center justify-center mb-2 sm:mb-4 shrink-0 group-hover:scale-105 transition-transform [&_svg]:w-6 [&_svg]:h-6`}
                 >
                   {tile.icon}
                 </div>
-                <h3 className="font-extrabold text-[11px] sm:text-sm text-[#d2145a] mb-0.5 sm:mb-1 leading-snug line-clamp-2">
+                <h3 className="font-extrabold text-sm sm:text-base text-[#d2145a] mb-1 leading-snug line-clamp-2">
                   {tile.label}
                 </h3>
-                <p className="text-[10px] sm:text-xs text-slate-500 leading-snug line-clamp-2 mt-auto">
+                <p className="text-xs sm:text-sm text-slate-500 leading-snug line-clamp-2">
                   {tile.description}
                 </p>
               </button>
