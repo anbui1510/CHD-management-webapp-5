@@ -580,6 +580,7 @@ export default function App() {
   const [filterDate, setFilterDate] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('Tất cả');
   const [exportLoading, setExportLoading] = useState<boolean>(false);
+  const filteredConsultsListRef = useRef<Consult[]>([]);
   const [botMessage, setBotMessage] = useState<string>('');
 
   // Bot Trigger PDF simulation State
@@ -1746,15 +1747,15 @@ export default function App() {
     setTimeout(() => {
       setBotMessage('Lọc dữ liệu từ slice "DanhSachHoiChanLoc" theo Ngày & Loại hội chẩn...');
       setTimeout(async () => {
-        const filtered = getFilteredConsults();
-        if (filtered.length === 0) {
-          triggerAlert('Không tìm thấy bản ghi nào khớp bộ lọc để xuất!', MODAL_TITLE.warning);
-          setExportLoading(false);
-          setBotMessage('');
-          return;
-        }
-
         try {
+          const filtered = filteredConsultsListRef.current;
+          if (filtered.length === 0) {
+            triggerAlert('Không tìm thấy bản ghi nào khớp bộ lọc để xuất!', MODAL_TITLE.warning);
+            setExportLoading(false);
+            setBotMessage('');
+            return;
+          }
+
           // Import ExcelJS dynamically to keep initial bundle size light
           const ExcelJS = await import('exceljs');
           
@@ -2114,6 +2115,7 @@ export default function App() {
     consultSortOrder,
     isPendingStaffConsult,
   ]);
+  filteredConsultsListRef.current = filteredConsultsList;
   const totalConsultPages = Math.ceil(filteredConsultsList.length / CONSULTS_PER_PAGE) || 1;
   const displayedConsults = useMemo(() => {
     if (isMobile) return filteredConsultsList.slice(0, mobileConsultVisibleCount);
