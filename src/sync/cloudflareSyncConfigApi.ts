@@ -38,7 +38,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-async function readSyncConfig(env: CloudflareSyncConfigEnv): Promise<SyncConfigRecord> {
+export async function readSyncConfig(env: CloudflareSyncConfigEnv): Promise<SyncConfigRecord> {
   const raw = await env.PUSH_KV.get(SYNC_CONFIG_KEY);
   if (raw) {
     try {
@@ -120,11 +120,13 @@ export async function handleCloudflareSyncConfigRequest(
       return json({ error: 'Địa chỉ Apps Script không hợp lệ.' }, 400);
     }
 
-    await writeSyncConfig(env, { scriptUrl: nextUrl, scriptSecret: nextSecret });
+    const current = await readSyncConfig(env);
+    const secretToStore = nextSecret || current.scriptSecret || '';
+    await writeSyncConfig(env, { scriptUrl: nextUrl, scriptSecret: secretToStore });
     return json({
       message: 'Đã đồng bộ cấu hình Google Sheets lên server dùng chung.',
       scriptUrl: nextUrl,
-      scriptSecret: nextSecret,
+      hasSecret: !!secretToStore,
       isSynced: true,
     });
   }
@@ -133,7 +135,7 @@ export async function handleCloudflareSyncConfigRequest(
     const config = await readSyncConfig(env);
     return json({
       scriptUrl: config.scriptUrl,
-      scriptSecret: config.scriptSecret || '',
+      hasSecret: !!config.scriptSecret,
       isSynced: !!config.scriptUrl,
     });
   }
@@ -145,7 +147,7 @@ export async function handleCloudflareSyncConfigRequest(
 
     if (!nextUrl) {
       await writeSyncConfig(env, { scriptUrl: '', scriptSecret: '' });
-      return json({ message: 'Đã hủy liên kết Google Apps Script.', scriptUrl: '', scriptSecret: '', isSynced: false });
+      return json({ message: 'Đã hủy liên kết Google Apps Script.', scriptUrl: '', hasSecret: false, isSynced: false });
     }
 
     if (!nextUrl.startsWith('https://script.google.com/')) {
@@ -157,11 +159,13 @@ export async function handleCloudflareSyncConfigRequest(
       return json({ error: setupError }, 500);
     }
 
-    await writeSyncConfig(env, { scriptUrl: nextUrl, scriptSecret: nextSecret });
+    const current = await readSyncConfig(env);
+    const secretToStore = nextSecret || (!nextUrl ? '' : current.scriptSecret || '');
+    await writeSyncConfig(env, { scriptUrl: nextUrl, scriptSecret: secretToStore });
     return json({
       message: 'Kết nối Google Apps Script thành công! Cấu hình dùng chung cho mọi thiết bị.',
       scriptUrl: nextUrl,
-      scriptSecret: nextSecret,
+      hasSecret: !!secretToStore,
       isSynced: true,
     });
   }

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Clipboard, X } from 'lucide-react';
 import { Consult, Patient, formatVNTime, normalizePriorityOrder, removeDiacritics, restoreWeightFromDate } from '../types';
@@ -6,7 +6,7 @@ import { ConsultSummaryReadOnly } from './ConsultSummaryReadOnly';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
-import { copyElementAsImage, CopyImageResultType } from '../utils/copySummaryImage';
+import { captureElementPngBlob, copyElementAsImage, CopyImageResultType, downloadBlob, openElementAsPdf } from '../utils/copySummaryImage';
 import {
   formatPatientWithPtvPhu,
   resolvePtvPhu1Display
@@ -98,7 +98,7 @@ function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
   );
 }
 
-function buildTextSummary(patient: Patient, consult: Consult, ptvPhu1Display: string) {
+export function buildConsultSummaryText(patient: Patient, consult: Consult, ptvPhu1Display: string) {
   const summaryDetailConsultResult = (consult.DetailConsultResult || consult.ConsultResultID || '').trim() || '—';
   const weightDisplay = formatSummaryWeight(consult.PatientWeight);
   const heightDisplay = formatSummaryHeight(consult.PatientHeight);
@@ -140,6 +140,57 @@ function buildTextSummary(patient: Patient, consult: Consult, ptvPhu1Display: st
     `- Mức độ ưu tiên gọi bệnh: ${priorityOrder}\n` +
     `- PTV: ${ptvString}\n` +
     `- Lưu ý/ghi chú gọi bệnh: ${consult.CallNote || 'Không'}\n`;
+}
+
+export function ConsultSummarySheet({
+  patient,
+  consult,
+  compact = false,
+  sheetId,
+}: {
+  patient: Patient;
+  consult: Consult;
+  compact?: boolean;
+  sheetId?: string;
+}) {
+  const ptvPhu1Display = resolvePtvPhu1Display(
+    consult.RequestBy || '',
+    consult.Scheduled2ndInterventionist,
+    consult.Scheduled2ndInterventionist
+  );
+
+  return (
+    <div
+      id={sheetId}
+      className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full select-text ${compact ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-5 space-y-3.5 shrink-0'}`}
+    >
+      <div className="space-y-1">
+        <div className="flex justify-between items-start gap-2 text-[9px] font-semibold text-slate-600 leading-tight">
+          <span>Khoa Tim Mạch</span>
+          <span className="text-right">Bệnh viện Nhi Đồng Thành Phố</span>
+        </div>
+        <h2 className="text-center font-black text-[13px] uppercase tracking-wide text-slate-900">
+          HỒ SƠ CAN THIỆP
+        </h2>
+        <div className="h-1" />
+      </div>
+
+      <div className={compact ? '' : 'border-b-2 border-slate-800 flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}>
+        <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${compact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
+          {formatPatientWithPtvPhu(patient.PatientName, ptvPhu1Display)}
+        </div>
+      </div>
+
+      <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${compact ? 'p-2' : 'p-3.5'}`}>
+        <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1">
+          THÔNG TIN HÀNH CHÍNH
+        </span>
+        <PatientAdminPrintInfo patient={patient} />
+      </div>
+
+      <ConsultSummaryReadOnly consult={consult} compact={compact} sectionsOnly />
+    </div>
+  );
 }
 
 export interface ConsultSummaryModalProps {
@@ -187,7 +238,7 @@ export function ConsultSummaryModal({
   };
 
   const handleCopy = () => {
-    const text = buildTextSummary(patient, mergedConsult, ptvPhu1Display);
+    const text = buildConsultSummaryText(patient, mergedConsult, ptvPhu1Display);
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -217,8 +268,8 @@ export function ConsultSummaryModal({
   const mobileZIndex = 'z-[150]';
 
   const modalShellClass = isMobile
-    ? `${mobileZIndex} flex flex-col bg-white font-sans text-xs overflow-hidden`
-    : `${zIndexClass} bg-slate-900/60 backdrop-blur-xs items-center justify-center p-4 flex overflow-hidden overscroll-none animate-in fade-in duration-200`;
+    ? `fixed inset-0 ${mobileZIndex} flex flex-col bg-white font-sans text-xs overflow-hidden`
+    : `fixed inset-0 ${zIndexClass} bg-slate-900/60 backdrop-blur-xs items-center justify-center p-4 flex overflow-hidden overscroll-none animate-in fade-in duration-200`;
 
   const modalPanelClass = isMobile
     ? 'flex flex-col flex-1 min-h-0 w-full overflow-hidden'
@@ -275,36 +326,12 @@ export function ConsultSummaryModal({
           className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${isMobile ? 'p-2 pb-2' : 'p-4 shrink-0'}`}
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
-          <div
-            id={CONSULT_SUMMARY_SCREENSHOT_CARD_ID}
-            className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full select-text ${isMobile ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-5 space-y-3.5 shrink-0'}`}
-          >
-            <div className="space-y-1">
-              <div className="flex justify-between items-start gap-2 text-[9px] font-semibold text-slate-600 leading-tight">
-                <span>Khoa Tim Mạch</span>
-                <span className="text-right">Bệnh viện Nhi Đồng Thành Phố</span>
-              </div>
-              <h2 className="text-center font-black text-[13px] uppercase tracking-wide text-slate-900">
-                HỒ SƠ CAN THIỆP
-              </h2>
-              <div className="h-1" />
-            </div>
-
-            <div className={isMobile ? '' : 'border-b-2 border-slate-800 flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}>
-              <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${isMobile ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
-                {formatPatientWithPtvPhu(patient.PatientName, ptvPhu1Display)}
-              </div>
-            </div>
-
-            <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${isMobile ? 'p-2' : 'p-3.5'}`}>
-              <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1">
-                THÔNG TIN HÀNH CHÍNH
-              </span>
-              <PatientAdminPrintInfo patient={patient} />
-            </div>
-
-            <ConsultSummaryReadOnly consult={mergedConsult} compact={isMobile} sectionsOnly />
-          </div>
+          <ConsultSummarySheet
+            patient={patient}
+            consult={mergedConsult}
+            compact={isMobile}
+            sheetId={CONSULT_SUMMARY_SCREENSHOT_CARD_ID}
+          />
         </div>
 
         <div className={`border-t border-slate-200 bg-white shrink-0 ${isMobile ? 'px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]' : 'p-4 rounded-b-3xl flex flex-col sm:flex-row items-center justify-between gap-3'}`}>
@@ -364,9 +391,182 @@ export function ConsultSummaryModal({
     </div>
   );
 
-  if (isMobile && typeof document !== 'undefined') {
-    return createPortal(modal, document.body);
-  }
+  if (typeof document === 'undefined') return modal;
+  return createPortal(modal, document.body);
+}
 
-  return modal;
+const SUMMARY_CAPTURE_ID = 'staff-result-summary-capture';
+
+function summaryFileBase(patient: Patient) {
+  const patientId = String(patient.PatientID1 || 'Unknown').trim();
+  const nameSlug = removeDiacritics(String(patient.PatientName || '')).replace(/\s+/g, '');
+  return `${patientId}_${nameSlug}`;
+}
+
+export function StaffSummaryExportActions({
+  patient,
+  consult,
+  onError,
+}: {
+  patient: Patient;
+  consult: Consult;
+  onError?: (message: string) => void;
+}) {
+  const [mode, setMode] = useState<'pdf' | 'png' | 'sms' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copiedSms, setCopiedSms] = useState(false);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const smsText = useMemo(() => {
+    const ptv = resolvePtvPhu1Display(
+      consult.RequestBy || '',
+      consult.Scheduled2ndInterventionist,
+      consult.Scheduled2ndInterventionist
+    );
+    return buildConsultSummaryText(patient, consult, ptv);
+  }, [patient, consult]);
+
+  useEffect(() => {
+    if (mode !== 'pdf') return;
+    let cancelled = false;
+    const run = async () => {
+      setBusy(true);
+      try {
+        await new Promise<void>(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+        const element = document.getElementById(SUMMARY_CAPTURE_ID);
+        if (!element) throw new Error('Không tìm thấy khung tóm tắt.');
+        await openElementAsPdf(element);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : String(err);
+          onErrorRef.current?.(`Không thể tạo PDF: ${message}`);
+        }
+      } finally {
+        if (!cancelled) {
+          setBusy(false);
+          setMode(current => (current === 'pdf' ? null : current));
+        }
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  const savePng = async () => {
+    const element = document.getElementById(SUMMARY_CAPTURE_ID);
+    if (!element) {
+      onError?.('Không tìm thấy khung tóm tắt để lưu ảnh.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const blob = await captureElementPngBlob(element);
+      downloadBlob(blob, `${summaryFileBase(patient)}.png`);
+      setMode(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      onError?.(`Không thể lưu ảnh: ${message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copySms = async () => {
+    try {
+      await navigator.clipboard.writeText(smsText);
+      setCopiedSms(true);
+      setTimeout(() => setCopiedSms(false), 2000);
+    } catch {
+      onError?.('Không sao chép được. Hãy chọn nội dung tin nhắn rồi copy thủ công.');
+    }
+  };
+
+  const actionBtn = 'px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px] font-black tracking-wide text-slate-800 hover:bg-slate-50 hover:border-slate-400 transition cursor-pointer disabled:opacity-50';
+
+  const overlay = mode === 'png' || mode === 'sms' ? (
+    <div className="fixed inset-0 z-[200] bg-slate-900/60 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
+          <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800">
+            {mode === 'png' ? 'Tóm tắt dạng ảnh' : 'Tóm tắt dạng tin nhắn'}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setMode(null)}
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+            aria-label="Đóng"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 min-h-0 bg-slate-50">
+          {mode === 'png' ? (
+            <div className="mx-auto w-[720px] max-w-full">
+              <ConsultSummarySheet patient={patient} consult={consult} sheetId={SUMMARY_CAPTURE_ID} />
+            </div>
+          ) : (
+            <textarea
+              readOnly
+              value={smsText}
+              className="w-full min-h-[360px] bg-white border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-800 leading-relaxed"
+            />
+          )}
+        </div>
+        <div className="px-4 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMode(null)}
+            className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          >
+            {mode === 'png' ? 'Hủy' : 'Đóng'}
+          </button>
+          {mode === 'png' ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => { void savePng(); }}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase disabled:opacity-50"
+            >
+              {busy ? 'Đang lưu...' : 'Lưu về máy'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { void copySms(); }}
+              className="px-4 py-2 rounded-xl bg-[#d2145a] hover:bg-pink-700 text-white text-xs font-black uppercase"
+            >
+              {copiedSms ? 'Đã sao chép' : 'Sao chép tin nhắn'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Tóm tắt:</span>
+        <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('pdf')}>
+          {busy && mode === 'pdf' ? '...' : 'PDF'}
+        </button>
+        <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('png')}>PNG</button>
+        <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('sms')}>SMS</button>
+      </div>
+      {mode === 'pdf' && typeof document !== 'undefined' && createPortal(
+        <div
+          aria-hidden
+          style={{ position: 'fixed', left: -4000, top: 0, width: 720, background: '#ffffff', zIndex: -1 }}
+        >
+          <ConsultSummarySheet patient={patient} consult={consult} sheetId={SUMMARY_CAPTURE_ID} />
+        </div>,
+        document.body
+      )}
+      {overlay && typeof document !== 'undefined' ? createPortal(overlay, document.body) : null}
+    </>
+  );
 }

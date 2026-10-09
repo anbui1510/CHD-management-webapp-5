@@ -1,4 +1,5 @@
 export const GOOGLE_APPS_SCRIPT_CODE = `/**
+ * SCRIPT_VERSION: 2026-10-09-security
  * Google Apps Script for Pediatric Cardiac (CHD) Patient Management System
  * Hook this script into your Google Sheets to sync with Cloud Run in real-time.
  * 
@@ -194,14 +195,16 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 2. Validate API Key for all other actions
+  // 2. API key is required for every action except the first setup.
   var apiKey = PropertiesService.getScriptProperties().getProperty("API_KEY");
-  if (apiKey) {
-    var reqKey = (e && e.parameter) ? e.parameter.apiKey : "";
-    if (reqKey !== apiKey) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Invalid or missing API Key" }))
-                           .setMimeType(ContentService.MimeType.JSON);
-    }
+  if (!apiKey) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "API Key chưa được cấu hình. Hãy gọi action=setup." }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+  var reqKey = (e && e.parameter) ? e.parameter.apiKey : "";
+  if (reqKey !== apiKey) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Invalid or missing API Key" }))
+                         .setMimeType(ContentService.MimeType.JSON);
   }
 
   if (action === "test") {
@@ -236,7 +239,7 @@ function doGet(e) {
         staff = readSheetAsJson(ss, "Staff");
       }
     }
-    return ContentService.createTextOutput(JSON.stringify({ staff: staff }))
+    return ContentService.createTextOutput(JSON.stringify({ staff: stripStaffPasswords(staff) }))
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -270,7 +273,7 @@ function doGet(e) {
   var responseData = {
     patients: patients,
     consults: consults,
-    staff: staff,
+    staff: stripStaffPasswords(staff),
     cathlabs: cathlabs,
     operations: operations,
     cmrs: cmrs,
@@ -439,23 +442,23 @@ function doPost(e) {
   
   // Validate API Key for POST requests
   var apiKey = PropertiesService.getScriptProperties().getProperty("API_KEY");
-  if (apiKey) {
-    var reqKey = "";
-    try {
-      if (e && e.postData && e.postData.contents) {
-        var payload = JSON.parse(e.postData.contents);
-        reqKey = payload.apiKey || "";
-      }
-    } catch (err) {}
-    
-    if (!reqKey && e && e.parameter) {
-      reqKey = e.parameter.apiKey || "";
+  if (!apiKey) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "API Key chưa được cấu hình." }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+  var reqKey = "";
+  try {
+    if (e && e.postData && e.postData.contents) {
+      var payloadCheck = JSON.parse(e.postData.contents);
+      reqKey = payloadCheck.apiKey || "";
     }
-    
-    if (reqKey !== apiKey) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Invalid or missing API Key" }))
-                           .setMimeType(ContentService.MimeType.JSON);
-    }
+  } catch (err) {}
+  if (!reqKey && e && e.parameter) {
+    reqKey = e.parameter.apiKey || "";
+  }
+  if (reqKey !== apiKey) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Unauthorized: Invalid or missing API Key" }))
+                         .setMimeType(ContentService.MimeType.JSON);
   }
 
   var result = { status: "error", message: "Unknown action" };
@@ -483,22 +486,17 @@ function doPost(e) {
       }
       
       if (!matchedStaff) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Mã nhân viên không tồn tại!" }))
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Mã nhân viên hoặc mật khẩu không đúng." }))
                              .setMimeType(ContentService.MimeType.JSON);
       }
       
-      var hashedInput = hashPassword(inputPassword, inputStaffKey);
-      var isPlaintextMatch = (String(matchedStaff.Password || "") === inputPassword);
-      var isHashedMatch = (String(matchedStaff.Password || "") === hashedInput);
-      
-      if (!isPlaintextMatch && !isHashedMatch) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Mật khẩu không đúng. Vui lòng thử lại!" }))
+      var verdict = verifyStoredPassword(inputPassword, String(matchedStaff.Password || ""), inputStaffKey);
+      if (!verdict.ok) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Mã nhân viên hoặc mật khẩu không đúng." }))
                              .setMimeType(ContentService.MimeType.JSON);
       }
-      
-      // Auto-migrate plaintext password to hash
-      if (isPlaintextMatch && !isHashedMatch) {
-        matchedStaff.Password = hashedInput;
+      if (verdict.upgraded) {
+        matchedStaff.Password = verdict.upgraded;
         writeRecordToSheet("Staff", "update", matchedStaff.StaffKey, matchedStaff);
       }
       
@@ -708,23 +706,55 @@ function readSheetAsJson(ss, sheetName) {
   return jsonArray;
 }
 
-// Hash password with per-user salt (StaffKey) using SHA-256
-function hashPassword(password, salt) {
-  var input = password + ":" + salt;
+function stripStaffPasswords(staff) {
+  var safe = [];
+  for (var i = 0; i < staff.length; i++) {
+    var copy = {};
+    for (var key in staff[i]) {
+      if (staff[i].hasOwnProperty(key) && key !== "Password") copy[key] = staff[i][key];
+    }
+    safe.push(copy);
+  }
+  return safe;
+}
+
+function sha256Hex(input) {
   var rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input, Utilities.Charset.UTF_8);
   var output = "";
   for (var i = 0; i < rawHash.length; i++) {
     var val = rawHash[i];
-    if (val < 0) {
-      val += 256;
-    }
+    if (val < 0) val += 256;
     var byteString = val.toString(16);
-    if (byteString.length == 1) {
-      byteString = "0" + byteString;
-    }
+    if (byteString.length == 1) byteString = "0" + byteString;
     output += byteString;
   }
   return output;
+}
+
+function hashPassword(password, salt) {
+  var useSalt = salt ? String(salt) : Utilities.getUuid().replace(/-/g, "");
+  return "sha256$" + useSalt + "$" + sha256Hex(password + ":" + useSalt);
+}
+
+function verifyStoredPassword(password, stored, staffKey) {
+  var saved = String(stored || "").trim();
+  if (!saved || !password) return { ok: false, upgraded: "" };
+  if (saved.indexOf("sha256$") === 0) {
+    var parts = saved.split("$");
+    if (parts.length !== 3) return { ok: false, upgraded: "" };
+    return { ok: hashPassword(password, parts[1]) === saved, upgraded: "" };
+  }
+  if (/^[0-9a-f]{64}$/i.test(saved)) {
+    var legacy = sha256Hex(password + ":" + staffKey);
+    if (legacy.toLowerCase() === saved.toLowerCase()) {
+      return { ok: true, upgraded: hashPassword(password, "") };
+    }
+    return { ok: false, upgraded: "" };
+  }
+  if (saved === String(password)) {
+    return { ok: true, upgraded: hashPassword(password, "") };
+  }
+  return { ok: false, upgraded: "" };
 }
 
 // Check if a string is a 64-character SHA-256 hash (hexadecimal)

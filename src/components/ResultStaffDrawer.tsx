@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PatientAdminEditButton } from './PatientAdminEditButton';
 import { AnimatePresence } from 'motion/react';
-import { AlertTriangle, Clipboard, ClipboardList, Stethoscope, X } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Stethoscope, X } from 'lucide-react';
 import {
   Consult,
   ConsultResultEnum,
@@ -29,7 +29,7 @@ import { MODAL_TITLE } from '../utils/modalTitles';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
 import { useMobileKeyboardInset } from '../hooks/useMobileKeyboardInset';
-import { ConsultSummaryModal } from './ConsultSummaryModal';
+import { StaffSummaryExportActions } from './ConsultSummaryModal';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -129,11 +129,10 @@ export default function ResultStaffDrawer({
   const isMobile = useIsMobile();
   const isModalOpen = layout === 'modal' && !!consultKey;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const { keyboardInset, viewportHeight } = useMobileKeyboardInset(isModalOpen);
   const keyboardOpen = isMobile && keyboardInset > 80;
   useLockBodyScroll(isModalOpen);
-  usePreventBackgroundTouchScroll(scrollContainerRef, isModalOpen && !showSummaryModal);
+  usePreventBackgroundTouchScroll(scrollContainerRef, isModalOpen);
 
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [isEditing, setIsEditing] = useState(false);
@@ -745,20 +744,17 @@ export default function ResultStaffDrawer({
 
                       {/* Action buttons area — sticky footer */}
                       <div className={`pt-2 border-t border-slate-100 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'px-4 md:px-6'}`}>
-                        {!autoEdit && !isFormEditing ? (
-                          <div className="w-full grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowSummaryModal(true)}
-                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 max-md:text-xs md:text-[11px]"
-                            >
-                              <Clipboard className="w-4 h-4 shrink-0" />
-                              Tóm tắt
-                            </button>
+                        <div className="w-full flex flex-wrap items-center gap-2">
+                          <StaffSummaryExportActions
+                            patient={patient}
+                            consult={{ ...consult, ...summaryConsultOverride }}
+                            onError={(msg) => triggerAlert(msg, MODAL_TITLE.warning)}
+                          />
+                          {!autoEdit && !isFormEditing ? (
                             <button
                               type="button"
                               onClick={() => setIsEditing(true)}
-                              className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer max-md:text-sm md:text-xs flex items-center justify-center gap-1.5 font-sans"
+                              className="ml-auto bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer max-md:text-sm md:text-xs flex items-center justify-center gap-1.5 font-sans"
                             >
                               <ClipboardList className="w-4 h-4 shrink-0" />
                               {isMobile
@@ -767,33 +763,25 @@ export default function ResultStaffDrawer({
                                   ? 'Sửa kết quả hội chẩn'
                                   : 'Điền kết quả hội chẩn'}
                             </button>
-                          </div>
-                        ) : (
-                          <div className="w-full grid grid-cols-3 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowSummaryModal(true)}
-                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-1.5 max-md:text-xs md:text-[11px]"
-                            >
-                              <Clipboard className="w-4 h-4 shrink-0" />
-                              Tóm tắt
-                            </button>
-                            <button
-                              type="button"
-                              onClick={requestRevertEdit}
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl transition cursor-pointer max-md:text-xs md:text-[10px] font-sans text-center"
-                            >
-                              {autoEdit ? 'Đóng' : 'Hủy'}
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={saving}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-2 md:px-4 rounded-2xl shadow-md transition cursor-pointer max-md:text-xs md:text-[10px] font-sans text-center font-bold disabled:opacity-50"
-                            >
-                              {saving ? 'Đang lưu...' : '✓ Lưu kết quả'}
-                            </button>
-                          </div>
-                        )}
+                          ) : (
+                            <div className="ml-auto flex gap-2">
+                              <button
+                                type="button"
+                                onClick={requestRevertEdit}
+                                className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold uppercase py-3 px-3 md:px-4 rounded-2xl transition cursor-pointer max-md:text-xs md:text-[10px] font-sans text-center"
+                              >
+                                {autoEdit ? 'Đóng' : 'Hủy'}
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={saving}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold uppercase py-3 px-3 md:px-4 rounded-2xl shadow-md transition cursor-pointer max-md:text-xs md:text-[10px] font-sans text-center font-bold disabled:opacity-50"
+                              >
+                                {saving ? 'Đang lưu...' : '✓ Lưu kết quả'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
               </form>
@@ -853,16 +841,6 @@ export default function ResultStaffDrawer({
           {drawerForm}
         </div>
         {exitConfirmDialog}
-        {showSummaryModal && (
-          <ConsultSummaryModal
-            patient={patient}
-            consult={consult}
-            consultOverride={summaryConsultOverride}
-            onClose={() => setShowSummaryModal(false)}
-            onError={(msg) => triggerAlert(msg, MODAL_TITLE.warning)}
-            zIndexClass="z-[90]"
-          />
-        )}
       </>
     );
   }
@@ -908,16 +886,6 @@ export default function ResultStaffDrawer({
               {drawerForm}
             </div>
             {exitConfirmDialog}
-            {showSummaryModal && (
-              <ConsultSummaryModal
-                patient={patient}
-                consult={consult}
-                consultOverride={summaryConsultOverride}
-                onClose={() => setShowSummaryModal(false)}
-                onError={(msg) => triggerAlert(msg, MODAL_TITLE.warning)}
-                zIndexClass="z-[90]"
-              />
-            )}
           </div>
         )}
     </AnimatePresence>

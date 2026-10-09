@@ -60,7 +60,7 @@ export default function VirtualSheets({
   }, [activeTab]);
 
   // Real Sync State
-  const [syncConfig, setSyncConfig] = useState<{ scriptUrl: string; scriptSecret?: string; isSynced: boolean }>({ scriptUrl: '', scriptSecret: '', isSynced: false });
+  const [syncConfig, setSyncConfig] = useState<{ scriptUrl: string; hasSecret?: boolean; isSynced: boolean }>({ scriptUrl: '', hasSecret: false, isSynced: false });
   const [loadingConfig, setLoadingConfig] = useState<boolean>(true);
   const [inputUrl, setInputUrl] = useState<string>('');
   const [inputSecret, setInputSecret] = useState<string>('');
@@ -88,9 +88,11 @@ export default function VirtualSheets({
         if (data.scriptUrl) {
           setInputUrl(data.scriptUrl);
         }
-        if (data.scriptSecret) {
-          setInputSecret(data.scriptSecret);
-        }
+        setSyncConfig({
+          scriptUrl: data.scriptUrl || '',
+          hasSecret: Boolean(data.hasSecret),
+          isSynced: Boolean(data.isSynced || data.scriptUrl),
+        });
         setLoadingConfig(false);
       })
       .catch(err => {
@@ -131,7 +133,7 @@ export default function VirtualSheets({
         await hydrateSyncConfigFromServer();
         setActionLoading(false);
         setActionSuccess(data.message);
-        setSyncConfig({ scriptUrl: inputUrl.trim(), scriptSecret: inputSecret.trim(), isSynced: true });
+        setSyncConfig({ scriptUrl: inputUrl.trim(), hasSecret: true, isSynced: true });
         if (onRefreshData) {
           onRefreshData(); // Reload parent medical data from new Sheet!
         }
@@ -159,7 +161,7 @@ export default function VirtualSheets({
           setActionSuccess('Đã hủy liên kết thành công!');
           setInputUrl('');
           setInputSecret('');
-          setSyncConfig({ scriptUrl: '', scriptSecret: '', isSynced: false });
+          setSyncConfig({ scriptUrl: '', hasSecret: false, isSynced: false });
           if (onRefreshData) {
             onRefreshData();
           }
@@ -420,11 +422,8 @@ export default function VirtualSheets({
             <span className="truncate flex-grow">
               <strong>URL Web App liên kết: </strong>
               <code className="bg-slate-100 p-1 rounded border border-slate-200 font-mono text-slate-700 select-all mr-3">{syncConfig.scriptUrl}</code>
-              {syncConfig.scriptSecret && (
-                <>
-                  <strong>API Key: </strong>
-                  <code className="bg-slate-100 p-1 rounded border border-slate-200 font-mono text-slate-700 select-all">{syncConfig.scriptSecret}</code>
-                </>
+              {syncConfig.hasSecret && (
+                <strong className="text-slate-500">Khóa API được lưu trên máy chủ</strong>
               )}
             </span>
             <div className="flex items-center gap-3 shrink-0">
@@ -611,7 +610,7 @@ export default function VirtualSheets({
                 </label>
                 <input
                   type="text"
-                  placeholder="Nhập hoặc tạo mã bảo mật để bảo vệ Apps Script"
+                  placeholder="Để trống nếu giữ khóa đang lưu trên máy chủ"
                   value={inputSecret}
                   onChange={(e) => setInputSecret(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none font-mono"

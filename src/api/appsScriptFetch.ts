@@ -4,7 +4,6 @@ import { getAppVersionPayload } from '../appVersion';
 import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
 import type { Staff, Source, Consult, Patient, Notification } from '../types';
 import {
-  buildAppsScriptActionUrl,
   fetchAppsScriptWithRetry,
   formatAppsScriptFetchError,
   formatAppsScriptHttpError,
@@ -33,38 +32,27 @@ type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CM
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
 const SCRIPT_SECRET_STORAGE_KEY = 'chd_apps_script_secret';
 
-const isLikelyMobileDevice = (): boolean => {
-  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+const getScriptSecret = () => '';
+
+const serverFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const native = typeof window !== 'undefined'
+    ? (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined
+    : undefined;
+  return (native || fetch)(input, init);
 };
 
-const getAppsScriptFetchTimeout = (force: boolean): number => {
-  const desktopTimeout = force ? 60000 : 20000;
-  if (!isLikelyMobileDevice()) return desktopTimeout;
-  return force ? 90000 : 45000;
-};
-
-const fetchWithTimeout = async (url: string, init?: RequestInit, timeout = 60000): Promise<Response> => {
-  const nativeFetch = (typeof window !== 'undefined' && (window as any).__CHD_NATIVE_FETCH__) || fetch;
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await nativeFetch(url, {
-      ...init,
-      signal: controller.signal
-    });
-    clearTimeout(id);
-    return response;
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
-  }
-};
-
-const getScriptSecret = () =>
-  localStorage.getItem(SCRIPT_SECRET_STORAGE_KEY) ||
-  String(viteEnv.VITE_GOOGLE_SCRIPT_SECRET || viteEnv.VITE_GOOGLE_SCRIPT_API_KEY || '').trim();
+const proxySheets = (
+  body: { kind: 'get' | 'post'; action?: string; payload?: Record<string, unknown> },
+  force = false
+) => fetchAppsScriptWithRetry(
+  () => serverFetch('/api/sheets/proxy', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }),
+  { maxAttempts: force ? 5 : 3, baseDelayMs: 1500 }
+);
 
 const clearMemoryCache = (): void => {
   cache = null;
@@ -74,19 +62,6 @@ const clearMemoryCache = (): void => {
   pendingStaffLoad = null;
 };
 
-const setScriptSecret = (secret: string): boolean => {
-  const trimmed = secret.trim();
-  const previous = getScriptSecret();
-  if (trimmed === previous) return false;
-
-  if (trimmed) {
-    localStorage.setItem(SCRIPT_SECRET_STORAGE_KEY, trimmed);
-  } else {
-    localStorage.removeItem(SCRIPT_SECRET_STORAGE_KEY);
-  }
-  clearMemoryCache();
-  return true;
-};
 const viteEnv = (import.meta as any).env || {};
 
 const EMPTY_DATA: SheetData = {
@@ -261,13 +236,6 @@ function bridgeResolveSession(token: string): string | null {
 
 function bridgeRevokeToken(token: string): void {
   removeBridgeSession(token);
-}
-
-async function bridgeHashPassword(password: string, salt: string): Promise<string> {
-  const msgUint8 = new TextEncoder().encode(password + ':' + salt);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Extract Bearer token from request init headers */
@@ -550,13 +518,7 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
 
   if (pendingStaffLoad && !force) return pendingStaffLoad;
 
-  const apiKey = getScriptSecret();
-  const fetchUrl = buildAppsScriptActionUrl(scriptUrl, 'getStaff', { apiKey: apiKey || undefined });
-
-  pendingStaffLoad = fetchAppsScriptWithRetry(
-    () => fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force)),
-    { maxAttempts: force ? 5 : 3, baseDelayMs: 1500 }
-  )
+  pendingStaffLoad = proxySheets({ kind: 'get', action: 'getStaff' }, force)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
@@ -632,14 +594,8 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
     return Promise.resolve(normalizeData({ staff: BUNDLED_STAFF }));
   }
 
-  const apiKey = getScriptSecret();
-  const fetchUrl = buildAppsScriptActionUrl(scriptUrl, 'getAll', { apiKey: apiKey || undefined });
-
   pendingLoadIsForce = force;
-  pendingLoad = fetchAppsScriptWithRetry(
-    () => fetchWithTimeout(fetchUrl, undefined, getAppsScriptFetchTimeout(force)),
-    { maxAttempts: force ? 5 : 3, baseDelayMs: 1500 }
-  )
+  pendingLoad = proxySheets({ kind: 'get', action: 'getAll' }, force)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
@@ -866,18 +822,7 @@ const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): 
 };
 
 const syncRecordToScript = (payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any }) => {
-  const scriptUrl = getScriptUrl();
-  if (!scriptUrl) return;
-
-  const apiKey = getScriptSecret();
-  void fetchAppsScriptWithRetry(
-    () => fetchWithTimeout(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ ...payload, apiKey })
-    }),
-    { maxAttempts: 3 }
-  ).then(async (response) => {
+  void proxySheets({ kind: 'post', payload }).then(async (response) => {
     const text = await response.text();
     if (!response.ok) {
       console.error(`Background upsert sync HTTP ${response.status}:`, text);
@@ -902,19 +847,7 @@ const postToScript = async (
   record: any,
   isInsert: boolean
 ) => {
-  const scriptUrl = getScriptUrl();
-  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
-
-  const apiKey = getScriptSecret();
-  const response = await fetchAppsScriptWithRetry(
-    () => fetchWithTimeout(scriptUrl, {
-      method: 'POST',
-      // text/plain avoids a browser preflight, which Apps Script Web Apps do not handle well.
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ ...payload, apiKey })
-    }),
-    { maxAttempts: 3 }
-  );
+  const response = await proxySheets({ kind: 'post', payload });
 
   const text = await response.text();
   if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
@@ -927,18 +860,10 @@ const postToScript = async (
 };
 
 const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'insert' | 'update'; key: string; data: any }>) => {
-  const scriptUrl = getScriptUrl();
-  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
-
-  const apiKey = getScriptSecret();
-  const response = await fetchAppsScriptWithRetry(
-    () => fetchWithTimeout(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'batch', operations, apiKey })
-    }),
-    { maxAttempts: 3 }
-  );
+  const response = await proxySheets({
+    kind: 'post',
+    payload: { action: 'batch', operations }
+  });
 
   const text = await response.text();
   if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
@@ -950,18 +875,10 @@ const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'i
 };
 
 const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
-  const scriptUrl = getScriptUrl();
-  if (!scriptUrl) throw new Error('Chưa cấu hình Google Apps Script URL');
-
-  const apiKey = getScriptSecret();
-  const response = await fetchAppsScriptWithRetry(
-    () => fetchWithTimeout(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'delete', ...payload, apiKey })
-    }),
-    { maxAttempts: 3 }
-  );
+  const response = await proxySheets({
+    kind: 'post',
+    payload: { action: 'delete', ...payload }
+  });
 
   const text = await response.text();
   if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
@@ -1379,48 +1296,31 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
 
     // POST /api/auth/login
     if (subAction === 'login' && method === 'POST') {
-      const body = await parseBody(init);
-      const { StaffKey, Password } = body || {};
-      if (!StaffKey || !Password) {
-        return jsonResponse({ error: 'Vui lòng nhập mã nhân viên và mật khẩu.' }, { status: 400 });
+      const upstream = await serverFetch(parsed.pathname, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: typeof init?.body === 'string' ? init.body : JSON.stringify(await parseBody(init)),
+      });
+      const data = await upstream.json().catch(() => ({ error: 'Lỗi đăng nhập.' }));
+      if (upstream.ok && data?.staff?.StaffKey) {
+        const token = bridgeCreateSession(String(data.staff.StaffKey));
+        const headers = new Headers({ 'Content-Type': 'application/json' });
+        const setCookie = upstream.headers.get('set-cookie');
+        if (setCookie) headers.append('set-cookie', setCookie);
+        return new Response(JSON.stringify({ token, staff: stripBridgePassword(data.staff) }), {
+          status: upstream.status,
+          headers,
+        });
       }
-
-      const verifyLocally = async () => {
-        let staffList: Staff[] = [];
-        try {
-          staffList = staffCache ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
-        } catch (e) {
-          console.warn('Failed to load staff list for local fallback, using bundled roster:', e);
-          staffList = BUNDLED_STAFF;
-        }
-        const localStaff = staffList.find((s: Staff) => String(s.StaffKey || '').trim() === String(StaffKey).trim())
-          ?? BUNDLED_STAFF.find((s: Staff) => String(s.StaffKey || '').trim() === String(StaffKey).trim());
-        if (!localStaff) {
-          return jsonResponse({ error: 'Mã nhân viên không tồn tại!' }, { status: 401 });
-        }
-        const expectedPassword = String(localStaff.Password || '1111').trim();
-        const inputPassword = String(Password).trim();
-        const hashedInput = await bridgeHashPassword(inputPassword, String(localStaff.StaffKey));
-        
-        if (inputPassword !== expectedPassword && hashedInput !== expectedPassword) {
-          return jsonResponse({ error: 'Mật khẩu không đúng. Vui lòng thử lại!' }, { status: 401 });
-        }
-        const token = bridgeCreateSession(String(localStaff.StaffKey));
-        return jsonResponse({ token, staff: stripBridgePassword(localStaff) });
-      };
-
-      // Local verification only — instant login without waiting for Apps Script
-      return verifyLocally();
+      return jsonResponse(data, { status: upstream.status });
     }
 
-    // POST /api/auth/logout
     if (subAction === 'logout' && method === 'POST') {
       const token = extractBridgeToken(init);
       if (token) bridgeRevokeToken(token);
-
-      // Clear in-memory cache only; persisted IndexedDB stays for fast re-login.
-      await clearLocalCache();
-
+      await serverFetch(parsed.pathname, { method: 'POST', credentials: 'include' }).catch(() => undefined);
+      await clearAllPersistedCache();
       return jsonResponse({ success: true });
     }
 
@@ -1685,16 +1585,14 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     }
 
     // 3. Sync to Google Sheets
-    await fetchWithTimeout(scriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
+    await proxySheets({
+      kind: 'post',
+      payload: {
         action: 'sync_sources',
         type: 'Source',
         key: '',
         data: nextSources,
-        apiKey: getScriptSecret()
-      })
+      }
     });
 
     return jsonResponse({ success: true, count: nextSources.length });
@@ -1750,12 +1648,15 @@ export const clearAllPersistedCache = async (): Promise<void> => {
   await clearPersistedData();
 };
 
-const applySyncConfigRecord = (scriptUrl: string, scriptSecret?: string): boolean => {
+const applySyncConfigRecord = (scriptUrl: string, _scriptSecret?: string): boolean => {
   const trimmedUrl = String(scriptUrl || '').trim();
   if (!trimmedUrl) return false;
   setScriptUrl(trimmedUrl);
-  const secret = String(scriptSecret || '').trim();
-  if (secret) setScriptSecret(secret);
+  try {
+    localStorage.removeItem(SCRIPT_SECRET_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
   return true;
 };
 
@@ -1768,6 +1669,7 @@ export async function migrateLocalSyncConfigToServer(): Promise<boolean> {
   const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
   const requestFetch = nativeFetch || window.fetch.bind(window);
   const localSecret = getScriptSecret();
+  if (!localSecret) return false;
 
   try {
     const migrateRes = await requestFetch('/api/sync-config/migrate', {
@@ -1824,16 +1726,15 @@ export const installAppsScriptFetchBridge = () => {
   (window as any).__CHD_APPS_SCRIPT_FETCH_BRIDGE__ = true;
 
   hydrateBridgeSessions();
+  try {
+    localStorage.removeItem(SCRIPT_SECRET_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
 
   const builtInUrl = normalizeAppsScriptUrl(String(viteEnv.VITE_GOOGLE_SCRIPT_URL || ''));
   if (builtInUrl && !localStorage.getItem(SCRIPT_URL_STORAGE_KEY)) {
     localStorage.setItem(SCRIPT_URL_STORAGE_KEY, builtInUrl);
-  }
-  const builtInSecret = String(
-    viteEnv.VITE_GOOGLE_SCRIPT_SECRET || viteEnv.VITE_GOOGLE_SCRIPT_API_KEY || ''
-  ).trim();
-  if (builtInSecret && !localStorage.getItem(SCRIPT_SECRET_STORAGE_KEY)) {
-    localStorage.setItem(SCRIPT_SECRET_STORAGE_KEY, builtInSecret);
   }
 
   const nativeFetch = window.fetch.bind(window);

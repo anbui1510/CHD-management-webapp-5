@@ -12,6 +12,17 @@ coverage/
 
 # Dữ liệu nhạy cảm / cấu hình máy local (dùng file *.example.json)
 data/sync_config.json
+data/patients.json
+data/consults.json
+data/cathlabs.json
+data/operations.json
+data/cmrs.json
+data/transplants.json
+data/staff.json
+data/notifications.json
+data/doctor-performance-marks.json
+data/sheets-sync-failures.json
+data/backup-*/
 
 # Cache dev
 .vite/

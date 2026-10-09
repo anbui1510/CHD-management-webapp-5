@@ -68,7 +68,7 @@ import { SearchTextInput } from './components/SearchTextInput';
 import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError, getMedicalDataFetchTimeout, peekCachedMedicalDataBundle, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
-import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
+import { clearAllPersistedCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
@@ -1106,6 +1106,7 @@ export default function App() {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ StaffKey: loginStaffKey, Password: loginPassword })
       });
@@ -1190,7 +1191,7 @@ export default function App() {
     setDoctorPerformanceMarks([]);
 
     // Clear in-memory bridge cache only; keep IndexedDB so re-login shows data instantly.
-    void clearLocalCache().catch(err => console.warn('Failed to clear memory cache on logout:', err));
+    void clearAllPersistedCache().catch(err => console.warn('Failed to clear cache on logout:', err));
   }, [currentStaff]);
 
   handleLogoutRef.current = handleLogout;

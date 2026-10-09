@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import {defineConfig} from 'vite';
 import { APP_VERSION } from './src/appVersion';
@@ -29,6 +30,26 @@ function resolveAppBuildId(): string {
   }
 }
 
+function stripBundledStaffSecrets() {
+  return {
+    name: 'strip-bundled-staff-secrets',
+    enforce: 'pre' as const,
+    load(id: string) {
+      const normalized = id.split('?')[0].replace(/\\/g, '/');
+      if (!normalized.endsWith('/data/staff.json')) return null;
+      const records = JSON.parse(fs.readFileSync(normalized, 'utf8')) as Array<Record<string, unknown>>;
+      const safe = records.map(staff => {
+        const next: Record<string, unknown> = { ...staff, Password: '' };
+        delete next.Email;
+        delete next.StaffPhone;
+        delete next.StaffDOB;
+        return next;
+      });
+      return JSON.stringify(safe);
+    },
+  };
+}
+
 export default defineConfig(() => {
   const appBuildId = resolveAppBuildId();
 
@@ -37,6 +58,7 @@ export default defineConfig(() => {
       __APP_BUILD_ID__: JSON.stringify(appBuildId),
     },
     plugins: [
+      stripBundledStaffSecrets(),
       react(),
       tailwindcss(),
       VitePWA({

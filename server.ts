@@ -12,7 +12,10 @@ import { createServer as createViteServer } from 'vite';
 import { Patient, Consult, Staff, CathLab, CMR, Transplant, Source, DeviceTemplate, RolePreset, Operation, Notification, DoctorPerformanceMark, SheetsSyncContext, SheetsSyncFailure } from './src/types';
 import { normalizeDiagnosisID } from './src/data/source';
 import { DEFAULT_ROLE_PRESET_RECORDS } from './src/auth/rolePresetDefaults';
-import { isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
+import { canAccessModule, isAdminStaff, isSystemRolePresetId, resolveRolePresetRecords, slugifyRolePresetId } from './src/auth/permissions';
+import { hashPassword, verifyPassword } from './src/auth/passwordCrypto';
+import { assertStaffMutation, denialForSheetsPayload } from './src/auth/staffUpdateGuard';
+import { forwardToAppsScript } from './src/sync/sheetsProxy';
 import { resolveStaffByNameOrKey, resolveStaffDisplayName } from './src/utils/staffNameMatch';
 import {
   buildMissingCathResultNotificationMessage,
@@ -58,6 +61,16 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
 
 app.use(express.json({ limit: '5mb' }));
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  }
+  next();
+});
 
 // ─────────────────────────────────────────────────────────────────
 // AUTH TOKEN SYSTEM
@@ -106,14 +119,23 @@ function stripPassword<T extends Record<string, any>>(staff: T): Omit<T, 'Passwo
   return safe;
 }
 
-/** Hash password with per-user salt (StaffKey) using SHA-256 */
-function hashPassword(password: string, salt: string): string {
-  return crypto.createHash('sha256').update(password + ':' + salt, 'utf8').digest('hex');
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function clientIp(req: express.Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
+  return req.socket.remoteAddress || 'unknown';
 }
 
-/** Check if a string is a 64-character SHA-255 hash (hexadecimal) */
-function isSHA256(str: string): boolean {
-  return /^[0-9a-f]{64}$/i.test(str);
+function tooManyLoginAttempts(key: string): boolean {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(key, { count: 1, resetAt: now + 10 * 60 * 1000 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > 8;
 }
 
 /** Extract Bearer token from Authorization header or cookie */
@@ -161,6 +183,21 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
       res.status(403).json({ error: 'Chỉ Admin mới có quyền thực hiện hành động này.' });
       return;
     }
+    (req as any).authStaff = staff;
+    next();
+  });
+}
+
+/** Admin, or a user allowed to open the Google Sheets module. */
+function requireSheetsConfig(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  requireAuth(req, res, () => {
+    const staffKey = (req as any).staffKey as string;
+    const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const staff = staffList.find(s => String(s.StaffKey) === staffKey);
+    if (!staff || (!isAdminStaff(staff) && !canAccessModule(staff, 'google-sheets'))) {
+      res.status(403).json({ error: 'Bạn không có quyền cấu hình Google Sheets.' });
+      return;
+    }
     next();
   });
 }
@@ -175,20 +212,26 @@ app.post('/api/auth/login', async (req, res) => {
       return;
     }
 
+    const attemptKey = `${clientIp(req)}:${String(StaffKey).trim()}`;
+    if (tooManyLoginAttempts(attemptKey)) {
+      res.status(429).json({ error: 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi vài phút.' });
+      return;
+    }
+
     const config = getSyncConfig();
     let staffMember: Staff | undefined;
+    const invalidLogin = () => {
+      res.status(401).json({ error: 'Mã nhân viên hoặc mật khẩu không đúng.' });
+    };
 
-    // 1. Try local verification first for instant login
     const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
     const localStaff = staffList.find(s => String(s.StaffKey || '').trim() === String(StaffKey).trim());
     if (localStaff) {
-      const hashedInput = hashPassword(Password, String(StaffKey));
-      const isPlaintextMatch = (String(localStaff.Password || '').trim() === String(Password).trim());
-      const isHashedMatch = (String(localStaff.Password || '').trim() === String(hashedInput).trim());
-      if (isPlaintextMatch || isHashedMatch) {
+      const verdict = verifyPassword(String(Password), String(localStaff.Password || ''), String(localStaff.StaffKey));
+      if (verdict.ok) {
         staffMember = localStaff;
-        if (isPlaintextMatch && !isHashedMatch) {
-          localStaff.Password = hashedInput;
+        if (verdict.upgraded) {
+          localStaff.Password = verdict.upgraded;
           writeDB(STAFF_FILE, staffList);
           if (config.scriptUrl) {
             await pushToGoogleSheetsAwaited('Staff', 'update', localStaff.StaffKey, localStaff, {
@@ -202,14 +245,13 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     if (localStaff && !staffMember) {
-      res.status(401).json({ error: 'Mật khẩu không đúng.' });
+      invalidLogin();
       return;
     }
 
     // 2. Fallback to Google Sheets only when staff is not in local roster
     if (!staffMember && !localStaff && config.scriptUrl) {
       try {
-        console.log(`Verifying credentials with Google Sheets for StaffKey: ${StaffKey}`);
         const response = await fetchWithTimeout(config.scriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -229,7 +271,7 @@ app.post('/api/auth/login', async (req, res) => {
             if (resData && resData.message === 'Unknown action') {
               throw new Error('Unknown action');
             }
-            res.status(401).json({ error: resData.message || 'Mật khẩu hoặc mã nhân viên không đúng.' });
+            invalidLogin();
             return;
           }
         } else {
@@ -244,7 +286,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     if (!staffMember) {
-      res.status(401).json({ error: 'Xác thực thất bại.' });
+      invalidLogin();
       return;
     }
 
@@ -254,6 +296,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const token = createSession(String(staffMember.StaffKey));
+    loginAttempts.delete(attemptKey);
     res.cookie('CHD_AUTH_TOKEN', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -323,13 +366,16 @@ app.get('/api/version', (_req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // Proxy endpoint to bypass CORS for Google Drive Export
-app.get('/api/proxy/drive-export', async (req, res) => {
+app.get('/api/proxy/drive-export', requireAuth, async (req, res) => {
   const { url } = req.query;
   if (!url || typeof url !== 'string' || !url.startsWith('https://docs.google.com/')) {
     return res.status(400).json({ error: 'Invalid Google Drive URL' });
   }
   try {
-    const fetchRes = await fetch(url);
+    const fetchRes = await fetch(url, { redirect: 'manual' });
+    if (fetchRes.status >= 300 && fetchRes.status < 400) {
+      return res.status(400).json({ error: 'Google Drive URL redirected' });
+    }
     if (!fetchRes.ok) {
       return res.status(fetchRes.status).send('Fetch from Google Drive failed');
     }
@@ -1439,16 +1485,48 @@ function writeDB<T>(filePath: string, data: T[]): void {
 }
 
 // API Sync Config Router Endpoints
-app.get('/api/sync-config', (req, res) => {
+app.get('/api/sync-config', (_req, res) => {
   const config = getSyncConfig();
   res.json({
     scriptUrl: config.scriptUrl,
-    scriptSecret: config.scriptSecret || '',
+    hasSecret: !!config.scriptSecret,
     isSynced: !!config.scriptUrl
   });
 });
 
-app.post('/api/sync-config', async (req, res) => {
+app.post('/api/sheets/proxy', requireAuth, async (req, res) => {
+  try {
+    const staffKey = String((req as any).staffKey || '');
+    const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const actor = staffList.find(member => String(member.StaffKey) === staffKey);
+    const body = req.body || {};
+    if (body.kind === 'post') {
+      const denial = denialForSheetsPayload(
+        { StaffKey: staffKey, Role: actor?.Role },
+        body.payload || null
+      );
+      if (denial) {
+        res.status(403).json({ error: denial });
+        return;
+      }
+    } else if (body.kind !== 'get') {
+      res.status(400).json({ error: 'Yêu cầu proxy không hợp lệ.' });
+      return;
+    }
+    const upstream = await forwardToAppsScript(getSyncConfig(), {
+      kind: body.kind,
+      action: body.action,
+      payload: body.payload,
+    });
+    const text = await upstream.text();
+    res.status(upstream.status).type('application/json').send(text);
+  } catch (err) {
+    console.error('Error in POST /api/sheets/proxy:', err);
+    res.status(500).json({ error: 'Không thể gọi Google Apps Script.' });
+  }
+});
+
+app.post('/api/sync-config', requireSheetsConfig, async (req, res) => {
   const { scriptUrl, scriptSecret } = req.body;
   
   if (!scriptUrl) {
@@ -1463,12 +1541,13 @@ app.post('/api/sync-config', async (req, res) => {
   }
 
   try {
-    // First, call action=setup to configure the API key in the Apps Script
+    const existing = getSyncConfig();
+    const secretToStore = String(scriptSecret || '').trim() || existing.scriptSecret || '';
     let setupUrl = `${scriptUrl}?action=setup`;
-    if (scriptSecret) {
-      setupUrl += `&apiKey=${encodeURIComponent(scriptSecret)}`;
+    if (secretToStore) {
+      setupUrl += `&apiKey=${encodeURIComponent(secretToStore)}`;
     }
-    console.log(`Setting up API Key on Google Sheet: ${setupUrl}`);
+    console.log('Setting up Google Apps Script connection');
     const setupRes = await fetchWithTimeout(setupUrl, { method: 'GET' }, 10000);
     if (!setupRes.ok) {
       throw new Error(`Google Apps Script setup trả về lỗi HTTP ${setupRes.status}`);
@@ -1496,10 +1575,10 @@ app.post('/api/sync-config', async (req, res) => {
 
     // Verify scriptUrl responds properly with test action
     let testUrl = `${scriptUrl}?action=test`;
-    if (scriptSecret) {
-      testUrl += `&apiKey=${encodeURIComponent(scriptSecret)}`;
+    if (secretToStore) {
+      testUrl += `&apiKey=${encodeURIComponent(secretToStore)}`;
     }
-    console.log(`Testing connection & initializing database worksheets on URL: ${testUrl}`);
+    console.log('Testing Google Apps Script connection');
     const testRes = await fetchWithTimeout(testUrl, { method: 'GET' }, 10000);
     
     if (!testRes.ok) {
@@ -1515,7 +1594,7 @@ app.post('/api/sync-config', async (req, res) => {
     }
 
     // Save and immediately trigger full initial pull sync
-    saveSyncConfig({ scriptUrl, scriptSecret });
+    saveSyncConfig({ scriptUrl, scriptSecret: secretToStore });
     const pullSuccess = await syncFromGoogleSheets(true);
 
     res.json({
@@ -1531,7 +1610,7 @@ app.post('/api/sync-config', async (req, res) => {
 });
 
 // Manual force sync endpoint
-app.post('/api/sync-config/sync', async (req, res) => {
+app.post('/api/sync-config/sync', requireSheetsConfig, async (req, res) => {
   const pullSuccess = await syncFromGoogleSheets(true);
   if (pullSuccess) {
     res.json({ success: true, message: "Đồng bộ thành công dữ liệu mới nhất từ Google Sheets!" });
@@ -2384,7 +2463,7 @@ app.get('/api/chd-brief/today', async (_req, res) => {
   }
 });
 
-app.post('/api/chd-brief/generate', async (req, res) => {
+app.post('/api/chd-brief/generate', requireAuth, async (req, res) => {
   try {
     const force = Boolean(req.body?.force);
     const result = await runPipeline({ force });
@@ -2486,6 +2565,17 @@ app.put('/api/staff/:key', requireAuth, async (req, res) => {
 
     const { payload, syncContext } = extractSyncContext(req.body || {});
     const updateData = payload || {};
+    const actor = staff.find(member => String(member.StaffKey) === String((req as any).staffKey || ''));
+    const denial = assertStaffMutation(
+      { StaffKey: String(actor?.StaffKey || ''), Role: actor?.Role },
+      String(key),
+      'update',
+      updateData
+    );
+    if (denial) {
+      res.status(403).json({ error: denial });
+      return;
+    }
     if (updateData.StaffPhone !== undefined && updateData.StaffPhone !== null) {
       updateData.StaffPhone = cleanSheetText(updateData.StaffPhone);
     }
@@ -2493,7 +2583,7 @@ app.put('/api/staff/:key', requireAuth, async (req, res) => {
     if (updateData.Password === undefined || updateData.Password === null || String(updateData.Password).trim() === '') {
       delete updateData.Password;
     } else {
-      updateData.Password = hashPassword(String(updateData.Password).trim(), staff[index].StaffKey);
+      updateData.Password = hashPassword(String(updateData.Password).trim());
     }
 
     staff[index] = { ...staff[index], ...updateData, StaffKey: staff[index].StaffKey };
@@ -2510,7 +2600,7 @@ app.put('/api/staff/:key', requireAuth, async (req, res) => {
       getSheetsPushOptions(req, syncContext, 'Staff', staff[index].StaffKey)
     );
 
-    res.json(withSheetsSync(staff[index], sheetsSync));
+    res.json(withSheetsSync(stripPassword(staff[index]), sheetsSync));
   } catch (err) {
     console.error('Error in PUT /api/staff/:key:', err);
     res.status(500).json({ error: 'Internal server error' });

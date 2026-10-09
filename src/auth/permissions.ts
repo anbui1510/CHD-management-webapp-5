@@ -188,7 +188,7 @@ export function getModuleLabel(module: AppModule): string {
 }
 
 export function isAdminStaff(staff: Staff | null | undefined): boolean {
-  return String(staff?.Role || '').trim().toLowerCase() === 'admin' || String(staff?.StaffKey || '').trim() === '11111';
+  return String(staff?.Role || '').trim().toLowerCase() === 'admin';
 }
 
 export function parsePermissions(raw: unknown): AppModule[] {
