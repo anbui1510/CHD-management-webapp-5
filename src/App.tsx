@@ -1227,12 +1227,6 @@ export default function App() {
 
   handleLogoutRef.current = handleLogout;
 
-  // Wake Apps Script while the login form is open so the password check is not a cold start.
-  useEffect(() => {
-    if (currentStaff) return;
-    void fetch('/api/auth/warm').catch(() => undefined);
-  }, [currentStaff]);
-
   // Restore inactivity-logout message on login screen (survives page refresh).
   useEffect(() => {
     if (currentStaff) return;
