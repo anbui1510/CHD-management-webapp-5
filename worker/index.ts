@@ -7,6 +7,7 @@ import {
   readRequestSession,
   type CloudflareGateEnv,
 } from '../src/sync/cloudflareGate';
+import { forwardToAppsScript } from '../src/sync/sheetsProxy';
 
 interface Env extends ChdBriefEnv, CloudflarePushEnv, CloudflareSyncConfigEnv, CloudflareGateEnv {
   ASSETS: Fetcher;
@@ -23,6 +24,14 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
+
+    if (url.pathname === '/api/auth/warm' && method === 'GET') {
+      const config = await readSyncConfig(env);
+      if (config.scriptUrl && config.scriptSecret) {
+        await forwardToAppsScript(config, { kind: 'get', action: 'getStaff' }).catch(() => undefined);
+      }
+      return json({ ok: true });
+    }
 
     if (url.pathname.startsWith('/api/auth/')) {
       return handleCloudflareAuthRequest(request, env);

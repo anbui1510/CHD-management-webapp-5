@@ -1327,7 +1327,7 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       const token = extractBridgeToken(init);
       if (token) bridgeRevokeToken(token);
       await serverFetch(parsed.pathname, { method: 'POST', credentials: 'include' }).catch(() => undefined);
-      await clearAllPersistedCache();
+      await clearLocalCache();
       return jsonResponse({ success: true });
     }
 

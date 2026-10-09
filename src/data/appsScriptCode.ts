@@ -438,7 +438,10 @@ function deleteRecordFromSheet(type, key) {
 
 // POST Requests - Inserts or Updates records
 function doPost(e) {
-  initializeDatabase();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss.getSheetByName("Patient") || !ss.getSheetByName("Staff")) {
+    initializeDatabase();
+  }
   
   // Validate API Key for POST requests
   var apiKey = PropertiesService.getScriptProperties().getProperty("API_KEY");

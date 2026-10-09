@@ -68,7 +68,7 @@ import { SearchTextInput } from './components/SearchTextInput';
 import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError, getMedicalDataFetchTimeout, peekCachedMedicalDataBundle, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
-import { clearAllPersistedCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
+import { clearLocalCache, hydrateSyncConfigFromServer, migrateLocalSyncConfigToServer } from './api/appsScriptFetch';
 import {
   APP_BUILD_ID,
   CHD_APP_BUILD_ID_KEY,
@@ -337,6 +337,7 @@ export default function App() {
   const [loginStaffKey, setLoginStaffKey] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
+  const [loginPending, setLoginPending] = useState(false);
   const [sheetsSetupNeeded, setSheetsSetupNeeded] = useState(false);
   const [sheetsSetupUrl, setSheetsSetupUrl] = useState('');
   const [sheetsSetupSecret, setSheetsSetupSecret] = useState('');
@@ -1095,7 +1096,7 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
-
+    if (loginPending) return;
 
     if (!loginStaffKey) {
       setLoginError('Vui l\u00f2ng ch\u1ecdn nh\u00e2n vi\u00ean \u0111\u1ec3 \u0111\u0103ng nh\u1eadp!');
@@ -1106,6 +1107,7 @@ export default function App() {
       return;
     }
 
+    setLoginPending(true);
     try {
       if (sheetsSetupNeeded) {
         const scriptUrl = sheetsSetupUrl.trim();
@@ -1179,6 +1181,8 @@ export default function App() {
       })();
     } catch (err) {
       setLoginError('L\u1ed7i k\u1ebft n\u1ed1i. Vui l\u00f2ng ki\u1ec3m tra m\u1ea1ng v\u00e0 th\u1eed l\u1ea1i.');
+    } finally {
+      setLoginPending(false);
     }
 
   };
@@ -1217,11 +1221,17 @@ export default function App() {
     setNotifications([]);
     setDoctorPerformanceMarks([]);
 
-    // Clear in-memory bridge cache only; keep IndexedDB so re-login shows data instantly.
-    void clearAllPersistedCache().catch(err => console.warn('Failed to clear cache on logout:', err));
+    // Keep the on-device copy so the next login opens immediately and syncs behind it.
+    void clearLocalCache().catch(err => console.warn('Failed to clear memory cache on logout:', err));
   }, [currentStaff]);
 
   handleLogoutRef.current = handleLogout;
+
+  // Wake Apps Script while the login form is open so the password check is not a cold start.
+  useEffect(() => {
+    if (currentStaff) return;
+    void fetch('/api/auth/warm').catch(() => undefined);
+  }, [currentStaff]);
 
   // Restore inactivity-logout message on login screen (survives page refresh).
   useEffect(() => {
@@ -2368,9 +2378,10 @@ export default function App() {
 
             <button
               type="submit"
-              className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold rounded-xl py-2.5 text-xs transition shadow-lg shadow-pink-950/20 uppercase tracking-wider flex items-center justify-center gap-1.5"
+              disabled={loginPending}
+              className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold rounded-xl py-2.5 text-xs transition shadow-lg shadow-pink-950/20 uppercase tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-70"
             >
-              <UserCheck className="w-4 h-4" /> Đăng nhập
+              <UserCheck className="w-4 h-4" /> {loginPending ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>
           </form>
         </div>
