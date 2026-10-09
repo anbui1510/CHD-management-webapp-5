@@ -38,6 +38,22 @@ async function cfAccountApi(pathname, options = {}) {
   return payload.result;
 }
 
+async function readExistingSyncConfig(kvId) {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${encodeURIComponent(SYNC_CONFIG_KEY)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) return null;
+  try {
+    return JSON.parse(await response.text());
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
   const { scriptUrl, scriptSecret } = readGoogleScriptConfigFromEnv();
 
@@ -52,7 +68,14 @@ async function main() {
   }
 
   const kvId = readKvNamespaceId();
-  const value = JSON.stringify({ scriptUrl, scriptSecret });
+  const existing = await readExistingSyncConfig(kvId);
+  const secretToStore = scriptSecret || String(existing?.scriptSecret || '').trim();
+  if (!secretToStore) {
+    console.log('[cloudflare-sync-config] No API key in env or KV — skipped so an empty key is not saved.');
+    process.exit(0);
+  }
+
+  const value = JSON.stringify({ scriptUrl, scriptSecret: secretToStore });
   await cfAccountApi(`/storage/kv/namespaces/${kvId}/values/${encodeURIComponent(SYNC_CONFIG_KEY)}`, {
     method: 'PUT',
     body: value,

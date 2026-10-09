@@ -337,6 +337,9 @@ export default function App() {
   const [loginStaffKey, setLoginStaffKey] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
+  const [sheetsSetupNeeded, setSheetsSetupNeeded] = useState(false);
+  const [sheetsSetupUrl, setSheetsSetupUrl] = useState('');
+  const [sheetsSetupSecret, setSheetsSetupSecret] = useState('');
   const [loginLoadError, setLoginLoadError] = useState<string>('');
   const [medicalDataLoadState, setMedicalDataLoadState] = useState<MedicalDataLoadState>({
     phase: 'idle',
@@ -1104,6 +1107,28 @@ export default function App() {
     }
 
     try {
+      if (sheetsSetupNeeded) {
+        const scriptUrl = sheetsSetupUrl.trim();
+        const scriptSecret = sheetsSetupSecret.trim();
+        if (!scriptUrl.startsWith('https://script.google.com/macros/s/') || !scriptSecret) {
+          setLoginError('Nhập Web App URL (https://script.google.com/macros/s/...) và khóa API, rồi đăng nhập lại.');
+          return;
+        }
+        const saveRes = await fetch('/api/sync-config', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scriptUrl, scriptSecret })
+        });
+        const saveData = await saveRes.json().catch(() => ({} as { error?: string }));
+        if (!saveRes.ok) {
+          setLoginError(saveData.error || 'Không lưu được cấu hình Google Sheets.');
+          return;
+        }
+        setSheetsSetupSecret('');
+        setSheetsSetupNeeded(false);
+      }
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         credentials: 'include',
@@ -1112,7 +1137,9 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setLoginError(data.error || 'M\u1eadt kh\u1ea9u kh\u00f4ng \u0111\u00fang. Vui l\u00f2ng th\u1eed l\u1ea1i!');
+        const message = data.error || 'M\u1eadt kh\u1ea9u kh\u00f4ng \u0111\u00fang. Vui l\u00f2ng th\u1eed l\u1ea1i!';
+        if (message === 'Máy chủ chưa cấu hình Google Sheets.') setSheetsSetupNeeded(true);
+        setLoginError(message);
         return;
       }
       const { token, staff: staffData } = data as { token: string; staff: Staff };
@@ -2288,6 +2315,40 @@ export default function App() {
                 ))}
               </select>
             </div>
+
+            {sheetsSetupNeeded && (
+              <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-[11px] leading-relaxed text-amber-100">
+                  Máy chủ chưa lưu kết nối Google Sheets. Dán Web App URL và khóa API, rồi bấm Đăng nhập.
+                </p>
+                <div>
+                  <label className="block text-amber-100/80 text-[10px] font-black uppercase tracking-wider mb-1.5">
+                    Web App URL
+                  </label>
+                  <input
+                    type="url"
+                    value={sheetsSetupUrl}
+                    onChange={(e) => setSheetsSetupUrl(e.target.value)}
+                    autoComplete="off"
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-amber-100/80 text-[10px] font-black uppercase tracking-wider mb-1.5">
+                    Khóa API
+                  </label>
+                  <input
+                    type="password"
+                    value={sheetsSetupSecret}
+                    onChange={(e) => setSheetsSetupSecret(e.target.value)}
+                    autoComplete="new-password"
+                    placeholder="Khóa API trong Apps Script"
+                    className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1.5">

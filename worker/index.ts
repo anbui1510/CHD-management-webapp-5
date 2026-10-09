@@ -1,6 +1,6 @@
 import { handleChdBriefRequest, type ChdBriefEnv } from '../src/chdDailyBrief/cloudflareApi';
 import { handleCloudflarePushRequest, type CloudflarePushEnv } from '../src/push/cloudflarePushApi';
-import { handleCloudflareSyncConfigRequest, type CloudflareSyncConfigEnv } from '../src/sync/cloudflareSyncConfigApi';
+import { handleCloudflareSyncConfigRequest, readSyncConfig, type CloudflareSyncConfigEnv } from '../src/sync/cloudflareSyncConfigApi';
 import {
   handleCloudflareAuthRequest,
   handleCloudflareSheetsProxy,
@@ -48,8 +48,13 @@ export default {
     if (url.pathname.startsWith('/api/sync-config')) {
       if (method !== 'GET') {
         const session = await readRequestSession(request, env);
-        if (!session) return json({ error: 'Yêu cầu đăng nhập để đổi cấu hình Google Sheets.' }, 401);
-        if (!session.canSync) return json({ error: 'Bạn không có quyền cấu hình Google Sheets.' }, 403);
+        if (session) {
+          if (!session.canSync) return json({ error: 'Bạn không có quyền cấu hình Google Sheets.' }, 403);
+        } else {
+          const config = await readSyncConfig(env);
+          const needsBootstrap = !config.scriptUrl || !config.scriptSecret;
+          if (!needsBootstrap) return json({ error: 'Yêu cầu đăng nhập để đổi cấu hình Google Sheets.' }, 401);
+        }
       }
       return handleCloudflareSyncConfigRequest(request, env);
     }

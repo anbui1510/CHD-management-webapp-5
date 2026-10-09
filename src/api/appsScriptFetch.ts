@@ -32,7 +32,14 @@ type SheetType = 'Patient' | 'Consult' | 'Staff' | 'CathLab' | 'Operation' | 'CM
 const SCRIPT_URL_STORAGE_KEY = 'chd_apps_script_url';
 const SCRIPT_SECRET_STORAGE_KEY = 'chd_apps_script_secret';
 
-const getScriptSecret = () => '';
+const readStoredScriptSecret = (): string => {
+  if (typeof window === 'undefined') return '';
+  try {
+    return String(localStorage.getItem(SCRIPT_SECRET_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+};
 
 const serverFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const native = typeof window !== 'undefined'
@@ -1668,7 +1675,7 @@ export async function migrateLocalSyncConfigToServer(): Promise<boolean> {
 
   const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
   const requestFetch = nativeFetch || window.fetch.bind(window);
-  const localSecret = getScriptSecret();
+  const localSecret = readStoredScriptSecret();
   if (!localSecret) return false;
 
   try {
@@ -1699,11 +1706,12 @@ export async function hydrateSyncConfigFromServer(): Promise<boolean> {
   try {
     const res = await requestFetch('/api/sync-config');
     if (!res.ok) return false;
-    const data = await res.json() as { scriptUrl?: string; scriptSecret?: string; isSynced?: boolean };
+    const data = await res.json() as { scriptUrl?: string; hasSecret?: boolean; isSynced?: boolean };
 
-    if (data.scriptUrl) {
-      return applySyncConfigRecord(data.scriptUrl, data.scriptSecret);
+    if (data.scriptUrl && data.hasSecret) {
+      return applySyncConfigRecord(data.scriptUrl);
     }
+    if (data.scriptUrl) setScriptUrl(data.scriptUrl);
 
     return migrateLocalSyncConfigToServer();
   } catch (err) {
@@ -1726,11 +1734,6 @@ export const installAppsScriptFetchBridge = () => {
   (window as any).__CHD_APPS_SCRIPT_FETCH_BRIDGE__ = true;
 
   hydrateBridgeSessions();
-  try {
-    localStorage.removeItem(SCRIPT_SECRET_STORAGE_KEY);
-  } catch {
-    // ignore
-  }
 
   const builtInUrl = normalizeAppsScriptUrl(String(viteEnv.VITE_GOOGLE_SCRIPT_URL || ''));
   if (builtInUrl && !localStorage.getItem(SCRIPT_URL_STORAGE_KEY)) {
