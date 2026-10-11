@@ -12,4 +12,6 @@ export const CAPTURE169_TYPO = {
   row: 'text-[34px]',
   meta: 'text-[30px]',
   sectionsWrap: 'text-[32px]',
+  /** Giá trị trường — đồng bộ với khối Kết quả staff chi tiết (đen, đậm vừa). */
+  fieldValue: 'font-semibold text-slate-900',
 } as const;

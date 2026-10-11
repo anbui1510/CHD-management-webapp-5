@@ -56,6 +56,12 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
   const bodyText = capture169 ? CAPTURE169_TYPO.body : isDense ? 'text-[10px]' : 'text-[11.5px]';
   const badgeText = capture169 ? CAPTURE169_TYPO.badge : compact ? 'text-[9px]' : 'text-[10px]';
   const rowText = capture169 ? CAPTURE169_TYPO.row : compact ? 'text-[9px]' : 'text-[12px]';
+  const valueCls = capture169
+    ? `${CAPTURE169_TYPO.fieldValue} ${valueSize}`
+    : `font-extrabold text-slate-800 ${valueSize}`;
+  const bodyValueCls = capture169
+    ? `${CAPTURE169_TYPO.fieldValue} ${bodyText}`
+    : `font-bold text-slate-800 ${bodyText}`;
 
   const sections = (
     <>
@@ -77,7 +83,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
               <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0 whitespace-nowrap`}>
                 {label}:
               </span>
-              <span className={`${mono ? 'font-mono font-bold' : 'font-extrabold'} text-slate-800 ${valueSize} break-words`}>
+              <span className={`${mono ? 'font-mono ' : ''}${capture169 ? CAPTURE169_TYPO.fieldValue : 'font-extrabold text-slate-800'} ${valueSize} break-words`}>
                 {value}
               </span>
             </span>
@@ -99,20 +105,20 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
         <div className={`grid grid-cols-1 ${capture169 ? '' : 'md:grid-cols-2'} gap-3 pt-1.5 border-t border-slate-100 ${compact || capture169 ? 'gap-2' : ''}`}>
           <div>
             <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider mb-1`}>Chẩn đoán chi tiết:</span>
-            <div className={`border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 font-bold text-slate-800 whitespace-pre-wrap break-words ${bodyText} min-h-0 w-full max-w-full overflow-visible`}>
+            <div className={`border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 whitespace-pre-wrap break-words ${bodyValueCls} min-h-0 w-full max-w-full overflow-visible`}>
               {consult.DetailDiagnosis || consult.DiagnosisID || '—'}
             </div>
           </div>
           <div>
             <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider mb-1`}>Kết quả staff chi tiết:</span>
-            <div className={`border border-slate-200 rounded-xl px-3 py-2.5 bg-indigo-50/30 text-indigo-950 font-bold whitespace-pre-wrap break-words ${bodyText} min-h-0 w-full max-w-full overflow-visible`}>
+            <div className={`border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 whitespace-pre-wrap break-words ${bodyValueCls} min-h-0 w-full max-w-full overflow-visible`}>
               {detailConsultResult}
             </div>
           </div>
         </div>
 
         {normalizeConsultMembers(consult.ConsultMember) && (
-          <p className={`text-slate-600 font-semibold ${bodyText}`}>
+          <p className={`${capture169 ? bodyValueCls : `text-slate-600 font-semibold ${bodyText}`}`}>
             <span className={`text-slate-400 font-bold uppercase ${capture169 ? CAPTURE169_TYPO.meta : 'text-[9px]'}`}>Thành viên duyệt HC: </span>
             {normalizeConsultMembers(consult.ConsultMember)}
           </p>
@@ -128,24 +134,28 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
             <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? CAPTURE169_TYPO.row : compact ? '' : 'text-[12.5px]'}`}>
               <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Kiểm dụng cụ:</span>
-                <span className={`px-1.5 py-0.5 rounded-md font-black uppercase leading-tight ${badgeText} ${
-                  checkDevice === 'Đủ'
-                    ? 'bg-emerald-100 text-emerald-850 border border-emerald-200'
-                    : checkDevice === 'Thiếu'
-                      ? 'bg-rose-100 text-rose-850 border border-rose-200'
-                      : 'bg-slate-100 text-slate-600 border border-slate-200'
-                }`}>
-                  {checkDevice || 'Chưa kiểm'}
-                </span>
+                {capture169 ? (
+                  <span className={`${valueCls} break-words`}>{checkDevice || 'Chưa kiểm'}</span>
+                ) : (
+                  <span className={`px-1.5 py-0.5 rounded-md font-black uppercase leading-tight ${badgeText} ${
+                    checkDevice === 'Đủ'
+                      ? 'bg-emerald-100 text-emerald-850 border border-emerald-200'
+                      : checkDevice === 'Thiếu'
+                        ? 'bg-rose-100 text-rose-850 border border-rose-200'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                  }`}>
+                    {checkDevice || 'Chưa kiểm'}
+                  </span>
+                )}
               </div>
               <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full ${capture169 ? '' : 'flex-1 justify-end text-right'}`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Số tiền dự kiến:</span>
-                <span className={`font-black text-rose-650 font-mono break-words ${valueSize}`}>{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
+                <span className={`${capture169 ? `font-mono ${valueCls}` : `font-black text-rose-650 font-mono ${valueSize}`} break-words`}>{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
               </div>
             </div>
-            <div className={`${capture169 ? 'flex flex-col items-stretch gap-1' : 'flex justify-between items-start gap-2'} border-b border-slate-200 pb-2 pt-1 px-1`}>
+            <div className={`${capture169 ? 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5' : 'flex justify-between items-start gap-2'} border-b border-slate-200 pb-2 pt-1 px-1`}>
               <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Dụng cụ dự kiến:</span>
-              <span className={`font-extrabold text-slate-800 break-words w-full ${capture169 ? 'text-left' : 'text-right max-w-[70%]'} ${valueSize}`}>{plannedDevice || '—'}</span>
+              <span className={`${valueCls} break-words ${capture169 ? 'min-w-0 flex-1' : 'text-right max-w-[70%]'}`}>{plannedDevice || '—'}</span>
             </div>
             {(supplyDepFeedback || operationFeedback) && (
               <div className={`bg-amber-50/20 border border-amber-200 p-2 rounded-lg text-amber-900 font-semibold leading-normal whitespace-pre-wrap break-words ${bodyText}`}>
@@ -164,28 +174,34 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
             <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? CAPTURE169_TYPO.row : compact ? '' : 'text-[12.5px]'}`}>
               <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Lịch TT dự kiến:</span>
-                <span className={`px-1.5 py-0.5 rounded-md font-black border uppercase leading-tight ${badgeText} ${
-                  plannedCathLabDate
-                    ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
-                    : 'bg-rose-100 border-rose-300 text-rose-850'
-                }`}>
-                  {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
-                </span>
+                {capture169 ? (
+                  <span className={`${valueCls} break-words`}>
+                    {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
+                  </span>
+                ) : (
+                  <span className={`px-1.5 py-0.5 rounded-md font-black border uppercase leading-tight ${badgeText} ${
+                    plannedCathLabDate
+                      ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
+                      : 'bg-rose-100 border-rose-300 text-rose-850'
+                  }`}>
+                    {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
+                  </span>
+                )}
               </div>
               <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full ${capture169 ? '' : 'flex-1 justify-end text-right'}`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Trạng thái gọi:</span>
-                <span className={`font-bold text-slate-800 break-words ${valueSize}`}>{callStatus || '—'}</span>
+                <span className={`${valueCls} break-words`}>{callStatus || '—'}</span>
               </div>
             </div>
-            <div className={`${capture169 ? 'flex flex-col items-stretch gap-1' : 'flex justify-between items-start gap-2'} border-b border-slate-200 pb-2 pt-1 px-1`}>
-              <span className={`text-[#d2145a] font-black tracking-wider uppercase shrink-0 ${capture169 ? CAPTURE169_TYPO.badge : 'text-[9px]'}`}>PTV:</span>
-              <span className={`font-extrabold text-slate-850 uppercase break-words w-full ${capture169 ? 'text-left normal-case' : 'text-right max-w-[75%]'} ${valueSize}`}>
+            <div className={`${capture169 ? 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5' : 'flex justify-between items-start gap-2'} border-b border-slate-200 pb-2 pt-1 px-1`}>
+              <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>PTV:</span>
+              <span className={`${valueCls} break-words ${capture169 ? 'min-w-0 flex-1' : 'text-right max-w-[75%]'}`}>
                 {ptvDisplay}
               </span>
             </div>
-            <div className={`${capture169 ? 'flex flex-col items-stretch gap-1' : 'flex justify-between items-start gap-2'} pt-1 px-1`}>
+            <div className={`${capture169 ? 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5' : 'flex justify-between items-start gap-2'} pt-1 px-1`}>
               <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Lưu ý / Ưu tiên:</span>
-              <span className={`font-bold text-slate-800 break-words w-full ${capture169 ? 'text-left' : 'text-right max-w-[70%]'} ${bodyText}`}>
+              <span className={`${bodyValueCls} break-words ${capture169 ? 'min-w-0 flex-1' : 'text-right max-w-[70%]'}`}>
                 {callNote ? `${priorityOrder} (${callNote})` : priorityOrder}
               </span>
             </div>
