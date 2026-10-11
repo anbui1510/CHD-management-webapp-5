@@ -3750,6 +3750,10 @@ export default function App() {
               createDiagnosisSource={createDiagnosisSource}
               triggerAlert={triggerAlert}
               onSaveSuccess={showSuccessBanner}
+              onViewPatientRecord={(pat) => {
+                setActiveMenu('patients');
+                setSelectedPatientForDetail(pat);
+              }}
             />
           )}
 
