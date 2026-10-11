@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Clipboard, X } from 'lucide-react';
 import { Consult, Patient, formatVNTime, normalizePriorityOrder, removeDiacritics, restoreWeightFromDate } from '../types';
@@ -154,53 +154,152 @@ export function buildConsultSummaryText(patient: Patient, consult: Consult, _ptv
   return lines.join('\n');
 }
 
+export type ConsultSummaryLayoutMode = 'default' | 'compact' | 'capture169';
+
+export const SUMMARY_16_9_WIDTH = 1280;
+export const SUMMARY_16_9_HEIGHT = 720;
+
 export function ConsultSummarySheet({
   patient,
   consult,
   compact = false,
+  layoutMode,
   sheetId,
 }: {
   patient: Patient;
   consult: Consult;
   compact?: boolean;
+  layoutMode?: ConsultSummaryLayoutMode;
   sheetId?: string;
 }) {
+  const mode: ConsultSummaryLayoutMode = layoutMode ?? (compact ? 'compact' : 'default');
+  const isCompact = mode === 'compact' || mode === 'capture169';
+  const isCapture169 = mode === 'capture169';
+
   const ptvPhu1Display = resolvePtvPhu1Display(
     consult.RequestBy || '',
     consult.Scheduled2ndInterventionist,
     consult.Scheduled2ndInterventionist
   );
 
+  const shellClass = isCapture169
+    ? 'p-2 space-y-1.5 text-[10px] rounded-lg border border-slate-800'
+    : isCompact
+      ? 'p-2.5 space-y-2 text-[10.5px] rounded-2xl border-2 border-slate-800'
+      : 'p-5 space-y-3.5 shrink-0 rounded-2xl border-2 border-slate-800';
+
   return (
     <div
       id={sheetId}
-      className={`bg-white border-2 border-slate-800 rounded-2xl text-slate-700 shadow-xs max-w-full select-text ${compact ? 'p-2.5 space-y-2 text-[10.5px]' : 'p-5 space-y-3.5 shrink-0'}`}
+      className={`bg-white text-slate-700 shadow-xs max-w-full select-text ${shellClass}`}
     >
-      <div className="space-y-1">
-        <div className="flex justify-between items-start gap-2 text-[9px] font-semibold text-slate-600 leading-tight">
+      <div className={isCapture169 ? 'space-y-0.5' : 'space-y-1'}>
+        <div className={`flex justify-between items-start gap-2 font-semibold text-slate-600 leading-tight ${isCapture169 ? 'text-[8px]' : 'text-[9px]'}`}>
           <span>Khoa Tim Mạch</span>
           <span className="text-right">Bệnh viện Nhi Đồng Thành Phố</span>
         </div>
-        <h2 className="text-center font-black text-[13px] uppercase tracking-wide text-slate-900">
+        <h2 className={`text-center font-black uppercase tracking-wide text-slate-900 ${isCapture169 ? 'text-[11px]' : 'text-[13px]'}`}>
           HỒ SƠ CAN THIỆP
         </h2>
-        <div className="h-1" />
       </div>
 
-      <div className={compact ? '' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-2 pb-1'}>
-        <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${compact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
+      <div className={isCompact ? '' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-2 pb-1'}>
+        <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${
+          isCapture169 ? 'text-[12px] px-2 py-0.5' : isCompact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'
+        }`}>
           {formatSummaryPatientTitle(patient.PatientName, consult, ptvPhu1Display)}
         </div>
       </div>
 
-      <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${compact ? 'p-2' : 'p-3.5'}`}>
-        <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1">
+      <div className={`bg-white border border-slate-700 rounded-xl space-y-1.5 ${isCapture169 ? 'p-1.5' : isCompact ? 'p-2' : 'p-3.5'}`}>
+        <span className={`font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-0.5 ${isCapture169 ? 'text-[8px]' : 'text-[10px]'}`}>
           THÔNG TIN HÀNH CHÍNH
         </span>
         <PatientAdminPrintInfo patient={patient} />
       </div>
 
-      <ConsultSummaryReadOnly consult={consult} compact={compact} sectionsOnly />
+      <ConsultSummaryReadOnly
+        consult={consult}
+        compact={isCompact}
+        capture169={isCapture169}
+        sectionsOnly
+      />
+    </div>
+  );
+}
+
+export function ConsultSummaryCaptureFrame({
+  patient,
+  consult,
+  sheetId,
+  previewFitWidth = false,
+  className = '',
+}: {
+  patient: Patient;
+  consult: Consult;
+  sheetId?: string;
+  previewFitWidth?: boolean;
+  className?: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentScale, setContentScale] = useState(1);
+  const [frameScale, setFrameScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const content = contentRef.current;
+      if (!content) return;
+      const naturalHeight = content.scrollHeight;
+      const heightScale = naturalHeight > 0
+        ? Math.min(1, SUMMARY_16_9_HEIGHT / naturalHeight)
+        : 1;
+      setContentScale(heightScale);
+
+      if (previewFitWidth && containerRef.current) {
+        const w = containerRef.current.clientWidth;
+        if (w > 0) setFrameScale(w / SUMMARY_16_9_WIDTH);
+      } else {
+        setFrameScale(1);
+      }
+    };
+
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (ro && containerRef.current) ro.observe(containerRef.current);
+    if (ro && contentRef.current) ro.observe(contentRef.current);
+    return () => ro?.disconnect();
+  }, [patient, consult, previewFitWidth]);
+
+  const previewHeight = previewFitWidth ? SUMMARY_16_9_HEIGHT * frameScale : SUMMARY_16_9_HEIGHT;
+
+  return (
+    <div
+      ref={containerRef}
+      className={`${previewFitWidth ? 'w-full mx-auto' : ''} ${className}`}
+      style={previewFitWidth ? { height: previewHeight, maxWidth: '100%' } : undefined}
+    >
+      <div
+        id={sheetId}
+        className="bg-white overflow-hidden shrink-0"
+        style={{
+          width: SUMMARY_16_9_WIDTH,
+          height: SUMMARY_16_9_HEIGHT,
+          transform: previewFitWidth ? `scale(${frameScale})` : undefined,
+          transformOrigin: 'top left',
+        }}
+      >
+        <div
+          ref={contentRef}
+          style={{
+            width: SUMMARY_16_9_WIDTH,
+            transform: contentScale < 1 ? `scale(${contentScale})` : undefined,
+            transformOrigin: 'top left',
+          }}
+        >
+          <ConsultSummarySheet patient={patient} consult={consult} layoutMode="capture169" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -338,11 +437,11 @@ export function ConsultSummaryModal({
           className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${isMobile ? 'p-2 pb-2' : 'p-4 shrink-0'}`}
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
-          <ConsultSummarySheet
+          <ConsultSummaryCaptureFrame
             patient={patient}
             consult={mergedConsult}
-            compact={isMobile}
-            sheetId={CONSULT_SUMMARY_SCREENSHOT_CARD_ID}
+            previewFitWidth={isMobile}
+            className={isMobile ? '' : 'max-w-[1280px] mx-auto'}
           />
         </div>
 
@@ -404,7 +503,21 @@ export function ConsultSummaryModal({
   );
 
   if (typeof document === 'undefined') return modal;
-  return createPortal(modal, document.body);
+  return (
+    <>
+      {createPortal(modal, document.body)}
+      {createPortal(
+        <div aria-hidden style={{ position: 'fixed', left: -5000, top: 0, zIndex: -1 }}>
+          <ConsultSummaryCaptureFrame
+            patient={patient}
+            consult={mergedConsult}
+            sheetId={CONSULT_SUMMARY_SCREENSHOT_CARD_ID}
+          />
+        </div>,
+        document.body
+      )}
+    </>
+  );
 }
 
 const SUMMARY_CAPTURE_ID = 'staff-result-summary-capture';
@@ -428,8 +541,10 @@ export function StaffSummaryExportActions({
   const [mode, setMode] = useState<'pdf' | 'png' | 'sms' | null>(null);
   const [busy, setBusy] = useState(false);
   const [copiedSms, setCopiedSms] = useState(false);
+  const pngScrollRef = useRef<HTMLDivElement>(null);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  usePreventBackgroundTouchScroll(pngScrollRef, isMobile && (mode === 'png' || mode === 'sms'));
   const smsText = useMemo(() => {
     const ptv = resolvePtvPhu1Display(
       consult.RequestBy || '',
@@ -524,15 +639,19 @@ export function StaffSummaryExportActions({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className={`flex-1 overflow-auto min-h-0 bg-slate-50 ${isMobile ? 'p-2' : 'p-4'}`}>
+        <div
+          ref={pngScrollRef}
+          data-touch-scroll-container
+          className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 bg-slate-100 ${isMobile ? 'px-1.5 py-1' : 'p-4'}`}
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           {mode === 'png' ? (
-            <div className={isMobile ? 'w-full' : 'mx-auto w-[720px] max-w-full'}>
-              <ConsultSummarySheet
-                patient={patient}
-                consult={consult}
-                compact={isMobile}
-              />
-            </div>
+            <ConsultSummaryCaptureFrame
+              patient={patient}
+              consult={consult}
+              previewFitWidth={isMobile}
+              className={isMobile ? '' : 'max-w-[1280px] mx-auto'}
+            />
           ) : (
             <textarea
               readOnly
@@ -584,11 +703,8 @@ export function StaffSummaryExportActions({
         <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('sms')}>SMS</button>
       </div>
       {(mode === 'pdf' || mode === 'png') && typeof document !== 'undefined' && createPortal(
-        <div
-          aria-hidden
-          style={{ position: 'fixed', left: -4000, top: 0, width: 720, background: '#ffffff', zIndex: -1 }}
-        >
-          <ConsultSummarySheet patient={patient} consult={consult} sheetId={SUMMARY_CAPTURE_ID} />
+        <div aria-hidden style={{ position: 'fixed', left: -5000, top: 0, zIndex: -1 }}>
+          <ConsultSummaryCaptureFrame patient={patient} consult={consult} sheetId={SUMMARY_CAPTURE_ID} />
         </div>,
         document.body
       )}
