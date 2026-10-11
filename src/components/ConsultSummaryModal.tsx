@@ -28,10 +28,10 @@ function PatientAdminPrintInfo({ patient, capture169 = false }: { patient: Patie
     ? `text-slate-400 font-bold ${CAPTURE169_TYPO.label} uppercase tracking-wider shrink-0 whitespace-nowrap`
     : 'text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0 whitespace-nowrap';
   const valueCls = capture169
-    ? `font-bold text-slate-800 ${CAPTURE169_TYPO.value}`
+    ? `${CAPTURE169_TYPO.fieldValue} ${CAPTURE169_TYPO.value}`
     : 'font-bold text-slate-800 text-[12.5px]';
   const monoCls = capture169
-    ? `font-extrabold font-mono text-slate-800 ${CAPTURE169_TYPO.value}`
+    ? `font-mono ${CAPTURE169_TYPO.fieldValue} ${CAPTURE169_TYPO.value}`
     : 'font-extrabold font-mono text-slate-800 text-[12.5px]';
 
   const Field = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
@@ -333,9 +333,33 @@ export function ConsultSummaryCaptureFrame({
       ? `translateX(-50%) scale(${contentScale})`
       : 'translateX(-50%)';
 
-  const frameTransform = previewFitWidth || previewFillViewport
-    ? `scale(${frameScale})`
-    : undefined;
+  const isPreviewScaled = previewFitWidth || previewFillViewport;
+  const previewLayoutW = SUMMARY_PORTRAIT_WIDTH * frameScale;
+  const previewLayoutH = SUMMARY_PORTRAIT_HEIGHT * frameScale;
+
+  const captureSheet = (
+    <div
+      id={sheetId}
+      className="bg-white overflow-hidden shrink-0"
+      style={{
+        width: SUMMARY_PORTRAIT_WIDTH,
+        height: SUMMARY_PORTRAIT_HEIGHT,
+      }}
+    >
+      <div
+        ref={contentRef}
+        style={{
+          width: SUMMARY_PORTRAIT_WIDTH,
+          position: 'relative',
+          left: '50%',
+          transform: contentTransform,
+          transformOrigin: 'top center',
+        }}
+      >
+        <ConsultSummarySheet patient={patient} consult={consult} layoutMode="capture169" />
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -344,39 +368,30 @@ export function ConsultSummaryCaptureFrame({
         previewFillViewport
           ? 'w-full h-full min-h-0 flex items-center justify-center overflow-hidden'
           : previewFitWidth
-            ? 'w-full mx-auto overflow-hidden'
+            ? 'w-full mx-auto overflow-hidden flex justify-center'
             : ''
       } ${className}`}
     >
-      <div
-        style={
-          previewFillViewport || previewFitWidth
-            ? { transform: frameTransform, transformOrigin: 'top center' }
-            : undefined
-        }
-      >
+      {isPreviewScaled ? (
         <div
-          id={sheetId}
-          className="bg-white overflow-hidden shrink-0"
-          style={{
-            width: SUMMARY_PORTRAIT_WIDTH,
-            height: SUMMARY_PORTRAIT_HEIGHT,
-          }}
+          className="relative shrink-0"
+          style={{ width: previewLayoutW, height: previewLayoutH }}
         >
           <div
-            ref={contentRef}
+            className="absolute top-0 left-0"
             style={{
               width: SUMMARY_PORTRAIT_WIDTH,
-              position: 'relative',
-              left: '50%',
-              transform: contentTransform,
-              transformOrigin: 'top center',
+              height: SUMMARY_PORTRAIT_HEIGHT,
+              transform: `scale(${frameScale})`,
+              transformOrigin: 'top left',
             }}
           >
-            <ConsultSummarySheet patient={patient} consult={consult} layoutMode="capture169" />
+            {captureSheet}
           </div>
         </div>
-      </div>
+      ) : (
+        captureSheet
+      )}
     </div>
   );
 }
