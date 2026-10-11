@@ -1,5 +1,25 @@
 /** Shared display helpers for consult scheduling summary cards/modals. */
 
+import type { Consult } from '../types';
+
+/** Kết luận hội chẩn mà tiêu đề tóm tắt có thể kèm PTV phụ (ngoài Staff thông). */
+export const CONSULT_RESULTS_WITH_PTV_PHU = [
+  'Can thiệp thông tim',
+  'Chụp chẩn đoán +/- can thiệp',
+  'Chụp chẩn đoán-Đo kháng lực',
+  'Điện sinh lý',
+  'Tiền Fontan',
+  'Tiền Glenn',
+] as const;
+
+export const shouldShowPtvPhuInSummary = (consult: Pick<Consult, 'ConsultType' | 'ConsultResultID'>) => {
+  if (consult.ConsultType === 'Staff thông') return true;
+  const resultId = String(consult.ConsultResultID || '').trim();
+  return CONSULT_RESULTS_WITH_PTV_PHU.some(
+    id => id.toLowerCase() === resultId.toLowerCase()
+  );
+};
+
 const CATH_INTERVENTIONIST_DOCTORS = [
   'BS. Phụng',
   'BS. Lợi',
@@ -14,6 +34,15 @@ const CATH_INTERVENTIONIST_DOCTORS = [
 export const formatPatientWithPtvPhu = (patientName: string, ptvPhu: string) => {
   if (!ptvPhu?.trim()) return patientName;
   return `${patientName} - PTV phụ: ${ptvPhu}`;
+};
+
+export const formatSummaryPatientTitle = (
+  patientName: string,
+  consult: Pick<Consult, 'ConsultType' | 'ConsultResultID'>,
+  ptvPhu: string
+) => {
+  if (!shouldShowPtvPhuInSummary(consult)) return patientName;
+  return formatPatientWithPtvPhu(patientName, ptvPhu);
 };
 
 export const getAutoScheduled2nd = (requestBy: string) => {
