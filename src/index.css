@@ -130,6 +130,32 @@ body,
     padding-bottom: 0.25rem !important;
   }
 
+  /*
+   * iOS PWA: --app-vh > layout viewport (chin dưới tab bar). Modal fixed inset-0
+   * chỉ phủ layout viewport → dải trắng dưới footer. Sheet staff dùng --app-vh.
+   */
+  body[data-staff-result-drawer-open="1"] {
+    --mobile-bottom-nav-offset: 0px;
+  }
+
+  body[data-staff-result-drawer-open="1"] .mobile-bottom-nav {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .staff-result-drawer-shell {
+    top: env(safe-area-inset-top, 0px);
+    bottom: auto;
+    height: calc(var(--app-vh, 100dvh) - env(safe-area-inset-top, 0px));
+    min-height: calc(var(--app-vh, 100dvh) - env(safe-area-inset-top, 0px));
+  }
+
+  .staff-result-drawer-panel {
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+  }
+
   /* Khối tiêu đề / tab / tìm kiếm gọn trên mobile (giữ cỡ chữ) */
   .mobile-view-shell {
     gap: 0.375rem;
