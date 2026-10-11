@@ -54,8 +54,16 @@ export function applyMobileViewportMetrics(): void {
   const isPortrait = layoutInnerH >= window.innerWidth;
   let bottomGap = 0;
 
-  // Khi bàn phím mở: co shell theo vùng viewport thực (tránh khoảng trắng dưới phần nhìn thấy).
-  let layoutVh = keyboardOpen ? Math.max(visibleH + offsetTop, visibleH) : visibleH;
+  /**
+   * Chiều cao UI (shell, modal): vùng nhìn thấy qua visualViewport — Safari, Chrome, PWA, Android.
+   * KHÔNG cộng thêm “chin” PWA vào đây (tránh tab bar lơ lửng + footer drawer bị cắt).
+   */
+  let uiHeight = keyboardOpen
+    ? Math.max(visibleH + offsetTop, visibleH)
+    : Math.max(visibleH + offsetTop, 0);
+  if (!keyboardOpen && uiHeight < 320) {
+    uiHeight = layoutInnerH;
+  }
 
   if (!keyboardOpen && isStandaloneDisplayMode() && isPortrait) {
     const physicalH = Math.round(Math.max(window.screen.height || 0, window.screen.width || 0));
@@ -64,11 +72,11 @@ export function applyMobileViewportMetrics(): void {
     // Known WebKit chin is typically ~34–80px; ignore keyboard-sized gaps.
     if (gap > 12 && gap < 100) {
       bottomGap = gap;
-      layoutVh += gap;
     }
   }
 
-  root.style.setProperty('--app-vh', `${layoutVh}px`);
+  root.style.setProperty('--app-layout-vh', `${uiHeight}px`);
+  root.style.setProperty('--app-vh', `${uiHeight}px`);
   root.style.setProperty(
     '--mobile-keyboard-overlap',
     keyboardOpen ? `${Math.max(0, layoutInnerH - visibleH - offsetTop)}px` : '0px'
@@ -83,7 +91,13 @@ export function applyMobileViewportMetrics(): void {
   root.style.backgroundColor = chinFill;
   if (document.body) {
     document.body.style.backgroundColor = chinFill;
-    document.body.style.minHeight = 'var(--app-vh, 100dvh)';
+    document.body.style.minHeight = 'var(--app-layout-vh, 100svh)';
+  }
+
+  if (isStandaloneDisplayMode()) {
+    root.dataset.displayMode = 'standalone';
+  } else {
+    delete root.dataset.displayMode;
   }
 }
 

@@ -27,21 +27,23 @@
     var(--mobile-bottom-nav-content) + var(--mobile-safe-bottom)
   );
   --app-vh: 100dvh;
+  /** Vùng UI thật (visualViewport) — dùng cho shell/modal; tránh cộng chin PWA. */
+  --app-layout-vh: 100svh;
 }
 
 html,
 body,
 #root {
   min-height: 100%;
-  min-height: 100dvh;
-  min-height: var(--app-vh, 100dvh);
+  min-height: 100svh;
+  min-height: var(--app-layout-vh, 100svh);
   min-height: -webkit-fill-available;
   /* Light chin: iOS PWA gap below fixed tab bar paints document background */
   background-color: #ffffff;
 }
 
 #root {
-  min-height: var(--app-vh, 100dvh);
+  min-height: var(--app-layout-vh, 100svh);
 }
 
 /*
@@ -50,8 +52,9 @@ body,
  * the utility parser and the shell loses height → huge white gap above the tab bar.
  */
 .app-shell {
-  min-height: var(--app-vh, 100dvh);
-  height: var(--app-vh, 100dvh);
+  min-height: var(--app-layout-vh, 100svh);
+  height: var(--app-layout-vh, 100svh);
+  max-height: var(--app-layout-vh, 100svh);
 }
 
 /*
@@ -145,15 +148,28 @@ body,
 
   .staff-result-drawer-shell {
     top: env(safe-area-inset-top, 0px);
-    bottom: auto;
-    height: calc(var(--app-vh, 100dvh) - env(safe-area-inset-top, 0px));
-    min-height: calc(var(--app-vh, 100dvh) - env(safe-area-inset-top, 0px));
+    bottom: 0;
+    height: auto;
+    min-height: 0;
+    max-height: none;
   }
 
   .staff-result-drawer-panel {
+    flex: 1 1 auto;
     height: 100%;
     max-height: 100%;
     min-height: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pwa-install-anchor {
+    bottom: calc(var(--mobile-bottom-nav-offset, 3rem) + 0.5rem);
+  }
+
+  @media (min-width: 768px) {
+    .pwa-install-anchor {
+      bottom: 1.5rem;
+    }
   }
 
   /* Khối tiêu đề / tab / tìm kiếm gọn trên mobile (giữ cỡ chữ) */
