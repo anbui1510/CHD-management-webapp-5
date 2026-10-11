@@ -194,7 +194,7 @@ export function ConsultSummarySheet({
   );
 
   const shellClass = isCapture169
-    ? `p-4 space-y-3 ${CAPTURE169_TYPO.shell} rounded-lg border-2 border-slate-800 overflow-visible`
+    ? `p-4 space-y-3 w-full min-w-0 box-border ${CAPTURE169_TYPO.shell} rounded-lg border-2 border-slate-800 overflow-visible`
     : isCompact
       ? 'p-2.5 space-y-2 text-[10.5px] rounded-2xl border-2 border-slate-800'
       : 'p-5 space-y-3.5 shrink-0 rounded-2xl border-2 border-slate-800';
@@ -246,12 +246,15 @@ export function ConsultSummaryCaptureFrame({
   consult,
   sheetId,
   previewFitWidth = false,
+  previewFillViewport = false,
   className = '',
 }: {
   patient: Patient;
   consult: Consult;
   sheetId?: string;
   previewFitWidth?: boolean;
+  /** Mobile preview: scale khung vừa cả chiều ngang và dọc vùng xem. */
+  previewFillViewport?: boolean;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -274,9 +277,18 @@ export function ConsultSummaryCaptureFrame({
       }
 
       let nextFrameScale = 1;
-      if (previewFitWidth && containerRef.current) {
+      if (containerRef.current && (previewFillViewport || previewFitWidth)) {
         const w = containerRef.current.clientWidth;
-        if (w > 0) nextFrameScale = w / SUMMARY_PORTRAIT_WIDTH;
+        const h = containerRef.current.clientHeight;
+        if (w > 0) {
+          const scaleW = w / SUMMARY_PORTRAIT_WIDTH;
+          if (previewFillViewport && h > 0) {
+            const scaleH = h / SUMMARY_PORTRAIT_HEIGHT;
+            nextFrameScale = Math.min(scaleW, scaleH);
+          } else {
+            nextFrameScale = scaleW;
+          }
+        }
       }
 
       const last = lastScalesRef.current;
@@ -302,9 +314,11 @@ export function ConsultSummaryCaptureFrame({
 
     let ro: ResizeObserver | null = null;
     const contentEl = contentRef.current;
-    if (typeof ResizeObserver !== 'undefined' && contentEl) {
+    const containerEl = containerRef.current;
+    if (typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(scheduleMeasure);
-      ro.observe(contentEl);
+      if (contentEl) ro.observe(contentEl);
+      if (previewFillViewport && containerEl) ro.observe(containerEl);
     }
 
     return () => {
@@ -312,32 +326,55 @@ export function ConsultSummaryCaptureFrame({
       window.removeEventListener('resize', scheduleMeasure);
       ro?.disconnect();
     };
-  }, [patient.PatientKey, consult.ConsultKey, previewFitWidth]);
+  }, [patient.PatientKey, consult.ConsultKey, previewFitWidth, previewFillViewport]);
+
+  const contentTransform =
+    contentScale < 1
+      ? `translateX(-50%) scale(${contentScale})`
+      : 'translateX(-50%)';
+
+  const frameTransform = previewFitWidth || previewFillViewport
+    ? `scale(${frameScale})`
+    : undefined;
 
   return (
     <div
       ref={containerRef}
-      className={`${previewFitWidth ? 'w-full mx-auto aspect-[9/16] overflow-hidden' : ''} ${className}`}
+      className={`${
+        previewFillViewport
+          ? 'w-full h-full min-h-0 flex items-center justify-center overflow-hidden'
+          : previewFitWidth
+            ? 'w-full mx-auto overflow-hidden'
+            : ''
+      } ${className}`}
     >
       <div
-        id={sheetId}
-        className="bg-white overflow-hidden shrink-0"
-        style={{
-          width: SUMMARY_PORTRAIT_WIDTH,
-          height: SUMMARY_PORTRAIT_HEIGHT,
-          transform: previewFitWidth ? `scale(${frameScale})` : undefined,
-          transformOrigin: 'top left',
-        }}
+        style={
+          previewFillViewport || previewFitWidth
+            ? { transform: frameTransform, transformOrigin: 'top center' }
+            : undefined
+        }
       >
         <div
-          ref={contentRef}
+          id={sheetId}
+          className="bg-white overflow-hidden shrink-0"
           style={{
             width: SUMMARY_PORTRAIT_WIDTH,
-            transform: contentScale < 1 ? `scale(${contentScale})` : undefined,
-            transformOrigin: 'top left',
+            height: SUMMARY_PORTRAIT_HEIGHT,
           }}
         >
-          <ConsultSummarySheet patient={patient} consult={consult} layoutMode="capture169" />
+          <div
+            ref={contentRef}
+            style={{
+              width: SUMMARY_PORTRAIT_WIDTH,
+              position: 'relative',
+              left: '50%',
+              transform: contentTransform,
+              transformOrigin: 'top center',
+            }}
+          >
+            <ConsultSummarySheet patient={patient} consult={consult} layoutMode="capture169" />
+          </div>
         </div>
       </div>
     </div>
@@ -666,7 +703,7 @@ export function StaffSummaryExportActions({
   const overlay = mode === 'png' || mode === 'sms' ? (
     <div className={overlayShellClass} role="dialog" aria-modal="true">
       <div className={overlayPanelClass}>
-        <div className={`border-b border-slate-200 flex items-center justify-between shrink-0 ${isMobile ? 'px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))]' : 'px-4 py-3'}`}>
+        <div className={`border-b border-slate-200 flex items-center justify-between shrink-0 ${isMobile ? 'px-2 py-1.5 pt-[max(0.35rem,env(safe-area-inset-top,0px))]' : 'px-4 py-3'}`}>
           <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800">
             {mode === 'png' ? 'Tóm tắt dạng ảnh' : 'Tóm tắt dạng tin nhắn'}
           </h3>
@@ -682,15 +719,20 @@ export function StaffSummaryExportActions({
         <div
           ref={pngScrollRef}
           data-touch-scroll-container
-          className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 bg-slate-100 ${isMobile ? 'px-1.5 py-1' : 'p-4'}`}
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          className={`flex-1 min-h-0 ${
+            mode === 'png' && isMobile
+              ? 'flex flex-col overflow-hidden bg-white p-0'
+              : `overflow-y-auto overscroll-contain touch-pan-y bg-slate-100 ${isMobile ? 'px-1.5 py-1' : 'p-4'}`
+          }`}
+          style={mode === 'png' && isMobile ? undefined : { WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
           {mode === 'png' ? (
             <ConsultSummaryCaptureFrame
               patient={patient}
               consult={consult}
               previewFitWidth={isMobile}
-              className={isMobile ? '' : 'max-w-[540px] mx-auto'}
+              previewFillViewport={isMobile}
+              className={isMobile ? 'flex-1 w-full' : 'max-w-[540px] mx-auto w-full'}
             />
           ) : (
             <textarea
@@ -701,7 +743,7 @@ export function StaffSummaryExportActions({
             />
           )}
         </div>
-        <div className={`border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0 ${isMobile ? 'px-3 py-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]' : 'px-4 py-3'}`}>
+        <div className={`border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0 ${isMobile ? 'px-2 py-1.5 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))]' : 'px-4 py-3'}`}>
           <button
             type="button"
             onClick={() => setMode(null)}
