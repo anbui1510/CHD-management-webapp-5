@@ -23,9 +23,12 @@ export interface ConsultSummaryReadOnlyProps {
   consult: Consult;
   compact?: boolean;
   sectionsOnly?: boolean;
+  /** Bố cục dày cho khung xuất 16:9. */
+  capture169?: boolean;
 }
 
-export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly = false }: ConsultSummaryReadOnlyProps) {
+export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly = false, capture169 = false }: ConsultSummaryReadOnlyProps) {
+  const isDense = compact || capture169;
   const checkDevice = consult.CheckDevice || '';
   const plannedDevice = consult.PlannedDevice || '';
   const plannedPrice = consult.PlannedPrice || '';
@@ -45,9 +48,9 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
     .filter(Boolean)
     .join(' - ') || 'Chưa gán';
 
-  const boxPad = compact ? 'p-2' : 'p-3';
-  const labelSize = compact ? 'text-[7.5px]' : 'text-[9px]';
-  const valueSize = compact ? 'text-[10px]' : 'text-[12.5px]';
+  const boxPad = capture169 ? 'p-1.5' : compact ? 'p-2' : 'p-3';
+  const labelSize = capture169 ? 'text-[7px]' : compact ? 'text-[7.5px]' : 'text-[9px]';
+  const valueSize = capture169 ? 'text-[9.5px]' : compact ? 'text-[10px]' : 'text-[12.5px]';
 
   const sections = (
     <>
@@ -55,35 +58,49 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
         <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider block border-b border-slate-200 pb-1">
           THÔNG TIN ĐĂNG KÝ HỘI CHẨN
         </span>
-        <div className={`grid grid-cols-2 ${compact ? 'sm:grid-cols-4 gap-x-1 gap-y-1 text-[9px]' : 'md:grid-cols-4 gap-x-4 gap-y-2 text-[12px]'}`}>
-          <div className="min-w-0">
-            <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider leading-tight`}>Ngày staff:</span>
-            <span className={`font-bold text-slate-800 font-mono ${valueSize} leading-tight`}>{formatVNTime(consult.ConsultDate)}</span>
-          </div>
-          <div className="min-w-0">
-            <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider leading-tight`}>BS đăng ký:</span>
-            <span className={`font-extrabold text-slate-800 ${valueSize} leading-tight break-words`}>{consult.RequestBy || '—'}</span>
-          </div>
-          <div className="min-w-0">
-            <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider leading-tight`}>Cân nặng:</span>
-            <span className={`font-extrabold text-slate-800 font-mono ${valueSize} leading-tight`}>{formatSummaryWeight(consult.PatientWeight)}</span>
-          </div>
-          <div className="min-w-0">
-            <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider leading-tight`}>Chiều cao:</span>
-            <span className={`font-semibold text-slate-700 font-mono ${valueSize} leading-tight`}>{formatSummaryHeight(consult.PatientHeight)}</span>
-          </div>
-        </div>
+        {(() => {
+          const InlineField = ({
+            label,
+            value,
+            mono,
+          }: {
+            label: string;
+            value: React.ReactNode;
+            mono?: boolean;
+          }) => (
+            <span className="inline-flex items-baseline gap-x-1 min-w-0 flex-wrap leading-tight">
+              <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0 whitespace-nowrap`}>
+                {label}:
+              </span>
+              <span className={`${mono ? 'font-mono font-bold' : 'font-extrabold'} text-slate-800 ${valueSize} break-words`}>
+                {value}
+              </span>
+            </span>
+          );
+          return (
+            <div className={`space-y-0.5 ${compact ? 'text-[9px]' : 'text-[12px]'}`}>
+              <div className={`grid grid-cols-2 ${compact ? 'gap-x-2 gap-y-0.5' : 'gap-x-4 gap-y-1'}`}>
+                <InlineField label="Ngày staff" value={formatVNTime(consult.ConsultDate)} mono />
+                <InlineField label="BS đăng ký" value={consult.RequestBy || '—'} />
+              </div>
+              <div className={`grid grid-cols-2 ${compact ? 'gap-x-2 gap-y-0.5' : 'gap-x-4 gap-y-1'}`}>
+                <InlineField label="Cân nặng" value={formatSummaryWeight(consult.PatientWeight)} mono />
+                <InlineField label="Chiều cao" value={formatSummaryHeight(consult.PatientHeight)} mono />
+              </div>
+            </div>
+          );
+        })()}
 
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 pt-1.5 border-t border-slate-100 ${compact ? 'gap-2' : ''}`}>
           <div>
             <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider mb-1`}>Chẩn đoán chi tiết:</span>
-            <div className={`border border-slate-200 rounded-xl px-2.5 py-1.5 bg-slate-50 font-bold text-slate-800 leading-relaxed ${compact ? 'text-[10px] min-h-[30px]' : 'text-[11.5px] min-h-[38px]'}`}>
+            <div className={`border border-slate-200 rounded-xl px-2.5 py-1.5 bg-slate-50 font-bold text-slate-800 leading-snug ${isDense ? 'text-[10px] min-h-0' : 'text-[11.5px] min-h-[38px]'}`}>
               {consult.DetailDiagnosis || consult.DiagnosisID || '—'}
             </div>
           </div>
           <div>
             <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider mb-1`}>Kết quả staff chi tiết:</span>
-            <div className={`border border-slate-200 rounded-xl px-2.5 py-1.5 bg-indigo-50/30 text-indigo-950 font-bold leading-relaxed ${compact ? 'text-[10px] min-h-[30px]' : 'text-[11.5px] min-h-[38px]'}`}>
+            <div className={`border border-slate-200 rounded-xl px-2.5 py-1.5 bg-indigo-50/30 text-indigo-950 font-bold leading-snug ${isDense ? 'text-[10px] min-h-0' : 'text-[11.5px] min-h-[38px]'}`}>
               {detailConsultResult}
             </div>
           </div>
@@ -97,7 +114,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
         )}
       </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${compact ? 'gap-2' : 'gap-3'}`}>
+      <div className={`grid ${capture169 ? 'grid-cols-2 gap-1.5' : `grid-cols-1 sm:grid-cols-2 ${compact ? 'gap-2' : 'gap-3'}`}`}>
         <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${boxPad}`}>
           <span className="text-[10px] font-black uppercase text-rose-600 tracking-wider block border-b border-slate-200 pb-1">
             CHUẨN BỊ DỤNG CỤ VẬT TƯ
@@ -174,7 +191,11 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
   );
 
   if (sectionsOnly) {
-    return <div className={compact ? 'space-y-2 text-[10.5px]' : 'space-y-3 text-xs'}>{sections}</div>;
+    return (
+      <div className={capture169 ? 'space-y-1 text-[10px]' : compact ? 'space-y-2 text-[10.5px]' : 'space-y-3 text-xs'}>
+        {sections}
+      </div>
+    );
   }
 
   return (
