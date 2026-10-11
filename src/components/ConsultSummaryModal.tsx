@@ -156,8 +156,12 @@ export function buildConsultSummaryText(patient: Patient, consult: Consult, _ptv
 
 export type ConsultSummaryLayoutMode = 'default' | 'compact' | 'capture169';
 
-export const SUMMARY_16_9_WIDTH = 1280;
-export const SUMMARY_16_9_HEIGHT = 720;
+/** Khung PNG/PDF dọc 9:16 (phù hợp màn hình điện thoại). */
+export const SUMMARY_PORTRAIT_WIDTH = 720;
+export const SUMMARY_PORTRAIT_HEIGHT = 1280;
+/** @deprecated Dùng SUMMARY_PORTRAIT_* — giữ alias tránh gãy import cũ. */
+export const SUMMARY_16_9_WIDTH = SUMMARY_PORTRAIT_WIDTH;
+export const SUMMARY_16_9_HEIGHT = SUMMARY_PORTRAIT_HEIGHT;
 
 export function ConsultSummarySheet({
   patient,
@@ -258,13 +262,13 @@ export function ConsultSummaryCaptureFrame({
 
       const naturalHeight = content.scrollHeight;
       const nextContentScale = naturalHeight > 0
-        ? Math.min(1, SUMMARY_16_9_HEIGHT / naturalHeight)
+        ? Math.min(1, SUMMARY_PORTRAIT_HEIGHT / naturalHeight)
         : 1;
 
       let nextFrameScale = 1;
       if (previewFitWidth && containerRef.current) {
         const w = containerRef.current.clientWidth;
-        if (w > 0) nextFrameScale = w / SUMMARY_16_9_WIDTH;
+        if (w > 0) nextFrameScale = w / SUMMARY_PORTRAIT_WIDTH;
       }
 
       const last = lastScalesRef.current;
@@ -305,14 +309,14 @@ export function ConsultSummaryCaptureFrame({
   return (
     <div
       ref={containerRef}
-      className={`${previewFitWidth ? 'w-full mx-auto aspect-video overflow-hidden' : ''} ${className}`}
+      className={`${previewFitWidth ? 'w-full mx-auto aspect-[9/16] overflow-hidden' : ''} ${className}`}
     >
       <div
         id={sheetId}
         className="bg-white overflow-hidden shrink-0"
         style={{
-          width: SUMMARY_16_9_WIDTH,
-          height: SUMMARY_16_9_HEIGHT,
+          width: SUMMARY_PORTRAIT_WIDTH,
+          height: SUMMARY_PORTRAIT_HEIGHT,
           transform: previewFitWidth ? `scale(${frameScale})` : undefined,
           transformOrigin: 'top left',
         }}
@@ -320,7 +324,7 @@ export function ConsultSummaryCaptureFrame({
         <div
           ref={contentRef}
           style={{
-            width: SUMMARY_16_9_WIDTH,
+            width: SUMMARY_PORTRAIT_WIDTH,
             transform: contentScale < 1 ? `scale(${contentScale})` : undefined,
             transformOrigin: 'top left',
           }}
@@ -469,7 +473,7 @@ export function ConsultSummaryModal({
             patient={patient}
             consult={mergedConsult}
             previewFitWidth={isMobile}
-            className={isMobile ? '' : 'max-w-[1280px] mx-auto'}
+            className={isMobile ? '' : 'max-w-[720px] mx-auto'}
           />
         </div>
 
@@ -678,7 +682,7 @@ export function StaffSummaryExportActions({
               patient={patient}
               consult={consult}
               previewFitWidth={isMobile}
-              className={isMobile ? '' : 'max-w-[1280px] mx-auto'}
+              className={isMobile ? '' : 'max-w-[720px] mx-auto'}
             />
           ) : (
             <textarea
