@@ -137,6 +137,14 @@ export default function ResultStaffDrawer({
   useLockBodyScroll(isModalOpen);
   usePreventBackgroundTouchScroll(scrollContainerRef, isModalOpen);
 
+  useEffect(() => {
+    if (!isModalOpen || !isMobile) return;
+    document.body.dataset.staffResultDrawerOpen = '1';
+    return () => {
+      delete document.body.dataset.staffResultDrawerOpen;
+    };
+  }, [isModalOpen, isMobile]);
+
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ResultFormState | null>(null);
@@ -393,7 +401,7 @@ export default function ResultStaffDrawer({
   const drawerForm = (
               <form 
                 onSubmit={submitResultUpdate} 
-                className={`flex flex-col min-h-0 overflow-hidden max-md:text-sm md:text-xs text-slate-700 leading-relaxed font-sans${mobileSheetStretch || !isMobile ? ' flex-1' : ''}`}
+                className={`flex flex-col min-h-0 h-full overflow-hidden max-md:text-sm md:text-xs text-slate-700 leading-relaxed font-sans${mobileSheetStretch || !isMobile ? ' flex-1' : ''}`}
               >
                 <div
                   ref={scrollContainerRef}
@@ -746,7 +754,7 @@ export default function ResultStaffDrawer({
                 </div>
 
                       {/* Action buttons area — sticky footer */}
-                      <div className={`max-md:pt-1.5 pt-2 border-t border-slate-100 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'max-md:px-3 px-4 md:px-6'}`}>
+                      <div className={`max-md:pt-1.5 pt-2 border-t border-slate-100 shrink-0 mt-auto pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'max-md:px-3 px-4 md:px-6'}`}>
                         <div className="w-full flex flex-wrap items-center gap-2">
                           <StaffSummaryExportActions
                             patient={patient}
@@ -856,23 +864,36 @@ export default function ResultStaffDrawer({
     );
   }
 
-  /** Không padding bottom nav — sheet phủ tới đáy màn (tránh dải xám + nội dung bị cắt). */
-  const modalOverlayStyle: React.CSSProperties | undefined =
-    isMobile && keyboardOpen ? { paddingBottom: `${keyboardInset}px` } : undefined;
+  /**
+   * iOS PWA: --app-vh (mobileViewport.ts) cao hơn innerHeight — Chrome test không thấy.
+   * Shell + panel bám --app-vh; khi bàn phím mở dùng visualViewport.
+   */
+  const mobileShellHeight = keyboardOpen
+    ? `${Math.max(viewportHeight, 320)}px`
+    : undefined;
 
-  const mobileSheetMaxHeight = `${Math.max(viewportHeight - 8, 320)}px`;
+  const modalOverlayStyle: React.CSSProperties | undefined = isMobile
+    ? {
+        ...(mobileShellHeight ? { height: mobileShellHeight, minHeight: mobileShellHeight } : {}),
+        ...(keyboardOpen ? { paddingBottom: `${keyboardInset}px` } : {}),
+      }
+    : undefined;
+
   const modalPanelStyle: React.CSSProperties | undefined = isMobileModal
     ? keyboardOpen
-      ? { height: mobileSheetMaxHeight, maxHeight: mobileSheetMaxHeight, flex: '0 0 auto' }
-      : { flex: '1 1 auto', minHeight: 0, maxHeight: '100%' }
+      ? {
+          height: `${Math.max(viewportHeight - keyboardInset, 280)}px`,
+          maxHeight: `${Math.max(viewportHeight - keyboardInset, 280)}px`,
+        }
+      : undefined
     : undefined;
 
   return (
     <AnimatePresence>
       {consultKey && (
           <div
-            className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
-              isMobile ? 'flex-col min-h-0 p-0' : 'items-center justify-center p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4'
+            className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[55] flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
+              isMobile ? 'staff-result-drawer-shell flex-col min-h-0 p-0' : 'items-center justify-center p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4'
             }`}
             style={modalOverlayStyle}
           >
@@ -883,7 +904,7 @@ export default function ResultStaffDrawer({
             <div
               className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 overflow-hidden min-h-0 ${
                 isMobileModal
-                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 flex-1 min-h-0 w-full max-h-full'
+                  ? 'staff-result-drawer-panel rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 w-full'
                   : 'rounded-3xl max-h-[96vh] animate-in zoom-in-95 duration-200'
               }`}
               style={modalPanelStyle}
