@@ -265,6 +265,7 @@ export function ConsultSummaryCaptureFrame({
     };
 
     measure();
+    requestAnimationFrame(() => requestAnimationFrame(measure));
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     if (ro && containerRef.current) ro.observe(containerRef.current);
     if (ro && contentRef.current) ro.observe(contentRef.current);
