@@ -15,7 +15,7 @@ export const CONSULT_SUMMARY_SCREENSHOT_CARD_ID = 'consult-summary-screenshot-ca
 
 const hasAdminField = (v?: string) => Boolean(v && String(v).trim() !== '' && v !== '-');
 
-function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
+function PatientAdminPrintInfo({ patient, capture169 = false }: { patient: Patient; capture169?: boolean }) {
   const hasId2 = hasAdminField(patient.PatientID2);
   const hasPhone2 = hasAdminField(patient.PatientPhone2);
   const hasPhone1 = hasAdminField(patient.PatientPhone1);
@@ -23,9 +23,15 @@ function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
   const isFullLayout = hasId2 && hasPhone2;
   const address = patient.PatientAddress || '—';
 
-  const labelCls = 'text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0 whitespace-nowrap';
-  const valueCls = 'font-bold text-slate-800 text-[12.5px]';
-  const monoCls = 'font-extrabold font-mono text-slate-800 text-[12.5px]';
+  const labelCls = capture169
+    ? 'text-slate-400 font-bold text-[11px] uppercase tracking-wider shrink-0 whitespace-nowrap'
+    : 'text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0 whitespace-nowrap';
+  const valueCls = capture169
+    ? 'font-bold text-slate-800 text-[15px]'
+    : 'font-bold text-slate-800 text-[12.5px]';
+  const monoCls = capture169
+    ? 'font-extrabold font-mono text-slate-800 text-[15px]'
+    : 'font-extrabold font-mono text-slate-800 text-[12.5px]';
 
   const Field = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
     <span className="inline-flex items-baseline gap-x-1.5">
@@ -39,7 +45,7 @@ function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
   );
 
   return (
-    <div className="space-y-2.5 text-[12px]">
+    <div className={`space-y-2.5 ${capture169 ? 'text-[14px]' : 'text-[12px]'}`}>
       {hasOtherName && (
         <Row>
           <Field label="Tên khác:" value={patient.OtherPatientName} />
@@ -156,9 +162,9 @@ export function buildConsultSummaryText(patient: Patient, consult: Consult, _ptv
 
 export type ConsultSummaryLayoutMode = 'default' | 'compact' | 'capture169';
 
-/** Khung PNG/PDF dọc 9:16 (phù hợp màn hình điện thoại). */
-export const SUMMARY_PORTRAIT_WIDTH = 720;
-export const SUMMARY_PORTRAIT_HEIGHT = 1280;
+/** Khung PNG/PDF dọc 9:16 (1080p portrait — chữ đủ lớn khi xem trên điện thoại). */
+export const SUMMARY_PORTRAIT_WIDTH = 1080;
+export const SUMMARY_PORTRAIT_HEIGHT = 1920;
 /** @deprecated Dùng SUMMARY_PORTRAIT_* — giữ alias tránh gãy import cũ. */
 export const SUMMARY_16_9_WIDTH = SUMMARY_PORTRAIT_WIDTH;
 export const SUMMARY_16_9_HEIGHT = SUMMARY_PORTRAIT_HEIGHT;
@@ -187,7 +193,7 @@ export function ConsultSummarySheet({
   );
 
   const shellClass = isCapture169
-    ? 'p-2 space-y-1.5 text-[10px] rounded-lg border border-slate-800'
+    ? 'p-3 space-y-2.5 text-[14px] rounded-lg border-2 border-slate-800'
     : isCompact
       ? 'p-2.5 space-y-2 text-[10.5px] rounded-2xl border-2 border-slate-800'
       : 'p-5 space-y-3.5 shrink-0 rounded-2xl border-2 border-slate-800';
@@ -197,29 +203,29 @@ export function ConsultSummarySheet({
       id={sheetId}
       className={`bg-white text-slate-700 shadow-xs max-w-full select-text ${shellClass}`}
     >
-      <div className={isCapture169 ? 'space-y-0.5' : 'space-y-1'}>
-        <div className={`flex justify-between items-start gap-2 font-semibold text-slate-600 leading-tight ${isCapture169 ? 'text-[8px]' : 'text-[9px]'}`}>
+      <div className={isCapture169 ? 'space-y-1' : 'space-y-1'}>
+        <div className={`flex justify-between items-start gap-2 font-semibold text-slate-600 leading-tight ${isCapture169 ? 'text-[13px]' : 'text-[9px]'}`}>
           <span>Khoa Tim Mạch</span>
           <span className="text-right">Bệnh viện Nhi Đồng Thành Phố</span>
         </div>
-        <h2 className={`text-center font-black uppercase tracking-wide text-slate-900 ${isCapture169 ? 'text-[11px]' : 'text-[13px]'}`}>
+        <h2 className={`text-center font-black uppercase tracking-wide text-slate-900 ${isCapture169 ? 'text-[22px]' : 'text-[13px]'}`}>
           HỒ SƠ CAN THIỆP
         </h2>
       </div>
 
       <div className={isCompact ? '' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-2 pb-1'}>
         <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${
-          isCapture169 ? 'text-[12px] px-2 py-0.5' : isCompact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'
+          isCapture169 ? 'text-[20px] px-3 py-1.5' : isCompact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'
         }`}>
           {formatSummaryPatientTitle(patient.PatientName, consult, ptvPhu1Display)}
         </div>
       </div>
 
-      <div className={`bg-white border border-slate-700 rounded-xl space-y-1.5 ${isCapture169 ? 'p-1.5' : isCompact ? 'p-2' : 'p-3.5'}`}>
-        <span className={`font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-0.5 ${isCapture169 ? 'text-[8px]' : 'text-[10px]'}`}>
+      <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${isCapture169 ? 'p-2.5' : isCompact ? 'p-2' : 'p-3.5'}`}>
+        <span className={`font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1 ${isCapture169 ? 'text-[14px]' : 'text-[10px]'}`}>
           THÔNG TIN HÀNH CHÍNH
         </span>
-        <PatientAdminPrintInfo patient={patient} />
+        <PatientAdminPrintInfo patient={patient} capture169={isCapture169} />
       </div>
 
       <ConsultSummaryReadOnly
@@ -261,9 +267,16 @@ export function ConsultSummaryCaptureFrame({
       if (!content) return;
 
       const naturalHeight = content.scrollHeight;
-      const nextContentScale = naturalHeight > 0
-        ? Math.min(1, SUMMARY_PORTRAIT_HEIGHT / naturalHeight)
-        : 1;
+      let nextContentScale = 1;
+      if (naturalHeight > 0) {
+        const fit = SUMMARY_PORTRAIT_HEIGHT / naturalHeight;
+        if (naturalHeight > SUMMARY_PORTRAIT_HEIGHT) {
+          nextContentScale = fit;
+        } else {
+          // Phóng nội dung để lấp khung dọc (tránh chữ nhỏ + khoảng trắng), tối đa ~1.85×
+          nextContentScale = Math.min(1.85, fit);
+        }
+      }
 
       let nextFrameScale = 1;
       if (previewFitWidth && containerRef.current) {
@@ -325,7 +338,7 @@ export function ConsultSummaryCaptureFrame({
           ref={contentRef}
           style={{
             width: SUMMARY_PORTRAIT_WIDTH,
-            transform: contentScale < 1 ? `scale(${contentScale})` : undefined,
+            transform: contentScale !== 1 ? `scale(${contentScale})` : undefined,
             transformOrigin: 'top left',
           }}
         >
@@ -473,7 +486,7 @@ export function ConsultSummaryModal({
             patient={patient}
             consult={mergedConsult}
             previewFitWidth={isMobile}
-            className={isMobile ? '' : 'max-w-[720px] mx-auto'}
+            className={isMobile ? '' : 'max-w-[540px] mx-auto'}
           />
         </div>
 
@@ -682,7 +695,7 @@ export function StaffSummaryExportActions({
               patient={patient}
               consult={consult}
               previewFitWidth={isMobile}
-              className={isMobile ? '' : 'max-w-[720px] mx-auto'}
+              className={isMobile ? '' : 'max-w-[540px] mx-auto'}
             />
           ) : (
             <textarea
