@@ -1,5 +1,6 @@
 import React from 'react';
 import { Consult, formatVNTime, normalizePriorityOrder } from '../types';
+import { CAPTURE169_TYPO } from '../utils/consultSummaryCaptureTypo';
 
 const formatSummaryWeight = (value?: string) => {
   const v = String(value || '').trim();
@@ -49,12 +50,12 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
     .join(' - ') || 'Chưa gán';
 
   const boxPad = capture169 ? 'p-2.5' : compact ? 'p-2' : 'p-3';
-  const labelSize = capture169 ? 'text-[17px]' : compact ? 'text-[7.5px]' : 'text-[9px]';
-  const valueSize = capture169 ? 'text-[23px] leading-snug' : compact ? 'text-[10px]' : 'text-[12.5px]';
-  const sectionTitle = capture169 ? 'text-[21px]' : 'text-[10px]';
-  const bodyText = capture169 ? 'text-[23px] leading-snug' : isDense ? 'text-[10px]' : 'text-[11.5px]';
-  const badgeText = capture169 ? 'text-[18px]' : compact ? 'text-[9px]' : 'text-[10px]';
-  const rowText = capture169 ? 'text-[21px]' : compact ? 'text-[9px]' : 'text-[12px]';
+  const labelSize = capture169 ? CAPTURE169_TYPO.label : compact ? 'text-[7.5px]' : 'text-[9px]';
+  const valueSize = capture169 ? CAPTURE169_TYPO.value : compact ? 'text-[10px]' : 'text-[12.5px]';
+  const sectionTitle = capture169 ? CAPTURE169_TYPO.sectionTitle : 'text-[10px]';
+  const bodyText = capture169 ? CAPTURE169_TYPO.body : isDense ? 'text-[10px]' : 'text-[11.5px]';
+  const badgeText = capture169 ? CAPTURE169_TYPO.badge : compact ? 'text-[9px]' : 'text-[10px]';
+  const rowText = capture169 ? CAPTURE169_TYPO.row : compact ? 'text-[9px]' : 'text-[12px]';
 
   const sections = (
     <>
@@ -112,7 +113,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
 
         {normalizeConsultMembers(consult.ConsultMember) && (
           <p className={`text-slate-600 font-semibold ${bodyText}`}>
-            <span className={`text-slate-400 font-bold uppercase ${capture169 ? 'text-[17px]' : 'text-[9px]'}`}>Thành viên duyệt HC: </span>
+            <span className={`text-slate-400 font-bold uppercase ${capture169 ? CAPTURE169_TYPO.meta : 'text-[9px]'}`}>Thành viên duyệt HC: </span>
             {normalizeConsultMembers(consult.ConsultMember)}
           </p>
         )}
@@ -124,7 +125,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
             CHUẨN BỊ DỤNG CỤ VẬT TƯ
           </span>
           <div className="space-y-1.5">
-            <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? 'text-[21px]' : compact ? '' : 'text-[12.5px]'}`}>
+            <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? CAPTURE169_TYPO.row : compact ? '' : 'text-[12.5px]'}`}>
               <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Kiểm dụng cụ:</span>
                 <span className={`px-1.5 py-0.5 rounded-md font-black uppercase leading-tight ${badgeText} ${
@@ -148,7 +149,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
             </div>
             {(supplyDepFeedback || operationFeedback) && (
               <div className={`bg-amber-50/20 border border-amber-200 p-2 rounded-lg text-amber-900 font-semibold leading-normal whitespace-pre-wrap break-words ${bodyText}`}>
-                <span className={`block font-black uppercase tracking-wider text-amber-800 ${capture169 ? 'text-[17px]' : 'text-[8px]'}`}>Liên khoa phản hồi:</span>
+                <span className={`block font-black uppercase tracking-wider text-amber-800 ${capture169 ? CAPTURE169_TYPO.meta : 'text-[8px]'}`}>Liên khoa phản hồi:</span>
                 {[supplyDepFeedback, operationFeedback].filter(Boolean).join(' | ')}
               </div>
             )}
@@ -160,7 +161,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
             KẾT QUẢ XẾP LỊCH CAN THIỆP
           </span>
           <div className="space-y-1.5">
-            <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? 'text-[21px]' : compact ? '' : 'text-[12.5px]'}`}>
+            <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? CAPTURE169_TYPO.row : compact ? '' : 'text-[12.5px]'}`}>
               <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Lịch TT dự kiến:</span>
                 <span className={`px-1.5 py-0.5 rounded-md font-black border uppercase leading-tight ${badgeText} ${
@@ -177,7 +178,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
               </div>
             </div>
             <div className={`${capture169 ? 'flex flex-col items-stretch gap-1' : 'flex justify-between items-start gap-2'} border-b border-slate-200 pb-2 pt-1 px-1`}>
-              <span className={`text-[#d2145a] font-black tracking-wider uppercase shrink-0 ${capture169 ? 'text-[18px]' : 'text-[9px]'}`}>PTV:</span>
+              <span className={`text-[#d2145a] font-black tracking-wider uppercase shrink-0 ${capture169 ? CAPTURE169_TYPO.badge : 'text-[9px]'}`}>PTV:</span>
               <span className={`font-extrabold text-slate-850 uppercase break-words w-full ${capture169 ? 'text-left normal-case' : 'text-right max-w-[75%]'} ${valueSize}`}>
                 {ptvDisplay}
               </span>
@@ -196,7 +197,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
 
   if (sectionsOnly) {
     return (
-      <div className={capture169 ? 'space-y-2.5 text-[21px] overflow-visible' : compact ? 'space-y-2 text-[10.5px]' : 'space-y-3 text-xs'}>
+      <div className={capture169 ? `space-y-2.5 ${CAPTURE169_TYPO.sectionsWrap} overflow-visible` : compact ? 'space-y-2 text-[10.5px]' : 'space-y-3 text-xs'}>
         {sections}
       </div>
     );
