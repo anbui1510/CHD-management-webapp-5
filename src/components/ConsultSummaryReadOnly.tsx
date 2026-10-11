@@ -49,12 +49,12 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
     .join(' - ') || 'Chưa gán';
 
   const boxPad = capture169 ? 'p-2.5' : compact ? 'p-2' : 'p-3';
-  const labelSize = capture169 ? 'text-[11px]' : compact ? 'text-[7.5px]' : 'text-[9px]';
-  const valueSize = capture169 ? 'text-[15px]' : compact ? 'text-[10px]' : 'text-[12.5px]';
-  const sectionTitle = capture169 ? 'text-[14px]' : 'text-[10px]';
-  const bodyText = capture169 ? 'text-[15px]' : isDense ? 'text-[10px]' : 'text-[11.5px]';
-  const badgeText = capture169 ? 'text-[12px]' : compact ? 'text-[9px]' : 'text-[10px]';
-  const rowText = capture169 ? 'text-[14px]' : compact ? 'text-[9px]' : 'text-[12px]';
+  const labelSize = capture169 ? 'text-[17px]' : compact ? 'text-[7.5px]' : 'text-[9px]';
+  const valueSize = capture169 ? 'text-[23px] leading-snug' : compact ? 'text-[10px]' : 'text-[12.5px]';
+  const sectionTitle = capture169 ? 'text-[21px]' : 'text-[10px]';
+  const bodyText = capture169 ? 'text-[23px] leading-snug' : isDense ? 'text-[10px]' : 'text-[11.5px]';
+  const badgeText = capture169 ? 'text-[18px]' : compact ? 'text-[9px]' : 'text-[10px]';
+  const rowText = capture169 ? 'text-[21px]' : compact ? 'text-[9px]' : 'text-[12px]';
 
   const sections = (
     <>
@@ -98,13 +98,13 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
         <div className={`grid grid-cols-1 ${capture169 ? '' : 'md:grid-cols-2'} gap-3 pt-1.5 border-t border-slate-100 ${compact || capture169 ? 'gap-2' : ''}`}>
           <div>
             <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider mb-1`}>Chẩn đoán chi tiết:</span>
-            <div className={`border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50 font-bold text-slate-800 leading-snug ${bodyText} min-h-0`}>
+            <div className={`border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 font-bold text-slate-800 whitespace-pre-wrap break-words ${bodyText} min-h-0 w-full max-w-full overflow-visible`}>
               {consult.DetailDiagnosis || consult.DiagnosisID || '—'}
             </div>
           </div>
           <div>
             <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider mb-1`}>Kết quả staff chi tiết:</span>
-            <div className={`border border-slate-200 rounded-xl px-2.5 py-2 bg-indigo-50/30 text-indigo-950 font-bold leading-snug ${bodyText} min-h-0`}>
+            <div className={`border border-slate-200 rounded-xl px-3 py-2.5 bg-indigo-50/30 text-indigo-950 font-bold whitespace-pre-wrap break-words ${bodyText} min-h-0 w-full max-w-full overflow-visible`}>
               {detailConsultResult}
             </div>
           </div>
@@ -112,7 +112,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
 
         {normalizeConsultMembers(consult.ConsultMember) && (
           <p className={`text-slate-600 font-semibold ${bodyText}`}>
-            <span className={`text-slate-400 font-bold uppercase ${capture169 ? 'text-[11px]' : 'text-[9px]'}`}>Thành viên duyệt HC: </span>
+            <span className={`text-slate-400 font-bold uppercase ${capture169 ? 'text-[17px]' : 'text-[9px]'}`}>Thành viên duyệt HC: </span>
             {normalizeConsultMembers(consult.ConsultMember)}
           </p>
         )}
@@ -124,8 +124,8 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
             CHUẨN BỊ DỤNG CỤ VẬT TƯ
           </span>
           <div className="space-y-1.5">
-            <div className={`flex justify-between items-center gap-2 bg-slate-50 p-1.5 px-2 rounded-lg border border-slate-100 ${capture169 ? 'text-[14px]' : compact ? '' : 'text-[12.5px]'}`}>
-              <div className="flex items-center gap-1 min-w-0 flex-1">
+            <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? 'text-[21px]' : compact ? '' : 'text-[12.5px]'}`}>
+              <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Kiểm dụng cụ:</span>
                 <span className={`px-1.5 py-0.5 rounded-md font-black uppercase leading-tight ${badgeText} ${
                   checkDevice === 'Đủ'
@@ -137,18 +137,18 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
                   {checkDevice || 'Chưa kiểm'}
                 </span>
               </div>
-              <div className="flex items-center gap-1 min-w-0 flex-1 justify-end text-right">
+              <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full ${capture169 ? '' : 'flex-1 justify-end text-right'}`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Số tiền dự kiến:</span>
-                <span className={`font-black text-rose-650 font-mono ${valueSize}`}>{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
+                <span className={`font-black text-rose-650 font-mono break-words ${valueSize}`}>{plannedPrice ? `${plannedPrice} VNĐ` : '—'}</span>
               </div>
             </div>
-            <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
+            <div className={`${capture169 ? 'flex flex-col items-stretch gap-1' : 'flex justify-between items-start gap-2'} border-b border-slate-200 pb-2 pt-1 px-1`}>
               <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Dụng cụ dự kiến:</span>
-              <span className={`font-extrabold text-slate-800 text-right break-words max-w-[70%] ${valueSize}`}>{plannedDevice || '—'}</span>
+              <span className={`font-extrabold text-slate-800 break-words w-full ${capture169 ? 'text-left' : 'text-right max-w-[70%]'} ${valueSize}`}>{plannedDevice || '—'}</span>
             </div>
             {(supplyDepFeedback || operationFeedback) && (
               <div className={`bg-amber-50/20 border border-amber-200 p-2 rounded-lg text-amber-900 font-semibold leading-normal whitespace-pre-wrap break-words ${bodyText}`}>
-                <span className={`block font-black uppercase tracking-wider text-amber-800 ${capture169 ? 'text-[11px]' : 'text-[8px]'}`}>Liên khoa phản hồi:</span>
+                <span className={`block font-black uppercase tracking-wider text-amber-800 ${capture169 ? 'text-[17px]' : 'text-[8px]'}`}>Liên khoa phản hồi:</span>
                 {[supplyDepFeedback, operationFeedback].filter(Boolean).join(' | ')}
               </div>
             )}
@@ -160,8 +160,8 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
             KẾT QUẢ XẾP LỊCH CAN THIỆP
           </span>
           <div className="space-y-1.5">
-            <div className={`flex justify-between items-center gap-2 bg-slate-50 p-1.5 px-2 rounded-lg border border-slate-100 ${capture169 ? 'text-[14px]' : compact ? '' : 'text-[12.5px]'}`}>
-              <div className="flex items-center gap-1 min-w-0 flex-1">
+            <div className={`${capture169 ? 'flex flex-col items-stretch gap-2' : 'flex justify-between items-center gap-2'} bg-slate-50 p-2 px-2.5 rounded-lg border border-slate-100 ${capture169 ? 'text-[21px]' : compact ? '' : 'text-[12.5px]'}`}>
+              <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Lịch TT dự kiến:</span>
                 <span className={`px-1.5 py-0.5 rounded-md font-black border uppercase leading-tight ${badgeText} ${
                   plannedCathLabDate
@@ -171,20 +171,20 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
                   {plannedCathLabDate ? formatVNTime(plannedCathLabDate) : 'Chưa xếp'}
                 </span>
               </div>
-              <div className="flex items-center gap-1 min-w-0 flex-1 justify-end text-right">
+              <div className={`flex ${capture169 ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 w-full ${capture169 ? '' : 'flex-1 justify-end text-right'}`}>
                 <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Trạng thái gọi:</span>
-                <span className={`font-bold text-slate-800 ${valueSize}`}>{callStatus || '—'}</span>
+                <span className={`font-bold text-slate-800 break-words ${valueSize}`}>{callStatus || '—'}</span>
               </div>
             </div>
-            <div className="flex justify-between items-start gap-2 border-b border-slate-200 pb-1.5 pt-0.5 px-1">
-              <span className={`text-[#d2145a] font-black tracking-wider uppercase shrink-0 ${capture169 ? 'text-[12px]' : 'text-[9px]'}`}>PTV:</span>
-              <span className={`font-extrabold text-slate-850 uppercase text-right break-words max-w-[75%] ${valueSize}`}>
+            <div className={`${capture169 ? 'flex flex-col items-stretch gap-1' : 'flex justify-between items-start gap-2'} border-b border-slate-200 pb-2 pt-1 px-1`}>
+              <span className={`text-[#d2145a] font-black tracking-wider uppercase shrink-0 ${capture169 ? 'text-[18px]' : 'text-[9px]'}`}>PTV:</span>
+              <span className={`font-extrabold text-slate-850 uppercase break-words w-full ${capture169 ? 'text-left normal-case' : 'text-right max-w-[75%]'} ${valueSize}`}>
                 {ptvDisplay}
               </span>
             </div>
-            <div className="flex justify-between items-start gap-2 pt-0.5 px-1">
+            <div className={`${capture169 ? 'flex flex-col items-stretch gap-1' : 'flex justify-between items-start gap-2'} pt-1 px-1`}>
               <span className={`text-slate-400 font-bold ${labelSize} uppercase tracking-wider shrink-0`}>Lưu ý / Ưu tiên:</span>
-              <span className={`font-bold text-slate-800 text-right break-words max-w-[70%] ${bodyText}`}>
+              <span className={`font-bold text-slate-800 break-words w-full ${capture169 ? 'text-left' : 'text-right max-w-[70%]'} ${bodyText}`}>
                 {callNote ? `${priorityOrder} (${callNote})` : priorityOrder}
               </span>
             </div>
@@ -196,7 +196,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
 
   if (sectionsOnly) {
     return (
-      <div className={capture169 ? 'space-y-2 text-[14px]' : compact ? 'space-y-2 text-[10.5px]' : 'space-y-3 text-xs'}>
+      <div className={capture169 ? 'space-y-2.5 text-[21px] overflow-visible' : compact ? 'space-y-2 text-[10.5px]' : 'space-y-3 text-xs'}>
         {sections}
       </div>
     );

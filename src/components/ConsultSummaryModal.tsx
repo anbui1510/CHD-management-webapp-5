@@ -24,13 +24,13 @@ function PatientAdminPrintInfo({ patient, capture169 = false }: { patient: Patie
   const address = patient.PatientAddress || '—';
 
   const labelCls = capture169
-    ? 'text-slate-400 font-bold text-[11px] uppercase tracking-wider shrink-0 whitespace-nowrap'
+    ? 'text-slate-400 font-bold text-[17px] uppercase tracking-wider shrink-0 whitespace-nowrap'
     : 'text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0 whitespace-nowrap';
   const valueCls = capture169
-    ? 'font-bold text-slate-800 text-[15px]'
+    ? 'font-bold text-slate-800 text-[23px] leading-snug'
     : 'font-bold text-slate-800 text-[12.5px]';
   const monoCls = capture169
-    ? 'font-extrabold font-mono text-slate-800 text-[15px]'
+    ? 'font-extrabold font-mono text-slate-800 text-[23px] leading-snug'
     : 'font-extrabold font-mono text-slate-800 text-[12.5px]';
 
   const Field = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
@@ -45,7 +45,7 @@ function PatientAdminPrintInfo({ patient, capture169 = false }: { patient: Patie
   );
 
   return (
-    <div className={`space-y-2.5 ${capture169 ? 'text-[14px]' : 'text-[12px]'}`}>
+    <div className={`space-y-2.5 ${capture169 ? 'text-[21px]' : 'text-[12px]'}`}>
       {hasOtherName && (
         <Row>
           <Field label="Tên khác:" value={patient.OtherPatientName} />
@@ -193,7 +193,7 @@ export function ConsultSummarySheet({
   );
 
   const shellClass = isCapture169
-    ? 'p-3 space-y-2.5 text-[14px] rounded-lg border-2 border-slate-800'
+    ? 'p-4 space-y-3 text-[21px] rounded-lg border-2 border-slate-800 overflow-visible'
     : isCompact
       ? 'p-2.5 space-y-2 text-[10.5px] rounded-2xl border-2 border-slate-800'
       : 'p-5 space-y-3.5 shrink-0 rounded-2xl border-2 border-slate-800';
@@ -204,25 +204,25 @@ export function ConsultSummarySheet({
       className={`bg-white text-slate-700 shadow-xs max-w-full select-text ${shellClass}`}
     >
       <div className={isCapture169 ? 'space-y-1' : 'space-y-1'}>
-        <div className={`flex justify-between items-start gap-2 font-semibold text-slate-600 leading-tight ${isCapture169 ? 'text-[13px]' : 'text-[9px]'}`}>
-          <span>Khoa Tim Mạch</span>
-          <span className="text-right">Bệnh viện Nhi Đồng Thành Phố</span>
+        <div className={`flex justify-between items-start gap-2 font-semibold text-slate-600 leading-snug ${isCapture169 ? 'text-[20px]' : 'text-[9px]'}`}>
+          <span className="shrink-0">Khoa Tim Mạch</span>
+          <span className="text-right leading-snug break-words">Bệnh viện Nhi Đồng Thành Phố</span>
         </div>
-        <h2 className={`text-center font-black uppercase tracking-wide text-slate-900 ${isCapture169 ? 'text-[22px]' : 'text-[13px]'}`}>
+        <h2 className={`text-center font-black uppercase tracking-wide text-slate-900 break-words ${isCapture169 ? 'text-[33px] leading-tight' : 'text-[13px]'}`}>
           HỒ SƠ CAN THIỆP
         </h2>
       </div>
 
       <div className={isCompact ? '' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-2 pb-1'}>
         <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${
-          isCapture169 ? 'text-[20px] px-3 py-1.5' : isCompact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'
+          isCapture169 ? 'text-[30px] px-3 py-2 leading-snug' : isCompact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'
         }`}>
           {formatSummaryPatientTitle(patient.PatientName, consult, ptvPhu1Display)}
         </div>
       </div>
 
       <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${isCapture169 ? 'p-2.5' : isCompact ? 'p-2' : 'p-3.5'}`}>
-        <span className={`font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1 ${isCapture169 ? 'text-[14px]' : 'text-[10px]'}`}>
+        <span className={`font-black uppercase text-slate-800 tracking-wider block border-b border-slate-200 pb-1 ${isCapture169 ? 'text-[21px]' : 'text-[10px]'}`}>
           THÔNG TIN HÀNH CHÍNH
         </span>
         <PatientAdminPrintInfo patient={patient} capture169={isCapture169} />
@@ -268,14 +268,8 @@ export function ConsultSummaryCaptureFrame({
 
       const naturalHeight = content.scrollHeight;
       let nextContentScale = 1;
-      if (naturalHeight > 0) {
-        const fit = SUMMARY_PORTRAIT_HEIGHT / naturalHeight;
-        if (naturalHeight > SUMMARY_PORTRAIT_HEIGHT) {
-          nextContentScale = fit;
-        } else {
-          // Phóng nội dung để lấp khung dọc (tránh chữ nhỏ + khoảng trắng), tối đa ~1.85×
-          nextContentScale = Math.min(1.85, fit);
-        }
+      if (naturalHeight > SUMMARY_PORTRAIT_HEIGHT) {
+        nextContentScale = SUMMARY_PORTRAIT_HEIGHT / naturalHeight;
       }
 
       let nextFrameScale = 1;
@@ -338,7 +332,7 @@ export function ConsultSummaryCaptureFrame({
           ref={contentRef}
           style={{
             width: SUMMARY_PORTRAIT_WIDTH,
-            transform: contentScale !== 1 ? `scale(${contentScale})` : undefined,
+            transform: contentScale < 1 ? `scale(${contentScale})` : undefined,
             transformOrigin: 'top left',
           }}
         >
