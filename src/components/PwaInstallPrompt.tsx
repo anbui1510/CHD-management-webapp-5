@@ -51,7 +51,7 @@ export default function PwaInstallPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed left-4 right-4 pwa-install-anchor md:bottom-6 md:left-auto md:right-6 md:max-w-sm z-[90] animate-in slide-in-from-bottom-4 max-h-[min(70dvh,calc(var(--app-layout-vh,100svh)*0.7))] overflow-y-auto">
+    <div className="fixed left-4 right-4 pwa-install-anchor md:bottom-6 md:left-auto md:right-6 md:max-w-sm z-[90] animate-in slide-in-from-bottom-4 max-h-[70dvh] overflow-y-auto">
       <div className="rounded-2xl border border-indigo-200 bg-white shadow-2xl overflow-hidden">
         <div className="px-4 py-3 bg-indigo-600 text-white flex items-center gap-2">
           <Smartphone className="w-4 h-4 shrink-0" />

@@ -1,31 +1,7 @@
 /**
- * iOS PWA (Add to Home Screen) often reports a “lying” viewport shorter than
- * the physical screen, leaving a chin below position:fixed bottom bars. The
- * chin paints with the document background (#0a0a0a in boot CSS) — the black
- * strip under Home/Thêm. This module:
- *  1) measures that gap and exposes --app-vh / --ios-bottom-gap
- *  2) paints html/body white so the chin matches the tab bar
- *  3) when the virtual keyboard is open, keeps layout height stable and hides bottom nav inset
+ * Mobile viewport helpers: keyboard overlap + optional iOS metrics.
+ * Shell height stays CSS `100dvh` — không set chiều cao shell bằng JS (tránh lệch mọi view).
  */
-
-function isStandaloneDisplayMode(): boolean {
-  if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
-
-function readSafeAreaInsetBottomPx(): number {
-  if (typeof document === 'undefined' || !document.body) return 0;
-  const probe = document.createElement('div');
-  probe.style.cssText =
-    'position:fixed;bottom:0;left:0;visibility:hidden;padding-bottom:env(safe-area-inset-bottom,0px);pointer-events:none;';
-  document.body.appendChild(probe);
-  const px = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
-  probe.remove();
-  return px;
-}
 
 function detectKeyboardOpen(vv: VisualViewport | null, layoutInnerH: number): boolean {
   if (!vv) return false;
@@ -51,54 +27,26 @@ export function applyMobileViewportMetrics(): void {
     else delete document.body.dataset.keyboardOpen;
   }
 
-  const isPortrait = layoutInnerH >= window.innerWidth;
-  let bottomGap = 0;
-
-  /**
-   * Chiều cao UI (shell, modal): vùng nhìn thấy qua visualViewport — Safari, Chrome, PWA, Android.
-   * KHÔNG cộng thêm “chin” PWA vào đây (tránh tab bar lơ lửng + footer drawer bị cắt).
-   */
-  let uiHeight = keyboardOpen
-    ? Math.max(visibleH + offsetTop, visibleH)
-    : Math.max(visibleH + offsetTop, 0);
-  if (!keyboardOpen && uiHeight < 320) {
-    uiHeight = layoutInnerH;
-  }
-
-  if (!keyboardOpen && isStandaloneDisplayMode() && isPortrait) {
-    const physicalH = Math.round(Math.max(window.screen.height || 0, window.screen.width || 0));
-    const reported = visibleH + offsetTop;
-    const gap = physicalH > 0 ? physicalH - reported : 0;
-    // Known WebKit chin is typically ~34–80px; ignore keyboard-sized gaps.
-    if (gap > 12 && gap < 100) {
-      bottomGap = gap;
-    }
-  }
-
-  root.style.setProperty('--app-layout-vh', `${uiHeight}px`);
-  root.style.setProperty('--app-vh', `${uiHeight}px`);
   root.style.setProperty(
     '--mobile-keyboard-overlap',
     keyboardOpen ? `${Math.max(0, layoutInnerH - visibleH - offsetTop)}px` : '0px'
   );
 
-  // Only expose ios-gap when safe-area is missing/too small (avoid double inset).
-  const safeBottom = readSafeAreaInsetBottomPx();
-  const effectiveGap = bottomGap > safeBottom + 4 ? bottomGap : 0;
-  root.style.setProperty('--ios-bottom-gap', `${effectiveGap}px`);
+  /* Không dùng --ios-bottom-gap / padding nav — gây dải trắng lớn dưới tab bar trên PWA. */
+  root.style.setProperty('--ios-bottom-gap', '0px');
 
   const chinFill = '#ffffff';
   root.style.backgroundColor = chinFill;
   if (document.body) {
     document.body.style.backgroundColor = chinFill;
-    document.body.style.minHeight = 'var(--app-layout-vh, 100svh)';
+    document.body.style.minHeight = '';
   }
 
-  if (isStandaloneDisplayMode()) {
-    root.dataset.displayMode = 'standalone';
-  } else {
-    delete root.dataset.displayMode;
-  }
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+  if (standalone) root.dataset.displayMode = 'standalone';
+  else delete root.dataset.displayMode;
 }
 
 export function installMobileViewportFix(): () => void {
@@ -107,9 +55,7 @@ export function installMobileViewportFix(): () => void {
   const onResize = () => applyMobileViewportMetrics();
   applyMobileViewportMetrics();
 
-  const timers = [50, 150, 300, 500, 800, 1200].map((ms) =>
-    window.setTimeout(applyMobileViewportMetrics, ms)
-  );
+  const timers = [50, 150, 300, 500].map((ms) => window.setTimeout(applyMobileViewportMetrics, ms));
 
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
