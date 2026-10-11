@@ -8,21 +8,10 @@ import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/use
 import { formatPatientDobWithAge, getPatientAgeDescription } from '../utils/patientDisplay';
 import { captureElementPngBlob, copyElementAsImage, CopyImageResultType, downloadBlob, openElementAsPdf } from '../utils/copySummaryImage';
 import {
-  formatPatientWithPtvPhu,
+  formatSummaryPatientTitle,
   resolvePtvPhu1Display
 } from '../utils/consultSummaryDisplay';
-import {
-  buildSchedulingSummaryHeader,
-  SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER
-} from '../utils/workflowMessages';
-
 export const CONSULT_SUMMARY_SCREENSHOT_CARD_ID = 'consult-summary-screenshot-card';
-
-const formatSummaryWeight = (value?: string) =>
-  value ? restoreWeightFromDate(value) + (String(value).includes('kg') ? '' : ' kg') : '—';
-
-const formatSummaryHeight = (value?: string) =>
-  value ? restoreWeightFromDate(value) + (String(value).includes('cm') ? '' : ' cm') : '—';
 
 const hasAdminField = (v?: string) => Boolean(v && String(v).trim() !== '' && v !== '-');
 
@@ -34,7 +23,7 @@ function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
   const isFullLayout = hasId2 && hasPhone2;
   const address = patient.PatientAddress || '—';
 
-  const labelCls = 'text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0';
+  const labelCls = 'text-slate-400 font-bold text-[9px] uppercase tracking-wider shrink-0 whitespace-nowrap';
   const valueCls = 'font-bold text-slate-800 text-[12.5px]';
   const monoCls = 'font-extrabold font-mono text-slate-800 text-[12.5px]';
 
@@ -65,8 +54,6 @@ function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
           <Row>
             <Field label="Ngày sinh:" value={formatPatientDobWithAge(patient.PatientDOB, undefined, formatVNTime)} />
             <Field label="Giới:" value={patient.PatientSex || '—'} />
-          </Row>
-          <Row>
             <Field label="Địa chỉ:" value={address} />
           </Row>
           <Row>
@@ -79,12 +66,10 @@ function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
           <Row>
             <Field label="Mã NB:" value={patient.PatientID1 || '—'} mono />
             <Field label="Giới:" value={patient.PatientSex || '—'} />
+            <Field label="Địa chỉ:" value={address} />
           </Row>
           <Row>
             <Field label="Ngày sinh:" value={formatPatientDobWithAge(patient.PatientDOB, undefined, formatVNTime)} />
-          </Row>
-          <Row>
-            <Field label="Địa chỉ:" value={address} />
           </Row>
           {(hasPhone1 || hasPhone2) && (
             <Row>
@@ -98,48 +83,75 @@ function PatientAdminPrintInfo({ patient }: { patient: Patient }) {
   );
 }
 
-export function buildConsultSummaryText(patient: Patient, consult: Consult, ptvPhu1Display: string) {
-  const summaryDetailConsultResult = (consult.DetailConsultResult || consult.ConsultResultID || '').trim() || '—';
-  const weightDisplay = formatSummaryWeight(consult.PatientWeight);
-  const heightDisplay = formatSummaryHeight(consult.PatientHeight);
-  const ageDesc = getPatientAgeDescription(patient.PatientDOB) || '—';
-  const addressDisplay = patient.PatientAddress || '';
-  const phoneList = [patient.PatientPhone1, patient.PatientPhone2].filter(Boolean).join(' | ');
+const isSmsSummaryValueEmpty = (value?: string | null) => {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return true;
+  const normalized = trimmed.toLowerCase();
+  return trimmed === '—' || trimmed === '-' || normalized === 'không' || normalized === 'chưa kiểm' ||
+    normalized === 'chưa gán' || normalized === 'chưa xếp' || normalized === 'chưa liên hệ';
+};
+
+const appendSmsLine = (lines: string[], label: string, value?: string | null) => {
+  if (isSmsSummaryValueEmpty(value)) return;
+  lines.push(`${label}: ${String(value).trim()}`);
+};
+
+export function buildConsultSummaryText(patient: Patient, consult: Consult, _ptvPhu1Display?: string) {
+  const ageDesc = getPatientAgeDescription(patient.PatientDOB);
+  const dobDisplay = formatVNTime(patient.PatientDOB);
+  const sexDobLine = [patient.PatientSex, dobDisplay && ageDesc ? `${dobDisplay} (${ageDesc})` : dobDisplay || ageDesc]
+    .filter(Boolean)
+    .join(' - ');
+
+  const phones = [patient.PatientPhone1, patient.PatientPhone2]
+    .map(p => String(p || '').trim())
+    .filter(p => p && p !== '-');
+  const phoneLine = phones.join(' - ');
+
+  const weightRaw = consult.PatientWeight ? restoreWeightFromDate(consult.PatientWeight) : '';
+  const heightRaw = consult.PatientHeight ? restoreWeightFromDate(consult.PatientHeight) : '';
+  const metricsLine = weightRaw || heightRaw
+    ? `CN ${weightRaw || '—'} kg/ CC ${heightRaw || '—'} cm`
+    : '';
+
+  const staffDate = consult.ConsultDate ? formatVNTime(consult.ConsultDate) : '';
+  const requestBy = String(consult.RequestBy || '').trim();
+  const staffLine = staffDate || requestBy
+    ? `Ngày staff: ${staffDate || '—'} - Đăng ký: ${requestBy || '—'}`
+    : '';
+
   const ptvList = [
     consult.Scheduled1stInterventionist,
     consult.Scheduled2ndInterventionist,
     consult.Scheduled3rdInterventionist
-  ].filter(Boolean);
-  const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : 'Chưa gán';
-  const priorityOrder = normalizePriorityOrder(consult.PriorityOrder);
+  ].filter(v => v && String(v).trim());
+  const ptvString = ptvList.length > 0 ? ptvList.join(' - ') : '';
 
-  return `${buildSchedulingSummaryHeader(formatPatientWithPtvPhu(patient.PatientName.toUpperCase(), ptvPhu1Display).toUpperCase())}\n` +
-    `-----------------------------------\n` +
-    `👤 *HÀNH CHÍNH BỆNH NHÂN:*\n` +
-    `- Họ và tên bệnh nhân: ${patient.PatientName.toUpperCase()} (${patient.PatientSex}, ${ageDesc})\n` +
-    (patient.OtherPatientName && String(patient.OtherPatientName).trim() !== '' && patient.OtherPatientName !== '-' ? `- Họ và tên khác: ${patient.OtherPatientName.toUpperCase()}\n` : '') +
-    `- Mã bệnh nhân (ID1): ${patient.PatientID1}\n` +
-    (patient.PatientID2 && String(patient.PatientID2).trim() !== '' && patient.PatientID2 !== '-' ? `- Mã NB khác (ID2): ${patient.PatientID2}\n` : '') +
-    `- Số điện thoại liên hệ: ${phoneList || '—'}\n` +
-    `- Địa chỉ thường trú: ${addressDisplay}\n` +
-    `- Chỉ số bé: ${weightDisplay} / ${heightDisplay}\n\n` +
-    `🩺 *ĐĂNG KÝ HỘI CHẨN & CHẨN ĐOÁN:*\n` +
-    `- Ngày staff hội chẩn: ${formatVNTime(consult.ConsultDate)}\n` +
-    `- Người đăng ký hội chẩn: ${consult.RequestBy || '—'}\n` +
-    `- Chẩn đoán chi tiết: ${consult.DetailDiagnosis || consult.DiagnosisID || '—'}\n` +
-    `- Kết quả staff chi tiết: ${summaryDetailConsultResult}\n\n` +
-    `🛠 *CHUẨN BỊ DỤNG CỤ:*\n` +
-    `- Kiểm dụng cụ: ${consult.CheckDevice || 'Chưa kiểm'}\n` +
-    `- Dụng cụ dự kiến: ${consult.PlannedDevice || '—'}\n` +
-    `- Số tiền dự kiến: ${consult.PlannedPrice ? `${consult.PlannedPrice} VNĐ` : '—'}\n` +
-    `- Ghi chú từ Phòng Vật tư: ${consult.SupplyDepFeedback || 'Không'}\n` +
-    `- Ghi chú từ Phòng Mổ: ${consult.OperationFeedback || 'Không'}\n\n` +
-    `${SCHEDULING_SUMMARY_UPDATE_SECTION_HEADER}\n` +
-    `- Lịch thông tim chính thức: ${consult.PlannedCathLabDate ? formatVNTime(consult.PlannedCathLabDate) : 'Chưa xếp'}\n` +
-    `- Trạng thái gọi bệnh nhân: ${consult.CallStatus || 'Chưa liên hệ'}\n` +
-    `- Mức độ ưu tiên gọi bệnh: ${priorityOrder}\n` +
-    `- PTV: ${ptvString}\n` +
-    `- Lưu ý/ghi chú gọi bệnh: ${consult.CallNote || 'Không'}\n`;
+  const priorityOrder = normalizePriorityOrder(consult.PriorityOrder);
+  const plannedDate = consult.PlannedCathLabDate ? formatVNTime(consult.PlannedCathLabDate) : '';
+
+  const lines: string[] = [];
+  if (patient.PatientName?.trim()) lines.push(patient.PatientName.trim());
+  if (sexDobLine) lines.push(sexDobLine);
+  if (phoneLine) lines.push(phoneLine);
+  if (patient.PatientAddress?.trim()) lines.push(patient.PatientAddress.trim());
+  if (metricsLine) lines.push(metricsLine);
+  if (staffLine) lines.push(staffLine);
+
+  appendSmsLine(lines, 'Dx', consult.DetailDiagnosis || consult.DiagnosisID);
+  appendSmsLine(lines, 'KQ hội chẩn', consult.DetailConsultResult || consult.ConsultResultID);
+  appendSmsLine(lines, 'Kiểm dụng cụ', consult.CheckDevice);
+  appendSmsLine(lines, 'Dụng cụ dự kiến', consult.PlannedDevice);
+  appendSmsLine(lines, 'Số tiền dự kiến', consult.PlannedPrice);
+  appendSmsLine(lines, 'Ghi chú từ Phòng Vật tư', consult.SupplyDepFeedback);
+  appendSmsLine(lines, 'Ghi chú từ Phòng Mổ', consult.OperationFeedback);
+  appendSmsLine(lines, 'Lịch thông tim chính thức', plannedDate);
+  appendSmsLine(lines, 'Trạng thái gọi bệnh nhân', consult.CallStatus);
+  appendSmsLine(lines, 'Mức độ ưu tiên gọi bệnh', priorityOrder);
+  appendSmsLine(lines, 'PTV', ptvString);
+  appendSmsLine(lines, 'Lưu ý/ghi chú gọi bệnh', consult.CallNote);
+
+  return lines.join('\n');
 }
 
 export function ConsultSummarySheet({
@@ -175,9 +187,9 @@ export function ConsultSummarySheet({
         <div className="h-1" />
       </div>
 
-      <div className={compact ? '' : 'border-b-2 border-slate-800 flex sm:flex-row flex-col sm:items-center justify-between gap-3 pb-3'}>
+      <div className={compact ? '' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-2 pb-1'}>
         <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${compact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'}`}>
-          {formatPatientWithPtvPhu(patient.PatientName, ptvPhu1Display)}
+          {formatSummaryPatientTitle(patient.PatientName, consult, ptvPhu1Display)}
         </div>
       </div>
 
@@ -412,6 +424,7 @@ export function StaffSummaryExportActions({
   consult: Consult;
   onError?: (message: string) => void;
 }) {
+  const isMobile = useIsMobile();
   const [mode, setMode] = useState<'pdf' | 'png' | 'sms' | null>(null);
   const [busy, setBusy] = useState(false);
   const [copiedSms, setCopiedSms] = useState(false);
@@ -487,10 +500,18 @@ export function StaffSummaryExportActions({
 
   const actionBtn = 'px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px] font-black tracking-wide text-slate-800 hover:bg-slate-50 hover:border-slate-400 transition cursor-pointer disabled:opacity-50';
 
+  const overlayShellClass = isMobile
+    ? 'fixed inset-0 z-[200] flex flex-col bg-white overflow-hidden'
+    : 'fixed inset-0 z-[200] bg-slate-900/60 flex items-center justify-center p-4';
+
+  const overlayPanelClass = isMobile
+    ? 'flex flex-col flex-1 min-h-0 w-full overflow-hidden'
+    : 'bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden';
+
   const overlay = mode === 'png' || mode === 'sms' ? (
-    <div className="fixed inset-0 z-[200] bg-slate-900/60 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
+    <div className={overlayShellClass} role="dialog" aria-modal="true">
+      <div className={overlayPanelClass}>
+        <div className={`border-b border-slate-200 flex items-center justify-between shrink-0 ${isMobile ? 'px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))]' : 'px-4 py-3'}`}>
           <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800">
             {mode === 'png' ? 'Tóm tắt dạng ảnh' : 'Tóm tắt dạng tin nhắn'}
           </h3>
@@ -503,20 +524,25 @@ export function StaffSummaryExportActions({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex-1 overflow-auto p-4 min-h-0 bg-slate-50">
+        <div className={`flex-1 overflow-auto min-h-0 bg-slate-50 ${isMobile ? 'p-2' : 'p-4'}`}>
           {mode === 'png' ? (
-            <div className="mx-auto w-[720px] max-w-full">
-              <ConsultSummarySheet patient={patient} consult={consult} sheetId={SUMMARY_CAPTURE_ID} />
+            <div className={isMobile ? 'w-full' : 'mx-auto w-[720px] max-w-full'}>
+              <ConsultSummarySheet
+                patient={patient}
+                consult={consult}
+                compact={isMobile}
+              />
             </div>
           ) : (
             <textarea
               readOnly
               value={smsText}
-              className="w-full min-h-[360px] bg-white border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-800 leading-relaxed"
+              className={`w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-800 leading-relaxed resize-none ${isMobile ? 'min-h-[50vh] flex-1' : 'min-h-[360px]'}`}
+              style={isMobile ? { minHeight: 'calc(100dvh - 9rem)' } : undefined}
             />
           )}
         </div>
-        <div className="px-4 py-3 border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0">
+        <div className={`border-t border-slate-200 bg-white flex justify-end gap-2 shrink-0 ${isMobile ? 'px-3 py-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]' : 'px-4 py-3'}`}>
           <button
             type="button"
             onClick={() => setMode(null)}
@@ -557,7 +583,7 @@ export function StaffSummaryExportActions({
         <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('png')}>PNG</button>
         <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('sms')}>SMS</button>
       </div>
-      {mode === 'pdf' && typeof document !== 'undefined' && createPortal(
+      {(mode === 'pdf' || mode === 'png') && typeof document !== 'undefined' && createPortal(
         <div
           aria-hidden
           style={{ position: 'fixed', left: -4000, top: 0, width: 720, background: '#ffffff', zIndex: -1 }}

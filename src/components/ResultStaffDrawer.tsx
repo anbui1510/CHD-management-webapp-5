@@ -172,8 +172,8 @@ export default function ResultStaffDrawer({
 
   const isFormEditing = autoEdit || isEditing;
   const isMobileModal = isMobile && layout === 'modal';
-  /** Mobile bottom sheet: always flex-fill so header/footer stay visible and body scrolls. */
-  const mobileSheetStretch = isMobileModal;
+  /** Chỉ giãn full chiều cao khi bàn phím mở — tránh khoảng trống dưới nội dung. */
+  const mobileSheetStretch = isMobileModal && keyboardOpen;
 
   const formStatesEqual = (a: ResultFormState, b: ResultFormState) =>
     JSON.stringify(a) === JSON.stringify(b);
@@ -339,8 +339,8 @@ export default function ResultStaffDrawer({
   if (!consultKey || !consult || !patient || !formData) return null;
 
   const isPanelLayout = layout === 'panel';
-  const formScrollPadding = isPanelLayout ? 'p-3 lg:p-4 xl:p-5' : 'p-4 md:p-6';
-  const formSectionSpacing = isPanelLayout ? 'space-y-4 xl:space-y-5' : 'space-y-6';
+  const formScrollPadding = isPanelLayout ? 'p-3 lg:p-4 xl:p-5' : 'max-md:p-3 p-4 md:p-6';
+  const formSectionSpacing = isPanelLayout ? 'space-y-4 xl:space-y-5' : 'max-md:space-y-3 space-y-6';
   const mainFormGridClass = isPanelLayout
     ? 'grid grid-cols-1 2xl:grid-cols-12 gap-3 xl:gap-4 items-stretch animate-in fade-in duration-300 min-h-0'
     : 'grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch animate-in fade-in duration-300 min-h-0';
@@ -371,18 +371,18 @@ export default function ResultStaffDrawer({
   };
 
   const drawerHeader = (
-    <div className="bg-[#d2145a] text-white px-4 md:px-5 py-3.5 md:py-2 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
-      <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
-        <Stethoscope className="w-5 h-5 md:w-4 md:h-4 text-white shrink-0" />
-        <span className="truncate max-md:text-base md:text-sm">Điền kết quả staff</span>
+    <div className="bg-[#d2145a] text-white px-3 md:px-5 py-2 md:py-2 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
+      <h3 className="font-extrabold text-xs md:text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
+        <Stethoscope className="w-4 h-4 text-white shrink-0" />
+        <span className="truncate max-md:text-sm md:text-sm">Điền kết quả staff</span>
       </h3>
       <button
         type="button"
         onClick={requestClose}
-        className="text-white hover:bg-white/10 p-2 rounded-full transition-colors shrink-0"
+        className="text-white hover:bg-white/10 p-1.5 rounded-full transition-colors shrink-0"
         aria-label="Đóng"
       >
-        <X className="w-5 h-5" />
+        <X className="w-4 h-4" />
       </button>
     </div>
   );
@@ -480,8 +480,8 @@ export default function ResultStaffDrawer({
                         </div>
 
                         {/* Khung 2: Thông tin hội chẩn — phía dưới */}
-                        <div className="flex flex-col flex-1 min-h-0">
-                          <div className={`bg-slate-50 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm h-full flex flex-col justify-start min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
+                        <div className="flex flex-col max-md:flex-none flex-1 min-h-0">
+                          <div className={`bg-slate-50 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm max-md:h-auto h-full flex flex-col justify-start min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
                             {!isFormEditing ? (
                               <div className="grid grid-cols-1 gap-y-1.5 max-md:text-xs md:text-[11px] text-slate-600 font-medium">
                                 <div className="flex flex-wrap items-baseline gap-x-2 xl:gap-x-3 gap-y-0">
@@ -563,7 +563,7 @@ export default function ResultStaffDrawer({
 
                         {/* Cột phải: Kết quả hội chẩn */}
                         <div className={rightFormColClass}>
-                          <div className={`bg-indigo-50/20 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
+                          <div className={`bg-indigo-50/20 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm max-md:h-auto h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
                             <span className="max-md:text-[10px] md:text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2 shrink-0">Kết quả hội chẩn</span>
                             
                             {!isFormEditing ? (
@@ -743,7 +743,7 @@ export default function ResultStaffDrawer({
                 </div>
 
                       {/* Action buttons area — sticky footer */}
-                      <div className={`pt-2 border-t border-slate-100 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'px-4 md:px-6'}`}>
+                      <div className={`max-md:pt-1.5 pt-2 border-t border-slate-100 shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'max-md:px-3 px-4 md:px-6'}`}>
                         <div className="w-full flex flex-wrap items-center gap-2">
                           <StaffSummaryExportActions
                             patient={patient}
@@ -877,7 +877,7 @@ export default function ResultStaffDrawer({
             <div
               className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 overflow-hidden min-h-0 ${
                 isMobileModal
-                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 max-h-[calc(100dvh-env(safe-area-inset-top,0px)-var(--mobile-bottom-nav-offset))]'
+                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 max-h-[calc(100dvh-env(safe-area-inset-top,0px)-var(--mobile-bottom-nav-offset))] max-md:h-auto'
                   : 'rounded-3xl max-h-[96vh] animate-in zoom-in-95 duration-200'
               }`}
               style={modalPanelStyle}
