@@ -228,6 +228,8 @@ export function ConsultSummarySheet({
   );
 }
 
+const scalesNearlyEqual = (a: number, b: number) => Math.abs(a - b) < 0.001;
+
 export function ConsultSummaryCaptureFrame({
   patient,
   consult,
@@ -243,42 +245,67 @@ export function ConsultSummaryCaptureFrame({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const lastScalesRef = useRef({ content: 1, frame: 1 });
   const [contentScale, setContentScale] = useState(1);
   const [frameScale, setFrameScale] = useState(1);
 
   useLayoutEffect(() => {
+    let rafId = 0;
+
     const measure = () => {
       const content = contentRef.current;
       if (!content) return;
+
       const naturalHeight = content.scrollHeight;
-      const heightScale = naturalHeight > 0
+      const nextContentScale = naturalHeight > 0
         ? Math.min(1, SUMMARY_16_9_HEIGHT / naturalHeight)
         : 1;
-      setContentScale(heightScale);
 
+      let nextFrameScale = 1;
       if (previewFitWidth && containerRef.current) {
         const w = containerRef.current.clientWidth;
-        if (w > 0) setFrameScale(w / SUMMARY_16_9_WIDTH);
-      } else {
-        setFrameScale(1);
+        if (w > 0) nextFrameScale = w / SUMMARY_16_9_WIDTH;
       }
+
+      const last = lastScalesRef.current;
+      if (
+        scalesNearlyEqual(last.content, nextContentScale) &&
+        scalesNearlyEqual(last.frame, nextFrameScale)
+      ) {
+        return;
+      }
+
+      lastScalesRef.current = { content: nextContentScale, frame: nextFrameScale };
+      setContentScale(nextContentScale);
+      setFrameScale(nextFrameScale);
     };
 
-    measure();
-    requestAnimationFrame(() => requestAnimationFrame(measure));
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    if (ro && containerRef.current) ro.observe(containerRef.current);
-    if (ro && contentRef.current) ro.observe(contentRef.current);
-    return () => ro?.disconnect();
-  }, [patient, consult, previewFitWidth]);
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(measure);
+    };
 
-  const previewHeight = previewFitWidth ? SUMMARY_16_9_HEIGHT * frameScale : SUMMARY_16_9_HEIGHT;
+    scheduleMeasure();
+    window.addEventListener('resize', scheduleMeasure);
+
+    let ro: ResizeObserver | null = null;
+    const contentEl = contentRef.current;
+    if (typeof ResizeObserver !== 'undefined' && contentEl) {
+      ro = new ResizeObserver(scheduleMeasure);
+      ro.observe(contentEl);
+    }
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', scheduleMeasure);
+      ro?.disconnect();
+    };
+  }, [patient.PatientKey, consult.ConsultKey, previewFitWidth]);
 
   return (
     <div
       ref={containerRef}
-      className={`${previewFitWidth ? 'w-full mx-auto' : ''} ${className}`}
-      style={previewFitWidth ? { height: previewHeight, maxWidth: '100%' } : undefined}
+      className={`${previewFitWidth ? 'w-full mx-auto aspect-video overflow-hidden' : ''} ${className}`}
     >
       <div
         id={sheetId}
