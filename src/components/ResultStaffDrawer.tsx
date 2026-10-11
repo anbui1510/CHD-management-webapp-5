@@ -397,8 +397,8 @@ export default function ResultStaffDrawer({
               >
                 <div
                   ref={scrollContainerRef}
-                  className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${formScrollPadding}${mobileSheetStretch || !isMobile ? ' flex-1' : ''}`}
-                  style={{ WebkitOverflowScrolling: 'touch' }}
+                  className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${formScrollPadding}${mobileSheetStretch || !isMobile ? ' flex-1' : ''}${isMobileModal ? ' max-md:pb-2' : ''}`}
+                  style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
                 >
                 <div className={`${formSectionSpacing}${isMobileModal ? ' max-md:flex-1 max-md:flex max-md:flex-col max-md:min-h-0' : ''}`}>
                       
@@ -746,7 +746,7 @@ export default function ResultStaffDrawer({
                 </div>
 
                       {/* Action buttons area — sticky footer */}
-                      <div className={`max-md:pt-1.5 pt-2 border-t border-slate-100 shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'max-md:px-3 px-4 md:px-6'}`}>
+                      <div className={`max-md:pt-1.5 pt-2 border-t border-slate-100 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'max-md:px-3 px-4 md:px-6'}`}>
                         <div className="w-full flex flex-wrap items-center gap-2">
                           <StaffSummaryExportActions
                             patient={patient}
@@ -856,20 +856,15 @@ export default function ResultStaffDrawer({
     );
   }
 
-  const modalOverlayStyle: React.CSSProperties | undefined = isMobile && keyboardOpen
-    ? { paddingBottom: `${keyboardInset}px` }
-    : isMobile
-      ? { paddingBottom: 'var(--mobile-bottom-nav-offset)' }
-      : undefined;
+  /** Không padding bottom nav — sheet phủ tới đáy màn (tránh dải xám + nội dung bị cắt). */
+  const modalOverlayStyle: React.CSSProperties | undefined =
+    isMobile && keyboardOpen ? { paddingBottom: `${keyboardInset}px` } : undefined;
 
-  const mobileSheetMaxHeight = keyboardOpen
-    ? `${Math.max(viewportHeight - 8, 320)}px`
-    : 'calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-bottom-nav-offset))';
+  const mobileSheetMaxHeight = `${Math.max(viewportHeight - 8, 320)}px`;
   const modalPanelStyle: React.CSSProperties | undefined = isMobileModal
-    ? {
-        height: mobileSheetMaxHeight,
-        maxHeight: mobileSheetMaxHeight,
-      }
+    ? keyboardOpen
+      ? { height: mobileSheetMaxHeight, maxHeight: mobileSheetMaxHeight, flex: '0 0 auto' }
+      : { flex: '1 1 auto', minHeight: 0, maxHeight: '100%' }
     : undefined;
 
   return (
@@ -877,7 +872,7 @@ export default function ResultStaffDrawer({
       {consultKey && (
           <div
             className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex overflow-hidden overscroll-none animate-in fade-in duration-200 ${
-              isMobile ? 'items-end justify-center p-0' : 'items-center justify-center p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4'
+              isMobile ? 'flex-col min-h-0 p-0' : 'items-center justify-center p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4'
             }`}
             style={modalOverlayStyle}
           >
@@ -888,7 +883,7 @@ export default function ResultStaffDrawer({
             <div
               className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 overflow-hidden min-h-0 ${
                 isMobileModal
-                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 max-h-[calc(100dvh-env(safe-area-inset-top,0px)-var(--mobile-bottom-nav-offset))] max-md:min-h-0'
+                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 flex-1 min-h-0 w-full max-h-full'
                   : 'rounded-3xl max-h-[96vh] animate-in zoom-in-95 duration-200'
               }`}
               style={modalPanelStyle}
