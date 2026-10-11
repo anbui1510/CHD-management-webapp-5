@@ -132,7 +132,7 @@ export default function ResultStaffDrawer({
   const isMobile = useIsMobile();
   const isModalOpen = layout === 'modal' && !!consultKey;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { keyboardInset, viewportHeight } = useMobileKeyboardInset(isModalOpen);
+  const { keyboardInset, viewportHeight, viewportOffsetTop } = useMobileKeyboardInset(isModalOpen);
   const keyboardOpen = isMobile && keyboardInset > 80;
   useLockBodyScroll(isModalOpen);
   usePreventBackgroundTouchScroll(scrollContainerRef, isModalOpen);
@@ -140,8 +140,10 @@ export default function ResultStaffDrawer({
   useEffect(() => {
     if (!isModalOpen || !isMobile) return;
     document.body.dataset.staffResultDrawerOpen = '1';
+    (window as Window & { __CHD_applyMobileViewport?: () => void }).__CHD_applyMobileViewport?.();
     return () => {
       delete document.body.dataset.staffResultDrawerOpen;
+      (window as Window & { __CHD_applyMobileViewport?: () => void }).__CHD_applyMobileViewport?.();
     };
   }, [isModalOpen, isMobile]);
 
@@ -864,29 +866,25 @@ export default function ResultStaffDrawer({
     );
   }
 
-  /**
-   * iOS PWA: --app-vh (mobileViewport.ts) cao hơn innerHeight — Chrome test không thấy.
-   * Shell + panel bám --app-vh; khi bàn phím mở dùng visualViewport.
-   */
-  const mobileShellHeight = keyboardOpen
-    ? `${Math.max(viewportHeight, 320)}px`
-    : undefined;
+  /** Bàn phím mở: shell bám visualViewport; bình thường CSS top/bottom 0 (--app-layout-vh). */
+  const modalOverlayStyle: React.CSSProperties | undefined =
+    isMobile && keyboardOpen
+      ? {
+          top: `${viewportOffsetTop}px`,
+          bottom: 'auto',
+          height: `${Math.max(viewportHeight, 320)}px`,
+          minHeight: `${Math.max(viewportHeight, 320)}px`,
+          paddingBottom: `${keyboardInset}px`,
+        }
+      : undefined;
 
-  const modalOverlayStyle: React.CSSProperties | undefined = isMobile
-    ? {
-        ...(mobileShellHeight ? { height: mobileShellHeight, minHeight: mobileShellHeight } : {}),
-        ...(keyboardOpen ? { paddingBottom: `${keyboardInset}px` } : {}),
-      }
-    : undefined;
-
-  const modalPanelStyle: React.CSSProperties | undefined = isMobileModal
-    ? keyboardOpen
+  const modalPanelStyle: React.CSSProperties | undefined =
+    isMobileModal && keyboardOpen
       ? {
           height: `${Math.max(viewportHeight - keyboardInset, 280)}px`,
           maxHeight: `${Math.max(viewportHeight - keyboardInset, 280)}px`,
         }
-      : undefined
-    : undefined;
+      : undefined;
 
   return (
     <AnimatePresence>
