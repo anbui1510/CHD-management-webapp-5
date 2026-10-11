@@ -23,7 +23,7 @@ export interface ConsultSummaryReadOnlyProps {
   consult: Consult;
   compact?: boolean;
   sectionsOnly?: boolean;
-  /** Bố cục dày cho khung xuất 16:9. */
+  /** Bố cục dày cho khung xuất PNG dọc 9:16. */
   capture169?: boolean;
 }
 
@@ -91,7 +91,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
           );
         })()}
 
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 pt-1.5 border-t border-slate-100 ${compact ? 'gap-2' : ''}`}>
+        <div className={`grid grid-cols-1 ${capture169 ? '' : 'md:grid-cols-2'} gap-3 pt-1.5 border-t border-slate-100 ${compact || capture169 ? 'gap-2' : ''}`}>
           <div>
             <span className={`text-slate-400 block font-bold ${labelSize} uppercase tracking-wider mb-1`}>Chẩn đoán chi tiết:</span>
             <div className={`border border-slate-200 rounded-xl px-2.5 py-1.5 bg-slate-50 font-bold text-slate-800 leading-snug ${isDense ? 'text-[10px] min-h-0' : 'text-[11.5px] min-h-[38px]'}`}>
@@ -114,7 +114,7 @@ export function ConsultSummaryReadOnly({ consult, compact = false, sectionsOnly 
         )}
       </div>
 
-      <div className={`grid ${capture169 ? 'grid-cols-2 gap-1.5' : `grid-cols-1 sm:grid-cols-2 ${compact ? 'gap-2' : 'gap-3'}`}`}>
+      <div className={`grid grid-cols-1 ${capture169 ? 'gap-1.5' : `sm:grid-cols-2 ${compact ? 'gap-2' : 'gap-3'}`}`}>
         <div className={`bg-white border border-slate-700 rounded-xl space-y-2 ${boxPad}`}>
           <span className="text-[10px] font-black uppercase text-rose-600 tracking-wider block border-b border-slate-200 pb-1">
             CHUẨN BỊ DỤNG CỤ VẬT TƯ
