@@ -110,9 +110,10 @@ interface StaffResultsViewProps {
   createDiagnosisSource: (DiagnosisID: string) => Promise<void>;
   triggerAlert: (message: string, title?: string) => void;
   onSaveSuccess?: (message: string) => void;
+  onViewPatientRecord?: (patient: Patient) => void;
 }
 
-export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert, onSaveSuccess }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert, onSaveSuccess, onViewPatientRecord }: StaffResultsViewProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
@@ -1136,6 +1137,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               createDiagnosisSource={createDiagnosisSource}
               triggerAlert={triggerAlert}
               onSaveSuccess={onSaveSuccess}
+              onViewPatientRecord={onViewPatientRecord}
             />
           </div>
         )}
@@ -1159,6 +1161,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
           createDiagnosisSource={createDiagnosisSource}
           triggerAlert={triggerAlert}
           onSaveSuccess={onSaveSuccess}
+          onViewPatientRecord={onViewPatientRecord}
         />
       )}
 

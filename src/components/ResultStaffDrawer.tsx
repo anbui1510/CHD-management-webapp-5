@@ -103,6 +103,8 @@ export interface ResultStaffDrawerProps {
   createDiagnosisSource: (DiagnosisID: string) => Promise<void>;
   triggerAlert: (message: string, title?: string) => void;
   onSaveSuccess?: (message: string) => void;
+  /** Mở Hồ sơ bệnh án (view patients) của bệnh nhi đang hội chẩn. */
+  onViewPatientRecord?: (patient: Patient) => void;
   layout?: 'modal' | 'panel';
   autoEdit?: boolean;
 }
@@ -123,6 +125,7 @@ export default function ResultStaffDrawer({
   createDiagnosisSource,
   triggerAlert,
   onSaveSuccess,
+  onViewPatientRecord,
   layout = 'modal',
   autoEdit = false
 }: ResultStaffDrawerProps) {
@@ -172,8 +175,8 @@ export default function ResultStaffDrawer({
 
   const isFormEditing = autoEdit || isEditing;
   const isMobileModal = isMobile && layout === 'modal';
-  /** Chỉ giãn full chiều cao khi bàn phím mở — tránh khoảng trống dưới nội dung. */
-  const mobileSheetStretch = isMobileModal && keyboardOpen;
+  /** Mobile bottom sheet luôn giãn full chiều cao — tránh vùng xám trống dưới footer. */
+  const mobileSheetStretch = isMobileModal;
 
   const formStatesEqual = (a: ResultFormState, b: ResultFormState) =>
     JSON.stringify(a) === JSON.stringify(b);
@@ -397,9 +400,9 @@ export default function ResultStaffDrawer({
                   className={`overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${formScrollPadding}${mobileSheetStretch || !isMobile ? ' flex-1' : ''}`}
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
-                <div className={formSectionSpacing}>
+                <div className={`${formSectionSpacing}${isMobileModal ? ' max-md:flex-1 max-md:flex max-md:flex-col max-md:min-h-0' : ''}`}>
                       
-                      <div className={mainFormGridClass}>
+                      <div className={`${mainFormGridClass}${isMobileModal ? ' max-md:flex-1 max-md:min-h-0' : ''}`}>
                         
                         {/* Cột trái: Bệnh nhi (trên) + Thông tin hội chẩn (dưới) */}
                         <div className={leftFormColClass}>
@@ -563,7 +566,7 @@ export default function ResultStaffDrawer({
 
                         {/* Cột phải: Kết quả hội chẩn */}
                         <div className={rightFormColClass}>
-                          <div className={`bg-indigo-50/20 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm max-md:h-auto h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
+                          <div className={`bg-indigo-50/20 border border-slate-200 ${innerCardRadius} ${innerCardPadding} space-y-2.5 xl:space-y-3 shadow-sm max-md:flex-1 max-md:min-h-0 h-full flex flex-col min-h-0 overflow-visible md:overflow-y-auto custom-scrollbar`}>
                             <span className="max-md:text-[10px] md:text-[9px] uppercase tracking-wide font-mono font-bold text-indigo-600 block border-b border-slate-100 pb-2 shrink-0">Kết quả hội chẩn</span>
                             
                             {!isFormEditing ? (
@@ -749,6 +752,14 @@ export default function ResultStaffDrawer({
                             patient={patient}
                             consult={{ ...consult, ...summaryConsultOverride }}
                             onError={(msg) => triggerAlert(msg, MODAL_TITLE.warning)}
+                            onOpenPatientRecord={
+                              onViewPatientRecord
+                                ? () => {
+                                    onViewPatientRecord(patient);
+                                    requestClose();
+                                  }
+                                : undefined
+                            }
                           />
                           {!autoEdit && !isFormEditing ? (
                             <button
@@ -856,8 +867,8 @@ export default function ResultStaffDrawer({
     : 'calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-bottom-nav-offset))';
   const modalPanelStyle: React.CSSProperties | undefined = isMobileModal
     ? {
+        height: mobileSheetMaxHeight,
         maxHeight: mobileSheetMaxHeight,
-        ...(keyboardOpen ? { height: mobileSheetMaxHeight } : {}),
       }
     : undefined;
 
@@ -877,7 +888,7 @@ export default function ResultStaffDrawer({
             <div
               className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 overflow-hidden min-h-0 ${
                 isMobileModal
-                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 max-h-[calc(100dvh-env(safe-area-inset-top,0px)-var(--mobile-bottom-nav-offset))] max-md:h-auto'
+                  ? 'rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 max-h-[calc(100dvh-env(safe-area-inset-top,0px)-var(--mobile-bottom-nav-offset))] max-md:min-h-0'
                   : 'rounded-3xl max-h-[96vh] animate-in zoom-in-95 duration-200'
               }`}
               style={modalPanelStyle}

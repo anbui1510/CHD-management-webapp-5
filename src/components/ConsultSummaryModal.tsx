@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Clipboard, X } from 'lucide-react';
 import { Consult, Patient, formatVNTime, normalizePriorityOrder, removeDiacritics, restoreWeightFromDate } from '../types';
@@ -624,19 +624,44 @@ export function StaffSummaryExportActions({
   patient,
   consult,
   onError,
+  onOpenPatientRecord,
 }: {
   patient: Patient;
   consult: Consult;
   onError?: (message: string) => void;
+  onOpenPatientRecord?: () => void;
 }) {
   const isMobile = useIsMobile();
   const [mode, setMode] = useState<'pdf' | 'png' | 'sms' | null>(null);
+  const [summaryMenuOpen, setSummaryMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copiedSms, setCopiedSms] = useState(false);
   const pngScrollRef = useRef<HTMLDivElement>(null);
+  const summaryMenuRef = useRef<HTMLDivElement>(null);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
   usePreventBackgroundTouchScroll(pngScrollRef, isMobile && (mode === 'png' || mode === 'sms'));
+
+  const closeSummaryMenu = useCallback(() => setSummaryMenuOpen(false), []);
+
+  useEffect(() => {
+    if (!summaryMenuOpen) return;
+    const onDocPointer = (e: MouseEvent | TouchEvent) => {
+      const root = summaryMenuRef.current;
+      if (root && !root.contains(e.target as Node)) closeSummaryMenu();
+    };
+    document.addEventListener('mousedown', onDocPointer);
+    document.addEventListener('touchstart', onDocPointer);
+    return () => {
+      document.removeEventListener('mousedown', onDocPointer);
+      document.removeEventListener('touchstart', onDocPointer);
+    };
+  }, [summaryMenuOpen, closeSummaryMenu]);
+
+  const pickSummaryMode = (next: 'pdf' | 'png' | 'sms') => {
+    closeSummaryMenu();
+    setMode(next);
+  };
   const smsText = useMemo(() => {
     const ptv = resolvePtvPhu1Display(
       consult.RequestBy || '',
@@ -705,7 +730,10 @@ export function StaffSummaryExportActions({
     }
   };
 
-  const actionBtn = 'px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-[11px] font-black tracking-wide text-slate-800 hover:bg-slate-50 hover:border-slate-400 transition cursor-pointer disabled:opacity-50';
+  const footerActionBtn =
+    'px-3 py-2 rounded-xl border border-slate-300 bg-white text-[11px] font-black tracking-wide text-slate-800 hover:bg-slate-50 hover:border-slate-400 transition cursor-pointer disabled:opacity-50 shrink-0';
+  const menuItemBtn =
+    'w-full text-left px-3 py-2.5 text-[11px] font-black tracking-wide text-slate-800 hover:bg-slate-50 transition cursor-pointer disabled:opacity-50';
 
   const overlayShellClass = isMobile
     ? 'fixed inset-0 z-[200] flex flex-col bg-white overflow-hidden'
@@ -720,7 +748,7 @@ export function StaffSummaryExportActions({
       <div className={overlayPanelClass}>
         <div className={`border-b border-slate-200 flex items-center justify-between shrink-0 ${isMobile ? 'px-2 py-1.5 pt-[max(0.35rem,env(safe-area-inset-top,0px))]' : 'px-4 py-3'}`}>
           <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800">
-            {mode === 'png' ? 'Tóm tắt dạng ảnh' : 'Tóm tắt dạng tin nhắn'}
+            {mode === 'png' ? 'Tóm tắt dạng photo' : 'Tóm tắt dạng tin nhắn'}
           </h3>
           <button
             type="button"
@@ -791,13 +819,38 @@ export function StaffSummaryExportActions({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Tóm tắt:</span>
-        <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('pdf')}>
-          {busy && mode === 'pdf' ? '...' : 'PDF'}
+      <div ref={summaryMenuRef} className="flex flex-wrap items-center gap-2 relative">
+        <button
+          type="button"
+          className={footerActionBtn}
+          disabled={busy}
+          aria-expanded={summaryMenuOpen}
+          aria-haspopup="menu"
+          onClick={() => setSummaryMenuOpen(open => !open)}
+        >
+          {busy && mode === 'pdf' ? '...' : 'Tóm tắt'}
         </button>
-        <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('png')}>PNG</button>
-        <button type="button" className={actionBtn} disabled={busy} onClick={() => setMode('sms')}>SMS</button>
+        {onOpenPatientRecord && (
+          <button type="button" className={footerActionBtn} onClick={onOpenPatientRecord}>
+            Hồ sơ
+          </button>
+        )}
+        {summaryMenuOpen && (
+          <div
+            role="menu"
+            className="absolute bottom-full left-0 mb-1.5 min-w-[9.5rem] rounded-xl border border-slate-200 bg-white shadow-lg py-1 z-[70] animate-in fade-in zoom-in-95 duration-150"
+          >
+            <button type="button" role="menuitem" className={menuItemBtn} disabled={busy} onClick={() => pickSummaryMode('pdf')}>
+              {busy && mode === 'pdf' ? 'Đang tạo PDF...' : 'PDF'}
+            </button>
+            <button type="button" role="menuitem" className={menuItemBtn} disabled={busy} onClick={() => pickSummaryMode('png')}>
+              Photo
+            </button>
+            <button type="button" role="menuitem" className={menuItemBtn} disabled={busy} onClick={() => pickSummaryMode('sms')}>
+              SMS
+            </button>
+          </div>
+        )}
       </div>
       {(mode === 'pdf' || mode === 'png') && typeof document !== 'undefined' && createPortal(
         <div aria-hidden style={{ position: 'fixed', left: -5000, top: 0, zIndex: -1 }}>
