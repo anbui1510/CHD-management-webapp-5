@@ -259,9 +259,11 @@ export function ConsultSummaryCaptureFrame({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const lastScalesRef = useRef({ content: 1, frame: 1 });
+  const lastScalesRef = useRef({ content: 1, frame: 1, height: SUMMARY_PORTRAIT_HEIGHT });
   const [contentScale, setContentScale] = useState(1);
   const [frameScale, setFrameScale] = useState(1);
+  const [captureHeight, setCaptureHeight] = useState(SUMMARY_PORTRAIT_HEIGHT);
+  const [layoutReady, setLayoutReady] = useState(false);
 
   useLayoutEffect(() => {
     let rafId = 0;
@@ -270,11 +272,15 @@ export function ConsultSummaryCaptureFrame({
       const content = contentRef.current;
       if (!content) return;
 
-      const naturalHeight = content.scrollHeight;
+      const naturalHeight = Math.max(content.scrollHeight, content.offsetHeight);
       let nextContentScale = 1;
       if (naturalHeight > SUMMARY_PORTRAIT_HEIGHT) {
         nextContentScale = SUMMARY_PORTRAIT_HEIGHT / naturalHeight;
       }
+      const nextCaptureHeight =
+        nextContentScale < 1
+          ? SUMMARY_PORTRAIT_HEIGHT
+          : Math.max(1, Math.ceil(naturalHeight));
 
       let nextFrameScale = 1;
       if (containerRef.current && (previewFillViewport || previewFitWidth)) {
@@ -283,7 +289,7 @@ export function ConsultSummaryCaptureFrame({
         if (w > 0) {
           const scaleW = w / SUMMARY_PORTRAIT_WIDTH;
           if (previewFillViewport && h > 0) {
-            const scaleH = h / SUMMARY_PORTRAIT_HEIGHT;
+            const scaleH = h / nextCaptureHeight;
             nextFrameScale = Math.min(scaleW, scaleH);
           } else {
             nextFrameScale = scaleW;
@@ -294,14 +300,17 @@ export function ConsultSummaryCaptureFrame({
       const last = lastScalesRef.current;
       if (
         scalesNearlyEqual(last.content, nextContentScale) &&
-        scalesNearlyEqual(last.frame, nextFrameScale)
+        scalesNearlyEqual(last.frame, nextFrameScale) &&
+        Math.abs(last.height - nextCaptureHeight) < 1
       ) {
         return;
       }
 
-      lastScalesRef.current = { content: nextContentScale, frame: nextFrameScale };
+      lastScalesRef.current = { content: nextContentScale, frame: nextFrameScale, height: nextCaptureHeight };
       setContentScale(nextContentScale);
       setFrameScale(nextFrameScale);
+      setCaptureHeight(nextCaptureHeight);
+      setLayoutReady(true);
     };
 
     const scheduleMeasure = () => {
@@ -328,32 +337,36 @@ export function ConsultSummaryCaptureFrame({
     };
   }, [patient.PatientKey, consult.ConsultKey, previewFitWidth, previewFillViewport]);
 
+  useLayoutEffect(() => {
+    setLayoutReady(false);
+    setCaptureHeight(SUMMARY_PORTRAIT_HEIGHT);
+    setContentScale(1);
+    lastScalesRef.current = { content: 1, frame: 1, height: SUMMARY_PORTRAIT_HEIGHT };
+  }, [patient.PatientKey, consult.ConsultKey]);
+
   const contentTransform =
-    contentScale < 1
-      ? `translateX(-50%) scale(${contentScale})`
-      : 'translateX(-50%)';
+    contentScale < 1 ? `scale(${contentScale})` : undefined;
 
   const isPreviewScaled = previewFitWidth || previewFillViewport;
   const previewLayoutW = SUMMARY_PORTRAIT_WIDTH * frameScale;
-  const previewLayoutH = SUMMARY_PORTRAIT_HEIGHT * frameScale;
+  const previewLayoutH = captureHeight * frameScale;
 
   const captureSheet = (
     <div
       id={sheetId}
-      className="bg-white overflow-hidden shrink-0"
+      className="bg-white shrink-0"
       style={{
         width: SUMMARY_PORTRAIT_WIDTH,
-        height: SUMMARY_PORTRAIT_HEIGHT,
+        height: layoutReady ? captureHeight : 'auto',
+        overflow: layoutReady ? 'hidden' : 'visible',
       }}
     >
       <div
         ref={contentRef}
         style={{
           width: SUMMARY_PORTRAIT_WIDTH,
-          position: 'relative',
-          left: '50%',
           transform: contentTransform,
-          transformOrigin: 'top center',
+          transformOrigin: 'top left',
         }}
       >
         <ConsultSummarySheet patient={patient} consult={consult} layoutMode="capture169" />
@@ -381,7 +394,7 @@ export function ConsultSummaryCaptureFrame({
             className="absolute top-0 left-0"
             style={{
               width: SUMMARY_PORTRAIT_WIDTH,
-              height: SUMMARY_PORTRAIT_HEIGHT,
+              height: captureHeight,
               transform: `scale(${frameScale})`,
               transformOrigin: 'top left',
             }}
@@ -529,12 +542,19 @@ export function ConsultSummaryModal({
           className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y min-h-0 ${isMobile ? 'p-2 pb-2' : 'p-4 shrink-0'}`}
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
-          <ConsultSummaryCaptureFrame
-            patient={patient}
-            consult={mergedConsult}
-            previewFitWidth
-            className={isMobile ? 'w-full' : 'max-w-[540px] mx-auto w-full'}
-          />
+          {isMobile ? (
+            <ConsultSummaryCaptureFrame
+              patient={patient}
+              consult={mergedConsult}
+              previewFitWidth
+              previewFillViewport
+              className="w-full flex-1 min-h-0"
+            />
+          ) : (
+            <div className="max-w-[540px] mx-auto w-full min-w-0">
+              <ConsultSummarySheet patient={patient} consult={mergedConsult} layoutMode="default" />
+            </div>
+          )}
         </div>
 
         <div className={`border-t border-slate-200 bg-white shrink-0 ${isMobile ? 'px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]' : 'p-4 rounded-b-3xl flex flex-col sm:flex-row items-center justify-between gap-3'}`}>
