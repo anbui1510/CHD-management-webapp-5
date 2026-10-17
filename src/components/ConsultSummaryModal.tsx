@@ -253,7 +253,7 @@ export function ConsultSummaryCaptureFrame({
   consult: Consult;
   sheetId?: string;
   previewFitWidth?: boolean;
-  /** Mobile preview: scale khung vừa cả chiều ngang và dọc vùng xem. */
+  /** Scale khung preview vừa chiều ngang (và dọc khi bật) vùng xem — tránh cắt chữ trên desktop. */
   previewFillViewport?: boolean;
   className?: string;
 }) {
@@ -532,8 +532,8 @@ export function ConsultSummaryModal({
           <ConsultSummaryCaptureFrame
             patient={patient}
             consult={mergedConsult}
-            previewFitWidth={isMobile}
-            className={isMobile ? '' : 'max-w-[540px] mx-auto'}
+            previewFitWidth
+            className={isMobile ? 'w-full' : 'max-w-[540px] mx-auto w-full'}
           />
         </div>
 
@@ -773,7 +773,7 @@ export function StaffSummaryExportActions({
             <ConsultSummaryCaptureFrame
               patient={patient}
               consult={consult}
-              previewFitWidth={isMobile}
+              previewFitWidth
               previewFillViewport={isMobile}
               className={isMobile ? 'flex-1 w-full' : 'max-w-[540px] mx-auto w-full'}
             />
