@@ -6,9 +6,16 @@ import type { Staff, Source, Consult, Patient, Notification } from '../types';
 import {
   fetchAppsScriptWithRetry,
   formatAppsScriptFetchError,
-  formatAppsScriptHttpError,
   normalizeAppsScriptUrl
 } from '../utils/appsScriptRetry';
+import {
+  SheetsProxyAuthError,
+  classifyProxyHttpError,
+  isSignedSessionToken,
+  peekSignedSessionExp,
+  SHEETS_PROXY_AUTH_ERROR_MESSAGE
+} from '../utils/sheetsProxyAuth';
+import { CHD_AUTH_TOKEN_HEADER } from '../sync/signedSession';
 import { sanitizeNotificationFields } from '../utils/workflowMessages';
 import { hasOsPushBeenDelivered, markOsPushDelivered } from '../utils/notificationPushDelivery';
 
@@ -47,19 +54,6 @@ const serverFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Resp
     : undefined;
   return (native || fetch)(input, init);
 };
-
-const proxySheets = (
-  body: { kind: 'get' | 'post'; action?: string; payload?: Record<string, unknown> },
-  force = false
-) => fetchAppsScriptWithRetry(
-  () => serverFetch('/api/sheets/proxy', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }),
-  { maxAttempts: force ? 5 : 3, baseDelayMs: 1500 }
-);
 
 const clearMemoryCache = (): void => {
   cache = null;
@@ -165,10 +159,19 @@ function hydrateBridgeSessions(): void {
     const storedToken = localStorage.getItem('CHD_AUTH_TOKEN');
     const storedStaffKey = localStorage.getItem(CHD_AUTH_STAFF_KEY);
     if (storedToken && storedStaffKey && !bridgeTokenStore.has(storedToken)) {
-      const restored = { staffKey: storedStaffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS };
-      bridgeTokenStore.set(storedToken, restored);
-      kept[storedToken] = restored;
-      writeBridgeSessionEntries(kept);
+      const jwtExp = peekSignedSessionExp(storedToken);
+      if (jwtExp !== null && Date.now() >= jwtExp) {
+        localStorage.removeItem('CHD_AUTH_TOKEN');
+        localStorage.removeItem(CHD_AUTH_STAFF_KEY);
+      } else {
+        const restored = {
+          staffKey: storedStaffKey,
+          expiresAt: jwtExp && jwtExp > Date.now() ? jwtExp : Date.now() + BRIDGE_SESSION_TTL_MS
+        };
+        bridgeTokenStore.set(storedToken, restored);
+        kept[storedToken] = restored;
+        writeBridgeSessionEntries(kept);
+      }
     }
   } catch {
     // ignore corrupt session storage
@@ -205,9 +208,12 @@ function bridgeGenerateToken(): string {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function bridgeCreateSession(staffKey: string): string {
-  const token = bridgeGenerateToken();
-  const session = { staffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS };
+function bridgeAdoptSession(token: string, staffKey: string): string {
+  const jwtExp = peekSignedSessionExp(token);
+  const expiresAt = jwtExp && jwtExp > Date.now()
+    ? jwtExp
+    : Date.now() + BRIDGE_SESSION_TTL_MS;
+  const session = { staffKey, expiresAt };
   bridgeTokenStore.set(token, session);
   persistBridgeSession(token, session);
   try {
@@ -218,13 +224,27 @@ function bridgeCreateSession(staffKey: string): string {
   return token;
 }
 
+function bridgeCreateSession(staffKey: string): string {
+  const token = bridgeGenerateToken();
+  return bridgeAdoptSession(token, staffKey);
+}
+
 function bridgeResolveSession(token: string): string | null {
+  const jwtExp = peekSignedSessionExp(token);
+  if (jwtExp !== null && Date.now() >= jwtExp) {
+    removeBridgeSession(token);
+    return null;
+  }
+
   let session = bridgeTokenStore.get(token);
   if (!session) {
     const storedToken = localStorage.getItem('CHD_AUTH_TOKEN');
     const storedStaffKey = localStorage.getItem(CHD_AUTH_STAFF_KEY);
     if (storedToken === token && storedStaffKey) {
-      session = { staffKey: storedStaffKey, expiresAt: Date.now() + BRIDGE_SESSION_TTL_MS };
+      session = {
+        staffKey: storedStaffKey,
+        expiresAt: jwtExp && jwtExp > Date.now() ? jwtExp : Date.now() + BRIDGE_SESSION_TTL_MS
+      };
       bridgeTokenStore.set(token, session);
       persistBridgeSession(token, session);
     } else {
@@ -235,11 +255,76 @@ function bridgeResolveSession(token: string): string | null {
     removeBridgeSession(token);
     return null;
   }
-  // Slide expiry on activity
-  session.expiresAt = Date.now() + BRIDGE_SESSION_TTL_MS;
-  persistBridgeSession(token, session);
+  // Slide local mapping on activity; signed JWT exp remains authoritative when present.
+  if (jwtExp === null) {
+    session.expiresAt = Date.now() + BRIDGE_SESSION_TTL_MS;
+    persistBridgeSession(token, session);
+  }
   return session.staffKey;
 }
+
+const getProxyAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const token = String(localStorage.getItem('CHD_AUTH_TOKEN') || '').trim();
+    if (token && token !== 'cookie-session') {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return headers;
+};
+
+const adoptRefreshedAuthToken = (token: string): void => {
+  const next = String(token || '').trim();
+  if (!isSignedSessionToken(next)) return;
+  let staffKey = '';
+  try {
+    staffKey = String(localStorage.getItem(CHD_AUTH_STAFF_KEY) || '').trim();
+  } catch {
+    staffKey = '';
+  }
+  if (!staffKey) {
+    staffKey = bridgeTokenStore.get(next)?.staffKey || '';
+  }
+  if (!staffKey) {
+    try {
+      const prev = String(localStorage.getItem('CHD_AUTH_TOKEN') || '').trim();
+      staffKey = bridgeTokenStore.get(prev)?.staffKey || '';
+    } catch {
+      // ignore
+    }
+  }
+  if (!staffKey) return;
+
+  try {
+    const prev = String(localStorage.getItem('CHD_AUTH_TOKEN') || '').trim();
+    if (prev && prev !== next) removeBridgeSession(prev);
+    localStorage.setItem('CHD_AUTH_TOKEN', next);
+  } catch {
+    // ignore quota errors
+  }
+  bridgeAdoptSession(next, staffKey);
+};
+
+const proxySheets = (
+  body: { kind: 'get' | 'post'; action?: string; payload?: Record<string, unknown> },
+  force = false
+) => fetchAppsScriptWithRetry(
+  async () => {
+    const response = await serverFetch('/api/sheets/proxy', {
+      method: 'POST',
+      credentials: 'include',
+      headers: getProxyAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    const refreshed = response.headers.get(CHD_AUTH_TOKEN_HEADER);
+    if (refreshed) adoptRefreshedAuthToken(refreshed);
+    return response;
+  },
+  { maxAttempts: force ? 5 : 3, baseDelayMs: 1500 }
+);
 
 function bridgeRevokeToken(token: string): void {
   removeBridgeSession(token);
@@ -404,6 +489,31 @@ const markClientPullFailed = (error: unknown) => {
   };
 };
 
+const markClientPushOk = (message = 'Đã ghi lên Google Sheets.') => {
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPushAt: Date.now(),
+    lastPushOk: true,
+    lastPushMessage: message
+  };
+};
+
+const markClientPushFailed = (error: unknown) => {
+  const message = formatAppsScriptFetchError(error);
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPushAt: Date.now(),
+    lastPushOk: false,
+    lastPushMessage: message
+  };
+};
+
+const throwIfProxyAuthFailed = (status: number, bodyText: string): void => {
+  const error = classifyProxyHttpError(status, bodyText);
+  if (error instanceof SheetsProxyAuthError) throw error;
+  throw error;
+};
+
 let backgroundPullRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let backgroundPullRetryAttempt = 0;
 
@@ -529,7 +639,7 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
-      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
+      if (!res.ok) throwIfProxyAuthFailed(res.status, text);
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         throw new Error('Apps Script đang trả về HTML.');
       }
@@ -606,7 +716,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
       const text = await res.text();
-      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
+      if (!res.ok) throwIfProxyAuthFailed(res.status, text);
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         const scriptError = text.match(/<div[^>]*>([^<]+)<\/div>\s*<\/body>/i)?.[1]?.trim();
         throw new Error(
@@ -632,6 +742,11 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
       return cache;
     })
     .catch(async err => {
+      if (err instanceof SheetsProxyAuthError) {
+        markClientPullFailed(err);
+        throw err;
+      }
+
       markClientPullFailed(err);
 
       const cachedAll = cache || await hydrateCacheFromPersisted();
@@ -828,24 +943,80 @@ const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): 
   return true;
 };
 
-const syncRecordToScript = (payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any }) => {
-  void proxySheets({ kind: 'post', payload }).then(async (response) => {
+type ClientSheetsSyncMeta = {
+  configured: boolean;
+  ok: boolean;
+  message: string;
+  at: number;
+};
+
+const SHEETS_PUSH_TIMEOUT_MS = 25000;
+
+const withSheetsPushTimeout = async <T>(work: Promise<T>): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error('Ghi Google Sheets quá lâu — kiểm tra mạng và bấm Đồng bộ lại.')),
+          SHEETS_PUSH_TIMEOUT_MS
+        );
+      })
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+const syncRecordToScriptAwaited = async (
+  payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any }
+): Promise<ClientSheetsSyncMeta> => {
+  const at = Date.now();
+  if (!getScriptUrl()) {
+    const meta = {
+      configured: false,
+      ok: false,
+      message: 'Chưa cấu hình Google Apps Script — chỉ lưu trên máy này.',
+      at
+    };
+    markClientPushFailed(new Error(meta.message));
+    return meta;
+  }
+
+  try {
+    const response = await withSheetsPushTimeout(proxySheets({ kind: 'post', payload }));
     const text = await response.text();
     if (!response.ok) {
-      console.error(`Background upsert sync HTTP ${response.status}:`, text);
-      return;
+      throwIfProxyAuthFailed(response.status, text);
     }
+    let result: { status?: string; message?: string };
     try {
-      const result = JSON.parse(text);
-      if (result.status === 'error') {
-        console.error('Background upsert sync error:', result.message);
-      }
+      result = JSON.parse(text);
     } catch {
-      console.error('Background upsert sync returned invalid JSON:', text);
+      throw new Error('Apps Script trả về phản hồi không hợp lệ khi ghi dữ liệu.');
     }
-  }).catch((err) => {
-    console.error('Background upsert sync failed:', err);
-  });
+    if (result.status === 'error') {
+      throw new Error(result.message || 'Apps Script không thể ghi dữ liệu');
+    }
+    const meta = {
+      configured: true,
+      ok: true,
+      message: 'Đã ghi lên Google Sheets.',
+      at: Date.now()
+    };
+    markClientPushOk(meta.message);
+    return meta;
+  } catch (error) {
+    if (error instanceof SheetsProxyAuthError) throw error;
+    markClientPushFailed(error);
+    return {
+      configured: true,
+      ok: false,
+      message: formatAppsScriptFetchError(error),
+      at: Date.now()
+    };
+  }
 };
 
 const postToScript = async (
@@ -857,12 +1028,13 @@ const postToScript = async (
   const response = await proxySheets({ kind: 'post', payload });
 
   const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  if (!response.ok) throwIfProxyAuthFailed(response.status, text);
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu');
   }
   upsertCachedRecord(config, record, isInsert);
+  markClientPushOk();
   return result;
 };
 
@@ -873,11 +1045,12 @@ const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'i
   });
 
   const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  if (!response.ok) throwIfProxyAuthFailed(response.status, text);
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu theo lô');
   }
+  markClientPushOk('Đã ghi hàng loạt lên Google Sheets.');
   return result;
 };
 
@@ -888,7 +1061,7 @@ const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
   });
 
   const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  if (!response.ok) throwIfProxyAuthFailed(response.status, text);
   let result: { status?: string; message?: string };
   try {
     result = JSON.parse(text);
@@ -900,6 +1073,7 @@ const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể xóa dữ liệu');
   }
+  markClientPushOk('Đã xóa trên Google Sheets.');
   return result;
 };
 
@@ -1099,12 +1273,29 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
 
   const isInsert = !(existing || isUpdate);
   upsertCachedRecord(config, record, isInsert);
-  syncRecordToScript({
-    type: config.type,
-    action: existing || isUpdate ? 'update' : 'insert',
-    key: String(finalKey),
-    data: record
-  });
+
+  let sheetsSync: ClientSheetsSyncMeta;
+  try {
+    sheetsSync = await syncRecordToScriptAwaited({
+      type: config.type,
+      action: existing || isUpdate ? 'update' : 'insert',
+      key: String(finalKey),
+      data: record
+    });
+  } catch (error) {
+    if (error instanceof SheetsProxyAuthError) {
+      try {
+        const token = localStorage.getItem('CHD_AUTH_TOKEN');
+        if (token) bridgeRevokeToken(token);
+        localStorage.removeItem('CHD_AUTH_TOKEN');
+        localStorage.removeItem(CHD_AUTH_STAFF_KEY);
+      } catch {
+        // ignore
+      }
+      return jsonResponse({ error: error.message || SHEETS_PROXY_AUTH_ERROR_MESSAGE }, { status: 401 });
+    }
+    throw error;
+  }
 
   if (endpoint === 'notifications' && isInsert && record?.StaffKey) {
     deliverWebPushForNotification(record);
@@ -1115,7 +1306,10 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
     void maybeNotifySchedulerAboutConsultMutation(previousConsult, record as Consult);
   }
 
-  return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
+  return jsonResponse(
+    { ...record, _sheetsSync: sheetsSync },
+    { status: existing || isUpdate ? 200 : 201 }
+  );
 };
 
 const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) => {
@@ -1311,10 +1505,18 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       });
       const data = await upstream.json().catch(() => ({ error: 'Lỗi đăng nhập.' }));
       if (upstream.ok && data?.staff?.StaffKey) {
-        const token = bridgeCreateSession(String(data.staff.StaffKey));
+        const upstreamToken = String(data.token || '').trim();
+        // Prefer Worker-signed JWT so /api/sheets/proxy can auth via Bearer when cookies drop on mobile.
+        const token = isSignedSessionToken(upstreamToken)
+          ? bridgeAdoptSession(upstreamToken, String(data.staff.StaffKey))
+          : bridgeCreateSession(String(data.staff.StaffKey));
         const headers = new Headers({ 'Content-Type': 'application/json' });
-        const setCookie = upstream.headers.get('set-cookie');
-        if (setCookie) headers.append('set-cookie', setCookie);
+        const setCookie = upstream.headers.get('set-cookie') || upstream.headers.get('Set-Cookie');
+        if (setCookie) headers.append('Set-Cookie', setCookie);
+        const refreshed = upstream.headers.get(CHD_AUTH_TOKEN_HEADER);
+        if (refreshed && isSignedSessionToken(refreshed)) {
+          headers.set(CHD_AUTH_TOKEN_HEADER, refreshed);
+        }
         return new Response(JSON.stringify({ token, staff: stripBridgePassword(data.staff) }), {
           status: upstream.status,
           headers,
@@ -1412,6 +1614,9 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
           : {})
       });
     } catch (err) {
+      if (err instanceof SheetsProxyAuthError) {
+        return jsonResponse({ error: err.message || SHEETS_PROXY_AUTH_ERROR_MESSAGE }, { status: 401 });
+      }
       const cached = await hydrateCacheFromPersisted();
       if (cached) {
         markClientPullFailed(err);

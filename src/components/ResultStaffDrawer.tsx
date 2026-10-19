@@ -288,13 +288,23 @@ export default function ResultStaffDrawer({
         patientName: patient?.PatientName || consult.PatientKey,
         patientKey: consult.PatientKey
       });
+      const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('CHD_AUTH_TOKEN') || '' : '';
       const response = await fetch(`/api/consults/${consultKey}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        credentials: 'include',
         body: JSON.stringify(withSyncContext(finalData, syncContext))
       });
       if (!response.ok) {
-        const d = await response.json().catch(() => ({}));
+        const d = await response.json().catch(() => ({})) as { error?: string };
+        if (response.status === 401) {
+          window.dispatchEvent(new CustomEvent('chd-auth-required', {
+            detail: { message: d.error || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' }
+          }));
+        }
         throw new Error(d.error || 'Không thể lưu kết quả hội chẩn');
       }
       const savedData = await response.json();
@@ -303,7 +313,11 @@ export default function ResultStaffDrawer({
         onPatchPatient(consult.PatientKey, { Outcome: automaticOutcome });
         const patientRes = await fetch(`/api/patients/${consult.PatientKey}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+          },
+          credentials: 'include',
           body: JSON.stringify(withSyncContext({ Outcome: automaticOutcome }, buildSyncContext('results-staff', {
             patientName: patient?.PatientName,
             patientKey: consult.PatientKey
@@ -320,7 +334,7 @@ export default function ResultStaffDrawer({
       if (options?.closeOnSuccess !== false) {
         forceClose();
       }
-      onSaveSuccess?.('Đã ghi lên Google Sheets');
+      // Banner text comes from reportMutationResponse (_sheetsSync); avoid a second false "Đã ghi Sheets".
       return true;
     } catch (err) {
       console.error(err);

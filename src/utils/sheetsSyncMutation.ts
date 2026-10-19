@@ -84,6 +84,9 @@ export async function parseMutationResponse<T>(response: Response): Promise<T> {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = (data as { error?: string }).error || `HTTP ${response.status}`;
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('chd-auth-required', { detail: { message } }));
+    }
     throw new Error(message);
   }
   return data as T;
@@ -103,13 +106,20 @@ export async function persistWithSheetsSync<T>(
     } catch {
       // keep original body
     }
-  } else if (body && typeof body === 'object' && !(body instanceof FormData)) {
-    body = JSON.stringify(withSyncContext(body as Record<string, unknown>, syncContext));
+  } else if (body && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof Blob) && !(body instanceof ArrayBuffer) && !(body instanceof URLSearchParams) && !(typeof ReadableStream !== 'undefined' && body instanceof ReadableStream)) {
+    body = JSON.stringify(withSyncContext(body as unknown as Record<string, unknown>, syncContext));
   }
 
+  const authToken =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('CHD_AUTH_TOKEN') || '' : '';
   const response = await fetch(url, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    credentials: init.credentials || 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(init.headers || {})
+    },
     body
   });
   const data = await parseMutationResponse<T>(response);
