@@ -117,6 +117,11 @@ import {
   DEFAULT_MOBILE_QUICK_SLOTS,
   MOBILE_QUICK_SLOT_COUNT,
 } from './utils/mobileQuickTabs';
+import {
+  buildCathlabsByPatientKey,
+  buildLatestConsultsMap,
+  filterEligibleCathWaitlist,
+} from './utils/cathlabWaitlist';
 import { PatientAdminEditButton } from './components/PatientAdminEditButton';
 import { SortColumnIcon } from './components/SortColumnIcon';
 import { MODAL_TITLE } from './utils/modalTitles';
@@ -258,6 +263,13 @@ export default function App() {
   const pendingStaffConsultCount = useMemo(
     () => consults.filter(isPendingStaffConsult).length,
     [consults, isPendingStaffConsult]
+  );
+
+  const cathlabsByPatientKey = useMemo(() => buildCathlabsByPatientKey(cathlabs), [cathlabs]);
+  const latestConsultsMap = useMemo(() => buildLatestConsultsMap(consults), [consults]);
+  const pendingScheduleCount = useMemo(
+    () => filterEligibleCathWaitlist(consults, patients, cathlabsByPatientKey, latestConsultsMap).length,
+    [consults, patients, cathlabsByPatientKey, latestConsultsMap]
   );
 
   const completedStaffConsultCount = useMemo(
@@ -4705,6 +4717,7 @@ export default function App() {
         onNavigate={(menuId) => navigateMenu(menuId)}
         onOpenMore={() => setIsMobileMoreMenuOpen(true)}
         pendingStaffCount={pendingStaffConsultCount}
+        pendingScheduleCount={pendingScheduleCount}
         quickTabIds={mobileBottomTabIds}
       />
 

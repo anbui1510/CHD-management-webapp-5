@@ -13,6 +13,7 @@ interface MobileBottomNavProps {
   onNavigate: (menuId: ActiveMenuId) => void;
   onOpenMore: () => void;
   pendingStaffCount?: number;
+  pendingScheduleCount?: number;
   quickTabIds?: ActiveMenuId[];
 }
 
@@ -21,6 +22,7 @@ export default function MobileBottomNav({
   onNavigate,
   onOpenMore,
   pendingStaffCount = 0,
+  pendingScheduleCount = 0,
   quickTabIds = [],
 }: MobileBottomNavProps) {
   const moreActive = isMoreMenuActive(activeMenu, quickTabIds);
@@ -66,6 +68,11 @@ export default function MobileBottomNav({
               {tabId === 'results-staff' && pendingStaffCount > 0 && (
                 <span className="absolute top-0.5 right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#d2145a] text-white text-[8px] font-black flex items-center justify-center">
                   {pendingStaffCount > 99 ? '99+' : pendingStaffCount}
+                </span>
+              )}
+              {tabId === 'schedule-tt' && pendingScheduleCount > 0 && (
+                <span className="absolute top-1 right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#d2145a] text-white text-[8px] font-black flex items-center justify-center">
+                  {pendingScheduleCount > 99 ? '99+' : pendingScheduleCount}
                 </span>
               )}
             </button>
