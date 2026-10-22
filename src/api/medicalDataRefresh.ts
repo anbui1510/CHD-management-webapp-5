@@ -6,12 +6,9 @@ import {
 } from './appsScriptFetch';
 import type { SheetsSyncStatus } from '../utils/sheetsSyncFeedback';
 
-export class AuthRequiredError extends Error {
-  constructor(message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') {
-    super(message);
-    this.name = 'AuthRequiredError';
-  }
-}
+import { AuthRequiredError } from '../auth/authErrors';
+
+export { AuthRequiredError };
 
 export type MedicalDataBundle = {
   patients: Patient[];
