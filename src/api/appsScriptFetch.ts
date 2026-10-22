@@ -3,12 +3,13 @@ import { buildWebPushPayload } from '../push/pushPayload';
 import { getAppVersionPayload } from '../appVersion';
 import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
 import type { Staff, Source, Consult, Patient, Notification } from '../types';
+import { AuthRequiredError } from '../auth/authErrors';
 import {
   fetchAppsScriptWithRetry,
   formatAppsScriptFetchError,
-  formatAppsScriptHttpError,
   normalizeAppsScriptUrl
 } from '../utils/appsScriptRetry';
+import { assertAppsScriptJsonOk, readSheetsProxyText } from '../utils/sheetsProxyErrors';
 import { sanitizeNotificationFields } from '../utils/workflowMessages';
 import { hasOsPushBeenDelivered, markOsPushDelivered } from '../utils/notificationPushDelivery';
 
@@ -528,12 +529,12 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
   pendingStaffLoad = proxySheets({ kind: 'get', action: 'getStaff' }, force)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
-      const text = await res.text();
-      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
+      const text = await readSheetsProxyText(res);
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         throw new Error('Apps Script đang trả về HTML.');
       }
       const parsed = JSON.parse(text);
+      assertAppsScriptJsonOk(parsed);
       const staffList = Array.isArray(parsed.staff) && parsed.staff.length > 0
         ? parsed.staff
         : BUNDLED_STAFF;
@@ -545,6 +546,7 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
       return staffCache!;
     })
     .catch(err => {
+      if (err instanceof AuthRequiredError) throw err;
       if (staffCache?.length) return staffCache;
       console.warn('Staff sync failed, using bundled roster:', err);
       return resolveOfflineStaffList();
@@ -605,8 +607,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
   pendingLoad = proxySheets({ kind: 'get', action: 'getAll' }, force)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
-      const text = await res.text();
-      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
+      const text = await readSheetsProxyText(res);
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         const scriptError = text.match(/<div[^>]*>([^<]+)<\/div>\s*<\/body>/i)?.[1]?.trim();
         throw new Error(
@@ -616,6 +617,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
         );
       }
       const parsed = JSON.parse(text);
+      assertAppsScriptJsonOk(parsed);
       cache = normalizeData(parsed);
       if (Array.isArray(cache.staff)) {
         staffCache = mergeStaffWithBundledPasswords(cache.staff);
@@ -632,6 +634,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
       return cache;
     })
     .catch(async err => {
+      if (err instanceof AuthRequiredError) throw err;
       markClientPullFailed(err);
 
       const cachedAll = cache || await hydrateCacheFromPersisted();
@@ -830,9 +833,11 @@ const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): 
 
 const syncRecordToScript = (payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any }) => {
   void proxySheets({ kind: 'post', payload }).then(async (response) => {
-    const text = await response.text();
-    if (!response.ok) {
-      console.error(`Background upsert sync HTTP ${response.status}:`, text);
+    let text = '';
+    try {
+      text = await readSheetsProxyText(response);
+    } catch (err) {
+      console.error('Background upsert sync failed:', err);
       return;
     }
     try {
@@ -856,8 +861,7 @@ const postToScript = async (
 ) => {
   const response = await proxySheets({ kind: 'post', payload });
 
-  const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  const text = await readSheetsProxyText(response);
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu');
@@ -872,8 +876,7 @@ const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'i
     payload: { action: 'batch', operations }
   });
 
-  const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  const text = await readSheetsProxyText(response);
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu theo lô');
@@ -887,8 +890,7 @@ const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
     payload: { action: 'delete', ...payload }
   });
 
-  const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  const text = await readSheetsProxyText(response);
   let result: { status?: string; message?: string };
   try {
     result = JSON.parse(text);
@@ -1331,16 +1333,57 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       return jsonResponse({ success: true });
     }
 
-    // GET /api/auth/me
+    // GET /api/auth/me — worker cookie is required for /api/sheets/proxy on Cloudflare.
     if (subAction === 'me' && method === 'GET') {
       const token = extractBridgeToken(init);
       if (!token) return jsonResponse({ error: 'Yêu cầu đăng nhập.' }, { status: 401 });
+
+      if (!isLocalHost()) {
+        const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
+        const upstream = await (nativeFetch || fetch)(parsed.pathname, {
+          method: 'GET',
+          credentials: 'include',
+        });
+        if (!upstream.ok) {
+          if (token) bridgeRevokeToken(token);
+          const errBody = await upstream.json().catch(() => ({})) as { error?: string };
+          return jsonResponse(
+            { error: errBody.error || 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.' },
+            { status: upstream.status }
+          );
+        }
+        const me = await upstream.json() as { StaffKey?: string };
+        const staffKey = String(me.StaffKey || '').trim();
+        if (!staffKey) {
+          if (token) bridgeRevokeToken(token);
+          return jsonResponse({ error: 'Phiên đăng nhập không hợp lệ.' }, { status: 401 });
+        }
+        bridgeResolveSession(token);
+        let staffList: Staff[];
+        try {
+          staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
+        } catch (err) {
+          if (err instanceof AuthRequiredError) {
+            if (token) bridgeRevokeToken(token);
+            return jsonResponse({ error: err.message }, { status: 401 });
+          }
+          staffList = BUNDLED_STAFF;
+        }
+        const staff = staffList.find((s: any) => String(s.StaffKey) === staffKey);
+        if (!staff) return jsonResponse({ error: 'Tài khoản không còn tồn tại.' }, { status: 401 });
+        return jsonResponse(staff);
+      }
+
       const staffKey = bridgeResolveSession(token);
       if (!staffKey) return jsonResponse({ error: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 });
       let staffList: Staff[];
       try {
         staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
-      } catch {
+      } catch (err) {
+        if (err instanceof AuthRequiredError) {
+          if (token) bridgeRevokeToken(token);
+          return jsonResponse({ error: err.message }, { status: 401 });
+        }
         staffList = BUNDLED_STAFF;
       }
       const staff = staffList.find((s: any) => String(s.StaffKey) === staffKey);
@@ -1412,6 +1455,9 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
           : {})
       });
     } catch (err) {
+      if (err instanceof AuthRequiredError) {
+        return jsonResponse({ error: err.message }, { status: 401 });
+      }
       const cached = await hydrateCacheFromPersisted();
       if (cached) {
         markClientPullFailed(err);
