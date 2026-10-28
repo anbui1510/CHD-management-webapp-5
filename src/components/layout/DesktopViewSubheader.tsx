@@ -16,14 +16,13 @@ export default function DesktopViewSubheader({ config }: DesktopViewSubheaderPro
     typeof config.onSearchChange === 'function';
 
   return (
-    <div className="hidden md:block shrink-0 bg-white border-b border-slate-200 shadow-sm">
+    <div className="hidden md:block shrink-0 bg-background border-b border-border">
       <div className="px-2 sm:px-3 md:px-4 xl:px-6 py-1.5 md:py-2 flex items-center gap-2 md:gap-3 min-h-[40px] md:min-h-[44px]">
-        {/* Trái: tên view */}
         <div className="flex items-center gap-2 min-w-0 shrink-0 max-w-[220px] lg:max-w-[260px]">
           {config.icon ? (
-            <span className="shrink-0 text-[#d2145a]">{config.icon}</span>
+            <span className="shrink-0 text-foreground">{config.icon}</span>
           ) : null}
-          <h2 className="text-xs font-extrabold text-neutral-900 uppercase tracking-tight truncate leading-tight">
+          <h2 className="text-sm font-medium text-foreground truncate leading-tight">
             {config.title}
           </h2>
         </div>
@@ -38,7 +37,7 @@ export default function DesktopViewSubheader({ config }: DesktopViewSubheaderPro
                 value={config.searchValue ?? ''}
                 onChange={(next) => config.onSearchChange?.(next)}
                 placeholder={config.searchPlaceholder ?? DEFAULT_SUBHEADER_SEARCH_PLACEHOLDER}
-                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-pink-400 focus:border-pink-400 font-sans"
+                className="w-full pl-8 pr-7 py-1.5 bg-background border border-input rounded-md text-sm focus:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] font-sans"
               />
               {config.searchValue ? (
                 <button

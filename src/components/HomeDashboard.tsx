@@ -8,7 +8,6 @@ import {
   Activity,
   CalendarDays,
   FileText,
-  HeartPulse,
   LayoutDashboard,
   Heart,
   ClipboardList,
@@ -24,6 +23,8 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { Patient, Consult, CathLab, findPatientByKey, normalizePatientKey } from '../types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
 import ChdDailyBriefHomeWidget from './ChdDailyBriefHomeWidget';
 import { buildCathlabsByPatientKey, isConsultCathCompleted, isConsultWaitlistExcludedByStatus } from '../utils/cathlabWaitlist';
 import { MODAL_TITLE } from '../utils/modalTitles';
@@ -81,18 +82,8 @@ const renderIcon = (name: string, className: string) => {
   }
 };
 
-const getColorClasses = (color: string) => {
-  switch (color) {
-    case 'pink': return { bg: 'bg-pink-50 hover:bg-pink-100/50 border-pink-100', text: 'text-[#d2145a]' };
-    case 'amber': return { bg: 'bg-amber-50 hover:bg-amber-100/50 border-amber-100', text: 'text-amber-600' };
-    case 'emerald': return { bg: 'bg-emerald-50 hover:bg-emerald-100/50 border-emerald-100', text: 'text-emerald-600' };
-    case 'rose': return { bg: 'bg-rose-50 hover:bg-rose-100/50 border-rose-100', text: 'text-rose-600' };
-    case 'blue': return { bg: 'bg-blue-50 hover:bg-blue-100/50 border-blue-100', text: 'text-blue-600' };
-    case 'violet': return { bg: 'bg-violet-50 hover:bg-violet-100/50 border-violet-100', text: 'text-violet-600' };
-    case 'cyan': return { bg: 'bg-cyan-50 hover:bg-cyan-100/50 border-cyan-100', text: 'text-cyan-600' };
-    case 'indigo': return { bg: 'bg-indigo-50 hover:bg-indigo-100/50 border-indigo-100', text: 'text-indigo-600' };
-    default: return { bg: 'bg-slate-50 hover:bg-slate-100 border-slate-150', text: 'text-slate-600' };
-  }
+const getColorClasses = (_color: string) => {
+  return { bg: 'bg-muted hover:bg-accent border-border', text: 'text-foreground' };
 };
 
 const getFormattedDateKey = (str: string | undefined): string => {
@@ -132,7 +123,7 @@ const isDateWithinRange = (dateValue: string | undefined, startDate: string, end
   return !!dateKey && dateKey >= startDate && dateKey <= endDate;
 };
 
-const PIE_COLORS = ['#d2145a', '#7c3aed', '#0891b2', '#059669', '#f59e0b', '#2563eb', '#e11d48'];
+const PIE_COLORS = ['#171717', '#404040', '#737373', '#a3a3a3', '#2563eb', '#1d4ed8', '#525252'];
 
 type PieMetric = 'diagnosis' | 'second_operator' | 'request_by' | 'cath_method';
 type PiePeriodMode = 'all' | 'month' | 'quarter' | 'year';
@@ -703,26 +694,24 @@ export default function HomeDashboard({
   const showBriefWidget = canAccessModule('chd-daily-brief');
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto md:overflow-hidden bg-slate-50 pt-2 px-3 sm:px-5 pb-4 space-y-3 sm:space-y-4 animate-in fade-in duration-300">
-      <div className="w-full min-h-[90px] bg-gradient-to-r from-pink-600 to-[#d2145a] rounded-3xl px-5 sm:px-6 text-white shadow-sm relative overflow-hidden shrink-0 flex items-center">
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-10 -translate-y-10">
-          <HeartPulse className="w-48 h-48 animate-pulse" />
-        </div>
-        <div className="relative z-10 max-w-4xl">
-          <h1 className="text-base sm:text-lg font-extrabold tracking-tight mb-0.5 leading-none">
-            Xin chào, {currentStaffName || 'Bác sĩ'}!
-          </h1>
-          <p className="text-pink-100 font-semibold text-[10px] sm:text-[11px] leading-snug">
-            Hệ thống Quản lý bệnh nhân Tim bẩm sinh (CHD MANAGEMENT V5.0). Đây là không gian làm việc số hóa giúp bạn theo dõi xuyên suốt từ lúc đăng ký hội chẩn, chuẩn bị, xếp lịch, can thiệp và theo dõi tái khám bệnh nhân
-          </p>
-        </div>
-      </div>
+    <div className="h-full flex flex-col overflow-y-auto md:overflow-hidden bg-background pt-2 px-3 sm:px-5 pb-4 space-y-3 sm:space-y-4">
+      <Card className="shrink-0 gap-2 py-4 shadow-sm">
+        <CardHeader className="px-5 sm:px-6">
+          <CardTitle className="text-lg">Xin chào, {currentStaffName || 'Bác sĩ'}</CardTitle>
+          <CardDescription>
+            Hệ thống quản lý bệnh nhân tim bẩm sinh. Theo dõi từ đăng ký hội chẩn, chuẩn bị, xếp lịch, can thiệp đến tái khám.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       <div className="relative shrink-0 z-20">
         <div className="absolute top-0 right-0 -mt-6">
-           <button
+           <Button
+             type="button"
+             variant="outline"
+             size="sm"
              onClick={() => setIsConfiguringStats(!isConfiguringStats)}
-             className="group text-[10px] text-slate-400 hover:text-slate-700 flex items-center bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-full border border-slate-200 transition"
+             className="group h-7 text-xs"
            >
              <Settings className={`w-3 h-3 ${isConfiguringStats ? '' : 'group-hover:animate-spin'}`} />
              {isConfiguringStats ? (
@@ -732,7 +721,7 @@ export default function HomeDashboard({
                  Tùy chọn hiển thị
                </span>
              )}
-           </button>
+           </Button>
         </div>
         
         {isConfiguringStats && (
@@ -745,7 +734,7 @@ export default function HomeDashboard({
                     type="checkbox" 
                     checked={selectedStatIds.includes(stat.id)} 
                     onChange={() => handleToggleStat(stat.id)}
-                    className="rounded text-pink-600 focus:ring-pink-500 cursor-pointer"
+                    className="rounded border-input cursor-pointer"
                   />
                   <div className={`scale-50 -my-3 origin-left`}>{stat.icon}</div>
                   {stat.label}
@@ -758,19 +747,12 @@ export default function HomeDashboard({
         <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
           <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {visibleStats.map((stat, idx) => (
-              <motion.div
-                key={idx}
-                whileHover={{ y: -1 }}
-                className={`bg-white rounded-2xl p-3 border ${stat.border} shadow-sm flex flex-col justify-between relative overflow-hidden group min-h-[85px]`}
-              >
-                <div className="absolute top-1 right-1 opacity-[0.08] transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                  {stat.icon}
-                </div>
-                <div className="z-10 relative">
-                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">{stat.label}</span>
-                  <p className={`text-3xl font-black mt-0.5 font-mono ${stat.color} leading-none`}>{stat.value}</p>
-                </div>
-              </motion.div>
+              <Card key={idx} className="gap-1 py-3 shadow-sm min-h-[85px]">
+                <CardContent className="px-3">
+                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-semibold mt-1 font-mono text-foreground leading-none">{stat.value}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
@@ -790,11 +772,11 @@ export default function HomeDashboard({
           
           {/* BIỂU ĐỒ THỐNG KÊ TIM THEO THÁNG */}
           <div 
-            className="bg-white border border-slate-150 rounded-2xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 relative w-full min-h-[180px] z-20"
+            className="bg-card border border-border rounded-xl p-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0 relative w-full min-h-[180px] z-20"
           >
             {/* Title & Total info */}
             <div className="flex flex-col justify-center shrink-0 pr-16 sm:pr-3 sm:border-r border-[#f1f5f9] sm:h-full w-full sm:w-[155px]">
-              <span className="text-[10px] font-black uppercase text-[#d2145a] tracking-tight flex items-center gap-1 shrink-0">
+              <span className="text-[10px] font-black uppercase text-foreground tracking-tight flex items-center gap-1 shrink-0">
                 <span className="leading-tight whitespace-normal break-words">
                   {chartMetric === 'staff_consults'
                     ? 'Histogram ca hội chẩn'
@@ -803,7 +785,7 @@ export default function HomeDashboard({
               </span>
               <div className="mt-1 flex items-baseline gap-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-0.5 max-w-max">
                 <span className="text-[10px] text-slate-500 font-bold">Tổng:</span>
-                <span className="text-xs font-black font-mono text-[#d2145a]">{totalCathInChart}</span>
+                <span className="text-xs font-black font-mono text-foreground">{totalCathInChart}</span>
                 <span className="text-[9px] text-slate-400 font-bold">ca</span>
               </div>
             </div>
@@ -825,7 +807,7 @@ export default function HomeDashboard({
                         initial={{ height: 0 }}
                         animate={{ height: `${percentage}%` }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
-                        className="w-full bg-[#d2145a] rounded-t-md group-hover:bg-pink-600 transition-colors cursor-pointer"
+                        className="w-full bg-primary rounded-t-md group-hover:bg-primary/80 transition-colors cursor-pointer"
                       />
                     </div>
 
@@ -847,7 +829,7 @@ export default function HomeDashboard({
                   onClick={() => setIsConfiguringChartMetric(!isConfiguringChartMetric)}
                   className={`p-1 rounded-lg border transition-all ${
                     isConfiguringChartMetric 
-                      ? 'bg-pink-100 border-pink-200 text-[#d2145a]' 
+                      ? 'bg-muted border-border text-foreground' 
                       : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                   title="Tùy chọn loại thống kê"
@@ -866,11 +848,11 @@ export default function HomeDashboard({
                       }}
                       className={`w-full text-left px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition ${
                         chartMetric === 'cathlabs' 
-                          ? 'bg-pink-50 text-[#d2145a]' 
+                          ? 'bg-accent text-foreground' 
                           : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${chartMetric === 'cathlabs' ? 'bg-[#d2145a]' : 'bg-transparent border border-slate-400'}`}></span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${chartMetric === 'cathlabs' ? 'bg-primary' : 'bg-transparent border border-slate-400'}`}></span>
                       Số ca thông tim
                     </button>
                     <button
@@ -881,11 +863,11 @@ export default function HomeDashboard({
                       }}
                       className={`w-full text-left px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 mt-1 transition ${
                         chartMetric === 'staff_consults' 
-                          ? 'bg-pink-50 text-[#d2145a]' 
+                          ? 'bg-accent text-foreground' 
                           : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${chartMetric === 'staff_consults' ? 'bg-[#d2145a]' : 'bg-transparent border border-slate-400'}`}></span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${chartMetric === 'staff_consults' ? 'bg-primary' : 'bg-transparent border border-slate-400'}`}></span>
                       Số ca staff thông
                     </button>
                     <button
@@ -896,11 +878,11 @@ export default function HomeDashboard({
                       }}
                       className={`w-full text-left px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 mt-1 transition ${
                         chartMetric === 'cathlabs_yearly' 
-                          ? 'bg-pink-50 text-[#d2145a]' 
+                          ? 'bg-accent text-foreground' 
                           : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${chartMetric === 'cathlabs_yearly' ? 'bg-[#d2145a]' : 'bg-transparent border border-slate-400'}`}></span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${chartMetric === 'cathlabs_yearly' ? 'bg-primary' : 'bg-transparent border border-slate-400'}`}></span>
                       Thống kê theo năm
                     </button>
                   </div>
@@ -912,18 +894,18 @@ export default function HomeDashboard({
                 <button 
                   type="button"
                   onClick={() => setChartYear(prev => prev + 1)}
-                  className="text-slate-400 hover:text-[#d2145a] p-0.5 line-none transition-colors"
+                  className="text-slate-400 hover:text-foreground p-0.5 line-none transition-colors"
                   title="Tăng năm"
                 >
                   <ChevronUp className="w-3 h-3" />
                 </button>
-                <span className="text-[9px] font-extrabold font-mono text-[#d2145a] leading-none my-0.5 px-1 min-w-[24px] text-center">
+                <span className="text-[9px] font-extrabold font-mono text-foreground leading-none my-0.5 px-1 min-w-[24px] text-center">
                   {chartYear}
                 </span>
                 <button 
                   type="button"
                   onClick={() => setChartYear(prev => prev - 1)}
-                  className="text-slate-400 hover:text-[#d2145a] p-0.5 line-none transition-colors"
+                  className="text-slate-400 hover:text-foreground p-0.5 line-none transition-colors"
                   title="Giảm năm"
                 >
                   <ChevronDown className="w-3 h-3" />
@@ -933,15 +915,15 @@ export default function HomeDashboard({
           </div>
 
           {/* TRUY CẬP NHANH SECTION */}
-          <div className="bg-white border border-slate-150 rounded-2xl p-4 shadow-sm flex flex-col flex-1 overflow-hidden">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-4 shrink-0">
-                <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-pink-600" /> TRUY CẬP NHANH
+                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-foreground" /> Truy cập nhanh
                 </h3>
                 <button
                   onClick={() => setIsConfiguring(!isConfiguring)}
-                  className="text-xs text-[#d2145a] hover:text-pink-800 font-extrabold flex items-center gap-1 bg-pink-50 hover:bg-pink-100 px-2.5 py-1 rounded-xl transition border border-pink-100 shrink-0"
+                  className="text-xs text-foreground hover:text-foreground font-extrabold flex items-center gap-1 bg-accent hover:bg-accent px-2.5 py-1 rounded-xl transition border border-border shrink-0"
                 >
                   <Settings className="w-3.5 h-3.5 animate-spin-hover" />
                   {isConfiguring ? 'Xong' : 'Tùy chọn hiển thị'}
@@ -953,7 +935,7 @@ export default function HomeDashboard({
                   <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Chọn tối đa 4 phím tắt:</span>
-                      <span className="text-[10px] text-pink-600 font-bold font-mono">Đã chọn {selectedShortcutIds.length}/4</span>
+                      <span className="text-[10px] text-foreground font-bold font-mono">Đã chọn {selectedShortcutIds.length}/4</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {allowedShortcuts.map(sh => {
@@ -965,20 +947,20 @@ export default function HomeDashboard({
                             onClick={() => handleToggleShortcut(sh.id)}
                             className={`flex items-center justify-between p-2 rounded-xl border transition-all text-left ${
                               isSelected 
-                                ? `bg-pink-50/50 border-pink-200` 
+                                ? `bg-accent border-border` 
                                 : 'bg-white border-slate-200 hover:bg-slate-50'
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? 'bg-white' : 'bg-slate-100'}`}>
-                                {renderIcon(sh.iconName, `w-4 h-4 ${isSelected ? 'text-[#d2145a]' : 'text-slate-500'}`)}
+                                {renderIcon(sh.iconName, `w-4 h-4 ${isSelected ? 'text-foreground' : 'text-slate-500'}`)}
                               </div>
                               <div className="min-w-0">
                                 <p className="text-[11px] font-bold text-slate-800 leading-tight truncate">{sh.label}</p>
                                 <p className="text-[9px] text-slate-400 leading-none mt-0.5 truncate">{sh.desc}</p>
                               </div>
                             </div>
-                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'border-pink-500 bg-[#d2145a] text-white' : 'border-slate-300 bg-white'}`}>
+                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white'}`}>
                               {isSelected && <span className="text-[8px] font-black">✓</span>}
                             </div>
                           </button>
@@ -1002,12 +984,12 @@ export default function HomeDashboard({
                         <button 
                           key={sh.id}
                           onClick={() => onNavigate(sh.id)}
-                          className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 hover:bg-pink-50 border border-slate-100 hover:border-pink-150 transition group text-center h-24 shadow-sm"
+                          className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 hover:bg-accent border border-slate-100 hover:border-border transition group text-center h-24 shadow-sm"
                         >
                           <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
                             {renderIcon(sh.iconName, `w-4 h-4 text-slate-600 group-hover:${colDef.text}`)}
                           </div>
-                          <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-[#d2145a]">{sh.label}</span>
+                          <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-foreground">{sh.label}</span>
                         </button>
                       );
                     })}
@@ -1025,11 +1007,11 @@ export default function HomeDashboard({
             <div className="order-2 h-[52%] min-h-[200px] flex flex-col overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 shrink-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <CalendarDays className="w-4 h-4 text-[#d2145a] shrink-0" />
+                  <CalendarDays className="w-4 h-4 text-foreground shrink-0" />
                   <span className="text-xs font-black text-slate-800 uppercase tracking-tight shrink-0">
                     Lịch can thiệp dự kiến ({weeklyScheduledCathCount} ca)
                   </span>
-                  <span className="text-[10px] font-black text-[#d2145a] font-mono bg-pink-100/50 border border-pink-100 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-[10px] font-black text-foreground font-mono bg-muted border border-border px-2 py-0.5 rounded-full shrink-0">
                     {getVNFullDateStr(daysOfWeek[0])} - {getVNFullDateStr(daysOfWeek[6])}
                   </span>
                 </div>
@@ -1044,7 +1026,7 @@ export default function HomeDashboard({
                   </button>
                   <button
                     onClick={handleResetToToday}
-                    className="text-[9px] font-black uppercase text-[#d2145a] bg-pink-50 hover:bg-pink-100 border border-pink-100 px-2 py-0.5 rounded-lg transition cursor-pointer"
+                    className="text-[9px] font-black uppercase text-foreground bg-accent hover:bg-accent border border-border px-2 py-0.5 rounded-lg transition cursor-pointer"
                   >
                     Hôm nay
                   </button>
@@ -1090,20 +1072,20 @@ export default function HomeDashboard({
                         key={dayKey}
                         className={`flex flex-col sm:flex-row gap-2 p-2.5 rounded-xl border transition ${
                           isToday 
-                            ? 'bg-pink-50/30 border-pink-200 shadow-sm shadow-pink-100/50' 
+                            ? 'bg-accent border-border shadow-sm' 
                             : 'bg-white border-slate-150 hover:border-slate-300'
                         }`}
                       >
                         {/* Day Label */}
                         <div className="flex sm:flex-col items-baseline sm:items-center justify-between sm:justify-center w-full sm:w-[80px] shrink-0 pb-1 sm:pb-0 sm:border-r border-slate-100">
-                          <span className={`text-[10px] font-black tracking-tight ${isToday ? 'text-[#d2145a]' : 'text-slate-700'}`}>
+                          <span className={`text-[10px] font-black tracking-tight ${isToday ? 'text-foreground' : 'text-slate-700'}`}>
                             {dayName}
                           </span>
                           <span className="text-[9px] font-extrabold font-mono text-slate-400 sm:mt-0.5">
                             {dayNumStr}
                           </span>
                           {isToday && (
-                            <span className="hidden sm:block text-[8px] font-black bg-[#d2145a] text-white px-1.5 py-0.5 rounded-full font-mono uppercase mt-1">
+                            <span className="hidden sm:block text-[8px] font-black bg-primary text-white px-1.5 py-0.5 rounded-full font-mono uppercase mt-1">
                               Today
                             </span>
                           )}
@@ -1123,7 +1105,7 @@ export default function HomeDashboard({
                                   <span className="text-[11px] font-black text-slate-800 uppercase truncate">
                                     {pat?.PatientName || 'Không rõ tên'}
                                   </span>
-                                  <span className="text-[9px] font-extrabold font-mono text-[#d2145a] bg-pink-50 border border-pink-150 px-1.5 py-0.2 rounded shrink-0">
+                                  <span className="text-[9px] font-extrabold font-mono text-foreground bg-accent border border-border px-1.5 py-0.2 rounded shrink-0">
                                     {c.DiagnosisID || 'N/A'}
                                   </span>
                                 </div>
@@ -1142,11 +1124,11 @@ export default function HomeDashboard({
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 shrink-0 mb-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Database className="w-4 h-4 text-[#d2145a] shrink-0" />
+                    <Database className="w-4 h-4 text-foreground shrink-0" />
                     <span className="text-xs font-black text-slate-800 uppercase tracking-tight truncate">
                       Thống kê tỷ lệ
                     </span>
-                    <span className="text-[10px] font-black text-[#d2145a] font-mono bg-pink-100/50 border border-pink-100 px-2 py-0.5 rounded-full shrink-0">
+                    <span className="text-[10px] font-black text-foreground font-mono bg-muted border border-border px-2 py-0.5 rounded-full shrink-0">
                       {pieConfig.total} {pieConfig.totalLabel}
                     </span>
                   </div>
@@ -1165,7 +1147,7 @@ export default function HomeDashboard({
                       onClick={() => setPieMetric(id)}
                       className={`px-2 py-1 rounded-lg text-[9px] font-black transition cursor-pointer ${
                         pieMetric === id
-                          ? 'bg-[#d2145a] text-white shadow-sm'
+                          ? 'bg-primary text-white shadow-sm'
                           : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                       }`}
                     >
@@ -1225,18 +1207,18 @@ export default function HomeDashboard({
                     <button
                       type="button"
                       onClick={() => setPieFilterYear(prev => prev - 1)}
-                      className="p-0.5 text-slate-500 hover:text-[#d2145a] hover:bg-slate-50 cursor-pointer"
+                      className="p-0.5 text-slate-500 hover:text-foreground hover:bg-slate-50 cursor-pointer"
                       title="Năm trước"
                     >
                       <ChevronLeft className="w-3 h-3" />
                     </button>
-                    <span className="px-2 text-[9px] font-black font-mono text-[#d2145a] min-w-[36px] text-center">
+                    <span className="px-2 text-[9px] font-black font-mono text-foreground min-w-[36px] text-center">
                       {pieFilterYear}
                     </span>
                     <button
                       type="button"
                       onClick={() => setPieFilterYear(prev => prev + 1)}
-                      className="p-0.5 text-slate-500 hover:text-[#d2145a] hover:bg-slate-50 cursor-pointer"
+                      className="p-0.5 text-slate-500 hover:text-foreground hover:bg-slate-50 cursor-pointer"
                       title="Năm sau"
                     >
                       <ChevronRight className="w-3 h-3" />
@@ -1288,7 +1270,7 @@ export default function HomeDashboard({
                   {hoveredPieSegment && (
                     <div className="absolute left-1/2 -translate-x-1/2 -top-3 z-20 bg-slate-900 text-white rounded-lg px-2.5 py-1.5 shadow-xl text-center pointer-events-none min-w-[128px]">
                       <div className="text-[9px] font-black uppercase tracking-wide truncate">{hoveredPieSegment.label}</div>
-                      <div className="text-[10px] font-mono font-black text-pink-100">
+                      <div className="text-[10px] font-mono font-black text-background">
                         {hoveredPieSegment.value} ca ({hoveredPieSegment.percent.toFixed(hoveredPieSegment.percent >= 10 ? 0 : 1)}%)
                       </div>
                     </div>
@@ -1297,7 +1279,7 @@ export default function HomeDashboard({
                     <span className="text-[9.5px] font-black uppercase text-slate-400 leading-tight">
                       {pieConfig.title}
                     </span>
-                    <span className="text-3xl font-black font-mono text-[#d2145a] leading-none mt-1">
+                    <span className="text-3xl font-black font-mono text-foreground leading-none mt-1">
                       {pieConfig.total}
                     </span>
                   </div>
@@ -1322,7 +1304,7 @@ export default function HomeDashboard({
                           </div>
                           <div className="flex items-baseline gap-1 shrink-0">
                             <span className="text-[10px] font-black font-mono text-slate-800">{segment.value}</span>
-                            <span className="text-[9px] font-black font-mono text-[#d2145a]">
+                            <span className="text-[9px] font-black font-mono text-foreground">
                               {segment.percent.toFixed(segment.percent >= 10 ? 0 : 1)}%
                             </span>
                           </div>

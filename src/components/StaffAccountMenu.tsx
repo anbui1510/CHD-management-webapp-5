@@ -48,20 +48,20 @@ export default function StaffAccountMenu({
       <button
         type="button"
         onClick={onToggle}
-        className={`flex items-center gap-1.5 rounded-xl px-2 py-0.5 transition ${
+        className={`flex items-center gap-1.5 rounded-md px-2 py-1 transition border ${
           isOpen
-            ? 'bg-white/20 border border-white/30'
-            : 'bg-white/10 border border-white/15 hover:bg-white/15'
+            ? 'bg-accent border-border'
+            : 'bg-background border-border hover:bg-accent'
         }`}
         title="Tài khoản"
       >
-        <div className="w-5 h-5 rounded-full bg-white text-[#d2145a] font-extrabold text-[10px] flex items-center justify-center uppercase shadow-inner shrink-0">
+        <div className="w-5 h-5 rounded-full bg-primary text-primary-foreground font-medium text-[10px] flex items-center justify-center uppercase shrink-0">
           {initial}
         </div>
-        <span className="font-extrabold text-xs text-white max-w-[140px] truncate hidden sm:inline">
+        <span className="font-medium text-xs text-foreground max-w-[140px] truncate hidden sm:inline">
           {staff.StaffName}
         </span>
-        <ChevronDown className={`w-3.5 h-3.5 text-white/80 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
@@ -69,7 +69,7 @@ export default function StaffAccountMenu({
           <div className="px-3 py-2 border-b border-slate-100">
             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Tài khoản</p>
             <p className="text-xs font-extrabold text-slate-800 truncate">{staff.StaffName}</p>
-            <p className="text-[10px] font-bold text-[#d2145a]">{staff.Role}</p>
+            <p className="text-[10px] font-medium text-muted-foreground">{staff.Role}</p>
           </div>
           <button
             type="button"

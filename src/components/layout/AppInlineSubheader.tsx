@@ -51,7 +51,7 @@ export default function AppInlineSubheader({
       <button
         type="button"
         onClick={onAddPatient}
-        className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium px-3 py-1.5 rounded-md text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
       >
         <Plus className="w-3.5 h-3.5" /> Thêm bệnh nhi mới
       </button>
@@ -64,7 +64,7 @@ export default function AppInlineSubheader({
       <button
         type="button"
         onClick={onAddConsult}
-        className="bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium px-3 py-1.5 rounded-md text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
       >
         <Plus className="w-3.5 h-3.5" /> Đăng kí staff
       </button>

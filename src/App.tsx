@@ -117,6 +117,23 @@ import {
   DEFAULT_MOBILE_QUICK_SLOTS,
   MOBILE_QUICK_SLOT_COUNT,
 } from './utils/mobileQuickTabs';
+import { Button } from './components/ui/button';
+import { Badge } from './components/ui/badge';
+import { Input } from './components/ui/input';
+import { Card } from './components/ui/card';
+import { TableHead, TableHeader, TableRow } from './components/ui/table';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from './components/ui/sidebar';
 import { PatientAdminEditButton } from './components/PatientAdminEditButton';
 import { SortColumnIcon } from './components/SortColumnIcon';
 import { MODAL_TITLE } from './utils/modalTitles';
@@ -147,7 +164,7 @@ import {
   Loader2,
   Unlink,
   Home,
-  Menu,
+  PanelLeft,
   ChevronRight,
   ChevronLeft,
   Info,
@@ -2246,22 +2263,19 @@ export default function App() {
   // Return Login screen if not authenticated
   if (!currentStaff) {
     return (
-      <div className={`min-h-screen bg-neutral-950 flex flex-col items-center p-4 relative overflow-hidden font-sans ${isMobile ? 'justify-start pt-[max(1.5rem,env(safe-area-inset-top))]' : 'justify-center'}`}>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#d2145a]/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-3xl p-6 md:p-8 shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
-          
+      <div className={`min-h-screen bg-muted flex flex-col items-center p-4 font-sans ${isMobile ? 'justify-start pt-[max(1.5rem,env(safe-area-inset-top))]' : 'justify-center'}`}>
+        <div className="w-full max-w-sm bg-card text-card-foreground border border-border rounded-xl p-6 md:p-8 shadow-sm">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#d2145a]/10 border border-[#d2145a]/20 text-[#d2145a] mb-2.5">
-              <Heart className="w-6 h-6 fill-[#d2145a]/10 animate-pulse" />
+            <div className="inline-flex items-center justify-center size-12 rounded-lg bg-primary text-primary-foreground mb-3">
+              <Heart className="w-5 h-5" />
             </div>
-            <h1 className="text-lg md:text-xl font-black text-white uppercase tracking-tight leading-none pt-1">CHD Management 5.0</h1>
-            <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1.5 leading-relaxed">
-              HỆ THỐNG QUẢN LÝ TIM BẨM SINH<br />
-              KHOA TIM MẠCH - BỆNH VIỆN NHI ĐỒNG THÀNH PHỐ
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">CHD Management 5.0</h1>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+              Hệ thống quản lý tim bẩm sinh
+              <br />
+              Khoa Tim mạch — Bệnh viện Nhi Đồng Thành phố
             </p>
-            <p className="text-[10px] text-neutral-500 font-mono font-semibold mt-2 tracking-wide">
+            <p className="text-xs text-muted-foreground font-mono mt-2">
               Phiên bản {CHD_VERSION_LABEL}
             </p>
           </div>
@@ -2269,13 +2283,15 @@ export default function App() {
           <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
             {((loginLoadError && staffList.length === 0) || loginError) && (
               <div className="space-y-2">
-                <div className="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-3 text-xs leading-relaxed flex gap-1.5 animate-in fade-in duration-200">
+                <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg p-3 text-sm leading-relaxed flex gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{(loginLoadError && staffList.length === 0) ? loginLoadError : loginError}</span>
                 </div>
                 {loginLoadError && staffList.length === 0 && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    className="w-full"
                     onClick={() => {
                       localStorage.removeItem('chd_apps_script_url');
                       fetch('/api/sync-config', {
@@ -2290,17 +2306,16 @@ export default function App() {
                           window.location.reload();
                         });
                     }}
-                    className="w-full bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl py-2.5 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
                   >
                     <Unlink className="w-3.5 h-3.5" />
                     Sử dụng Database Offline (Hủy liên kết Sheets)
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
 
-            <div>
-              <label className="block text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">
                 Tên nhân viên
               </label>
               <select
@@ -2309,7 +2324,7 @@ export default function App() {
                   setLoginStaffKey(e.target.value);
                   setLoginPassword('');
                 }}
-                className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] transition-all font-semibold"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               >
                 <option value="" disabled>-- Chọn nhân viên --</option>
                 {staffList.map((s) => (
@@ -2321,62 +2336,55 @@ export default function App() {
             </div>
 
             {sheetsSetupNeeded && (
-              <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-[11px] leading-relaxed text-amber-100">
+              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">
+                <p className="text-sm leading-relaxed">
                   Máy chủ chưa lưu kết nối Google Sheets. Dán Web App URL và khóa API, rồi bấm Đăng nhập.
                 </p>
-                <div>
-                  <label className="block text-amber-100/80 text-[10px] font-black uppercase tracking-wider mb-1.5">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium">
                     Web App URL
                   </label>
-                  <input
+                  <Input
                     type="url"
                     value={sheetsSetupUrl}
                     onChange={(e) => setSheetsSetupUrl(e.target.value)}
                     autoComplete="off"
                     placeholder="https://script.google.com/macros/s/.../exec"
-                    className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
                   />
                 </div>
-                <div>
-                  <label className="block text-amber-100/80 text-[10px] font-black uppercase tracking-wider mb-1.5">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium">
                     Khóa API
                   </label>
-                  <input
+                  <Input
                     type="password"
                     value={sheetsSetupSecret}
                     onChange={(e) => setSheetsSetupSecret(e.target.value)}
                     autoComplete="new-password"
                     placeholder="Khóa API trong Apps Script"
-                    className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
                   />
                 </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">
                 Mật khẩu
               </label>
-              <input
+              <Input
                 type="password"
                 required
                 disabled={!loginStaffKey}
                 autoComplete="new-password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full bg-neutral-950 text-white border border-neutral-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#d2145a] placeholder:text-neutral-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder={loginStaffKey ? "Nhập Password nhân viên" : "Vui lòng chọn nhân viên trước"}
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loginPending}
-              className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold rounded-xl py-2.5 text-xs transition shadow-lg shadow-pink-950/20 uppercase tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-70"
-            >
+            <Button type="submit" disabled={loginPending} className="w-full">
               <UserCheck className="w-4 h-4" /> {loginPending ? 'Đang đăng nhập...' : 'Đăng nhập'}
-            </button>
+            </Button>
           </form>
         </div>
       </div>
@@ -2400,72 +2408,104 @@ export default function App() {
       onRefreshSheetsStatus={refreshSheetsSyncStatus}
     >
     <ViewSubheaderProvider>
-    <div className="app-shell bg-slate-50 text-slate-800 flex flex-col font-sans overflow-hidden">
-      
-      {/* Top Application Header Bar styled beautifully like the secondary custom red banner in screenshot */}
-      <header className="bg-[#d2145a] text-white shrink-0 shadow-md pt-[env(safe-area-inset-top)]">
-        <div className="max-w-none px-4 md:px-6 py-2 flex items-center justify-between min-h-[52px]">
-          
-          {/* Left Panel: Menu toggle + View title & Subtitle */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <button 
-              onClick={handleHeaderMenuToggle}
-              className="hover:bg-white/10 p-1.5 rounded-xl transition shrink-0"
-              title={isMobile ? 'Mở menu module' : 'Mở rộng Sidebar'}
-            >
-              <Menu className="w-5 h-5 text-white/90" />
-            </button>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="shrink-0 hidden sm:block">
-                <Heart className="w-5 h-5 text-pink-200 animate-pulse fill-pink-500/20" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xs md:text-sm font-extrabold tracking-wide uppercase truncate leading-tight text-white">
-                  {MAIN_HEADER_TITLE}
-                </h1>
-              </div>
+    <div className="app-shell flex flex-row bg-background text-foreground font-sans overflow-hidden">
+      <Sidebar collapsed={!isSidebarExpanded}>
+        <SidebarHeader>
+          <div className={`flex items-center gap-2 px-2 py-1.5 ${isSidebarExpanded ? '' : 'justify-center px-0'}`}>
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Heart className="size-4" />
             </div>
+            {isSidebarExpanded && (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold leading-none">CHD</p>
+                <p className="truncate text-xs text-muted-foreground mt-1">{currentStaff.StaffName}</p>
+              </div>
+            )}
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Điều hướng</SidebarGroupLabel>
+            <SidebarMenu>
+              {primarySideMenus.map((menu) => (
+                <SidebarMenuItem key={menu.id}>
+                  <SidebarMenuButton
+                    isActive={activeMenu === menu.id}
+                    title={menu.label}
+                    onClick={() => navigateMenu(menu.id as typeof activeMenu)}
+                  >
+                    {getNavIcon(menu.id as ActiveMenuId)}
+                    <span className="truncate group-data-[collapsed=true]/sidebar:hidden">{menu.label}</span>
+                    {menu.id === 'results-staff' && pendingStaffConsultCount > 0 && (
+                      isSidebarExpanded ? (
+                        <Badge variant="secondary" className="ml-auto group-data-[collapsed=true]/sidebar:hidden">
+                          {pendingStaffConsultCount}
+                        </Badge>
+                      ) : (
+                        <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+                      )
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
+          {isSidebarExpanded && (
+            <Button variant="outline" size="sm" className="w-full" onClick={handleResetDatabase}>
+              Kiểm Reset Database
+            </Button>
+          )}
+          {isSidebarExpanded && (
+            <p className="px-2 text-center text-[10px] font-mono text-muted-foreground break-all" title={CHD_VERSION_LABEL}>
+              {CHD_VERSION_LABEL}
+            </p>
+          )}
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset>
+      <header className="bg-background text-foreground shrink-0 border-b border-border pt-[env(safe-area-inset-top)]">
+        <div className="max-w-none px-3 md:px-4 py-2 flex items-center justify-between min-h-[52px] gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleHeaderMenuToggle}
+              title={isMobile ? 'Mở menu module' : 'Thu gọn sidebar'}
+            >
+              <PanelLeft className="size-4" />
+            </Button>
+            <h1 className="text-sm font-semibold tracking-tight truncate text-foreground">
+              {MAIN_HEADER_TITLE}
+            </h1>
           </div>
 
-          {/* Right Panel: CHD MANAGEMENT V5.0, circular Admin avatar, Log out */}
-          <div className="flex items-center gap-2 shrink-0">
-            
-            {/* Sync trigger — bấm để kéo dữ liệu mới từ Google Sheets */}
-            <button 
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={() => refreshFullData(true)}
               disabled={isMedicalDataSyncing}
-              className={`hover:bg-white/10 px-2 py-1.5 rounded-xl transition flex items-center gap-1 text-[10px] font-bold shrink-0 border border-white/20 ${
-                isMedicalDataSyncing ? 'opacity-60 cursor-not-allowed' : ''
-              }`}
               title={isMedicalDataSyncing ? 'Đang đồng bộ...' : 'Đồng bộ lại dữ liệu từ Google Sheets'}
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-white/90 ${isMedicalDataSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-3.5 ${isMedicalDataSyncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Đồng bộ</span>
-            </button>
+            </Button>
 
-            <span
-              className={`inline-flex max-w-[7.5rem] sm:max-w-none truncate px-1.5 sm:px-2 py-1 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-wide border ${
-                sheetsSyncBadge.tone === 'ok'
-                  ? 'bg-emerald-500/20 border-emerald-200/40 text-emerald-50'
-                  : sheetsSyncBadge.tone === 'error'
-                    ? 'bg-rose-500/25 border-rose-200/40 text-rose-50'
-                    : sheetsSyncBadge.tone === 'warn'
-                      ? 'bg-amber-500/25 border-amber-200/40 text-amber-50'
-                      : 'bg-white/10 border-white/20 text-white/80'
-              }`}
+            <Badge
+              variant={sheetsSyncBadge.tone === 'error' ? 'destructive' : 'secondary'}
+              className="max-w-[7.5rem] sm:max-w-none truncate"
               title={sheetsSyncBadge.title}
             >
               {sheetsSyncBadge.label}
+            </Badge>
+
+            <span className="hidden md:inline-flex items-center rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              V5.0
             </span>
-
-            {/* Title: CHD MANAGEMENT V5.0 */}
-            <div className="hidden md:flex items-center gap-1 text-xs font-black tracking-tight text-white/90">
-              <span>CHD MANAGEMENT</span>
-              <span className="bg-white/15 border border-white/25 rounded px-1.5 py-0.5 text-[8px] font-mono leading-none">V5.0</span>
-            </div>
-
-            {/* Separator line */}
-            <span className="hidden md:block w-px h-5 bg-white/25"></span>
 
             {/* Workflow notifications */}
             <BellNotificationMenu
@@ -2495,13 +2535,15 @@ export default function App() {
             />
 
             {/* Logout Button */}
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={handleLogout}
-              className="hover:bg-white/10 border border-white/15 p-1.5 rounded-xl text-white hover:text-red-200 transition shrink-0"
               title="Đăng xuất"
             >
-              <LogOut className="w-4 h-4" />
-            </button>
+              <LogOut className="size-4" />
+            </Button>
           </div>
 
         </div>
@@ -2521,15 +2563,13 @@ export default function App() {
 
       {/* Hero success/error notifications */}
       {formSuccessMessage && (
-        <div className={`text-white text-center py-2 text-xs font-bold shadow-inner ${formSuccessWarning ? 'bg-amber-600' : 'bg-green-600'}`}>
-          {formSuccessWarning ? '⚠ ' : '✓ '}{formSuccessMessage}
+        <div className={`border-b px-4 py-2 text-center text-sm ${formSuccessWarning ? 'border-amber-200 bg-amber-50 text-amber-950' : 'border-emerald-200 bg-emerald-50 text-emerald-950'}`}>
+          {formSuccessMessage}
         </div>
       )}
 
       {(medicalDataLoadState.phase === 'loading' || medicalDataLoadState.phase === 'syncing') && (
-        <div className={`text-white text-center py-2 px-3 text-xs font-bold shadow-inner flex items-center justify-center gap-2 ${
-          medicalDataLoadState.backgroundSync ? 'bg-sky-600' : 'bg-amber-500'
-        }`}>
+        <div className="border-b border-border bg-muted text-foreground text-center py-2 px-3 text-sm flex items-center justify-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           <span>
             {medicalDataLoadState.backgroundSync
@@ -2548,42 +2588,46 @@ export default function App() {
       )}
 
       {medicalDataLoadState.phase === 'error' && medicalDataLoadState.message && (
-        <div className="relative z-30 bg-red-600 text-white text-center py-2.5 px-3 text-xs font-bold shadow-inner flex flex-col sm:flex-row items-center justify-center gap-2 flex-wrap">
+        <div className="relative z-30 border-b border-destructive/30 bg-destructive/10 text-destructive text-center py-2 px-3 text-sm flex flex-col sm:flex-row items-center justify-center gap-2 flex-wrap">
           <div className="flex items-start sm:items-center justify-center gap-2 min-w-0">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
             <span className="min-w-0 leading-snug">{medicalDataLoadState.message}</span>
           </div>
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={() => refreshFullData(true)}
-            className="relative z-30 shrink-0 min-h-[44px] px-4 py-2 rounded-xl bg-white text-red-700 font-extrabold underline-offset-2 hover:bg-red-50 active:bg-red-100 touch-manipulation"
+            className="relative z-30 shrink-0"
           >
             Đồng bộ lại
-          </button>
+          </Button>
         </div>
       )}
 
       {medicalDataLoadState.phase === 'ready' && medicalDataLoadState.message && (
-        <div className="relative z-30 bg-amber-500 text-white text-center py-2.5 px-3 text-xs font-bold shadow-inner flex flex-col sm:flex-row items-center justify-center gap-2 flex-wrap">
+        <div className="relative z-30 border-b border-amber-200 bg-amber-50 text-amber-950 text-center py-2 px-3 text-sm flex flex-col sm:flex-row items-center justify-center gap-2 flex-wrap">
           <div className="flex items-start sm:items-center justify-center gap-2 min-w-0">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
             <span className="min-w-0 leading-snug">{medicalDataLoadState.message}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
+            <Button
               type="button"
+              size="sm"
               onClick={() => refreshFullData(true)}
-              className="relative z-30 min-h-[44px] px-4 py-2 rounded-xl bg-white text-amber-800 font-extrabold hover:bg-amber-50 active:bg-amber-100 touch-manipulation"
+              className="relative z-30"
             >
               Đồng bộ lại
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() => setMedicalDataLoadState(prev => ({ ...prev, message: undefined }))}
-              className="relative z-30 min-h-[44px] px-3 py-2 rounded-xl border border-white/40 text-white font-extrabold hover:bg-white/10 touch-manipulation"
+              className="relative z-30"
             >
               Đóng
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -2591,77 +2635,6 @@ export default function App() {
       {/* Dual Panel Workspace Block */}
       <div className="app-main-workspace max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4">
         
-        {/* Collapsible Left navigation Aside drawer */}
-        <aside className={`hidden md:block ${isSidebarExpanded ? 'w-full md:w-64' : 'w-16'} transition-all duration-200 shrink-0 h-full overflow-y-auto pb-2 xl:pb-4`}>
-          <div className={`bg-white border border-slate-200 rounded-3xl ${isSidebarExpanded ? 'p-4' : 'p-2 sm:p-2'} shadow-sm space-y-4`}>
-            
-            {/* Quick profile overview */}
-            {isSidebarExpanded && (
-              <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl">
-                <span className="text-[10px] font-black uppercase text-slate-400 font-mono tracking-wider">Tài khoản</span>
-                <p className="font-extrabold text-neutral-900 text-xs truncate leading-snug">{currentStaff.StaffName}</p>
-                <p className="text-[10px] text-[#d2145a] font-mono leading-none pt-0.5 font-bold">Chức vụ: {currentStaff.Role}</p>
-              </div>
-            )}
-
-            {/* Menu Group lists */}
-            <nav className="space-y-1">
-              {primarySideMenus.map((menu) => (
-                <button
-                  key={menu.id}
-                  onClick={() => navigateMenu(menu.id as typeof activeMenu)}
-                  title={!isSidebarExpanded ? menu.label : undefined}
-                  className={`relative w-full flex items-center ${isSidebarExpanded ? 'gap-2.5 px-3' : 'justify-center p-2'} py-2 text-xs font-semibold rounded-2xl transition-all ${
-                    activeMenu === menu.id 
-                      ? 'bg-pink-50 text-[#d2145a] hover:bg-pink-100/55' 
-                      : 'text-neutral-600 hover:bg-slate-100 hover:text-neutral-900'
-                  }`}
-                >
-                  <span className={`${activeMenu === menu.id ? 'text-[#d2145a]' : 'text-slate-400'}`}>
-                    {getNavIcon(menu.id as ActiveMenuId)}
-                  </span>
-                  {isSidebarExpanded && (
-                    <span className="truncate flex-1 text-left">{menu.label}</span>
-                  )}
-                  {menu.id === 'results-staff' && pendingStaffConsultCount > 0 && (
-                    isSidebarExpanded ? (
-                      <span className="bg-pink-100 text-[#d2145a] text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-auto">
-                        {pendingStaffConsultCount}
-                      </span>
-                    ) : (
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#d2145a] rounded-full"></span>
-                    )
-                  )}
-                </button>
-              ))}
-            </nav>
-
-            {/* Reset option section */}
-            {isSidebarExpanded && (
-              <div className="pt-3 border-t border-slate-150 space-y-2">
-                <button
-                  onClick={handleResetDatabase}
-                  className="w-full bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-500 font-extrabold text-[10px] py-1.5 px-3 rounded-xl transition border border-slate-150 flex items-center justify-center gap-1"
-                >
-                  Kiểm Reset Database
-                </button>
-              </div>
-            )}
-
-            <div className={`pt-3 border-t border-slate-150 ${isSidebarExpanded ? '' : 'px-0.5'}`}>
-              <p
-                className="text-[9px] text-slate-400 font-mono font-semibold text-center leading-snug break-all"
-                title={CHD_VERSION_LABEL}
-              >
-                {isSidebarExpanded
-                  ? CHD_VERSION_LABEL
-                  : CHD_VERSION_LABEL.replace(/^CHD5\./, '5.')}
-              </p>
-            </div>
-
-          </div>
-        </aside>
-
         {/* Primary View content frame */}
         <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'heart-transplant' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
           
@@ -2735,16 +2708,16 @@ export default function App() {
 
           {/* PATIENT MANAGER PANEL */}
           {activeMenu === 'patients' && (
-            <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-2 sm:p-6 gap-2 sm:gap-4 overflow-hidden">
+            <div className="flex-1 min-h-0 h-full flex flex-col bg-background p-2 sm:p-4 gap-2 sm:gap-3 overflow-hidden">
               
               <div className="mobile-view-shell flex flex-col shrink-0 md:hidden">
-                <h2 className="text-sm font-extrabold text-neutral-900 tracking-tight flex items-center gap-1.5 uppercase">
-                  <Heart className="w-5 h-5 text-pink-600 fill-pink-50" /> Hồ sơ bệnh án
+                <h2 className="text-sm font-semibold text-foreground tracking-tight flex items-center gap-1.5">
+                  <Heart className="w-4 h-4" /> Hồ sơ bệnh án
                 </h2>
                 
                 <div className="flex items-center gap-1.5">
-                  <div className="mobile-view-search-wrap relative flex-1 min-w-0 flex items-center bg-slate-50 border border-slate-200">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <div className="mobile-view-search-wrap relative flex-1 min-w-0 flex items-center bg-background border border-input">
+                    <Search className="w-4 h-4 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
                     <SearchTextInput
                       type="text"
                       placeholder="Tìm tên, mã NB, chẩn đoán..."
@@ -2754,7 +2727,7 @@ export default function App() {
                         setPatientCurrentPage(1);
                         setMobilePatientVisibleCount(MOBILE_PATIENTS_BATCH);
                       }}
-                      className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0 font-sans"
+                      className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-sm focus:outline-none focus:ring-0 font-sans"
                     />
                     {patientSearch && (
                       <button 
@@ -2770,35 +2743,36 @@ export default function App() {
                     )}
                   </div>
 
-                  <button
+                  <Button
+                    type="button"
+                    size="icon"
                     onClick={openAddPatientForm}
-                    className="w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm transition cursor-pointer flex items-center justify-center"
                     title="Thêm bệnh nhi mới"
                     aria-label="Thêm bệnh nhi mới"
                   >
-                    <Plus className="w-5 h-5" />
-                  </button>
+                    <Plus className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl flex flex-col shadow-sm overflow-hidden">
+              <Card className="flex-1 min-h-0 gap-0 py-0 rounded-xl shadow-sm overflow-hidden">
                 
                 <div
                   ref={patientTableScrollRef}
                   onScroll={handlePatientTableScroll}
                   className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar"
                 >
-                  <table className="w-full text-left text-xs border-collapse min-w-[720px]">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] uppercase font-black tracking-wider font-mono">
-                        <th className="py-3 px-4 shadow-sm sticky left-0 z-20 bg-slate-50 min-w-[140px]">Họ và tên bé</th>
-                        <th className="py-3 px-4 shadow-sm">Ngày sinh</th>
-                        <th className="py-3 px-4 shadow-sm">Giới tính</th>
-                        <th className="py-3 px-4 shadow-sm">Địa chỉ</th>
-                        <th className="py-3 px-4 shadow-sm">Chẩn đoán gần nhất</th>
-                        <th className="py-3 px-4 text-right shadow-sm">Chi tiết</th>
-                      </tr>
-                    </thead>
+                  <table className="w-full text-left text-sm border-collapse min-w-[720px]">
+                    <TableHeader className="sticky top-0 z-10 bg-muted/40">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="sticky left-0 z-20 bg-muted min-w-[140px]">Họ và tên bé</TableHead>
+                        <TableHead>Ngày sinh</TableHead>
+                        <TableHead>Giới tính</TableHead>
+                        <TableHead>Địa chỉ</TableHead>
+                        <TableHead>Chẩn đoán gần nhất</TableHead>
+                        <TableHead className="text-right">Chi tiết</TableHead>
+                      </TableRow>
+                    </TableHeader>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {filteredPatients.length === 0 ? (
                         <tr>
@@ -2814,10 +2788,10 @@ export default function App() {
                             <tr 
                               key={pat.PatientKey} 
                               onClick={() => setSelectedPatientForDetail(pat)}
-                              className="hover:bg-pink-50/50 cursor-pointer transition duration-150 group"
+                              className="hover:bg-muted/50 cursor-pointer transition duration-150 group border-b"
                             >
-                              <td className="py-3 px-4 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/50 shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] min-w-[140px]">
-                                <p className="font-extrabold text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat.PatientName}</p>
+                              <td className="py-3 px-4 sticky left-0 z-[5] bg-card group-hover:bg-muted shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] min-w-[140px]">
+                                <p className="font-medium text-foreground leading-tight">{pat.PatientName}</p>
                                 <p className="text-[10px] text-slate-400 mt-0.5 font-mono">Mã HS: {pat.PatientID1}</p>
                               </td>
                               <td className="py-3 px-4 font-normal text-slate-600">{formatVNTime(pat.PatientDOB)}</td>
@@ -2849,7 +2823,7 @@ export default function App() {
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <button 
-                                  className="text-slate-350 group-hover:text-[#d2145a] transition translate-x-0 group-hover:translate-x-1 duration-200"
+                                  className="text-muted-foreground group-hover:text-foreground transition translate-x-0 group-hover:translate-x-1 duration-200"
                                 >
                                   <ChevronRight className="w-4 h-4 ml-auto" />
                                 </button>
@@ -2870,11 +2844,11 @@ export default function App() {
                   </table>
                 </div>
 
-                <div className="hidden md:flex bg-slate-50 border-t border-slate-200 p-4 flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-                  <div className="text-[11px] text-slate-500 font-semibold font-mono uppercase">
+                <div className="hidden md:flex bg-muted/40 border-t border-border px-4 py-3 flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                  <div className="text-xs text-muted-foreground">
                     Tổng số: {filteredPatients.length} / {patients.length} bệnh nhi tim bẩm sinh CHD 
                     {filteredPatients.length > 0 && (
-                      <span className="text-[#d2145a] ml-1">
+                      <span className="text-foreground ml-1">
                         (Trang {patientCurrentPage} / {totalPatientPages} - Hiển thị {(patientCurrentPage - 1) * PATIENTS_PER_PAGE + 1} đến {Math.min(patientCurrentPage * PATIENTS_PER_PAGE, filteredPatients.length)})
                       </span>
                     )}
@@ -2885,14 +2859,14 @@ export default function App() {
                       <button
                         onClick={() => setPatientCurrentPage(1)}
                         disabled={patientCurrentPage === 1}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Đầu
                       </button>
                       <button
                         onClick={() => setPatientCurrentPage(p => Math.max(1, p - 1))}
                         disabled={patientCurrentPage === 1}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Trước
                       </button>
@@ -2904,14 +2878,14 @@ export default function App() {
                       <button
                         onClick={() => setPatientCurrentPage(p => Math.min(totalPatientPages, p + 1))}
                         disabled={patientCurrentPage === totalPatientPages}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Sau
                       </button>
                       <button
                         onClick={() => setPatientCurrentPage(totalPatientPages)}
                         disabled={patientCurrentPage === totalPatientPages}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Cuối
                       </button>
@@ -2919,7 +2893,7 @@ export default function App() {
                   )}
                 </div>
 
-              </div>
+              </Card>
 
             </div>
           )}
@@ -3248,20 +3222,20 @@ export default function App() {
 
           {/* ACTIVE CONSULTATION LIST (Hội chẩn split screen, Screenshot 5) */}
           {activeMenu === 'consult-list' && (
-            <div className="flex-1 min-h-0 h-full flex flex-col lg:flex-row gap-3 lg:gap-6 animate-in fade-in duration-200 w-full bg-slate-50 p-2 sm:p-4 lg:p-6 overflow-hidden">
+            <div className="flex-1 min-h-0 h-full flex flex-col lg:flex-row gap-3 w-full bg-background p-2 sm:p-4 overflow-hidden">
               
-              <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-3xl p-3 sm:p-4 lg:p-5 shadow-sm min-w-0">
+              <Card className="flex-1 min-h-0 gap-0 py-0 rounded-xl shadow-sm min-w-0 overflow-hidden flex flex-col">
                 
-                <div className="mobile-view-shell shrink-0 flex flex-col border-b border-slate-150 pb-1.5 mb-1.5">
-                  <div className="md:hidden">
-                    <h3 className="font-extrabold text-neutral-900 uppercase flex items-center gap-1.5 text-sm">
-                      <ClipboardCheck className="w-5 h-5 text-teal-600" />
+                <div className="mobile-view-shell shrink-0 flex flex-col border-b border-border px-3 py-2 md:hidden">
+                  <div>
+                    <h3 className="font-semibold text-foreground flex items-center gap-1.5 text-sm">
+                      <ClipboardCheck className="w-4 h-4" />
                       Đăng ký hội chẩn
                     </h3>
                   </div>
 
-                  <div className="flex items-center gap-1.5 md:hidden">
-                    <div className="mobile-view-search-wrap relative flex-1 min-w-0 flex items-center bg-slate-50 border border-slate-200">
+                  <div className="flex items-center gap-1.5">
+                    <div className="mobile-view-search-wrap relative flex-1 min-w-0 flex items-center bg-background border border-input">
                       <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                       <SearchTextInput
                         type="text"
@@ -3269,7 +3243,7 @@ export default function App() {
                         debounceMs={280}
                         value={consultListSearch}
                         onChange={applyConsultListSearch}
-                        className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-xs font-semibold focus:outline-none focus:ring-0 font-sans"
+                        className="mobile-view-search-input w-full pl-8 pr-8 bg-transparent border-0 text-sm focus:outline-none focus:ring-0 font-sans"
                       />
                       {consultListSearch && (
                         <button 
@@ -3282,23 +3256,26 @@ export default function App() {
                         </button>
                       )}
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="icon"
                       onClick={() => setIsFilterExpanded(true)}
-                      className="lg:hidden w-10 h-10 shrink-0 rounded-full bg-white border border-slate-200 text-[#d2145a] shadow-sm flex items-center justify-center"
+                      className="lg:hidden shrink-0"
                       title="Bộ lọc & xuất báo cáo"
                       aria-label="Bộ lọc"
                     >
                       <Filter className="w-4 h-4" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
                       onClick={openAddConsultForm}
-                      className="w-10 h-10 shrink-0 rounded-full bg-[#d2145a] hover:bg-pink-700 text-white shadow-sm flex items-center justify-center"
                       title="Đăng kí staff"
                       aria-label="Đăng kí staff"
                     >
-                      <Plus className="w-5 h-5" />
-                    </button>
+                      <Plus className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
 
@@ -3316,11 +3293,11 @@ export default function App() {
                   onScroll={handleConsultListTableScroll}
                   className="flex-1 min-h-0 overflow-x-auto overflow-y-auto custom-scrollbar"
                 >
-                  <table className="w-full text-left text-xs border-collapse min-w-[360px] md:min-w-[850px]">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-black tracking-wider font-mono">
-                        <th
-                          className="py-2.5 px-3 sticky left-0 z-20 bg-slate-50 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none cursor-pointer hover:text-[#d2145a] select-none transition-colors duration-150"
+                  <table className="w-full text-left text-sm border-collapse min-w-[360px] md:min-w-[850px]">
+                    <TableHeader className="sticky top-0 z-10 bg-muted/40">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead
+                          className="sticky left-0 z-20 bg-muted min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none cursor-pointer hover:text-foreground select-none"
                           onClick={() => {
                             setConsultSortField('name');
                             setConsultSortOrder(prev => (consultSortField === 'name' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
@@ -3331,11 +3308,11 @@ export default function App() {
                             <span>Bệnh nhi</span>
                             <SortColumnIcon active={consultSortField === 'name'} order={consultSortOrder} />
                           </div>
-                        </th>
-                        <th className="hidden md:table-cell py-2.5 px-3">Kiểu staff</th>
-                        <th className="hidden md:table-cell py-2.5 px-3">Chẩn đoán</th>
-                        <th
-                          className="py-2.5 px-3 cursor-pointer hover:text-[#d2145a] select-none transition-colors duration-150"
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell">Kiểu staff</TableHead>
+                        <TableHead className="hidden md:table-cell">Chẩn đoán</TableHead>
+                        <TableHead
+                          className="cursor-pointer hover:text-foreground select-none"
                           onClick={() => {
                             setConsultSortField('date');
                             setConsultSortOrder(prev => (consultSortField === 'date' ? (prev === 'asc' ? 'desc' : 'asc') : 'desc'));
@@ -3346,12 +3323,12 @@ export default function App() {
                             <span>Ngày staff</span>
                             <SortColumnIcon active={consultSortField === 'date'} order={consultSortOrder} />
                           </div>
-                        </th>
-                        <th className="py-2.5 px-3">BS đăng ký</th>
-                        <th className="md:hidden py-2.5 px-2 text-center w-10">Xóa</th>
-                        <th className="hidden md:table-cell py-2.5 px-3 text-right">Biên bản PDF / Kịch bản</th>
-                      </tr>
-                    </thead>
+                        </TableHead>
+                        <TableHead>BS đăng ký</TableHead>
+                        <TableHead className="md:hidden text-center w-10">Xóa</TableHead>
+                        <TableHead className="hidden md:table-cell text-right">Biên bản PDF / Kịch bản</TableHead>
+                      </TableRow>
+                    </TableHeader>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                       {filteredConsultsList.length === 0 ? (
                         <tr>
@@ -3368,13 +3345,13 @@ export default function App() {
                             <tr 
                               key={item.ConsultKey} 
                               onClick={() => makeRegisterEdit(item)}
-                              className="hover:bg-pink-50/45 cursor-pointer transition duration-150 group"
+                              className="hover:bg-muted/50 cursor-pointer transition duration-150 group border-b"
                             >
-                              <td className="py-3 px-3 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/45 min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none">
-                                <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat.PatientName}</p>
+                              <td className="py-3 px-3 sticky left-0 z-[5] bg-card group-hover:bg-muted min-w-[140px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)] md:static md:z-auto md:min-w-0 md:shadow-none">
+                                <p className="font-medium text-foreground leading-tight">{pat.PatientName}</p>
                                 <p className="text-[10px] text-slate-500 font-mono">MNB: {pat.PatientID1}</p>
                               </td>
-                              <td className="hidden md:table-cell py-3 px-3 uppercase tracking-wide font-extrabold font-mono text-[10px] text-[#d2145a]">{item.ConsultType}</td>
+                              <td className="hidden md:table-cell py-3 px-3 text-xs text-muted-foreground">{item.ConsultType}</td>
                               <td className="hidden md:table-cell py-3 px-3">
                                 <div className="flex flex-col">
                                   <span className="text-red-700 bg-red-50 border border-red-200 font-bold px-1.5 py-0.5 rounded text-[10px] font-mono w-max">{item.DiagnosisID}</span>
@@ -3434,7 +3411,7 @@ export default function App() {
                                       e.stopPropagation();
                                       makeRegisterEdit(item);
                                     }}
-                                    className="bg-slate-100 hover:bg-[#d2145a] hover:text-white border border-slate-200 font-bold px-1.5 py-1 rounded text-[10px] transition cursor-pointer"
+                                    className="bg-secondary hover:bg-primary hover:text-primary-foreground border border-border font-medium px-1.5 py-1 rounded-md text-[10px] transition cursor-pointer"
                                     title="Sửa"
                                   >
                                     ✏️
@@ -3470,7 +3447,7 @@ export default function App() {
                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 mb-4 space-y-1.5">
                           {pat && (
                             <p className="font-bold text-slate-800">
-                              Bệnh nhi: <span className="font-extrabold text-[#d2145a] uppercase">{pat.PatientName}</span>
+                              Bệnh nhi: <span className="font-semibold text-foreground">{pat.PatientName}</span>
                             </p>
                           )}
                           {consultToDelete && (
@@ -3522,11 +3499,11 @@ export default function App() {
                 )}
 
                 {/* Pagination footer — desktop only */}
-                <div className="hidden lg:flex shrink-0 bg-slate-50 border border-slate-200 mt-4 rounded-2xl p-4 flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-                  <div className="text-[11px] text-slate-500 font-semibold font-mono uppercase">
+                <div className="hidden lg:flex shrink-0 bg-muted/40 border-t border-border px-4 py-3 flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-xs text-muted-foreground">
                     Tổng số: {filteredConsultsList.length} / {consults.length} đợt hội chẩn
                     {filteredConsultsList.length > 0 && (
-                      <span className="text-[#d2145a] ml-1">
+                      <span className="text-foreground ml-1">
                         (Trang {consultCurrentPage}/{totalConsultPages} - Hiển thị {(consultCurrentPage - 1) * CONSULTS_PER_PAGE + 1} đến {Math.min(consultCurrentPage * CONSULTS_PER_PAGE, filteredConsultsList.length)})
                       </span>
                     )}
@@ -3537,14 +3514,14 @@ export default function App() {
                       <button
                         onClick={() => setConsultCurrentPage(1)}
                         disabled={consultCurrentPage === 1}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Đầu
                       </button>
                       <button
                         onClick={() => setConsultCurrentPage(p => Math.max(1, p - 1))}
                         disabled={consultCurrentPage === 1}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Trước
                       </button>
@@ -3556,14 +3533,14 @@ export default function App() {
                       <button
                         onClick={() => setConsultCurrentPage(p => Math.min(totalConsultPages, p + 1))}
                         disabled={consultCurrentPage === totalConsultPages}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Sau
                       </button>
                       <button
                         onClick={() => setConsultCurrentPage(totalConsultPages)}
                         disabled={consultCurrentPage === totalConsultPages}
-                        className="px-2 py-1 rounded text-[10px] uppercase font-bold bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Cuối
                       </button>
@@ -3571,7 +3548,7 @@ export default function App() {
                   )}
                 </div>
 
-              </div>
+              </Card>
 
               {/* Mobile filter sheet */}
               {isFilterExpanded && (
@@ -3582,13 +3559,13 @@ export default function App() {
                     aria-label="Đóng bộ lọc"
                     onClick={() => setIsFilterExpanded(false)}
                   />
-                  <div className="absolute inset-x-0 bottom-0 max-h-[min(70dvh,480px)] bg-white rounded-t-3xl shadow-2xl border border-slate-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] overflow-y-auto">
-                    <div className="flex items-center justify-between border-b border-slate-150 pb-2 mb-4">
+                  <div className="absolute inset-x-0 bottom-0 max-h-[min(70dvh,480px)] bg-background rounded-t-xl shadow-lg border border-border p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] overflow-y-auto">
+                    <div className="flex items-center justify-between border-b border-border pb-2 mb-4">
                       <div className="flex items-center gap-1.5">
-                        <Filter className="w-4 h-4 text-[#d2145a]" />
-                        <h4 className="font-extrabold uppercase text-[10px] text-neutral-900 tracking-wider">Bộ lọc &amp; Xuất báo cáo</h4>
+                        <Filter className="w-4 h-4 text-foreground" />
+                        <h4 className="font-semibold text-sm text-foreground">Bộ lọc &amp; Xuất báo cáo</h4>
                       </div>
-                      <button type="button" onClick={() => setIsFilterExpanded(false)} className="p-1 text-slate-400 hover:text-[#d2145a]">
+                      <button type="button" onClick={() => setIsFilterExpanded(false)} className="p-1 text-muted-foreground hover:text-foreground">
                         <X className="w-5 h-5" />
                       </button>
                     </div>
@@ -3647,25 +3624,25 @@ export default function App() {
               {!isFilterExpanded ? (
                 <div 
                   onClick={() => setIsFilterExpanded(true)}
-                  className="hidden lg:flex bg-white hover:bg-slate-50 border border-slate-200 rounded-3xl p-3 flex-col items-center justify-start pt-8 gap-2 cursor-pointer shadow-sm w-14 shrink-0 group transition-all duration-200"
+                  className="hidden lg:flex bg-card hover:bg-accent border border-border rounded-xl p-3 flex-col items-center justify-start pt-8 gap-2 cursor-pointer shadow-sm w-14 shrink-0 group transition-all duration-200"
                   title="Mở rộng bộ lọc"
                 >
-                  <Filter className="w-5 h-5 text-[#d2145a] group-hover:scale-110 transition-transform" />
+                  <Filter className="w-5 h-5 text-foreground group-hover:scale-110 transition-transform" />
                   <ChevronLeft className="w-4 h-4 text-slate-400" />
                   <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500 [writing-mode:vertical-lr] rotate-180">
                     Mở bộ lọc &amp; xuất báo cáo
                   </span>
                 </div>
               ) : (
-                <div className="hidden lg:flex bg-white border border-slate-200 rounded-3xl p-5 flex-col shadow-sm text-xs font-semibold text-slate-700 w-[280px] shrink-0 h-full min-h-0 animate-in slide-in-from-right-4 duration-200">
-                  <div className="flex items-center justify-between border-b border-slate-150 pb-2 mb-4 shrink-0">
+                <div className="hidden lg:flex bg-card border border-border rounded-xl p-4 flex-col shadow-sm text-sm text-foreground w-[280px] shrink-0 h-full min-h-0">
+                  <div className="flex items-center justify-between border-b border-border pb-2 mb-4 shrink-0">
                     <div className="flex items-center gap-1.5">
-                      <Filter className="w-4 h-4 text-[#d2145a]" />
-                      <h4 className="font-extrabold uppercase text-[10px] text-neutral-900 tracking-wider">Bộ lọc &amp; Xuất báo cáo</h4>
+                      <Filter className="w-4 h-4 text-foreground" />
+                      <h4 className="font-semibold text-sm text-foreground">Bộ lọc &amp; Xuất báo cáo</h4>
                     </div>
                     <button
                       onClick={() => setIsFilterExpanded(false)}
-                      className="p-1 text-slate-400 hover:text-[#d2145a] hover:bg-slate-100 rounded-lg transition"
+                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition"
                       title="Thu gọn bộ lọc"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -4696,7 +4673,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Footer bar */}
-      <footer className="hidden md:block bg-slate-900 border-t border-slate-800 text-slate-400 text-[10px] py-1.5 shrink-0 text-center font-medium font-sans">
+      <footer className="hidden md:block bg-muted border-t border-border text-muted-foreground text-[10px] py-1.5 shrink-0 text-center font-medium font-sans">
         <span>© 2026 CHD Management v5.0 | Bệnh viện Tim Tim Mạch &amp; Khoa Phẫu Thuật Tim Nhi (Google Sheets &amp; PDF Sync)</span>
       </footer>
 
@@ -4737,6 +4714,7 @@ export default function App() {
         loadWhenReady={medicalDataLoadState.phase === 'ready'}
       />
 
+      </SidebarInset>
     </div>
     </ViewSubheaderProvider>
     </SheetsSyncFeedbackProvider>

@@ -77,14 +77,14 @@ export default function BellNotificationMenu({
       <button
         type="button"
         onClick={onToggle}
-        className={`relative border p-1.5 rounded-xl text-white transition ${
-          isOpen ? 'bg-white/20 border-white/30' : 'bg-white/10 border-white/15 hover:bg-white/15'
+        className={`relative border p-1.5 rounded-md text-foreground transition ${
+          isOpen ? 'bg-accent border-border' : 'bg-background border-border hover:bg-accent'
         }`}
         title="Thông báo"
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-yellow-300 text-[#d2145a] text-[9px] font-black flex items-center justify-center shadow">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-medium flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

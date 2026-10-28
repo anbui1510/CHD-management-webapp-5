@@ -27,11 +27,11 @@ export default function MobileMoreMenu({
         aria-label="Đóng menu"
         onClick={onClose}
       />
-      <div className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,640px)] bg-white rounded-t-3xl shadow-2xl border border-slate-200 flex flex-col pb-[var(--mobile-safe-bottom)]">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
+      <div className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,640px)] bg-background rounded-t-xl shadow-lg border border-border flex flex-col pb-[var(--mobile-safe-bottom)]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div>
-            <p className="text-sm font-black text-slate-800 uppercase tracking-wide">Thêm module</p>
-            <p className="text-[10px] text-slate-400 font-medium">Chọn module — sẽ ghim vào thanh dưới</p>
+            <p className="text-sm font-semibold text-foreground">Thêm module</p>
+            <p className="text-xs text-muted-foreground">Chọn module — sẽ ghim vào thanh dưới</p>
           </div>
           <button
             type="button"
@@ -51,13 +51,13 @@ export default function MobileMoreMenu({
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-left transition ${
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-md text-left transition ${
                   active
-                    ? 'bg-pink-50 text-[#d2145a] border border-pink-100'
-                    : 'text-slate-700 hover:bg-slate-50 border border-transparent'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-foreground hover:bg-muted'
                 }`}
               >
-                <span className={active ? 'text-[#d2145a]' : 'text-slate-400'}>
+                <span className={active ? 'text-foreground' : 'text-muted-foreground'}>
                   {getNavIcon(item.id, 'w-5 h-5')}
                 </span>
                 <span className="text-sm font-semibold">{item.label}</span>
