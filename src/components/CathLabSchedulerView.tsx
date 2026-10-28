@@ -201,8 +201,8 @@ const DELAY_TAB_STYLES: Record<
     badgeActive: 'bg-rose-100 text-rose-800',
   },
   delayRedFilled: {
-    active: 'bg-[#d2145a] text-white shadow-xs',
-    badgeActive: 'bg-pink-100 text-[#d2145a]',
+    active: 'bg-primary text-white shadow-xs',
+    badgeActive: 'bg-pink-100 text-primary',
   },
   delayBlack: {
     active: 'bg-slate-900 text-white shadow-xs',
@@ -2953,7 +2953,7 @@ Xin cảm ơn!`;
           onClick={() => requestMobileTabChange('calendar')}
           className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10.5px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
             mobileTab === 'calendar'
-              ? 'bg-[#d2145a] text-white shadow-xs'
+              ? 'bg-primary text-white shadow-xs'
               : 'bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600'
           }`}
         >
@@ -3011,14 +3011,14 @@ Xin cảm ơn!`;
           <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-4 min-h-0 overflow-hidden">
         
         {/* LEFT COLUMN: Waiting Queue Table */}
-        <div className={`flex-1 lg:flex-initial flex flex-col bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-0 ${pureCalendarMode ? 'hidden' : isDeviceFilterExpanded ? 'hidden' : 'lg:col-span-6'} ${mobileTab === 'waitlist' && !isDeviceFilterExpanded ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex-1 lg:flex-initial flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-0 ${pureCalendarMode ? 'hidden' : isDeviceFilterExpanded ? 'hidden' : 'lg:col-span-6'} ${mobileTab === 'waitlist' && !isDeviceFilterExpanded ? 'flex' : 'hidden lg:flex'}`}>
           
           <div className="hidden lg:flex p-4 border-b border-slate-100 bg-slate-50 shrink-0 items-center justify-between gap-2">
             <div>
               <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide">
                 Danh sách chờ xếp lịch
               </h3>
-              <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
+              <p className="text-[9px] text-primary font-bold uppercase mt-0.5">
                 Tổng cộng: {allEligibleWaitlist.length} ca hợp lệ trong hệ thống (C:{consults.length}, P:{patients.length}, M:{latestConsultsMap.size})
               </p>
             </div>
@@ -3049,13 +3049,13 @@ Xin cảm ơn!`;
               onClick={() => setActiveTab('unscheduled')}
               className={`shrink-0 lg:flex-1 lg:min-w-[120px] py-2 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'unscheduled'
-                  ? 'bg-[#d2145a] text-white shadow-xs'
+                  ? 'bg-primary text-white shadow-xs'
                   : 'bg-white hover:bg-slate-100/70 border border-slate-200 text-slate-600'
               }`}
             >
               Chưa xếp lịch
               <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
-                activeTab === 'unscheduled' ? 'bg-pink-100 text-[#d2145a]' : 'bg-slate-100 text-slate-600'
+                activeTab === 'unscheduled' ? 'bg-pink-100 text-primary' : 'bg-slate-100 text-slate-600'
               }`}>
                 {segmentedWaitlist.unscheduled.length}
               </span>
@@ -3652,7 +3652,7 @@ Xin cảm ơn!`;
               ? { maxHeight: `${mobileEditorPanelMaxHeight}px` }
               : undefined
           }
-          className={`flex-1 lg:flex-initial flex flex-col rounded-3xl shadow-sm min-h-0 ${
+          className={`flex-1 lg:flex-initial flex flex-col rounded-xl shadow-sm min-h-0 ${
             mobileEditorActive ? 'overflow-hidden' : 'overflow-y-auto lg:overflow-hidden'
           } ${pureCalendarMode ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : isDeviceFilterExpanded ? 'lg:col-span-12 bg-white border border-[#e2e8f0]' : 'lg:col-span-6 bg-white border border-[#e2e8f0]'} ${(mobileTab === 'calendar' || mobileTab === 'editor' || isDeviceFilterExpanded) ? 'flex' : 'hidden lg:flex'}`}
         >
@@ -3667,7 +3667,7 @@ Xin cảm ơn!`;
               <div className="p-2 lg:p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-2 lg:gap-3 shrink-0">
                 <div className="hidden lg:block">
                   <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-[#d2145a]" />
+                    <Calendar className="w-4 h-4 text-primary" />
                     Lịch thông tim dự kiến
                   </h3>
                 </div>
@@ -3697,7 +3697,7 @@ Xin cảm ơn!`;
                   
                   <button 
                     onClick={jumpToToday}
-                    className="bg-white border border-slate-200 text-[#d2145a] font-extrabold text-[10px] py-1 px-3 rounded-xl hover:bg-slate-50 cursor-pointer transition"
+                    className="bg-white border border-slate-200 text-primary font-extrabold text-[10px] py-1 px-3 rounded-xl hover:bg-slate-50 cursor-pointer transition"
                   >
                     Hôm nay
                   </button>
@@ -3732,7 +3732,7 @@ Xin cảm ơn!`;
                 {calendarView === 'month' && (
                   <div className="flex flex-col bg-white shrink-0 lg:shrink lg:flex-1 lg:min-h-0">
                     {/* Day Headers (Vietnamese abbreviations) */}
-                    <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[#d2145a] text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl shrink-0">
+                    <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-primary text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl shrink-0">
                       <div>T2</div>
                       <div>T3</div>
                       <div>T4</div>
@@ -3756,12 +3756,12 @@ Xin cảm ơn!`;
                             key={`${cell.dateStr}-${idx}`}
                             className={`min-h-[60px] lg:min-h-[90px] xl:min-h-[100px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-start transition ${
                               cell.isCurrentMonth ? 'text-slate-800' : 'bg-slate-50/40 text-slate-300 pointer-events-none opacity-45'
-                            } ${cell.isToday ? 'bg-[#d2145a]/5 border-[#d2145a]/30' : ''}`}
+                            } ${cell.isToday ? 'bg-primary/5 border-primary/30' : ''}`}
                           >
                             {/* Day Number inside the cell */}
                             <div className="text-right shrink-0">
                               {cell.isToday ? (
-                                <span className="bg-[#d2145a] text-white font-black text-[10px] w-5 h-5 inline-flex items-center justify-center rounded-full shadow-xs">
+                                <span className="bg-primary text-white font-black text-[10px] w-5 h-5 inline-flex items-center justify-center rounded-full shadow-xs">
                                   {cell.day}
                                 </span>
                               ) : (
@@ -3805,7 +3805,7 @@ Xin cảm ơn!`;
                 {/* 2. WEEKLY VIEW */}
                 {calendarView === 'week' && (
                   <div className="flex-1 flex flex-col bg-white">
-                    <div className="grid grid-cols-7 gap-1.5 text-center font-extrabold text-[#d2145a] text-[10px] uppercase py-2 bg-slate-50 border border-slate-200 rounded-t-2xl">
+                    <div className="grid grid-cols-7 gap-1.5 text-center font-extrabold text-primary text-[10px] uppercase py-2 bg-slate-50 border border-slate-200 rounded-t-2xl">
                       <div>T2</div>
                       <div>T3</div>
                       <div>T4</div>
@@ -3825,13 +3825,13 @@ Xin cảm ơn!`;
                           <div
                             key={`${cell.dateStr}-${idx}`}
                             className={`min-h-[160px] p-2 rounded-xl bg-white border border-slate-200 flex flex-col transition ${
-                              cell.isToday ? 'bg-[#d2145a]/5 ring-1 ring-[#d2145a]/20' : ''
+                              cell.isToday ? 'bg-primary/5 ring-1 ring-primary/20' : ''
                             }`}
                           >
                             <div className="border-b border-slate-100 pb-1 flex justify-between items-center mb-1">
                               <span className="font-bold text-[9px] text-slate-400 font-mono">{cell.dateStr.substring(5)}</span>
                               {cell.isToday ? (
-                                <span className="bg-[#d2145a] text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-md">TODAY</span>
+                                <span className="bg-primary text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-md">TODAY</span>
                               ) : (
                                 <span className="font-extrabold font-mono text-[11px] text-slate-800">{cell.day}</span>
                               )}
@@ -3941,7 +3941,7 @@ Xin cảm ơn!`;
                     <span>←</span>
                     <span className="hidden lg:inline"> Quay lại Lịch Tháng</span>
                   </button>
-                  <span className="hidden lg:inline-block bg-[#d2145a] text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-xs select-none mr-2">
+                  <span className="hidden lg:inline-block bg-primary text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-xs select-none mr-2">
                     Xếp lịch
                   </span>
                 </div>
@@ -3970,7 +3970,7 @@ Xin cảm ơn!`;
 
                       {/* Patient name highlight — tách khỏi ô hành chính */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="bg-[#d2145a] border-2 border-[#d2145a] rounded-2xl px-4 py-3 shadow-sm">
+                        <div className="bg-primary border-2 border-primary rounded-2xl px-4 py-3 shadow-sm">
                           <span className="font-black text-white uppercase text-sm sm:text-base tracking-wide block whitespace-normal break-words leading-snug">
                             {pat.PatientName}
                           </span>
@@ -4114,7 +4114,7 @@ Xin cảm ơn!`;
                         {/* Cột phải: chuẩn bị dụng cụ, xếp lịch */}
                         <div className="space-y-2">
                 <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-xs space-y-2">
-                  <span className="font-extrabold text-[#d2145a] text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                  <span className="font-extrabold text-primary text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     CHUẨN BỊ DỤNG CỤ
                   </span>
 
@@ -4198,7 +4198,7 @@ Xin cảm ơn!`;
                 {/* Part 5: XẾP LỊCH */}
                 {checkDevice !== 'Thiếu' && (
                   <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-xs space-y-2">
-                    <span className="font-extrabold text-[#d2145a] text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                    <span className="font-extrabold text-primary text-[10.5px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                       XẾP LỊCH
                     </span>
 
@@ -4244,7 +4244,7 @@ Xin cảm ơn!`;
                       {showConfirmRemoveDialog && (
                         <div className="md:col-span-2 bg-rose-50 border border-rose-200 p-3.5 rounded-2xl flex flex-col gap-2.5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
                           <p className="text-xs font-bold text-rose-900 leading-normal flex items-start gap-2">
-                            <AlertTriangle className="w-4.5 h-4.5 text-[#d2145a] shrink-0 mt-0.5" />
+                            <AlertTriangle className="w-4.5 h-4.5 text-primary shrink-0 mt-0.5" />
                             <span>Bạn đã chọn <strong>"{callStatus}"</strong>. <br/>BN sẽ loại khỏi view "Xếp lịch" và đưa về View "Lưu trữ". Bạn có chắc chắn không?</span>
                           </p>
                           <div className="flex gap-2 justify-end">
@@ -4259,7 +4259,7 @@ Xin cảm ơn!`;
                                type="button"
                                onClick={handleConfirmRemove}
                                disabled={saving}
-                               className="bg-[#d2145a] hover:bg-rose-700 text-white px-4.5 py-1 rounded-xl font-black text-[10.5px] cursor-pointer transition shadow-xs disabled:opacity-50"
+                               className="bg-primary hover:bg-rose-700 text-white px-4.5 py-1 rounded-xl font-black text-[10.5px] cursor-pointer transition shadow-xs disabled:opacity-50"
                             >
                                {saving ? 'Đang lưu...' : 'Có, Loại bỏ'}
                             </button>
@@ -4429,7 +4429,7 @@ Xin cảm ơn!`;
                             onViewPatientRecord(pat);
                           }
                         }}
-                        className="bg-indigo-50 hover:bg-indigo-100 text-[#d2145a] border border-indigo-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                        className="bg-indigo-50 hover:bg-indigo-100 text-primary border border-indigo-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
                       >
                         <Heart className="w-3.5 h-3.5" /> Hồ sơ
                       </button>
@@ -4451,7 +4451,7 @@ Xin cảm ơn!`;
                       <button
                         type="button"
                         onClick={() => handleOpenSmsModal(pat)}
-                        className="bg-rose-50 hover:bg-rose-100 text-[#d2145a] border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
+                        className="bg-rose-50 hover:bg-rose-100 text-primary border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 shrink-0 shadow-xs cursor-pointer"
                       >
                         <PhoneCall className="w-3.5 h-3.5" /> SMS
                       </button>
@@ -4492,7 +4492,7 @@ Xin cảm ơn!`;
                             onViewPatientRecord(pat);
                           }
                         }}
-                        className="bg-indigo-50 hover:bg-indigo-100 text-[#d2145a] border border-indigo-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
+                        className="bg-indigo-50 hover:bg-indigo-100 text-primary border border-indigo-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
                         title="Xem hồ sơ bệnh án chi tiết trong danh sách bệnh nhi"
                       >
                         <Heart className="w-3.5 h-3.5" /> Xem hồ sơ
@@ -4517,7 +4517,7 @@ Xin cảm ơn!`;
                       <button
                         type="button"
                         onClick={() => handleOpenSmsModal(pat)}
-                        className="bg-rose-50 hover:bg-rose-100 text-[#d2145a] border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
+                        className="bg-rose-50 hover:bg-rose-100 text-primary border border-rose-200 font-bold text-[10.5px] px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
                         title="Tạo nội dung SMS thông báo kết quả hội chẩn và lịch can thiệp để copy gửi thân nhân"
                       >
                         <PhoneCall className="w-3.5 h-3.5" /> Gửi tin nhắn SMS
@@ -4749,10 +4749,10 @@ Xin cảm ơn!`;
           )}
 
           {/* Export Schedule Panel */}
-          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
+          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isFilterExpanded ? (
               <div 
-                className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl"
+                className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-xl"
                 onClick={() => {
                   setIsFilterExpanded(true);
                   setIsDeviceFilterExpanded(false);
@@ -4769,7 +4769,7 @@ Xin cảm ơn!`;
               </div>
             ) : (
               <div className="flex flex-col relative h-full min-h-0">
-                <div className="p-4 border-b border-slate-100 bg-[#b31448] text-white rounded-t-3xl flex justify-between items-center shrink-0">
+                <div className="p-4 border-b border-slate-100 bg-[#b31448] text-white rounded-t-xl flex justify-between items-center shrink-0">
                   <h3 className="font-black text-[12px] uppercase tracking-wider flex items-center gap-2">
                     <Filter className="w-4 h-4" /> BỘ LỌC XUẤT LỊCH
                   </h3>
@@ -4803,7 +4803,7 @@ Xin cảm ơn!`;
                 <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-3xl space-y-3">
                   <p className="text-[10px] font-semibold text-slate-500 flex justify-between">
                     <span>Tổng số ca tìm thấy:</span>
-                    <span className="font-black text-[#d2145a] text-[12px]">{exportFilteredConsults.length}</span>
+                    <span className="font-black text-primary text-[12px]">{exportFilteredConsults.length}</span>
                   </p>
                   {errorMsg && (
                     <div className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 text-[10px] rounded flex items-center gap-1">
@@ -4823,9 +4823,9 @@ Xin cảm ơn!`;
           </div>
 
           {/* Device Export Panel */}
-          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isDeviceFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
+          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col ${isDeviceFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isDeviceFilterExpanded ? (
-               <div className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-3xl" onClick={() => { setIsDeviceFilterExpanded(true); setIsFilterExpanded(false); requestMobileTabChange('calendar'); }}>
+               <div className="flex flex-col items-center py-5 cursor-pointer hover:bg-slate-50 transition rounded-xl" onClick={() => { setIsDeviceFilterExpanded(true); setIsFilterExpanded(false); requestMobileTabChange('calendar'); }}>
                  <div className="bg-slate-100 p-2.5 rounded-2xl text-slate-500 mb-6 hover:bg-[#0d9488] hover:text-white transition">
                    <Filter className="w-5 h-5" />
                  </div>
@@ -4837,7 +4837,7 @@ Xin cảm ơn!`;
                </div>
             ) : (
                <div className="flex flex-col relative h-full min-h-0">
-                 <div className="p-4 border-b border-slate-100 bg-[#0d9488] text-white rounded-t-3xl flex justify-between items-center shrink-0">
+                 <div className="p-4 border-b border-slate-100 bg-[#0d9488] text-white rounded-t-xl flex justify-between items-center shrink-0">
                     <h3 className="font-black text-[12px] uppercase tracking-wider flex items-center gap-2">
                       <Filter className="w-4 h-4" /> BỘ LỌC DUYỆT DỤNG CỤ
                     </h3>
@@ -5031,7 +5031,7 @@ Xin cảm ơn!`;
                <button onClick={() => setActionConfirm(null)} className="px-4 py-2 font-bold text-xs bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition shadow-sm cursor-pointer">
                   {actionConfirm.useCoKhong ? 'Không' : 'Hủy bỏ'}
                </button>
-               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' || actionConfirm.type === 'loai_row' ? 'bg-[#d2145a] hover:bg-rose-700' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-600 hover:bg-emerald-700' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
+               <button onClick={handleExecuteActionConfirm} disabled={saving} className={`px-4 py-2 font-bold text-xs text-white rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer ${actionConfirm.type === 'loai' || actionConfirm.type === 'loai_row' ? 'bg-primary hover:bg-rose-700' : actionConfirm.type === 'save_schedule' ? 'bg-emerald-600 hover:bg-emerald-700' : actionConfirm.type === 'ad_hoc_override' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
                   {saving ? 'Đang thực hiện...' : actionConfirm.useCoKhong ? 'Có' : actionConfirm.type === 'save_schedule' ? 'Đồng ý lưu' : 'Đồng ý'}
                </button>
             </div>
@@ -5174,10 +5174,10 @@ Xin cảm ơn!`;
             if (!pat) return null;
             const hasPhone = Boolean(pat.PatientPhone1 || pat.PatientPhone2);
             return (
-              <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-4 border-b border-slate-200 bg-rose-50/60 flex items-center justify-between text-[#d2145a] shrink-0">
+              <div className="bg-white rounded-xl max-w-2xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-4 border-b border-slate-200 bg-rose-50/60 flex items-center justify-between text-primary shrink-0">
                   <div className="flex items-center gap-2.5">
-                    <div className="bg-white text-[#d2145a] rounded-xl p-2 border border-rose-100 shadow-xs">
+                    <div className="bg-white text-primary rounded-xl p-2 border border-rose-100 shadow-xs">
                       <PhoneCall className="w-5 h-5" />
                     </div>
                     <div>
@@ -5245,7 +5245,7 @@ Xin cảm ơn!`;
                     type="button"
                     onClick={handleCopySmsMessage}
                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none ${
-                      smsCopied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#d2145a] hover:bg-pink-700'
+                      smsCopied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary hover:bg-pink-700'
                     }`}
                   >
                     <Clipboard className="w-3.5 h-3.5 shrink-0" />
@@ -5261,7 +5261,7 @@ Xin cảm ơn!`;
       {/* AD-HOC SCHEDULING MODAL (XẾP BỔ SUNG) */}
       {showAdHocModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-3 overflow-hidden animate-in fade-in duration-200">
-          <div className="bg-slate-50 rounded-3xl shadow-2xl border border-slate-205 w-full max-w-[min(1800px,99vw)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[94vh]">
+          <div className="bg-slate-50 rounded-xl shadow-2xl border border-slate-205 w-full max-w-[min(1800px,99vw)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-250 max-h-[94vh]">
             
             {/* Modal Header */}
             <div className="py-3 px-5 bg-indigo-900 text-white flex justify-between items-center shrink-0">
@@ -5306,7 +5306,7 @@ Xin cảm ơn!`;
                             handleClearSelectedPatient();
                             setAdHocPendingConsult(null);
                           }}
-                          className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-3 py-1 rounded-lg text-[11px] transition flex items-center gap-1 cursor-pointer"
+                          className="bg-primary/10 hover:bg-primary/20 text-primary font-extrabold px-3 py-1 rounded-lg text-[11px] transition flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3 h-3" /> Mới
                         </button>
@@ -5340,7 +5340,7 @@ Xin cảm ơn!`;
                                       key={pat.PatientKey}
                                       type="button"
                                       onClick={() => handleSelectPatient(pat)}
-                                      className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"
+                                      className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-primary"
                                     >
                                       <div>
                                         <span className="font-extrabold uppercase">{pat.PatientName}</span>
@@ -5367,7 +5367,7 @@ Xin cảm ơn!`;
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
-                              <p className="font-black text-[11px] uppercase text-[#d2145a] pr-6 leading-tight">
+                              <p className="font-black text-[11px] uppercase text-primary pr-6 leading-tight">
                                 {adHocPatientName} <span className="text-[9px] font-mono normal-case text-slate-500">({adHocPatientSex})</span>
                               </p>
                               <div className="mt-1 space-y-0.5 text-[10px]">
@@ -5426,7 +5426,7 @@ Xin cảm ơn!`;
                   {/* COLUMN 2: THÔNG TIN HỘI CHẨN */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 shadow-sm">
                       <div className="border-b border-slate-100 pb-2">
-                        <span className="text-xs font-black uppercase text-[#d2145a] tracking-wider">
+                        <span className="text-xs font-black uppercase text-primary tracking-wider">
                           2. Thông tin hội chẩn
                         </span>
                       </div>
@@ -5442,7 +5442,7 @@ Xin cảm ơn!`;
                                   type="button"
                                   onClick={() => setAdHocConsultType(type)}
                                   className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
-                                    active ? 'bg-[#d2145a] border-[#d2145a] text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    active ? 'bg-primary border-primary text-white' : 'bg-slate-50 border-slate-200 text-slate-600'
                                   }`}
                                 >
                                   {type}
@@ -5482,7 +5482,7 @@ Xin cảm ơn!`;
                           <SearchableEnumSelect required options={diagnosisOptions} value={adHocDiagnosisID} onChange={(value) => { clearAdHocFieldError('DiagnosisID'); setAdHocDiagnosisID(normalizeDiagnosisID(value)); }} allowCreate createLabel={(value) => `Thêm DiagnosisID "${value}" vào Source`} onCreateOption={createDiagnosisSource} placeholder="— Chọn ICD —" searchPlaceholder="Gõ ICD..." className={adHocHasError('DiagnosisID') ? '[&>button]:border-rose-500 [&>button]:bg-rose-50 [&>button]:ring-2 [&>button]:ring-rose-200' : ''} />
                         ), { fieldKey: 'DiagnosisID' })}
                         {renderAdHocRow('Ưu tiên *', (
-                          <select value={adHocPriorityOrder} onChange={(e) => setAdHocPriorityOrder(e.target.value as any)} className={`${adHocSelectCls} text-[#d2145a]`}>
+                          <select value={adHocPriorityOrder} onChange={(e) => setAdHocPriorityOrder(e.target.value as any)} className={`${adHocSelectCls} text-primary`}>
                             {PRIORITY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
                         ))}
@@ -5538,7 +5538,7 @@ Xin cảm ơn!`;
                           <MobileAutoExpandTextarea minRows={2} placeholder="Phòng vật tư phản hồi..." value={adHocSupplyDepFeedback} onChange={(e) => setAdHocSupplyDepFeedback(e.target.value)} className={adHocInputCls} />
                         ), { alignTop: true })}
                         {renderAdHocRow('Trạng thái gọi bệnh', (
-                          <select value={adHocCallStatus} onChange={(e) => setAdHocCallStatus(e.target.value)} className={`${adHocSelectCls} text-[#d2145a]`}>
+                          <select value={adHocCallStatus} onChange={(e) => setAdHocCallStatus(e.target.value)} className={`${adHocSelectCls} text-primary`}>
                             <option value="">— Chưa gọi —</option>
                             {CALL_STATUS_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                           </select>

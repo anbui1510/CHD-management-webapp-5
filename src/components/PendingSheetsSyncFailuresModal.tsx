@@ -21,7 +21,7 @@ export default function PendingSheetsSyncFailuresModal({
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-rose-100 space-y-4 font-sans max-h-[85vh] overflow-y-auto"
+          className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl border border-rose-100 space-y-4 font-sans max-h-[85vh] overflow-y-auto"
         >
           <div className="flex items-start gap-3">
             <div className="bg-rose-50 text-rose-600 rounded-full w-11 h-11 flex items-center justify-center shrink-0">
@@ -51,7 +51,7 @@ export default function PendingSheetsSyncFailuresModal({
           <button
             type="button"
             onClick={onAcknowledgeAll}
-            className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
+            className="w-full bg-primary hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
           >
             Đã hiểu — tiếp tục sử dụng app
           </button>

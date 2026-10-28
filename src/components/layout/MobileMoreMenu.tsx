@@ -53,11 +53,11 @@ export default function MobileMoreMenu({
                 onClick={() => onNavigate(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-3 rounded-md text-left transition ${
                   active
-                    ? 'bg-accent text-accent-foreground'
+                    ? 'bg-accent text-primary'
                     : 'text-foreground hover:bg-muted'
                 }`}
               >
-                <span className={active ? 'text-foreground' : 'text-muted-foreground'}>
+                <span className={active ? 'text-primary' : 'text-muted-foreground'}>
                   {getNavIcon(item.id, 'w-5 h-5')}
                 </span>
                 <span className="text-sm font-semibold">{item.label}</span>

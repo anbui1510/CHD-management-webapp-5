@@ -236,7 +236,7 @@ export default function CategorySettingsPanel({
     );
 
     return (
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col h-[520px] transition-all hover:shadow-md">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col h-[520px] transition-all hover:shadow-md">
         <div className="mb-3">
           <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center justify-between">
             <span>{title}</span>
@@ -445,7 +445,7 @@ export default function CategorySettingsPanel({
           type="button"
           onClick={handleSaveAll}
           disabled={saving}
-          className="bg-[#d2145a] hover:bg-pink-700 text-white rounded-xl px-5 py-2 text-xs font-extrabold transition shadow-md shadow-pink-900/10 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          className="bg-primary hover:bg-pink-700 text-white rounded-xl px-5 py-2 text-xs font-extrabold transition shadow-md shadow-pink-900/10 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
         >
           <Save className="w-3.5 h-3.5" /> {saving ? 'Đang lưu đồng bộ...' : 'Lưu & Đồng bộ lên Sheets'}
         </button>

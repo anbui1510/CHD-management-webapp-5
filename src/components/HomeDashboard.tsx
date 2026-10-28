@@ -123,7 +123,7 @@ const isDateWithinRange = (dateValue: string | undefined, startDate: string, end
   return !!dateKey && dateKey >= startDate && dateKey <= endDate;
 };
 
-const PIE_COLORS = ['#171717', '#404040', '#737373', '#a3a3a3', '#2563eb', '#1d4ed8', '#525252'];
+const PIE_COLORS = ['#d2145a', '#9f1239', '#fb7185', '#fda4af', '#be185d', '#e11d48', '#881337'];
 
 type PieMetric = 'diagnosis' | 'second_operator' | 'request_by' | 'cath_method';
 type PiePeriodMode = 'all' | 'month' | 'quarter' | 'year';

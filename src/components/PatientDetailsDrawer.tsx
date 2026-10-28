@@ -136,10 +136,10 @@ export default function PatientDetailsDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="patient-details-drawer-title"
-        className="relative bg-white w-full max-w-2xl max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[90vh] rounded-3xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-250 overflow-hidden min-h-0"
+        className="relative bg-white w-full max-w-2xl max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[90vh] rounded-xl shadow-2xl flex flex-col z-50 animate-in zoom-in-95 duration-250 overflow-hidden min-h-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
+        <div className="bg-primary text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0 rounded-t-xl">
           <div className="flex items-center gap-2">
             <UserSquare2 className="w-5 h-5" />
             <h3 id="patient-details-drawer-title" className="font-extrabold text-sm tracking-wide uppercase">Hồ sơ chi tiết bệnh nhi</h3>
@@ -156,11 +156,11 @@ export default function PatientDetailsDrawer({
         >
           <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 border border-slate-150 rounded-2xl shadow-sm">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="hidden md:flex w-14 h-14 rounded-full bg-pink-100 border-2 border-pink-200 text-[#d2145a] items-center justify-center font-bold text-xl uppercase shadow-inner shrink-0">
+              <div className="hidden md:flex w-14 h-14 rounded-full bg-pink-100 border-2 border-pink-200 text-primary items-center justify-center font-bold text-xl uppercase shadow-inner shrink-0">
                 {patient.PatientSex === 'Nam' ? '👦' : '👧'}
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-mono tracking-wider font-extrabold text-[#d2145a] bg-pink-50 border border-pink-200 rounded px-1.5 py-0.5">
+                <span className="text-[10px] uppercase font-mono tracking-wider font-extrabold text-primary bg-pink-50 border border-pink-200 rounded px-1.5 py-0.5">
                   MNB: {patient.PatientID1}{patient.PatientID2 ? ` | MNB khác: ${patient.PatientID2}` : ''}
                 </span>
                 <h2 className="text-lg font-black text-slate-800 leading-none uppercase pt-2">{patient.PatientName}</h2>
@@ -271,7 +271,7 @@ export default function PatientDetailsDrawer({
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <ClipboardCheck className="w-4.5 h-4.5 text-[#d2145a]" />
+                  <ClipboardCheck className="w-4.5 h-4.5 text-primary" />
                   Lịch sử hội chẩn ({patientConsults.length})
                 </h4>
               </div>
@@ -293,7 +293,7 @@ export default function PatientDetailsDrawer({
                       {' - '}{c.DetailDiagnosis || '—'}
                     </p>
                     <p className="font-semibold text-slate-700 leading-relaxed">
-                      <span className="font-extrabold text-[#d2145a] bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded">{c.ConsultResultID || '—'}</span>
+                      <span className="font-extrabold text-primary bg-pink-50 border border-pink-200 px-1.5 py-0.5 rounded">{c.ConsultResultID || '—'}</span>
                       {' - '}{c.DetailConsultResult || '—'}
                     </p>
                     {c.FilePDFBBHC && (
@@ -323,7 +323,7 @@ export default function PatientDetailsDrawer({
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-4.5 h-4.5 text-[#d2145a]" />
+                  <Activity className="w-4.5 h-4.5 text-primary" />
                   Lịch sử thông tim ({patientCathlabs.length})
                 </h4>
               </div>
@@ -364,7 +364,7 @@ export default function PatientDetailsDrawer({
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <CalendarDays className="w-4.5 h-4.5 text-[#d2145a]" />
+                  <CalendarDays className="w-4.5 h-4.5 text-primary" />
                   Lịch sử chụp MRI ({patientCmrs.length})
                 </h4>
               </div>
@@ -387,7 +387,7 @@ export default function PatientDetailsDrawer({
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Scissors className="w-4.5 h-4.5 text-[#d2145a]" />
+                  <Scissors className="w-4.5 h-4.5 text-primary" />
                   Lịch sử phẫu thuật ({patientOperations.length})
                 </h4>
               </div>

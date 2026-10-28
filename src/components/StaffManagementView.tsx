@@ -348,7 +348,7 @@ export default function StaffManagementView({
   if (!canManageStaff(currentStaff)) {
     return (
       <div className="h-full flex items-center justify-center p-8">
-        <div className="max-w-md text-center bg-white border border-red-100 rounded-3xl p-8 shadow-sm">
+        <div className="max-w-md text-center bg-white border border-red-100 rounded-xl p-8 shadow-sm">
           <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Lock className="w-7 h-7 text-red-500" />
           </div>
@@ -377,7 +377,7 @@ export default function StaffManagementView({
     <div className="h-full flex flex-col min-h-0 animate-in fade-in duration-300 p-6 md:p-8 bg-slate-50 overflow-hidden">
       <div className="shrink-0 mb-4 md:hidden flex flex-col gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-wider text-[#d2145a] mb-1 flex items-center gap-1.5">
+          <p className="text-[10px] font-black uppercase tracking-wider text-primary mb-1 flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5" /> Module 6 · Quản lý nhân sự
           </p>
           <h2 className="text-xl font-extrabold text-slate-900">Phân quyền module & tài khoản</h2>
@@ -393,7 +393,7 @@ export default function StaffManagementView({
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
                 activeTab === tab.id
-                  ? 'bg-[#d2145a] text-white border-[#d2145a]'
+                  ? 'bg-primary text-white border-primary'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-pink-200'
               }`}
             >
@@ -420,7 +420,7 @@ export default function StaffManagementView({
       ) : activeTab === 'guide' ? (
         <div className="flex-1 min-h-0 overflow-y-auto space-y-6 animate-in fade-in duration-200 pr-1 select-text">
           {/* Card 1: Workflow */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
               <span className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-650 shrink-0">
                 <Layers className="w-4 h-4" />
@@ -463,7 +463,7 @@ export default function StaffManagementView({
           </div>
 
           {/* Card 2: Scar Regulations */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
               <span className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-650 shrink-0">
                 <Award className="w-4 h-4" />
@@ -513,7 +513,7 @@ export default function StaffManagementView({
           </div>
 
           {/* Card 3: Override and Exemptions */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
               <span className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
                 <AlertTriangle className="w-4 h-4" />
@@ -548,7 +548,7 @@ export default function StaffManagementView({
           </div>
 
           {/* Card 4: Address Warning */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
               <span className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
                 <Info className="w-4 h-4" />
@@ -575,7 +575,7 @@ export default function StaffManagementView({
           </div>
 
           {/* Card 5: Role Matrix */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 mb-3">
               <span className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-650 shrink-0">
                 <Shield className="w-4 h-4" />
@@ -587,7 +587,7 @@ export default function StaffManagementView({
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                <h4 className="text-xs font-black text-[#d2145a] mb-1">Admin khoa tim mạch</h4>
+                <h4 className="text-xs font-black text-primary mb-1">Admin khoa tim mạch</h4>
                 <p className="text-[10px] text-slate-500 leading-relaxed">
                   Có toàn quyền truy cập mọi module, quản lý nhân viên y tế, gán vai trò, cấu hình danh mục và chỉnh sửa các tham số nghiệp vụ.
                 </p>
@@ -616,17 +616,17 @@ export default function StaffManagementView({
       ) : activeTab === 'marks' ? (
         <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-4">
           <div className="xl:col-span-4 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3 h-fit">
-            <div className="bg-white border border-red-100 rounded-3xl p-4 shadow-sm">
+            <div className="bg-white border border-red-100 rounded-xl p-4 shadow-sm">
               <p className="text-[10px] font-black uppercase tracking-wider text-red-400">Tổng sẹo</p>
               <p className="text-4xl font-black font-mono text-red-700 mt-2">{markStats.totalScore}</p>
               <p className="text-[11px] font-bold text-slate-400 mt-1">{markStats.totalEvents} sự kiện được ghi nhận</p>
             </div>
-            <div className="bg-white border border-amber-100 rounded-3xl p-4 shadow-sm">
+            <div className="bg-white border border-amber-100 rounded-xl p-4 shadow-sm">
               <p className="text-[10px] font-black uppercase tracking-wider text-amber-500">Nhân sự có sẹo</p>
               <p className="text-4xl font-black font-mono text-amber-700 mt-2">{markStats.affectedStaff}</p>
               <p className="text-[11px] font-bold text-slate-400 mt-1">Tính trên toàn bộ dữ liệu hiện có</p>
             </div>
-            <div className="bg-white border border-slate-150 rounded-3xl p-4 shadow-sm">
+            <div className="bg-white border border-slate-150 rounded-xl p-4 shadow-sm">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Cập nhật mới nhất</p>
               <p className="text-lg font-black text-slate-800 mt-2">
                 {markStats.recentMarks[0]?.CreatedTime ? formatVNTime(markStats.recentMarks[0].CreatedTime) : '—'}
@@ -636,7 +636,7 @@ export default function StaffManagementView({
           </div>
 
           <div className="xl:col-span-8 flex flex-col min-h-0 gap-4">
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
@@ -681,7 +681,7 @@ export default function StaffManagementView({
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex-1 min-h-0">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex-1 min-h-0">
               <div className="p-4 border-b border-slate-100">
                 <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -716,7 +716,7 @@ export default function StaffManagementView({
       ) : (
         <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-4">
           {/* Staff list */}
-          <div className="xl:col-span-4 flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl overflow-hidden">
+          <div className="xl:col-span-4 flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="p-4 border-b border-slate-100 space-y-3 shrink-0">
               <div className="relative md:hidden">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -732,7 +732,7 @@ export default function StaffManagementView({
                   type="checkbox"
                   checked={showInactive}
                   onChange={(e) => setShowInactive(e.target.checked)}
-                  className="rounded border-slate-300 text-[#d2145a] focus:ring-pink-300"
+                  className="rounded border-slate-300 text-primary focus:ring-pink-300"
                 />
                 Hiện cả tài khoản đã nghỉ (FireDate)
               </label>
@@ -751,7 +751,7 @@ export default function StaffManagementView({
                       type="button"
                       onClick={() => handleSelectStaff(staff)}
                       className={`w-full text-left p-3.5 transition flex items-center gap-3 ${
-                        isSelected ? 'bg-pink-50 border-l-4 border-[#d2145a]' : 'hover:bg-slate-50 border-l-4 border-transparent'
+                        isSelected ? 'bg-pink-50 border-l-4 border-primary' : 'hover:bg-slate-50 border-l-4 border-transparent'
                       }`}
                     >
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-[11px] font-black ${
@@ -767,7 +767,7 @@ export default function StaffManagementView({
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-[10px] font-bold text-[#d2145a]">{permCount} module</p>
+                        <p className="text-[10px] font-bold text-primary">{permCount} module</p>
                         <ChevronRight className="w-4 h-4 text-slate-300 ml-auto" />
                       </div>
                     </button>
@@ -778,7 +778,7 @@ export default function StaffManagementView({
           </div>
 
           {/* Edit panel */}
-          <div className="xl:col-span-8 flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl overflow-hidden">
+          <div className="xl:col-span-8 flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl overflow-hidden">
             {!selectedStaff ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                 <UserCog className="w-12 h-12 text-slate-200 mb-3" />
@@ -808,7 +808,7 @@ export default function StaffManagementView({
                       type="button"
                       onClick={handleSave}
                       disabled={saving}
-                      className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-[#d2145a] hover:bg-[#b8124e] text-white flex items-center gap-1.5 disabled:opacity-60 transition"
+                      className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-primary hover:bg-[#b8124e] text-white flex items-center gap-1.5 disabled:opacity-60 transition"
                     >
                       <Save className="w-3.5 h-3.5" />
                       {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
@@ -950,12 +950,12 @@ export default function StaffManagementView({
                             disabled={draft.Role === 'Admin' && preset.id !== 'admin-khoa'}
                             className={`text-left p-3 rounded-2xl border transition ${
                               active
-                                ? 'border-[#d2145a] bg-pink-50 ring-1 ring-pink-200'
+                                ? 'border-primary bg-pink-50 ring-1 ring-pink-200'
                                 : 'border-slate-200 hover:border-pink-200 bg-white'
                             } disabled:opacity-40`}
                           >
                             <p className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
-                              {active && <CheckCircle2 className="w-3.5 h-3.5 text-[#d2145a]" />}
+                              {active && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
                               {preset.label}
                             </p>
                             <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
@@ -995,7 +995,7 @@ export default function StaffManagementView({
                                       checked={checked}
                                       disabled={locked || draft.Role === 'Admin'}
                                       onChange={() => toggleModule(module.id)}
-                                      className="mt-0.5 rounded border-slate-300 text-[#d2145a]"
+                                      className="mt-0.5 rounded border-slate-300 text-primary"
                                     />
                                     <span className="min-w-0">
                                       <span className="block text-[11px] font-bold text-slate-800">{module.label}</span>

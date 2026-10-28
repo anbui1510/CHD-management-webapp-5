@@ -241,11 +241,11 @@ export default function TransplantRegisterModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
         <div className="px-5 py-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-[#d2145a]" />
-            <h2 className="text-sm font-black uppercase text-[#d2145a]">Đăng ký ghép tim</h2>
+            <ClipboardList className="w-5 h-5 text-primary" />
+            <h2 className="text-sm font-black uppercase text-primary">Đăng ký ghép tim</h2>
           </div>
           <button type="button" onClick={onClose}><X className="w-5 h-5 text-slate-500" /></button>
         </div>
@@ -256,7 +256,7 @@ export default function TransplantRegisterModal({
             <div className="bg-white border rounded-2xl p-3 space-y-2">
               <div className="flex justify-between items-center">
                 <label className="text-[10px] font-black uppercase text-slate-500">Chọn bệnh nhi *</label>
-                <button type="button" onClick={() => setPatientMode('create')} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-pink-50 text-[#d2145a]"><Plus className="w-3 h-3 inline" /> Mới</button>
+                <button type="button" onClick={() => setPatientMode('create')} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-pink-50 text-primary"><Plus className="w-3 h-3 inline" /> Mới</button>
               </div>
               <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
                 <button type="button" onClick={() => setPatientMode('select')} className={`flex-1 py-1 text-xs font-bold rounded-lg ${patientMode === 'select' ? 'bg-indigo-600 text-white' : ''}`}>Chọn có sẵn</button>
@@ -331,7 +331,7 @@ export default function TransplantRegisterModal({
           </div>
           <div className="px-4 py-3 border-t flex gap-2">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-2xl border font-bold text-sm">Hủy</button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-2xl bg-[#d2145a] text-white font-bold text-sm flex items-center justify-center gap-2"><Save className="w-4 h-4" />{saving ? 'Đang lưu...' : 'Lưu đăng ký'}</button>
+            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-2xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2"><Save className="w-4 h-4" />{saving ? 'Đang lưu...' : 'Lưu đăng ký'}</button>
           </div>
         </form>
       </div>

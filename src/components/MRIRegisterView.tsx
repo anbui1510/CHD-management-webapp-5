@@ -540,8 +540,8 @@ export default function MRIRegisterView({
 
       {/* Title + action — mobile only */}
       <div className="mobile-view-card shrink-0 md:hidden flex flex-col bg-white border border-slate-200 shadow-sm">
-        <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
-          <Activity className="w-5 h-5 text-[#d2145a]" /> Đăng ký MRI tim
+        <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-primary">
+          <Activity className="w-5 h-5 text-primary" /> Đăng ký MRI tim
         </h2>
       </div>
 
@@ -551,7 +551,7 @@ export default function MRIRegisterView({
           <button
             onClick={() => setActiveTab('pending')}
             className={`flex-1 text-center py-2 rounded-lg transition-colors cursor-pointer ${
-              activeTab === 'pending' ? 'bg-[#d2145a] text-white font-bold' : 'text-[#d2145a] hover:bg-pink-50'
+              activeTab === 'pending' ? 'bg-primary text-white font-bold' : 'text-primary hover:bg-pink-50'
             }`}
           >
             Chờ chụp MRI <span className="text-[10px] opacity-75 font-mono">({segmented.pending.length})</span>
@@ -610,7 +610,7 @@ export default function MRIRegisterView({
       </div>
 
       {/* List table */}
-      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
         <div className="flex-1 overflow-x-auto overflow-y-auto">
           <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
             <thead className="bg-slate-50/70 text-slate-500 sticky top-0 uppercase text-[9px] font-extrabold tracking-wider z-10 shadow-xs">
@@ -646,7 +646,7 @@ export default function MRIRegisterView({
                     </td>
                     <td className="py-3 px-3 font-bold text-slate-600">{item.PatientWeight ? `${item.PatientWeight} kg` : '—'}</td>
                     <td className="py-3 px-3">
-                      <span className="text-[9px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">
+                      <span className="text-[9px] text-primary font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">
                         {item.CMRDiagnosisID || '—'}
                       </span>
                       <span className="line-clamp-2">{item.CMRDiagnosis || '—'}</span>
@@ -682,7 +682,7 @@ export default function MRIRegisterView({
       {/* REGISTRATION MODAL */}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-3xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[88vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
+          <div className="bg-white rounded-xl max-w-3xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[88vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
 
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
@@ -722,7 +722,7 @@ export default function MRIRegisterView({
 
                 {/* Patient choice */}
                 <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2">
-                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                  <span className="font-extrabold text-primary text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     1. Bệnh nhi
                   </span>
 
@@ -926,7 +926,7 @@ export default function MRIRegisterView({
 
                 {/* MRI registration fields */}
                 <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2.5">
-                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                  <span className="font-extrabold text-primary text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     2. Thông tin chỉ định MRI
                   </span>
 
@@ -992,7 +992,7 @@ export default function MRIRegisterView({
                           <button
                             type="button"
                             onClick={() => { setShowAddDocInput(false); setCustomDocVal(''); setRequestBy(''); }}
-                            className="text-slate-400 hover:text-[#d2145a] px-2 text-xs font-bold"
+                            className="text-slate-400 hover:text-primary px-2 text-xs font-bold"
                             title="Quay lại"
                           >
                             ✕
@@ -1063,7 +1063,7 @@ export default function MRIRegisterView({
         const isPending = !getFormattedDateKey(previewItem.CMRDate);
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl max-w-2xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-xl max-w-2xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
 
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
@@ -1125,7 +1125,7 @@ export default function MRIRegisterView({
 
                   {/* MRI info */}
                   <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm space-y-2.5">
-                    <span className="font-extrabold text-[#d2145a] text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5">
+                    <span className="font-extrabold text-primary text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5">
                       Thông tin đăng ký MRI
                     </span>
 
@@ -1141,7 +1141,7 @@ export default function MRIRegisterView({
                         </div>
                         <div className="sm:col-span-2">
                           <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã chẩn đoán:</span>
-                          <span className="text-[10px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded">{previewItem.CMRDiagnosisID || '—'}</span>
+                          <span className="text-[10px] text-primary font-black bg-pink-50 px-1.5 py-0.5 rounded">{previewItem.CMRDiagnosisID || '—'}</span>
                         </div>
                         <div className="sm:col-span-2">
                           <span className="text-slate-400 block font-bold text-[8px] uppercase">Chẩn đoán MRI:</span>

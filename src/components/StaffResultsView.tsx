@@ -795,7 +795,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                       return next;
                     });
                   }}
-                  className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-[#d2145a] cursor-pointer"
+                  className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-primary cursor-pointer"
                   title={allPageSelected ? 'Bỏ chọn trang này' : 'Chọn tất cả trang này'}
                 >
                   {allPageSelected ? <CheckSquare className="w-4 h-4" /> : somePageSelected ? <CheckSquare className="w-4 h-4 opacity-50" /> : <Square className="w-4 h-4" />}
@@ -830,17 +830,17 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                         e.stopPropagation();
                         toggleSelectDeleteKey(c.ConsultKey);
                       }}
-                      className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-[#d2145a] cursor-pointer"
+                      className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-primary cursor-pointer"
                       title={selectedDeleteKeys.has(c.ConsultKey) ? 'Bỏ chọn' : 'Chọn để xoá'}
                     >
                       {selectedDeleteKeys.has(c.ConsultKey)
-                        ? <CheckSquare className="w-4 h-4 text-[#d2145a]" />
+                        ? <CheckSquare className="w-4 h-4 text-primary" />
                         : <Square className="w-4 h-4" />}
                     </button>
                   </td>
                   <td 
                     onClick={() => handleOpenConsult(c)}
-                    className={`px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 font-extrabold text-[#d2145a] uppercase hover:underline cursor-pointer sticky left-10 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] group-hover:bg-slate-50/80 ${
+                    className={`px-2 lg:px-3 xl:px-4 py-2.5 lg:py-3 font-extrabold text-primary uppercase hover:underline cursor-pointer sticky left-10 z-10 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] group-hover:bg-slate-50/80 ${
                       splitPanelOpen ? 'min-w-[130px] 2xl:min-w-[160px]' : 'min-w-[160px]'
                     } ${
                       selectedConsultKey === c.ConsultKey ? 'bg-indigo-50/80' : selectedDeleteKeys.has(c.ConsultKey) ? 'bg-rose-50/40' : 'bg-white'
@@ -915,8 +915,8 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       {/* Header Area — mobile only; desktop dùng subheader toàn app */}
       <div className="mobile-view-card md:hidden shrink-0 flex flex-col bg-white border border-slate-200 shadow-sm">
         <div className="flex items-center gap-1.5 min-w-0">
-          <ClipboardList className="w-5 h-5 text-[#d2145a] animate-pulse shrink-0" />
-          <h2 className="text-sm font-extrabold text-neutral-[#d2145a] tracking-tight uppercase truncate min-w-0 flex-1">
+          <ClipboardList className="w-5 h-5 text-primary animate-pulse shrink-0" />
+          <h2 className="text-sm font-extrabold text-primary tracking-tight uppercase truncate min-w-0 flex-1">
             Nhập kết quả staff
           </h2>
           <button
@@ -962,7 +962,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
       {/* Main workspace: split list + detail panel on desktop */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-1.5 lg:gap-2 xl:gap-3 2xl:gap-4 overflow-hidden">
-        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl xl:rounded-2xl 2xl:rounded-3xl p-2.5 lg:p-3 xl:p-4 2xl:p-6 shadow-sm gap-2 lg:gap-2.5 xl:gap-4 overflow-hidden transition-all duration-300 ${
+        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl xl:rounded-2xl 2xl:rounded-xl p-2.5 lg:p-3 xl:p-4 2xl:p-6 shadow-sm gap-2 lg:gap-2.5 xl:gap-4 overflow-hidden transition-all duration-300 ${
           selectedConsultKey && !isMobile ? 'lg:w-[35%] xl:w-[38%] 2xl:w-[46%] lg:shrink-0' : 'flex-1'
         }`}>
         
@@ -975,7 +975,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               setCurrentPage(1);
             }}
             className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
-              staffType === 'cath' ? 'border-[#d2145a] text-[#d2145a]' : 'border-transparent text-slate-500 hover:text-slate-700'
+              staffType === 'cath' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <Stethoscope className="w-4 h-4 shrink-0" />
@@ -989,7 +989,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
               setCurrentPage(1);
             }}
             className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
-              staffType === 'surg' ? 'border-[#d2145a] text-[#d2145a]' : 'border-transparent text-slate-500 hover:text-slate-700'
+              staffType === 'surg' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             <Scissors className="w-4 h-4 shrink-0" />
@@ -1168,10 +1168,10 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       {/* COMBINED STAFF BỔ SUNG MODAL */}
       {showCombinedForm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative font-sans">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative font-sans">
             
             {/* Header */}
-            <div className="flex items-center justify-between gap-2 border-b border-slate-150 px-4 md:px-6 py-3 md:py-4 bg-indigo-50/50 text-[#d2145a] shrink-0">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-150 px-4 md:px-6 py-3 md:py-4 bg-indigo-50/50 text-primary shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <ClipboardList className="w-5 h-5 animate-pulse text-indigo-600 shrink-0" />
                 <div className="min-w-0">
@@ -1225,7 +1225,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                 
                 {/* COLUMN 1: Patients & Registration */}
                 <div className="space-y-2 pr-0 md:pr-3">
-                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                  <span className="font-extrabold text-primary text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     1. Đăng ký Staff &amp; Bệnh Nhi
                   </span>
 
@@ -1594,7 +1594,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
                 {/* COLUMN 2: Clinical outcome details */}
                 <div className="space-y-2 pl-0 md:pl-3 pt-3 md:pt-0">
-                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                  <span className="font-extrabold text-primary text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     2. Kết quả hội chẩn
                   </span>
 
@@ -1767,7 +1767,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
         const pat = consultToDelete ? getPatientByKey(consultToDelete.PatientKey) : null;
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 animate-in zoom-in-95 duration-150 text-slate-700 text-xs">
+            <div className="bg-white rounded-xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 animate-in zoom-in-95 duration-150 text-slate-700 text-xs">
               <div className="flex items-center gap-3 text-red-650 mb-3.5">
                 <div className="bg-red-50 p-2 rounded-full border border-red-150">
                   <AlertTriangle className="w-6 h-6 animate-bounce text-red-600" />
@@ -1787,7 +1787,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                     const p = c ? getPatientByKey(c.PatientKey) : null;
                     return (
                       <p key={key} className="font-semibold text-slate-700 border-b border-slate-100 pb-1 last:border-0">
-                        <span className="font-extrabold text-[#d2145a] uppercase">{p?.PatientName || '—'}</span>
+                        <span className="font-extrabold text-primary uppercase">{p?.PatientName || '—'}</span>
                         <span className="text-slate-400 font-mono ml-2">{p?.PatientID1 || key}</span>
                       </p>
                     );
@@ -1796,7 +1796,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
                   <>
                     {pat && (
                       <p className="font-bold text-slate-800">
-                        Bệnh nhi: <span className="font-extrabold text-[#d2145a] uppercase">{pat.PatientName}</span>
+                        Bệnh nhi: <span className="font-extrabold text-primary uppercase">{pat.PatientName}</span>
                       </p>
                     )}
                     {consultToDelete && (
@@ -1845,7 +1845,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
       {deleteFeedback?.phase === 'deleting' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-3 animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-3 animate-in zoom-in-95 duration-150">
             <div className="mx-auto w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
             <h4 className="font-extrabold text-sm uppercase text-slate-800">Đang xóa...</h4>
             <p className="text-[11px] text-slate-500 font-medium">Vui lòng chờ trong giây lát</p>
@@ -1855,7 +1855,7 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
 
       {deleteFeedback?.phase === 'success' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-4 animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-4 animate-in zoom-in-95 duration-150">
             <div className="mx-auto bg-emerald-50 text-emerald-600 rounded-full w-12 h-12 flex items-center justify-center">
               <CheckCircle2 className="w-6 h-6" />
             </div>

@@ -1385,7 +1385,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
         </div>
 
        {activeTab === 'pending' && (
-         <div className="flex-1 overflow-hidden bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col">
+         <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
             <div className="flex-1 overflow-auto custom-scrollbar">
               <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                 <thead className="sticky top-0 z-10">
@@ -1410,7 +1410,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                         <tr key={c.ConsultKey} onClick={() => openPendingForm(c, p)} className="hover:bg-slate-50 cursor-pointer transition">
                           <td className="py-4 px-4 text-slate-800 font-extrabold uppercase">{p.PatientName}</td>
                           <td className="py-4 px-4 text-slate-600 text-center font-medium">{formatVNTime(p.PatientDOB) || '-'}</td>
-                          <td className="py-4 px-4 text-center font-extrabold text-[#d2145a]">{c.DiagnosisID || '-'}</td>
+                          <td className="py-4 px-4 text-center font-extrabold text-primary">{c.DiagnosisID || '-'}</td>
                           <td className="py-4 px-4 text-center text-slate-500 font-medium">
                             {c.PlannedCathLabDate ? formatVNTime(c.PlannedCathLabDate) : '-'}
                           </td>
@@ -1431,7 +1431,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        )}
 
        {activeTab === 'done' && (
-         <div className="flex-1 overflow-hidden bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col">
+         <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
             <div className="flex-1 overflow-auto custom-scrollbar">
               <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                 <thead className="sticky top-0 z-10">
@@ -1458,7 +1458,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                         <tr key={cath.CathKey} onClick={() => openDoneForm(cath)} className="hover:bg-slate-50 cursor-pointer transition">
                           <td className="py-4 px-4 text-slate-800 font-extrabold uppercase">{p.PatientName}</td>
                           <td className="py-4 px-4 text-slate-600 text-center font-medium">{formatVNTime(p.PatientDOB) || '-'}</td>
-                          <td className="py-4 px-4 text-center font-extrabold text-[#d2145a]">{typeof cath.PostDiagnosisID === 'string' ? cath.PostDiagnosisID : (cath.PostDiagnosisID ? String(cath.PostDiagnosisID) : '-')}</td>
+                          <td className="py-4 px-4 text-center font-extrabold text-primary">{typeof cath.PostDiagnosisID === 'string' ? cath.PostDiagnosisID : (cath.PostDiagnosisID ? String(cath.PostDiagnosisID) : '-')}</td>
                           <td className="py-4 px-4 text-slate-700 font-medium line-clamp-2">{typeof cath.PostDiagnosis === 'string' ? cath.PostDiagnosis : (cath.PostDiagnosis ? String(cath.PostDiagnosis) : '-')}</td>
                           <td className="py-4 px-4 text-slate-700 font-medium whitespace-pre-wrap">{parseCathMethods(cath.CathMethod).join(', ')}</td>
                           <td className="py-4 px-4 text-center text-slate-500 font-medium">
@@ -1522,7 +1522,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
        {/* ===================== FORM MODAL ===================== */}
        {(selectedPending || selectedDone || isAdHocModalOpen) && (
           <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-            <div className="bg-white rounded-3xl max-w-4xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col text-sm font-medium overflow-hidden">
+            <div className="bg-white rounded-xl max-w-4xl w-full my-auto max-h-[calc(100dvh-16px)] sm:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col text-sm font-medium overflow-hidden">
               <div className="bg-[#1e293b] text-white px-5 py-3 flex justify-between items-center shrink-0 z-10">
                 <h3 className="font-extrabold uppercase tracking-wide flex items-center gap-2">
                    <Stethoscope /> 
@@ -1544,13 +1544,13 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                 {isAdHocModalOpen ? (
                       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col text-xs font-semibold relative mb-4">
                          <div className="flex items-center justify-between mb-3">
-                            <label className="block text-[#d2145a] font-extrabold uppercase text-[10px]">
+                            <label className="block text-primary font-extrabold uppercase text-[10px]">
                               Chọn Bệnh nhi cần đăng ký *
                             </label>
                             <button
                                type="button"
                                onClick={() => setAdHocPatientMode('new')} 
-                               className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-3 py-1 rounded-lg text-[10px] transition flex items-center gap-1 cursor-pointer"
+                               className="bg-primary/10 hover:bg-primary/20 text-primary font-extrabold px-3 py-1 rounded-lg text-[10px] transition flex items-center gap-1 cursor-pointer"
                             >
                                <Plus className="w-3 h-3" /> Mới
                             </button>
@@ -1589,7 +1589,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                                     key={p.PatientKey}
                                     type="button"
                                     onClick={() => handleAdHocPatientSelect(p)}
-                                    className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"
+                                    className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-primary"
                                   >
                                     <div>
                                       <span className="font-extrabold uppercase">{p.PatientName}</span>
@@ -1621,9 +1621,9 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                                 
                                 <div className="flex items-start justify-between">
                                   <div className="space-y-2">
-                                    <h4 className="font-black text-sm uppercase text-[#d2145a] flex items-center gap-2">
+                                    <h4 className="font-black text-sm uppercase text-primary flex items-center gap-2">
                                       <span>👤 {selectedPat.PatientName}</span>
-                                      <span className="bg-white border border-pink-200 text-[#d2145a] text-[10px] px-2 py-0.5 rounded-full font-mono normal-case">{selectedPat.PatientSex}</span>
+                                      <span className="bg-white border border-pink-200 text-primary text-[10px] px-2 py-0.5 rounded-full font-mono normal-case">{selectedPat.PatientSex}</span>
                                     </h4>
                                     
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2.5">
@@ -1739,7 +1739,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                    return (
                      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                           <div className="font-extrabold text-[#d2145a] text-xs uppercase mb-3 border-b border-indigo-50 pb-2">Thông tin hành chính</div>
+                           <div className="font-extrabold text-primary text-xs uppercase mb-3 border-b border-indigo-50 pb-2">Thông tin hành chính</div>
                            <div className="space-y-1.5 text-xs">
                              <div className="flex gap-2"><span className="text-slate-500 w-20 shrink-0">Họ tên:</span> <span className="font-extrabold text-slate-800 uppercase">{p.PatientName}</span></div>
                              <div className="flex gap-2"><span className="text-slate-500 w-20 shrink-0">Giới tính:</span> <span className="font-bold text-slate-800">{p.PatientSex}</span></div>
@@ -1750,7 +1750,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                         </div>
                         {c && (
                            <div>
-                              <div className="font-extrabold text-[#d2145a] text-xs uppercase mb-3 border-b border-indigo-50 pb-2">Thông tin hội chẩn</div>
+                              <div className="font-extrabold text-primary text-xs uppercase mb-3 border-b border-indigo-50 pb-2">Thông tin hội chẩn</div>
                               <div className="space-y-1.5 text-xs">
                                 <div className="flex gap-2"><span className="text-slate-500 w-28 shrink-0">Chẩn đoán chi tiết:</span> <span className="font-bold text-slate-800 break-words">{c.DetailDiagnosis}</span></div>
                                 <div className="flex gap-2"><span className="text-slate-500 w-28 shrink-0">Kết quả chi tiết HC:</span> <span className="font-bold text-slate-800 break-words">{c.DetailConsultResult}</span></div>
@@ -1760,7 +1760,7 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
                         )}
                         {!c && selectedDone && (
                            <div>
-                              <div className="font-extrabold text-[#d2145a] text-xs uppercase mb-3 border-b border-indigo-50 pb-2">Thông tin ca can thiệp</div>
+                              <div className="font-extrabold text-primary text-xs uppercase mb-3 border-b border-indigo-50 pb-2">Thông tin ca can thiệp</div>
                               <div className="space-y-1.5 text-xs text-slate-500 italic">
                                 Hồ sơ cập nhật trực tiếp từ khoá chính Can thiệp tim mạch.
                               </div>
@@ -1793,11 +1793,11 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
 
                     {isAdHocModalOpen && (
                       <div>
-                        <label className="block text-[#d2145a] font-bold text-[10px] uppercase mb-1">Loại can thiệp (PriorityOrder) <span className="text-rose-500">*</span></label>
+                        <label className="block text-primary font-bold text-[10px] uppercase mb-1">Loại can thiệp (PriorityOrder) <span className="text-rose-500">*</span></label>
                         <select 
                           value={adHocPriorityOrder} 
                           onChange={e => setAdHocPriorityOrder(e.target.value as any)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary"
                         >
                            <option value="Cấp cứu">Cấp cứu</option>
                            <option value="Chương trình">Chương trình</option>

@@ -236,7 +236,7 @@ export default function ChdDailyBriefView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <RefreshCw className="w-6 h-6 animate-spin text-[#d2145a]" />
+        <RefreshCw className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
   }
@@ -248,7 +248,7 @@ export default function ChdDailyBriefView() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Newspaper className="w-6 h-6 text-[#d2145a]" />
+              <Newspaper className="w-6 h-6 text-primary" />
               <h1 className="text-2xl font-bold text-slate-800">CHD Daily Brief</h1>
             </div>
             <p className="text-slate-500 text-sm">Bản tin y văn tim mạch nhi mỗi sáng 7h</p>
@@ -256,7 +256,7 @@ export default function ChdDailyBriefView() {
           <button
             onClick={() => handleGenerate(Boolean(content))}
             disabled={generating}
-            className="flex items-center gap-2 px-4 py-2 bg-[#d2145a] text-white rounded-lg hover:bg-[#b01048] disabled:opacity-60 transition-colors text-sm font-medium shrink-0"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-[#b01048] disabled:opacity-60 transition-colors text-sm font-medium shrink-0"
           >
             {generating ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -295,7 +295,7 @@ export default function ChdDailyBriefView() {
         {topic && (
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
-              <Clock className="w-4 h-4 text-[#d2145a]" />
+              <Clock className="w-4 h-4 text-primary" />
               <span className="text-sm font-semibold text-slate-700">{dateVN}</span>
             </div>
             <h2 className="text-lg font-bold text-[#2E5090] mb-2">{topic.topic}</h2>
@@ -332,7 +332,7 @@ export default function ChdDailyBriefView() {
         {content && content.articles.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-[#d2145a]" />
+              <BookOpen className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-bold text-slate-800">5 bài đọc hôm nay</h3>
             </div>
             {content.articles.map((article, idx) => (
@@ -387,7 +387,7 @@ export default function ChdDailyBriefView() {
                   onClick={() => loadBriefForDate(entry.date)}
                   className={`w-full text-left flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
                     selectedDate === entry.date
-                      ? 'bg-pink-50 text-[#d2145a]'
+                      ? 'bg-pink-50 text-primary'
                       : 'hover:bg-slate-50 text-slate-600'
                   }`}
                 >

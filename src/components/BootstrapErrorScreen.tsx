@@ -9,8 +9,8 @@ export default function BootstrapErrorScreen({
 }) {
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center p-6 font-sans">
-      <div className="w-full max-w-md rounded-3xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl space-y-4">
-        <h1 className="text-lg font-black uppercase tracking-tight text-[#d2145a]">
+      <div className="w-full max-w-md rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl space-y-4">
+        <h1 className="text-lg font-black uppercase tracking-tight text-primary">
           Không thể mở ứng dụng
         </h1>
         <p className="text-sm text-neutral-300 leading-relaxed">{message}</p>
@@ -20,7 +20,7 @@ export default function BootstrapErrorScreen({
         <button
           type="button"
           onClick={onRetry || (() => window.location.reload())}
-          className="w-full rounded-xl bg-[#d2145a] hover:bg-pink-700 py-2.5 text-xs font-bold uppercase tracking-wide cursor-pointer"
+          className="w-full rounded-xl bg-primary hover:bg-pink-700 py-2.5 text-xs font-bold uppercase tracking-wide cursor-pointer"
         >
           Xóa cache &amp; tải lại
         </button>

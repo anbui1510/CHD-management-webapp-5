@@ -364,7 +364,7 @@ export default function ResultStaffDrawer({
     ? '2xl:col-span-7 flex flex-col min-h-0'
     : 'lg:col-span-7 flex flex-col min-h-0';
   const innerCardPadding = isPanelLayout ? 'p-2.5 lg:p-3 xl:p-4' : 'p-3 md:p-4';
-  const innerCardRadius = isPanelLayout ? 'rounded-2xl xl:rounded-3xl' : 'rounded-3xl';
+  const innerCardRadius = isPanelLayout ? 'rounded-2xl xl:rounded-xl' : 'rounded-xl';
 
   const summaryConsultOverride: Partial<Consult> = {
     ConsultResultID: (formData.ConsultResultID || consult.ConsultResultID) as Consult['ConsultResultID'],
@@ -384,7 +384,7 @@ export default function ResultStaffDrawer({
   };
 
   const drawerHeader = (
-    <div className="bg-[#d2145a] text-white px-3 md:px-5 py-2 md:py-2 flex items-center justify-between shadow-sm shrink-0 rounded-t-3xl">
+    <div className="bg-primary text-white px-3 md:px-5 py-2 md:py-2 flex items-center justify-between shadow-sm shrink-0 rounded-t-xl">
       <h3 className="font-extrabold text-xs md:text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans min-w-0">
         <Stethoscope className="w-4 h-4 text-white shrink-0" />
         <span className="truncate max-md:text-sm md:text-sm">Điền kết quả staff</span>
@@ -422,7 +422,7 @@ export default function ResultStaffDrawer({
                             <div>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <h4 className={`font-black text-[#d2145a] uppercase leading-tight max-md:text-base ${isPanelLayout ? 'md:text-sm xl:text-base 2xl:text-lg' : 'md:text-sm lg:text-lg'}`}>{patient.PatientName}</h4>
+                                  <h4 className={`font-black text-primary uppercase leading-tight max-md:text-base ${isPanelLayout ? 'md:text-sm xl:text-base 2xl:text-lg' : 'md:text-sm lg:text-lg'}`}>{patient.PatientName}</h4>
                                   {patient.OtherPatientName && (
                                     <p className="max-md:text-[11px] md:text-[10px] text-slate-400 font-medium italic mt-0.5 md:mt-1">Tên khác: {patient.OtherPatientName}</p>
                                   )}
@@ -501,7 +501,7 @@ export default function ResultStaffDrawer({
                                   <p><span className="text-slate-400">Ngày hội chẩn:</span> <span className="font-bold text-slate-800 font-mono">{formatVNTime(formData.ConsultDate)}</span></p>
                                   <p><span className="text-slate-400">BS đăng ký:</span> <span className="font-bold text-slate-800">{formData.RequestBy || ''}</span></p>
                                 </div>
-                                <p><span className="text-slate-400">Kiểu staff:</span> <span className="font-bold text-[#d2145a]">{formData.ConsultType || ''}</span></p>
+                                <p><span className="text-slate-400">Kiểu staff:</span> <span className="font-bold text-primary">{formData.ConsultType || ''}</span></p>
                                 {formData.ConsultMember && String(formData.ConsultMember).trim() && (
                                   <p>
                                     <span className="text-slate-400">Thành viên hội chẩn:</span>{' '}
@@ -547,8 +547,8 @@ export default function ResultStaffDrawer({
                                         onClick={() => setFormData(prev => ({ ...prev, ConsultType: type }))}
                                         className={`rounded-xl px-2.5 py-1.5 text-xs font-extrabold border transition ${
                                           formData.ConsultType === type
-                                            ? 'bg-[#d2145a] text-white border-[#d2145a] shadow-sm'
-                                            : 'bg-white text-slate-600 border-slate-200 hover:border-[#d2145a]/40'
+                                            ? 'bg-primary text-white border-primary shadow-sm'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40'
                                         }`}
                                       >
                                         {type}
@@ -588,7 +588,7 @@ export default function ResultStaffDrawer({
                                   </p>
                                   <p className="flex items-baseline gap-2 flex-wrap">
                                     <span className="text-slate-400 shrink-0">Kết luận chính:</span>
-                                    {formData.ConsultResultID ? <span className="font-extrabold text-[#d2145a]">{formData.ConsultResultID}</span> : null}
+                                    {formData.ConsultResultID ? <span className="font-extrabold text-primary">{formData.ConsultResultID}</span> : null}
                                   </p>
                                 </div>
 
@@ -775,7 +775,7 @@ export default function ResultStaffDrawer({
                             <button
                               type="button"
                               onClick={() => setIsEditing(true)}
-                              className="ml-auto bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer max-md:text-sm md:text-xs flex items-center justify-center gap-1.5 font-sans"
+                              className="ml-auto bg-primary hover:bg-pink-700 text-white font-extrabold uppercase py-3 px-4 rounded-2xl shadow-md transition-transform hover:scale-[1.02] cursor-pointer max-md:text-sm md:text-xs flex items-center justify-center gap-1.5 font-sans"
                             >
                               <ClipboardList className="w-4 h-4 shrink-0" />
                               {isMobile
@@ -857,7 +857,7 @@ export default function ResultStaffDrawer({
   if (layout === 'panel') {
     return (
       <>
-        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-xl xl:rounded-2xl 2xl:rounded-3xl shadow-sm overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 bg-white border border-slate-200 rounded-xl xl:rounded-2xl 2xl:rounded-xl shadow-sm overflow-hidden">
           {drawerHeader}
           {drawerForm}
         </div>
@@ -902,8 +902,8 @@ export default function ResultStaffDrawer({
             <div
               className={`relative bg-white w-full max-w-6xl shadow-2xl flex flex-col z-50 overflow-hidden min-h-0 ${
                 isMobileModal
-                  ? 'staff-result-drawer-panel rounded-t-3xl rounded-b-none animate-in slide-in-from-bottom duration-200 w-full'
-                  : 'rounded-3xl max-h-[96vh] animate-in zoom-in-95 duration-200'
+                  ? 'staff-result-drawer-panel rounded-t-xl rounded-b-none animate-in slide-in-from-bottom duration-200 w-full'
+                  : 'rounded-xl max-h-[96vh] animate-in zoom-in-95 duration-200'
               }`}
               style={modalPanelStyle}
             >

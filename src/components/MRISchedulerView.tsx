@@ -974,7 +974,7 @@ export default function MRISchedulerView({
   const renderInput = (key: keyof CMR, label: string, placeholder = '', required = false) => (
     <div>
       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-        {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
+        {label}{required && <span className="text-primary ml-0.5">*</span>}
       </label>
       <input
         type="text"
@@ -982,7 +982,7 @@ export default function MRISchedulerView({
         onChange={(event) => updateField(key, event.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
       />
     </div>
   );
@@ -990,7 +990,7 @@ export default function MRISchedulerView({
   const renderLongTextInput = (key: keyof CMR, label: string, placeholder = '', required = false) => (
     <div>
       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-        {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
+        {label}{required && <span className="text-primary ml-0.5">*</span>}
       </label>
       <MobileAutoExpandTextarea
         minRows={2}
@@ -998,7 +998,7 @@ export default function MRISchedulerView({
         onChange={(event) => updateField(key, event.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
       />
     </div>
   );
@@ -1006,7 +1006,7 @@ export default function MRISchedulerView({
   const renderEnumInput = (key: keyof CMR, label: string, options: string[], placeholder = 'Gõ để tìm hoặc chọn', required = false) => (
     <div>
       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-        {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
+        {label}{required && <span className="text-primary ml-0.5">*</span>}
       </label>
       <SearchableEnumSelect
         required={required}
@@ -1025,14 +1025,14 @@ export default function MRISchedulerView({
   const renderTextarea = (key: keyof CMR, label: string, required = false) => (
     <div>
       <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-        {label}{required && <span className="text-[#d2145a] ml-0.5">*</span>}
+        {label}{required && <span className="text-primary ml-0.5">*</span>}
       </label>
       <MobileAutoExpandTextarea
         minRows={3}
         value={String(formData[key] || '')}
         onChange={(event) => updateField(key, event.target.value)}
         required={required}
-        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
       />
     </div>
   );
@@ -1070,7 +1070,7 @@ export default function MRISchedulerView({
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans">
       <div className="flex-1 overflow-hidden p-3 lg:p-4 flex h-full min-h-0 gap-4">
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
-          <div className={`${isFilterExpanded ? 'hidden xl:flex xl:col-span-5' : 'lg:col-span-6'} ${selectedItem ? 'hidden lg:flex' : 'flex'} bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
+          <div className={`${isFilterExpanded ? 'hidden xl:flex xl:col-span-5' : 'lg:col-span-6'} ${selectedItem ? 'hidden lg:flex' : 'flex'} bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
             {/* Mobile Tab bar: [Xếp bổ sung (+)] [Chờ xếp] [Đã xếp] [Lịch chụp] [Bộ lọc (hình tròn)] */}
             <div className="flex sm:hidden items-center justify-between p-2 bg-slate-50 border-b border-slate-200 gap-1.5 shrink-0">
                <button
@@ -1086,7 +1086,7 @@ export default function MRISchedulerView({
                  <button
                    onClick={() => { setActiveTab('unscheduled'); setMobileActiveTab('unscheduled'); }}
                    className={`flex-1 text-center py-1.5 rounded-lg transition-colors cursor-pointer ${
-                     mobileActiveTab === 'unscheduled' ? 'bg-[#d2145a] text-white font-bold' : 'text-[#d2145a]'
+                     mobileActiveTab === 'unscheduled' ? 'bg-primary text-white font-bold' : 'text-primary'
                    }`}
                  >
                    Chờ xếp <span className="text-[9px] opacity-75 font-mono">({segmentedItems.unscheduled.length})</span>
@@ -1124,10 +1124,10 @@ export default function MRISchedulerView({
             <div className="hidden sm:flex p-4 border-b border-slate-100 bg-slate-50 shrink-0 items-center justify-between gap-2">
               <div>
                 <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-[#d2145a]" />
+                  <Activity className="w-4 h-4 text-primary" />
                   Danh sách chờ xếp lịch MRI
                 </h3>
-                <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
+                <p className="text-[9px] text-primary font-bold uppercase mt-0.5">
                   Tổng cộng: {allMriItems.length} ca MRI tim
                 </p>
               </div>
@@ -1144,11 +1144,11 @@ export default function MRISchedulerView({
               <button
                 onClick={() => setActiveTab('unscheduled')}
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition ${
-                  activeTab === 'unscheduled' ? 'bg-[#d2145a] text-white shadow-xs' : 'bg-white hover:bg-slate-100 border border-slate-200 text-slate-600'
+                  activeTab === 'unscheduled' ? 'bg-primary text-white shadow-xs' : 'bg-white hover:bg-slate-100 border border-slate-200 text-slate-600'
                 }`}
               >
                 Chờ xếp lịch
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${activeTab === 'unscheduled' ? 'bg-pink-100 text-[#d2145a]' : 'bg-slate-100 text-slate-600'}`}>
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${activeTab === 'unscheduled' ? 'bg-pink-100 text-primary' : 'bg-slate-100 text-slate-600'}`}>
                   {segmentedItems.unscheduled.length}
                 </span>
               </button>
@@ -1172,7 +1172,7 @@ export default function MRISchedulerView({
                 placeholder="Tìm họ tên, ID, chẩn đoán MRI..."
                 value={searchQuery}
                 onChange={setSearchQuery}
-                className="w-full pl-9 pr-9 py-2 bg-slate-100 border-0 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]/50"
+                className="w-full pl-9 pr-9 py-2 bg-slate-100 border-0 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} className="absolute right-6 top-5 text-slate-400 hover:text-slate-600">
@@ -1262,7 +1262,7 @@ export default function MRISchedulerView({
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className="text-[9px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">
+                          <span className="text-[9px] text-primary font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">
                             {item.CMRDiagnosisID || '—'}
                           </span>
                           <span className="line-clamp-2">{item.CMRDiagnosis || '—'}</span>
@@ -1294,16 +1294,16 @@ export default function MRISchedulerView({
             </div>
           </div>
 
-          <div className={`${isFilterExpanded ? 'lg:col-span-12 xl:col-span-7' : 'lg:col-span-6'} ${!selectedItem && mobileActiveTab !== 'calendar' ? 'hidden lg:flex' : 'flex'} bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
+          <div className={`${isFilterExpanded ? 'lg:col-span-12 xl:col-span-7' : 'lg:col-span-6'} ${!selectedItem && mobileActiveTab !== 'calendar' ? 'hidden lg:flex' : 'flex'} bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col`}>
             {!selectedItem ? (
               <>
                 <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
                   <div className="hidden sm:block">
                     <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-[#d2145a]" />
+                      <Calendar className="w-4 h-4 text-primary" />
                       Lịch chụp MRI dự kiến
                     </h3>
-                    <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
+                    <p className="text-[9px] text-primary font-bold uppercase mt-0.5">
                       Calendar lịch MRI tim bẩm sinh
                     </p>
                   </div>
@@ -1320,7 +1320,7 @@ export default function MRISchedulerView({
                   </div>
                 </div>
                 <div className="flex-1 p-3 flex flex-col min-h-0">
-                  <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[#d2145a] text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl">
+                  <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-primary text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl">
                     <div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div><div>CN</div>
                   </div>
                   <div className="grid grid-cols-7 gap-1 border-l border-r border-b border-slate-200 rounded-b-2xl bg-slate-100/50 p-1 flex-1 overflow-hidden">
@@ -1331,10 +1331,10 @@ export default function MRISchedulerView({
                           key={`${cell.dateStr}-${index}`}
                           className={`min-h-[76px] xl:min-h-[92px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between transition ${
                             cell.isCurrentMonth ? 'text-slate-800' : 'bg-slate-50/40 text-slate-300 pointer-events-none opacity-45'
-                          } ${cell.isToday ? 'bg-[#d2145a]/5 border-[#d2145a]/30' : ''}`}
+                          } ${cell.isToday ? 'bg-primary/5 border-primary/30' : ''}`}
                         >
                           <div className="text-right">
-                            <span className={`font-black font-mono text-[10px] ${cell.isToday ? 'bg-[#d2145a] text-white w-5 h-5 inline-flex items-center justify-center rounded-full' : 'text-slate-500'}`}>
+                            <span className={`font-black font-mono text-[10px] ${cell.isToday ? 'bg-primary text-white w-5 h-5 inline-flex items-center justify-center rounded-full' : 'text-slate-500'}`}>
                               {cell.day}
                             </span>
                           </div>
@@ -1359,7 +1359,7 @@ export default function MRISchedulerView({
                   </div>
                   <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-[10px] text-slate-500 font-medium shrink-0">
                     <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#b31448]"></span> Ca MRI đã xếp lịch</span>
-                    <span className="text-[9px] text-[#d2145a] font-extrabold">CMR Scheduler</span>
+                    <span className="text-[9px] text-primary font-extrabold">CMR Scheduler</span>
                   </div>
                 </div>
               </>
@@ -1370,7 +1370,7 @@ export default function MRISchedulerView({
                     <button type="button" onClick={requestExit} className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-extrabold text-[10.5px] px-3.5 py-1.5 rounded-xl transition">
                       ← Quay lại Lịch Tháng
                     </button>
-                    <span className="bg-[#d2145a] text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg">
+                    <span className="bg-primary text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg">
                       Xếp lịch
                     </span>
                   </div>
@@ -1416,7 +1416,7 @@ export default function MRISchedulerView({
                   })()}
 
                   <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-3">
-                    <span className="font-extrabold text-[#d2145a] text-[10px] uppercase tracking-wider block">
+                    <span className="font-extrabold text-primary text-[10px] uppercase tracking-wider block">
                       Thông tin liên quan MRI
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -1428,37 +1428,37 @@ export default function MRISchedulerView({
                       {renderEnumInput('PostDepart', 'Khoa sau chụp', departmentOptions, 'Gõ khoa để tìm')}
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                          Gây mê<span className="text-[#d2145a] ml-0.5">*</span>
+                          Gây mê<span className="text-primary ml-0.5">*</span>
                         </label>
                         <select
                           value={String(formData.Anesthesia || '')}
                           onChange={(event) => updateField('Anesthesia', event.target.value)}
                           required
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
                         >
                           {ANESTHESIA_OPTIONS.map(option => <option key={option} value={option}>{option || 'Chọn'}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                          Ngày chụp MRI dự kiến<span className="text-[#d2145a] ml-0.5">*</span>
+                          Ngày chụp MRI dự kiến<span className="text-primary ml-0.5">*</span>
                         </label>
                         <VNDateInput
                           value={String(formData.CMRScheduledDate || '')}
                           onChange={(val) => updateField('CMRScheduledDate', val)}
                           required
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold font-sans focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold font-sans focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                       </div>
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] uppercase mb-1">
-                          Trạng thái gọi MRI<span className="text-[#d2145a] ml-0.5">*</span>
+                          Trạng thái gọi MRI<span className="text-primary ml-0.5">*</span>
                         </label>
                         <select
                           value={String(formData.CMRCallStatus || '')}
                           onChange={(event) => updateField('CMRCallStatus', event.target.value)}
                           required
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#d2145a]"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
                         >
                           {CALL_STATUS_OPTIONS.map(option => <option key={option} value={option}>{option || 'Chọn'}</option>)}
                         </select>
@@ -1537,10 +1537,10 @@ export default function MRISchedulerView({
             </div>
           )}
 
-          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
+          <div className={`transition-all duration-300 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col ${isFilterExpanded ? 'w-full lg:w-[320px] flex-1 min-h-0' : 'hidden lg:flex lg:w-[52px]'}`}>
             {!isFilterExpanded ? (
               <button
-                className="flex flex-col items-center py-5 hover:bg-slate-50 transition rounded-3xl h-full"
+                className="flex flex-col items-center py-5 hover:bg-slate-50 transition rounded-xl h-full"
                 onClick={() => setIsFilterExpanded(true)}
               >
                 <div className="bg-slate-100 p-2.5 rounded-2xl text-slate-500 mb-6 hover:bg-indigo-50 hover:text-indigo-600 transition">
@@ -1552,7 +1552,7 @@ export default function MRISchedulerView({
               </button>
             ) : (
               <div className="flex flex-col relative h-full min-h-0">
-                <div className="p-4 border-b border-slate-100 bg-[#b31448] text-white rounded-t-3xl flex justify-between items-center shrink-0">
+                <div className="p-4 border-b border-slate-100 bg-[#b31448] text-white rounded-t-xl flex justify-between items-center shrink-0">
                   <h3 className="font-black text-[12px] uppercase tracking-wider flex items-center gap-2">
                     <Filter className="w-4 h-4" /> Bộ lọc xếp lịch
                   </h3>
@@ -1656,7 +1656,7 @@ export default function MRISchedulerView({
                         }}
                         className="w-full text-left bg-slate-50 hover:bg-pink-50 border border-slate-150 rounded-xl p-3 transition"
                       >
-                        <span className="block text-[9px] font-black text-[#d2145a] font-mono">
+                        <span className="block text-[9px] font-black text-primary font-mono">
                           {formatVNTime(item.CMRScheduledDate)}
                         </span>
                         <span className="block text-xs font-extrabold uppercase text-slate-900 truncate">
@@ -1673,7 +1673,7 @@ export default function MRISchedulerView({
                 <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-3xl space-y-3">
                   <p className="text-[10px] font-semibold text-slate-500 flex justify-between">
                     <span>Tổng số ca tìm thấy:</span>
-                    <span className="font-black text-[#d2145a] text-[12px]">{filteredScheduleItems.length}</span>
+                    <span className="font-black text-primary text-[12px]">{filteredScheduleItems.length}</span>
                   </p>
                   {exportMsg && (
                     <div className={`px-3 py-2 text-[10px] rounded flex items-center gap-1 border ${exportMsg.includes('thành công') ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
@@ -1698,7 +1698,7 @@ export default function MRISchedulerView({
       {/* XẾP BỔ SUNG MRI MODAL */}
       {showAdHoc && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[96vh] md:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[96vh] md:max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150 relative">
 
             <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
               <div className="flex items-center gap-2">
@@ -1737,7 +1737,7 @@ export default function MRISchedulerView({
 
                 {/* Patient choice */}
                 <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2">
-                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                  <span className="font-extrabold text-primary text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     1. Bệnh nhi
                   </span>
 
@@ -1901,7 +1901,7 @@ export default function MRISchedulerView({
 
                 {/* MRI fields */}
                 <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm space-y-2.5">
-                  <span className="font-extrabold text-[#d2145a] text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
+                  <span className="font-extrabold text-primary text-[11px] uppercase tracking-wider block border-b border-slate-200 pb-1">
                     2. Thông tin MRI &amp; Xếp lịch
                   </span>
 

@@ -199,7 +199,7 @@ function ActivityMetricRow({
                     initial={{ height: 0 }}
                     animate={{ height: `${percentage}%` }}
                     transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className="w-full bg-[#d2145a] rounded-t-md"
+                    className="w-full bg-primary rounded-t-md"
                   />
                 </div>
                 <span className="text-[8px] font-black text-slate-400 font-mono mt-1 truncate max-w-full">
@@ -463,14 +463,14 @@ export default function StaffProfileView({
     <div className="h-full flex flex-col overflow-hidden bg-slate-50 animate-in fade-in duration-300">
       <div className="shrink-0 flex items-center justify-between gap-3 px-1 pb-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-wider text-[#d2145a] mb-1">Hồ sơ cá nhân</p>
+          <p className="text-[10px] font-black uppercase tracking-wider text-primary mb-1">Hồ sơ cá nhân</p>
           <h2 className="text-xl font-extrabold text-slate-900">Profile · {profileStaff.StaffName}</h2>
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-[#d2145a] hover:border-pink-200 transition"
+            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-primary hover:border-pink-200 transition"
             title="Quay lại"
           >
             <X className="w-4 h-4" />
@@ -480,10 +480,10 @@ export default function StaffProfileView({
 
       <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 overflow-y-auto pr-1">
         <div className="space-y-4 min-w-0">
-          <div className="bg-white border border-slate-150 rounded-3xl p-4 shadow-sm">
+          <div className="bg-white border border-slate-150 rounded-xl p-4 shadow-sm">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
               <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-[#d2145a]" />
+                <Activity className="w-4 h-4 text-primary" />
                 Thống kê hoạt động
               </h3>
 
@@ -520,11 +520,11 @@ export default function StaffProfileView({
 
                 {(filter.preset === 'year' || filter.preset === 'month' || filter.preset === 'quarter') && !showCustomPicker && (
                   <div className="flex items-center border border-slate-100 rounded-lg bg-slate-50 p-0.5">
-                    <button type="button" onClick={() => setFilter(prev => ({ ...prev, year: prev.year + 1 }))} className="text-slate-400 hover:text-[#d2145a] p-0.5">
+                    <button type="button" onClick={() => setFilter(prev => ({ ...prev, year: prev.year + 1 }))} className="text-slate-400 hover:text-primary p-0.5">
                       <ChevronUp className="w-3 h-3" />
                     </button>
-                    <span className="text-[10px] font-extrabold font-mono text-[#d2145a] px-2">{filter.year}</span>
-                    <button type="button" onClick={() => setFilter(prev => ({ ...prev, year: prev.year - 1 }))} className="text-slate-400 hover:text-[#d2145a] p-0.5">
+                    <span className="text-[10px] font-extrabold font-mono text-primary px-2">{filter.year}</span>
+                    <button type="button" onClick={() => setFilter(prev => ({ ...prev, year: prev.year - 1 }))} className="text-slate-400 hover:text-primary p-0.5">
                       <ChevronDown className="w-3 h-3" />
                     </button>
                   </div>
@@ -557,7 +557,7 @@ export default function StaffProfileView({
             </div>
 
             {showCustomPicker && customFrom && customTo && (
-              <div className="mb-4 rounded-2xl border border-pink-100 bg-pink-50/40 px-3 py-2 text-[10px] font-bold text-[#d2145a]">
+              <div className="mb-4 rounded-2xl border border-pink-100 bg-pink-50/40 px-3 py-2 text-[10px] font-bold text-primary">
                 Đang lọc: {formatVNTime(customFrom)} → {formatVNTime(customTo)}
               </div>
             )}
@@ -577,7 +577,7 @@ export default function StaffProfileView({
             </div>
           </div>
 
-          <div className="bg-white border border-red-100 rounded-3xl p-4 shadow-sm">
+          <div className="bg-white border border-red-100 rounded-xl p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
@@ -637,24 +637,24 @@ export default function StaffProfileView({
         </div>
 
         <div className="xl:sticky xl:top-0 h-fit">
-          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-sm">
+          <div className="bg-white border border-slate-150 rounded-xl p-5 shadow-sm">
             <div className="flex flex-col items-center text-center">
               <div className="relative group">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt={profileStaff.StaffName}
-                    className="w-28 h-28 rounded-3xl object-cover border-4 border-pink-50 shadow-sm"
+                    className="w-28 h-28 rounded-xl object-cover border-4 border-pink-50 shadow-sm"
                   />
                 ) : (
-                  <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-pink-500 to-[#d2145a] text-white flex items-center justify-center text-4xl font-black shadow-sm">
+                  <div className="w-28 h-28 rounded-xl bg-gradient-to-br from-pink-500 to-primary text-white flex items-center justify-center text-4xl font-black shadow-sm">
                     {initial}
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-9 h-9 rounded-2xl bg-white border border-pink-200 text-[#d2145a] shadow-md flex items-center justify-center hover:bg-pink-50 transition"
+                  className="absolute -bottom-1 -right-1 w-9 h-9 rounded-2xl bg-white border border-pink-200 text-primary shadow-md flex items-center justify-center hover:bg-pink-50 transition"
                   title="Thay avatar"
                 >
                   <Camera className="w-4 h-4" />
@@ -673,7 +673,7 @@ export default function StaffProfileView({
               {(profileStaff.Name || adminDraft.Name) && (
                 <p className="text-xs font-semibold text-slate-500">{profileStaff.Name || adminDraft.Name}</p>
               )}
-              <span className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pink-50 text-[#d2145a] text-[10px] font-black uppercase">
+              <span className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pink-50 text-primary text-[10px] font-black uppercase">
                 <Shield className="w-3 h-3" />
                 {profileStaff.Role}
               </span>
@@ -686,7 +686,7 @@ export default function StaffProfileView({
                   <button
                     type="button"
                     onClick={() => setIsEditingAdmin(true)}
-                    className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-pink-200 hover:text-[#d2145a] inline-flex items-center gap-1 transition"
+                    className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-pink-200 hover:text-primary inline-flex items-center gap-1 transition"
                   >
                     <Pencil className="w-3 h-3" /> Sửa
                   </button>
@@ -703,7 +703,7 @@ export default function StaffProfileView({
                       type="button"
                       onClick={handleSaveProfile}
                       disabled={saving}
-                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[#d2145a] text-white hover:bg-[#b8124e] inline-flex items-center gap-1 disabled:opacity-60"
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-primary text-white hover:bg-[#b8124e] inline-flex items-center gap-1 disabled:opacity-60"
                     >
                       <Save className="w-3 h-3" />
                       {saving ? 'Đang lưu...' : 'Lưu'}

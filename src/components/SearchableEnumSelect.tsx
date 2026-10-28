@@ -354,7 +354,7 @@ export function SearchableEnumSelect({
         aria-hidden
       >
         {renderSelectedFace(true)}
-        <ChevronDown className="w-4 h-4 text-[#d2145a] shrink-0 rotate-180" />
+        <ChevronDown className="w-4 h-4 text-primary shrink-0 rotate-180" />
       </div>
     </div>
   );
@@ -401,11 +401,11 @@ export function SearchableEnumSelect({
               onMouseEnter={() => setHighlightedIndex(idx)}
               onClick={() => selectSingleValue('')}
               className={`px-3.5 py-2 text-xs font-semibold cursor-pointer flex items-center justify-between ${
-                highlighted ? 'bg-[#d2145a]/10 text-[#d2145a]' : 'text-slate-400 hover:bg-slate-50'
+                highlighted ? 'bg-primary/10 text-primary' : 'text-slate-400 hover:bg-slate-50'
               }`}
             >
               <span>{placeholder}</span>
-              {!value && <Check className="w-4 h-4 text-[#d2145a]" />}
+              {!value && <Check className="w-4 h-4 text-primary" />}
             </div>
           );
         })()}
@@ -425,14 +425,14 @@ export function SearchableEnumSelect({
               onClick={() => (multiple ? toggleMultiValue(option) : selectSingleValue(option))}
               className={`px-3.5 py-2 text-xs font-bold cursor-pointer transition flex items-center justify-between gap-2 ${
                 highlighted
-                  ? 'bg-[#d2145a]/10 text-[#d2145a]'
+                  ? 'bg-primary/10 text-primary'
                   : selected
                     ? 'bg-indigo-50 text-indigo-700'
                     : 'text-slate-700 hover:bg-slate-50'
               }`}
             >
               <span className="leading-snug">{option}</span>
-              {selected && <Check className="w-4 h-4 text-[#d2145a] shrink-0" />}
+              {selected && <Check className="w-4 h-4 text-primary shrink-0" />}
             </div>
           );
         })}
@@ -467,9 +467,9 @@ export function SearchableEnumSelect({
         onKeyDown={handleTriggerKeyDown}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`w-full min-h-[38px] bg-white border rounded-xl px-2.5 py-1.5 text-xs font-semibold flex items-center justify-between gap-2 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#d2145a]/30 ${
+        className={`w-full min-h-[38px] bg-white border rounded-xl px-2.5 py-1.5 text-xs font-semibold flex items-center justify-between gap-2 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${
           triggerBorderClass
-        } ${isOpen && isMobile ? 'ring-2 ring-[#d2145a]/35 border-[#d2145a]/30' : 'hover:border-[#d2145a]/40'}`}
+        } ${isOpen && isMobile ? 'ring-2 ring-primary/35 border-primary/30' : 'hover:border-primary/40'}`}
         aria-label={mobileContextLabel || fieldLabel || placeholder}
       >
         {renderSelectedFace(true)}

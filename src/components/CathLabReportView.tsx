@@ -351,9 +351,9 @@ function CathLabReportViewInner({
     <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50 overflow-hidden">
       
       {/* Title Header — mobile only */}
-      <div className="shrink-0 md:hidden flex flex-col gap-3 bg-white p-5 border border-slate-200 rounded-3xl shadow-sm">
+      <div className="shrink-0 md:hidden flex flex-col gap-3 bg-white p-5 border border-slate-200 rounded-xl shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-pink-50 flex items-center justify-center text-[#d2145a] shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-pink-50 flex items-center justify-center text-primary shadow-sm">
             <FileText className="w-6 h-6" />
           </div>
           <div>
@@ -367,7 +367,7 @@ function CathLabReportViewInner({
         <button
           type="button"
           onClick={() => setActiveTab('report')}
-          className={`font-extrabold text-[11px] sm:text-[13px] px-4 py-2 rounded-2xl transition flex items-center gap-2 ${activeTab === 'report' ? 'bg-[#d2145a] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+          className={`font-extrabold text-[11px] sm:text-[13px] px-4 py-2 rounded-2xl transition flex items-center gap-2 ${activeTab === 'report' ? 'bg-primary text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
         >
           <FileText className="w-4 h-4 shrink-0" />
           Báo cáo & Thống kê
@@ -401,7 +401,7 @@ function CathLabReportViewInner({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400">Tổng số ca thông tim</span>
             <h3 className="text-2xl font-black text-slate-900 mt-1 font-mono">{stats.total}</h3>
@@ -411,7 +411,7 @@ function CathLabReportViewInner({
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] uppercase font-bold text-emerald-500">Can thiệp Thành công</span>
             <h3 className="text-2xl font-black text-emerald-600 mt-1 font-mono">{stats.success} <span className="text-xs font-semibold text-slate-400">({stats.successRate}%)</span></h3>
@@ -421,7 +421,7 @@ function CathLabReportViewInner({
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] uppercase font-bold text-rose-500 font-bold">Không thành công</span>
             <h3 className="text-2xl font-black text-rose-600 mt-1 font-mono">{stats.failed}</h3>
@@ -431,7 +431,7 @@ function CathLabReportViewInner({
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm flex items-center justify-between">
+        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] uppercase font-bold text-amber-500 font-bold">Hoãn thủ thuật</span>
             <h3 className="text-2xl font-black text-amber-600 mt-1 font-mono">{stats.postponed}</h3>
@@ -443,16 +443,16 @@ function CathLabReportViewInner({
       </div>
 
       {/* Filters Box */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 shrink-0">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4 shrink-0">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[#d2145a]" />
+            <Filter className="w-4 h-4 text-primary" />
             <h4 className="font-extrabold text-xs text-neutral-900 uppercase">Bộ lọc báo cáo chuyên sâu</h4>
           </div>
           <button
             type="button"
             onClick={handleResetFilters}
-            className="text-[#d2145a] hover:underline text-xs font-bold transition cursor-pointer"
+            className="text-primary hover:underline text-xs font-bold transition cursor-pointer"
           >
             Xóa tất cả bộ lọc
           </button>
@@ -469,14 +469,14 @@ function CathLabReportViewInner({
                 <button
                   type="button"
                   onClick={() => setTimeMode('preset')}
-                  className={`px-2 py-0.5 rounded-md font-extrabold cursor-pointer ${timeMode === 'preset' ? 'bg-white shadow-xs text-[#d2145a]' : 'text-slate-500'}`}
+                  className={`px-2 py-0.5 rounded-md font-extrabold cursor-pointer ${timeMode === 'preset' ? 'bg-white shadow-xs text-primary' : 'text-slate-500'}`}
                 >
                   Mặc định
                 </button>
                 <button
                   type="button"
                   onClick={() => setTimeMode('range')}
-                  className={`px-2 py-0.5 rounded-md font-extrabold cursor-pointer ${timeMode === 'range' ? 'bg-white shadow-xs text-[#d2145a]' : 'text-slate-500'}`}
+                  className={`px-2 py-0.5 rounded-md font-extrabold cursor-pointer ${timeMode === 'range' ? 'bg-white shadow-xs text-primary' : 'text-slate-500'}`}
                 >
                   Khoảng ngày
                 </button>
@@ -668,7 +668,7 @@ function CathLabReportViewInner({
       </div>
 
       {/* Main Table List */}
-      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
         <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
           <table className="w-full text-left text-xs border-collapse min-w-[1200px]">
             <thead className="sticky top-0 z-10">
@@ -704,7 +704,7 @@ function CathLabReportViewInner({
                         {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
                       </td>
                       <td className="py-3.5 px-4 sticky left-0 z-[5] bg-white group-hover:bg-pink-50/30 min-w-[200px] shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]">
-                        <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-[#d2145a]">{pat?.PatientName ? safeString(pat.PatientName) : '—'}</p>
+                        <p className="font-black text-neutral-900 leading-tight uppercase group-hover:text-primary">{pat?.PatientName ? safeString(pat.PatientName) : '—'}</p>
                         <p className="text-[10px] text-slate-400 font-mono mt-0.5">
                           MNB: {pat?.PatientID1 ? safeString(pat.PatientID1) : '—'} | DOB: {pat?.PatientDOB ? formatVNTime(pat.PatientDOB) : '—'}
                         </p>
@@ -829,7 +829,7 @@ export default function CathLabReportView(props: CathLabReportViewProps) {
     return <CathLabReportViewInner {...props} />;
   } catch (err: any) {
     return (
-      <div className="p-6 bg-red-50 border border-red-200 rounded-3xl text-red-700 font-sans m-4">
+      <div className="p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 font-sans m-4">
         <h3 className="font-extrabold text-base uppercase mb-2">Đã xảy ra lỗi khi tải Báo cáo</h3>
         <p className="text-sm font-semibold mb-4">{err?.message || String(err)}</p>
         <pre className="text-[10px] bg-red-100/50 p-4 rounded-xl overflow-auto max-h-[300px] font-mono leading-relaxed">

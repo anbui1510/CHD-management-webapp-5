@@ -258,7 +258,7 @@ export default function HisCathImportPanel({
 
   return (
     <div className="flex-1 flex flex-col gap-4 min-h-0">
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm shrink-0 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm shrink-0 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
@@ -324,10 +324,10 @@ export default function HisCathImportPanel({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[#d2145a]" />
+            <Filter className="w-4 h-4 text-primary" />
             <span className="text-xs font-extrabold uppercase text-slate-700">Kết quả import</span>
             <span className="text-[10px] font-bold text-slate-400">({filteredRows.length}/{rows.length} dòng)</span>
           </div>
@@ -390,7 +390,7 @@ export default function HisCathImportPanel({
                     {row.cathDate ? formatVNTime(row.cathDate) : '—'}
                   </td>
                   <td className="py-3 px-3 text-slate-600">{row.cathMethod || '—'}</td>
-                  <td className="py-3 px-3 text-center font-extrabold text-[#d2145a]">
+                  <td className="py-3 px-3 text-center font-extrabold text-primary">
                     {row.diagnosisID || '—'}
                   </td>
                   <td className="py-3 px-3 text-indigo-700">{row.ptvMain || '—'}</td>

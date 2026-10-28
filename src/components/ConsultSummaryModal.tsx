@@ -215,7 +215,7 @@ export function ConsultSummarySheet({
       </div>
 
       <div className={isCompact ? '' : 'flex sm:flex-row flex-col sm:items-center justify-between gap-2 pb-1'}>
-        <div className={`bg-[#d2145a] text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${
+        <div className={`bg-primary text-white font-black uppercase tracking-wide rounded-xl shrink-0 max-w-full break-words shadow-xs leading-snug ${
           isCapture169 ? `${CAPTURE169_TYPO.patientBanner} px-3 py-2 leading-snug` : isCompact ? 'text-[14px] px-2.5 py-1' : 'text-sm px-3.5 py-1.5 sm:max-w-[75%]'
         }`}>
           {formatSummaryPatientTitle(patient.PatientName, consult, ptvPhu1Display)}
@@ -489,7 +489,7 @@ export function ConsultSummaryModal({
 
   const modalPanelClass = isMobile
     ? 'flex flex-col flex-1 min-h-0 w-full overflow-hidden'
-    : 'bg-slate-50/95 backdrop-blur-md w-full max-w-3xl max-h-[95vh] rounded-3xl border border-slate-200 shadow-2xl flex flex-col min-h-0 overflow-hidden font-sans text-xs animate-in zoom-in-95 duration-200';
+    : 'bg-slate-50/95 backdrop-blur-md w-full max-w-3xl max-h-[95vh] rounded-xl border border-slate-200 shadow-2xl flex flex-col min-h-0 overflow-hidden font-sans text-xs animate-in zoom-in-95 duration-200';
 
   const modal = (
     <div
@@ -512,7 +512,7 @@ export function ConsultSummaryModal({
         className={modalPanelClass}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`border-b border-slate-200 bg-white flex items-center justify-between text-[#d2145a] shrink-0 ${isMobile ? 'px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))]' : 'p-4 rounded-t-3xl'}`}>
+        <div className={`border-b border-slate-200 bg-white flex items-center justify-between text-primary shrink-0 ${isMobile ? 'px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))]' : 'p-4 rounded-t-xl'}`}>
           <div className="flex items-center gap-2 min-w-0">
             <div className="bg-emerald-50 text-emerald-600 rounded-xl p-2 shrink-0">
               <Clipboard className="w-5 h-5" />
@@ -602,7 +602,7 @@ export function ConsultSummaryModal({
               type="button"
               onClick={handleCopy}
               className={`rounded-xl text-xs font-black uppercase text-white shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 outline-none ${
-                copied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#d2145a] hover:bg-pink-700'
+                copied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-primary hover:bg-pink-700'
               } ${isMobile ? 'flex-1 min-w-[5rem] py-2.5 px-3' : 'px-4 py-2'}`}
             >
               <Check className="w-3.5 h-3.5 shrink-0" />
@@ -827,7 +827,7 @@ export function StaffSummaryExportActions({
             <button
               type="button"
               onClick={() => { void copySms(); }}
-              className="px-4 py-2 rounded-xl bg-[#d2145a] hover:bg-pink-700 text-white text-xs font-black uppercase"
+              className="px-4 py-2 rounded-xl bg-primary hover:bg-pink-700 text-white text-xs font-black uppercase"
             >
               {copiedSms ? 'Đã sao chép' : 'Sao chép tin nhắn'}
             </button>

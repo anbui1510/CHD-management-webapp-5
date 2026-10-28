@@ -44,7 +44,7 @@ export default function ChdDailyBriefHomeWidget({ onOpen, className = '' }: ChdD
       className={`text-left bg-gradient-to-br from-blue-50 via-white to-pink-50/40 rounded-2xl p-3 border border-blue-100/80 shadow-sm flex flex-col relative overflow-hidden group min-h-[85px] hover:border-pink-200 hover:shadow-md transition-all ${className}`}
     >
       <div className="absolute top-1 right-1 opacity-[0.07] pointer-events-none">
-        <Newspaper className="w-16 h-16 text-[#d2145a] group-hover:scale-110 transition-transform" />
+        <Newspaper className="w-16 h-16 text-primary group-hover:scale-110 transition-transform" />
       </div>
 
       <div className="relative z-10 flex flex-col gap-1.5 min-h-0">
@@ -53,7 +53,7 @@ export default function ChdDailyBriefHomeWidget({ onOpen, className = '' }: ChdD
             <Newspaper className="w-3 h-3 shrink-0" />
             CHD Daily Brief
           </span>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#d2145a] shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-primary shrink-0" />
         </div>
 
         <p className="text-[10px] font-bold text-slate-600 leading-snug">{dateVN}</p>

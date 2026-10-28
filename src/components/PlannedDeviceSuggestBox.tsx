@@ -199,8 +199,8 @@ export function PlannedDeviceSuggestBox({
           title="Gợi ý dụng cụ"
           className={`absolute bottom-2 right-2 w-7 h-7 rounded-full border shadow-sm flex items-center justify-center transition cursor-pointer ${
             showSuggestions
-              ? 'bg-[#d2145a] border-[#d2145a] text-white'
-              : 'bg-white/95 border-pink-200 text-[#d2145a] hover:bg-pink-50'
+              ? 'bg-primary border-primary text-white'
+              : 'bg-white/95 border-pink-200 text-primary hover:bg-pink-50'
           }`}
         >
           <Wrench className="w-3.5 h-3.5" />
@@ -215,7 +215,7 @@ export function PlannedDeviceSuggestBox({
       {showSuggestions && (
         <div className="mt-2 rounded-2xl border border-pink-200 bg-pink-50/80 p-2 shadow-sm">
           <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#d2145a]">
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-primary">
               Gợi ý dụng cụ {normalizedDiagnosisID ? `(${normalizedDiagnosisID})` : ''}
             </span>
             <div className="flex items-center gap-2">

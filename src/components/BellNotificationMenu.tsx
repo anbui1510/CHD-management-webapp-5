@@ -23,7 +23,7 @@ interface BellNotificationMenuProps {
 
 const getNotificationTitleClass = (severity?: Notification['Severity']): string => {
   if (severity === 'critical') return 'text-red-700';
-  return 'text-[#d2145a]';
+  return 'text-primary';
 };
 
 export default function BellNotificationMenu({
@@ -107,7 +107,7 @@ export default function BellNotificationMenu({
               <button
                 type="button"
                 onClick={() => staffNotifications.filter(item => !item.IsRead).forEach(item => onMarkRead(item.NotificationKey))}
-                className="text-[10px] font-black text-[#d2145a] hover:bg-pink-50 px-2 py-1 rounded-lg transition flex items-center gap-1"
+                className="text-[10px] font-black text-primary hover:bg-pink-50 px-2 py-1 rounded-lg transition flex items-center gap-1"
               >
                 <CheckCheck className="w-3.5 h-3.5" />
                 Đã đọc hết
@@ -143,7 +143,7 @@ export default function BellNotificationMenu({
                         <button
                           type="button"
                           onClick={() => onMarkRead(item.NotificationKey)}
-                          className="text-[9px] font-black text-[#d2145a] hover:bg-white px-1.5 py-1 rounded transition"
+                          className="text-[9px] font-black text-primary hover:bg-white px-1.5 py-1 rounded transition"
                         >
                           Đã đọc
                         </button>

@@ -57,7 +57,7 @@ class AppErrorBoundary extends Component<
       return (
         <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center p-6 font-sans">
           <div className="text-center space-y-3">
-            <div className="mx-auto h-8 w-8 rounded-full border-2 border-[#d2145a] border-t-transparent animate-spin" />
+            <div className="mx-auto h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
             <p className="text-sm font-semibold text-neutral-200">Đang cập nhật phiên bản mới...</p>
           </div>
         </div>

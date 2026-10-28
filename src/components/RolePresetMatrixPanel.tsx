@@ -174,14 +174,14 @@ export default function RolePresetMatrixPanel({
         <button
           type="button"
           onClick={startCreate}
-          className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-[#d2145a] text-white flex items-center gap-1.5 hover:bg-[#b8124e] transition"
+          className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-primary text-white flex items-center gap-1.5 hover:bg-[#b8124e] transition"
         >
           <Plus className="w-3.5 h-3.5" /> Thêm vai trò mẫu
         </button>
       </div>
 
       <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 gap-4">
-        <div className="xl:col-span-5 flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl overflow-hidden">
+        <div className="xl:col-span-5 flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="p-3 border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
             Danh sách preset ({rolePresetRecords.length})
           </div>
@@ -195,7 +195,7 @@ export default function RolePresetMatrixPanel({
                   className={`p-3 flex items-start gap-2 ${active ? 'bg-pink-50' : 'hover:bg-slate-50'}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-extrabold text-xs text-[#d2145a] truncate">{record.RolePresetLabel}</p>
+                    <p className="font-extrabold text-xs text-primary truncate">{record.RolePresetLabel}</p>
                     <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{record.RolePresetDescription}</p>
                     <p className="text-[9px] font-mono text-slate-400 mt-1">
                       {record.RolePresetID} · {preset?.modules.length ?? 0} module
@@ -206,7 +206,7 @@ export default function RolePresetMatrixPanel({
                     <button
                       type="button"
                       onClick={() => startEdit(record)}
-                      className="p-1.5 rounded-lg border border-slate-200 hover:border-pink-200 text-slate-500 hover:text-[#d2145a]"
+                      className="p-1.5 rounded-lg border border-slate-200 hover:border-pink-200 text-slate-500 hover:text-primary"
                       title="Sửa"
                     >
                       <Pencil className="w-3.5 h-3.5" />
@@ -228,7 +228,7 @@ export default function RolePresetMatrixPanel({
           </div>
         </div>
 
-        <div className="xl:col-span-7 flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl overflow-hidden">
+        <div className="xl:col-span-7 flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl overflow-hidden">
           {!draft ? (
             <div className="flex-1 flex items-center justify-center p-8 text-center text-sm text-slate-400 font-semibold">
               Chọn preset để sửa hoặc bấm &quot;Thêm vai trò mẫu&quot;
@@ -247,7 +247,7 @@ export default function RolePresetMatrixPanel({
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-[#d2145a] text-white flex items-center gap-1 disabled:opacity-50"
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-primary text-white flex items-center gap-1 disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" /> {saving ? 'Đang lưu...' : 'Lưu preset'}
                   </button>
@@ -321,7 +321,7 @@ export default function RolePresetMatrixPanel({
                                   checked={checked}
                                   disabled={locked}
                                   onChange={() => toggleModule(module.id)}
-                                  className="mt-0.5 rounded border-slate-300 text-[#d2145a]"
+                                  className="mt-0.5 rounded border-slate-300 text-primary"
                                 />
                                 <span className="text-[11px] font-bold text-slate-700">{getModuleLabel(module.id)}</span>
                               </label>

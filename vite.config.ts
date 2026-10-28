@@ -72,7 +72,7 @@ export default defineConfig(() => {
           name: 'CHD Management',
           short_name: 'CHD',
           description: 'Hệ thống quản lý bệnh nhi tim bẩm sinh',
-          theme_color: '#171717',
+          theme_color: '#d2145a',
           background_color: '#ffffff',
           display: 'standalone',
           orientation: 'portrait-primary',

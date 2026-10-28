@@ -127,7 +127,7 @@ export function StaffMultiSelect({ staffList = [], selectedMembers = [], onChang
       {/* Selection Control Container */}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus-within:ring-1 focus-within:ring-[#d2145a] focus-within:border-[#d2145a] shadow-sm cursor-pointer flex items-center justify-between min-h-[38px] transition duration-150"
+        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary shadow-sm cursor-pointer flex items-center justify-between min-h-[38px] transition duration-150"
       >
         {/* Selected Tags area */}
         <div className="flex flex-wrap gap-1.5 flex-1 select-none mr-2">
@@ -137,7 +137,7 @@ export function StaffMultiSelect({ staffList = [], selectedMembers = [], onChang
             normalizedMembers.map(member => (
               <span 
                 key={member}
-                className="inline-flex items-center gap-1 bg-pink-50 text-[#d2145a] hover:bg-pink-100 border border-pink-100 px-2 py-0.5 rounded-lg text-[11px] font-bold font-sans transition-colors duration-100"
+                className="inline-flex items-center gap-1 bg-pink-50 text-primary hover:bg-pink-100 border border-pink-100 px-2 py-0.5 rounded-lg text-[11px] font-bold font-sans transition-colors duration-100"
               >
                 {member}
                 <button
@@ -193,7 +193,7 @@ export function StaffMultiSelect({ staffList = [], selectedMembers = [], onChang
                     onClick={() => handleToggleOption(opt.shortName)}
                     className={`flex items-center justify-between px-3.5 py-2 font-sans font-bold cursor-pointer transition duration-100 select-none ${
                         isSelected 
-                          ? 'bg-pink-50 text-[#d2145a]' 
+                          ? 'bg-pink-50 text-primary' 
                           : 'hover:bg-slate-50 text-slate-700'
                     }`}
                   >
@@ -202,7 +202,7 @@ export function StaffMultiSelect({ staffList = [], selectedMembers = [], onChang
                       <span className="text-[10px] text-slate-400 font-medium font-sans mt-0.5">{opt.fullName}</span>
                     </div>
                     {isSelected && (
-                      <Check className="w-4 h-4 text-[#d2145a] shrink-0 font-bold ml-2" />
+                      <Check className="w-4 h-4 text-primary shrink-0 font-bold ml-2" />
                     )}
                   </div>
                 );

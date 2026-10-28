@@ -2902,9 +2902,9 @@ export default function App() {
           <AnimatePresence>
             {showAddConsult && (
               <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4">
-                <div className="bg-white rounded-3xl max-w-xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+                <div className="bg-white rounded-xl max-w-xl w-full max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] shadow-2xl border border-slate-150 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
                   
-                  <div className="flex items-center justify-between border-b border-slate-150 px-6 py-3.5 text-[#d2145a] shrink-0">
+                  <div className="flex items-center justify-between border-b border-slate-150 px-6 py-3.5 text-primary shrink-0">
                     <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
                       <ClipboardList className="w-5 h-5 animate-pulse" /> Đăng ký staff
                     </h3>
@@ -2929,7 +2929,7 @@ export default function App() {
                     {/* Searchable Patient Selection Block */}
                     <div className="bg-slate-50 border border-slate-150 p-4 rounded-2xl space-y-3">
                       <div className="flex items-center justify-between">
-                        <label className="block text-[#d2145a] font-extrabold uppercase text-[10px]">
+                        <label className="block text-primary font-extrabold uppercase text-[10px]">
                           Chọn Bệnh nhi cần đăng ký *
                         </label>
                         <button
@@ -2950,7 +2950,7 @@ export default function App() {
                             });
                             setShowAddPatient(true);
                           }}
-                          className="bg-[#d2145a]/10 hover:bg-[#d2145a]/20 text-[#d2145a] font-extrabold px-3 py-1 rounded-lg text-[10px] transition flex items-center gap-1 cursor-pointer"
+                          className="bg-primary/10 hover:bg-primary/20 text-primary font-extrabold px-3 py-1 rounded-lg text-[10px] transition flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3 h-3" /> Mới
                         </button>
@@ -2993,7 +2993,7 @@ export default function App() {
                                   handlePatientSelectChange(p.PatientKey);
                                   setSearchPatientQuery(''); // Clear search input
                                 }}
-                                className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-[#d2145a]"
+                                className="w-full text-left px-3 py-2.5 text-xs transition flex justify-between items-center cursor-pointer hover:bg-pink-50 hover:text-primary"
                               >
                                 <div>
                                   <span className="font-extrabold uppercase">{p.PatientName}</span>
@@ -3014,9 +3014,9 @@ export default function App() {
                           <div className="bg-pink-50/70 border border-pink-100 rounded-2xl p-4 text-xs text-slate-800 relative shadow-sm">
                             <div className="flex items-start justify-between">
                               <div className="space-y-2">
-                                <h4 className="font-black text-sm uppercase text-[#d2145a] flex items-center gap-2">
+                                <h4 className="font-black text-sm uppercase text-primary flex items-center gap-2">
                                   <span>👤 {selectedPat.PatientName}</span>
-                                  <span className="bg-white border border-pink-200 text-[#d2145a] text-[10px] px-2 py-0.5 rounded-full font-mono normal-case">{selectedPat.PatientSex}</span>
+                                  <span className="bg-white border border-pink-200 text-primary text-[10px] px-2 py-0.5 rounded-full font-mono normal-case">{selectedPat.PatientSex}</span>
                                 </h4>
                                 
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2.5">
@@ -3048,7 +3048,7 @@ export default function App() {
                                   handlePatientSelectChange('');
                                   setSearchPatientQuery('');
                                 }}
-                                className="bg-white hover:bg-pink-100 hover:text-[#d2145a] transition text-slate-400 font-bold w-6 h-6 rounded-full flex items-center justify-center border border-pink-100 cursor-pointer shadow-sm ml-2"
+                                className="bg-white hover:bg-pink-100 hover:text-primary transition text-slate-400 font-bold w-6 h-6 rounded-full flex items-center justify-center border border-pink-100 cursor-pointer shadow-sm ml-2"
                                 title="Bỏ chọn & Tìm bệnh nhân khác"
                               >
                                 ✕
@@ -3080,8 +3080,8 @@ export default function App() {
                               onClick={() => setNewConsultData(prev => ({ ...prev, ConsultType: type }))}
                               className={`rounded-xl px-3 py-2 font-extrabold border transition ${
                                 newConsultData.ConsultType === type
-                                  ? 'bg-[#d2145a] text-white border-[#d2145a] shadow-sm'
-                                  : 'bg-white text-slate-600 border-slate-200 hover:border-[#d2145a]/40'
+                                  ? 'bg-primary text-white border-primary shadow-sm'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40'
                               }`}
                             >
                               {type}
@@ -3207,7 +3207,7 @@ export default function App() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2 rounded-xl transition shadow-md cursor-pointer text-xs"
+                      className="flex-1 bg-primary hover:bg-pink-700 text-white font-extrabold uppercase py-2 rounded-xl transition shadow-md cursor-pointer text-xs"
                     >
                       Lưu đăng ký
                     </button>
@@ -3432,7 +3432,7 @@ export default function App() {
                   const keyToDelete = consultListConfirmDeleteKey;
                   return (
                     <div className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                      <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 animate-in zoom-in-95 duration-150 text-slate-700 text-xs">
+                      <div className="bg-white rounded-xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 animate-in zoom-in-95 duration-150 text-slate-700 text-xs">
                         <div className="flex items-center gap-3 text-red-650 mb-3.5">
                           <div className="bg-red-50 p-2 rounded-full border border-red-150">
                             <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -3490,7 +3490,7 @@ export default function App() {
 
                 {consultListDeletingKey && (
                   <div className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-3 animate-in zoom-in-95 duration-150">
+                    <div className="bg-white rounded-xl max-w-sm w-full shadow-2xl border border-slate-200 p-6 text-center space-y-3 animate-in zoom-in-95 duration-150">
                       <div className="mx-auto w-10 h-10 border-2 border-sky-600 border-t-transparent rounded-full animate-spin" />
                       <h4 className="font-extrabold text-sm uppercase text-slate-800">Đang xóa...</h4>
                       <p className="text-[11px] text-slate-500 font-medium">Vui lòng chờ trong giây lát</p>
@@ -3955,18 +3955,18 @@ export default function App() {
 
           {/* EXCEL EXPORT PANEL */}
           {activeMenu === 'excel-export' && (
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm max-w-xl mx-auto space-y-6 text-xs animate-in fade-in duration-200">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm max-w-xl mx-auto space-y-6 text-xs animate-in fade-in duration-200">
               
               <div className="text-center">
                 <div className="bg-emerald-50 text-emerald-600 inline-flex p-3 rounded-2xl mb-2">
                   <Download className="w-6 h-6" />
                 </div>
-                <h2 className="text-base font-extrabold text-[#d2145a] uppercase">Báo cáo &amp; Kết xuất Dữ liệu Hội chẩn</h2>
+                <h2 className="text-base font-extrabold text-primary uppercase">Báo cáo &amp; Kết xuất Dữ liệu Hội chẩn</h2>
                 <p className="text-slate-400 mt-0.5">Lập Bảng Excel lưu trữ, liên hệ gia đình NB hoặc nộp lưu trữ khoa mạch.</p>
               </div>
 
               <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-3">
-                <span className="font-extrabold text-[#d2145a] block uppercase text-[10px] tracking-wider">Cơ cấu bộ lọc Slice</span>
+                <span className="font-extrabold text-primary block uppercase text-[10px] tracking-wider">Cơ cấu bộ lọc Slice</span>
                 <div className="grid grid-cols-2 gap-3 font-medium">
                   <div>
                     <span className="text-slate-400">Kiểu staff chọn:</span>
@@ -4076,9 +4076,9 @@ export default function App() {
         {editingRegConsultKey && (
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4 pb-[var(--mobile-bottom-nav-offset)] md:pb-4 animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={() => setEditingRegConsultKey(null)}></div>
-            <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col z-50 max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="relative bg-white w-full max-w-4xl rounded-xl shadow-2xl flex flex-col z-50 max-h-[min(88dvh,calc(100dvh-var(--mobile-bottom-nav-offset)-0.5rem))] md:max-h-[92vh] animate-in zoom-in-95 duration-200 overflow-hidden">
               
-              <div className="bg-[#d2145a] text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
+              <div className="bg-primary text-white px-6 py-4 flex items-center justify-between shadow-sm shrink-0">
                 <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-1.5 font-sans">
                   <Stethoscope className="w-5 h-5 text-white animate-pulse" /> Sửa Đăng ký staff
                 </h3>
@@ -4233,8 +4233,8 @@ export default function App() {
                                     onClick={() => setEditConsultData(prev => ({ ...prev, ConsultType: type }))}
                                     className={`rounded-xl px-3 py-2 font-extrabold border transition ${
                                       editConsultData.ConsultType === type
-                                        ? 'bg-[#d2145a] text-white border-[#d2145a] shadow-sm'
-                                        : 'bg-white text-slate-600 border-slate-200 hover:border-[#d2145a]/40'
+                                        ? 'bg-primary text-white border-primary shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40'
                                     }`}
                                   >
                                     {type}
@@ -4292,7 +4292,7 @@ export default function App() {
                                     setEditConsultData(prev => ({ ...prev, Department: val as any }));
                                   }
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none text-[#d2145a] font-bold"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none text-primary font-bold"
                               >
                                 <option value="">-- Không bắt buộc --</option>
                                 {DEFAULT_DEPARTMENTS.map(d => (
@@ -4350,7 +4350,7 @@ export default function App() {
                         </button>
                         <button
                           type="submit"
-                          className="px-10 py-2.5 bg-[#d2145a] hover:bg-[#b0104b] text-white font-extrabold uppercase rounded-xl shadow-md transition cursor-pointer text-xs"
+                          className="px-10 py-2.5 bg-primary hover:bg-primary/90 text-white font-extrabold uppercase rounded-xl shadow-md transition cursor-pointer text-xs"
                         >
                           ✓ Lưu Đăng ký staff
                         </button>
@@ -4370,9 +4370,9 @@ export default function App() {
       <AnimatePresence>
         {showAddPatient && (
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-4 sm:p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed font-sans">
+            <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-150 p-4 sm:p-6 space-y-5 text-xs text-slate-700 font-semibold leading-relaxed font-sans">
               
-              <div className="flex items-center justify-between border-b border-slate-150 pb-2.5 text-[#d2145a]">
+              <div className="flex items-center justify-between border-b border-slate-150 pb-2.5 text-primary">
                 <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
                   <Heart className="w-5 h-5 animate-pulse" /> {editingPatientKey ? "SỬA HỒ SƠ HÀNH CHÍNH" : "Đăng ký hồ sơ mới"}
                 </h3>
@@ -4393,7 +4393,7 @@ export default function App() {
               <form onSubmit={handleAddPatientSubmit} className="space-y-4 font-medium text-slate-700">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[#d2145a] font-extrabold uppercase text-[10px] mb-1">Mã người bệnh *</label>
+                    <label className="block text-primary font-extrabold uppercase text-[10px] mb-1">Mã người bệnh *</label>
                     <input
                       type="text"
                       required
@@ -4546,7 +4546,7 @@ export default function App() {
                   </button>
                   <button
                     type="submit"
-                    className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-3 rounded-2xl transition shadow-md cursor-pointer"
+                    className="w-full bg-primary hover:bg-pink-700 text-white font-extrabold uppercase py-3 rounded-2xl transition shadow-md cursor-pointer"
                   >
                     Lưu
                   </button>
@@ -4588,7 +4588,7 @@ export default function App() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-150 text-center space-y-4 font-sans"
+              className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-slate-150 text-center space-y-4 font-sans"
             >
               <div className="mx-auto bg-amber-50 text-amber-600 rounded-full w-12 h-12 flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6" />
@@ -4602,7 +4602,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setCustomAlert(null)}
-                className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
+                className="w-full bg-primary hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
               >
                 Đồng ý
               </button>
@@ -4619,10 +4619,10 @@ export default function App() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-150 space-y-4 font-sans"
+              className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-150 space-y-4 font-sans"
             >
               <div className="flex items-center gap-3 border-b border-slate-100 pb-2.5">
-                <div className="bg-pink-50 text-[#d2145a] rounded-full w-10 h-10 flex items-center justify-center shrink-0">
+                <div className="bg-pink-50 text-primary rounded-full w-10 h-10 flex items-center justify-center shrink-0">
                   <ClipboardCheck className="w-5 h-5" />
                 </div>
                 <div>
@@ -4662,7 +4662,7 @@ export default function App() {
                       }
                     }, 50);
                   }}
-                  className="w-full bg-[#d2145a] hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
+                  className="w-full bg-primary hover:bg-pink-700 text-white font-extrabold uppercase py-2.5 rounded-2xl transition shadow-md cursor-pointer text-xs"
                 >
                   Xác nhận
                 </button>

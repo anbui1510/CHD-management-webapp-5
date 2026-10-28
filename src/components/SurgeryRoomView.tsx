@@ -117,7 +117,7 @@ export default function SurgeryRoomView({
       </div>
 
       {activeTab === 'pending' && (
-        <div className="flex-1 overflow-hidden bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col">
+        <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
           <div className="flex-1 flex items-center justify-center p-10">
             <div className="text-center max-w-md">
               <p className="text-slate-500 font-semibold text-sm">Chưa có ca chờ phẫu thuật</p>
@@ -133,7 +133,7 @@ export default function SurgeryRoomView({
       )}
 
       {activeTab === 'done' && (
-        <div className="flex-1 overflow-hidden bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col">
+        <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
           <div className="flex-1 overflow-auto custom-scrollbar">
             <table className="w-full text-left text-xs border-collapse min-w-[900px]">
               <thead className="sticky top-0 z-10">
@@ -197,7 +197,7 @@ export default function SurgeryRoomView({
 
       {selectedDone && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] shadow-2xl border border-slate-200 flex flex-col text-sm font-medium overflow-hidden">
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[92vh] shadow-2xl border border-slate-200 flex flex-col text-sm font-medium overflow-hidden">
             <div className="bg-[#1e293b] text-white px-5 py-3 flex justify-between items-center shrink-0">
               <h3 className="font-extrabold uppercase tracking-wide flex items-center gap-2">
                 <Stethoscope />
@@ -211,7 +211,7 @@ export default function SurgeryRoomView({
             <div className="flex-1 p-4 bg-slate-50/50 space-y-4 overflow-y-auto custom-scrollbar">
               <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <div className="font-extrabold text-[#d2145a] text-xs uppercase mb-3 border-b border-indigo-50 pb-2">
+                  <div className="font-extrabold text-primary text-xs uppercase mb-3 border-b border-indigo-50 pb-2">
                     Thông tin hành chính
                   </div>
                   <div className="space-y-1.5 text-xs">
@@ -258,7 +258,7 @@ export default function SurgeryRoomView({
               </div>
 
               <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-3">
-                <div className="font-extrabold text-[#d2145a] text-xs uppercase border-b border-indigo-50 pb-2">
+                <div className="font-extrabold text-primary text-xs uppercase border-b border-indigo-50 pb-2">
                   Thông tin phẫu thuật
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">

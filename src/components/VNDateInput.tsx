@@ -151,8 +151,8 @@ export function VNDateInput({ value, onChange, className, ...props }: Props) {
           e.stopPropagation();
           setOpen(prev => !prev);
         }}
-        className={`absolute right-1.5 z-10 text-slate-400 hover:text-[#d2145a] focus:outline-none cursor-pointer p-1.5 rounded-lg transition flex items-center justify-center touch-manipulation ${
-          open ? 'bg-pink-50 text-[#d2145a]' : 'hover:bg-slate-100'
+        className={`absolute right-1.5 z-10 text-slate-400 hover:text-primary focus:outline-none cursor-pointer p-1.5 rounded-lg transition flex items-center justify-center touch-manipulation ${
+          open ? 'bg-pink-50 text-primary' : 'hover:bg-slate-100'
         }`}
         title="Chọn từ lịch"
         aria-label="Chọn ngày từ lịch"
@@ -175,7 +175,7 @@ export function VNDateInput({ value, onChange, className, ...props }: Props) {
             <button
               type="button"
               onClick={() => pickDate(toIsoDate(new Date()))}
-              className="flex-1 text-[11px] font-bold text-[#d2145a] bg-pink-50 border border-pink-100 rounded-xl py-1.5"
+              className="flex-1 text-[11px] font-bold text-primary bg-pink-50 border border-pink-100 rounded-xl py-1.5"
             >
               Hôm nay
             </button>

@@ -38,10 +38,10 @@ export default function MobileBottomNav({
           type="button"
           onClick={() => onNavigate('home')}
           className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1.5 pb-1 text-[10px] font-bold leading-none transition ${
-            isBottomTabActive(activeMenu, 'home') ? 'text-foreground' : 'text-muted-foreground'
+            isBottomTabActive(activeMenu, 'home') ? 'text-primary' : 'text-muted-foreground'
           }`}
         >
-          <span className={isBottomTabActive(activeMenu, 'home') ? 'text-foreground' : 'text-muted-foreground'}>
+          <span className={isBottomTabActive(activeMenu, 'home') ? 'text-primary' : 'text-muted-foreground'}>
             {getNavIcon('home', 'w-5 h-5')}
           </span>
           <span className="truncate max-w-full">Home</span>
@@ -56,10 +56,10 @@ export default function MobileBottomNav({
               type="button"
               onClick={() => onNavigate(tabId)}
               className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1.5 pb-1 text-[10px] font-bold leading-none transition ${
-                active ? 'text-foreground' : 'text-muted-foreground'
+                active ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
-              <span className={active ? 'text-foreground' : 'text-muted-foreground'}>
+              <span className={active ? 'text-primary' : 'text-muted-foreground'}>
                 {getNavIcon(tabId, 'w-5 h-5')}
               </span>
               <span className="truncate max-w-full">{tab.shortLabel || tab.label}</span>
@@ -76,10 +76,10 @@ export default function MobileBottomNav({
           type="button"
           onClick={onOpenMore}
           className={`relative flex flex-col items-center justify-end gap-0.5 px-1 pt-1.5 pb-1 text-[10px] font-bold leading-none transition ${
-            moreActive ? 'text-foreground' : 'text-muted-foreground'
+            moreActive ? 'text-primary' : 'text-muted-foreground'
           }`}
         >
-          <span className={moreActive ? 'text-foreground' : 'text-muted-foreground'}>
+          <span className={moreActive ? 'text-primary' : 'text-muted-foreground'}>
             <MoreHorizontal className="w-5 h-5" />
           </span>
           <span>Thêm</span>

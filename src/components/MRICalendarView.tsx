@@ -124,15 +124,15 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
 
   return (
     <div className="flex-1 bg-slate-50 min-h-0 flex flex-col font-sans p-3 lg:p-4">
-      <div className="flex-1 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col">
+      <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-full min-h-0 flex flex-col">
 
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div>
             <h3 className="font-extrabold text-slate-800 text-[13px] uppercase tracking-wide flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-[#d2145a]" />
+              <Calendar className="w-4 h-4 text-primary" />
               Lịch chụp MRI tim
             </h3>
-            <p className="text-[9px] text-[#d2145a] font-bold uppercase mt-0.5">
+            <p className="text-[9px] text-primary font-bold uppercase mt-0.5">
               {scheduledItems.length} ca MRI dự kiến
             </p>
           </div>
@@ -162,7 +162,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
         </div>
 
         <div className="flex-1 p-3 flex flex-col min-h-0">
-          <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[#d2145a] text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl">
+          <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-primary text-[10px] uppercase py-2 bg-slate-50/70 border border-slate-200 rounded-t-2xl">
             <div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div><div>CN</div>
           </div>
           <div className="grid grid-cols-7 gap-1 border-l border-r border-b border-slate-200 rounded-b-2xl bg-slate-100/50 p-1 flex-1 overflow-hidden">
@@ -173,10 +173,10 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
                   key={`${cell.dateStr}-${index}`}
                   className={`min-h-[76px] xl:min-h-[92px] p-1.5 rounded-xl border border-slate-200 bg-white flex flex-col justify-between transition ${
                     cell.isCurrentMonth ? 'text-slate-800' : 'bg-slate-50/40 text-slate-300 pointer-events-none opacity-45'
-                  } ${cell.isToday ? 'bg-[#d2145a]/5 border-[#d2145a]/30' : ''}`}
+                  } ${cell.isToday ? 'bg-primary/5 border-primary/30' : ''}`}
                 >
                   <div className="text-right">
-                    <span className={`font-black font-mono text-[10px] ${cell.isToday ? 'bg-[#d2145a] text-white w-5 h-5 inline-flex items-center justify-center rounded-full' : 'text-slate-500'}`}>
+                    <span className={`font-black font-mono text-[10px] ${cell.isToday ? 'bg-primary text-white w-5 h-5 inline-flex items-center justify-center rounded-full' : 'text-slate-500'}`}>
                       {cell.day}
                     </span>
                   </div>
@@ -201,7 +201,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
           </div>
           <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-[10px] text-slate-500 font-medium shrink-0">
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#b31448]"></span> Ca MRI dự kiến chụp</span>
-            <span className="text-[9px] text-[#d2145a] font-extrabold">CMR Calendar</span>
+            <span className="text-[9px] text-primary font-extrabold">CMR Calendar</span>
           </div>
         </div>
       </div>
@@ -211,7 +211,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
         const patient = selectedItem.__patient;
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-xl max-w-xl w-full max-h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
 
               <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
                 <div className="flex items-center gap-2">
@@ -268,7 +268,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
 
                 {/* MRI info */}
                 <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm">
-                  <span className="font-extrabold text-[#d2145a] text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
+                  <span className="font-extrabold text-primary text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5 mb-2.5">
                     Thông tin MRI
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -290,7 +290,7 @@ export default function MRICalendarView({ patients, cmrs }: MRICalendarViewProps
                     </div>
                     <div className="sm:col-span-2">
                       <span className="text-slate-400 block font-bold text-[8px] uppercase">Mã chẩn đoán:</span>
-                      <span className="text-[10px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded">{selectedItem.CMRDiagnosisID || '—'}</span>
+                      <span className="text-[10px] text-primary font-black bg-pink-50 px-1.5 py-0.5 rounded">{selectedItem.CMRDiagnosisID || '—'}</span>
                     </div>
                     <div className="sm:col-span-2">
                       <span className="text-slate-400 block font-bold text-[8px] uppercase">Chẩn đoán MRI:</span>

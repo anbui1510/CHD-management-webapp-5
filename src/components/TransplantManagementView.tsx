@@ -294,7 +294,7 @@ export default function TransplantManagementView({
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="shrink-0 flex flex-wrap items-center gap-2 mb-3">
-        <button type="button" onClick={() => setActiveTab('notReady')} className={`px-4 py-2 rounded-full text-xs font-black uppercase ${activeTab === 'notReady' ? 'bg-[#d2145a] text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
+        <button type="button" onClick={() => setActiveTab('notReady')} className={`px-4 py-2 rounded-full text-xs font-black uppercase ${activeTab === 'notReady' ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
           Chưa đủ tiêu chuẩn ({tabItems.notReady.length})
         </button>
         <button type="button" onClick={() => setActiveTab('ready')} className={`px-4 py-2 rounded-full text-xs font-black uppercase ${activeTab === 'ready' ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>
@@ -310,7 +310,7 @@ export default function TransplantManagementView({
       </div>
 
       <div className="flex-1 min-h-0 flex gap-3">
-        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden transition-all ${selectedKey ? 'w-[48%]' : 'flex-1'}`}>
+        <div className={`flex flex-col min-h-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all ${selectedKey ? 'w-[48%]' : 'flex-1'}`}>
           <div className="overflow-auto flex-1">
             <table className="w-full min-w-[900px] text-left text-xs">
               <thead className="sticky top-0 z-10">
@@ -378,7 +378,7 @@ export default function TransplantManagementView({
         </div>
 
         {selectedItem && (
-          <div className="flex-1 min-w-0 flex flex-col bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          <div className="flex-1 min-w-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 py-3 bg-[#b31448] text-white flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-bold uppercase opacity-80">Hồ sơ ghép tim</div>
@@ -435,15 +435,15 @@ export default function TransplantManagementView({
         )}
 
         <div className={`shrink-0 flex flex-col ${isFilterExpanded ? 'w-[320px]' : 'w-[52px]'}`}>
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-sm flex flex-col h-full min-h-0">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col h-full min-h-0">
             {!isFilterExpanded ? (
-              <button type="button" onClick={() => setIsFilterExpanded(true)} className="flex flex-col items-center py-5 h-full hover:bg-slate-50 rounded-3xl">
+              <button type="button" onClick={() => setIsFilterExpanded(true)} className="flex flex-col items-center py-5 h-full hover:bg-slate-50 rounded-xl">
                 <Filter className="w-5 h-5 text-slate-500 mb-4" />
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Bộ lọc</span>
               </button>
             ) : (
               <>
-                <div className="p-4 border-b bg-[#b31448] text-white rounded-t-3xl flex justify-between items-center">
+                <div className="p-4 border-b bg-[#b31448] text-white rounded-t-xl flex justify-between items-center">
                   <h3 className="font-black text-[12px] uppercase flex items-center gap-2"><Filter className="w-4 h-4" /> Bộ lọc ghép tim</h3>
                   <button type="button" onClick={() => setIsFilterExpanded(false)}><X className="w-4 h-4" /></button>
                 </div>

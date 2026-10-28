@@ -142,9 +142,9 @@ export function MiniCalendar({
               onClick={() => onChange(cell.iso)}
               className={`h-8 rounded-lg text-[11px] font-bold transition ${
                 selected
-                  ? 'bg-[#d2145a] text-white shadow-sm'
+                  ? 'bg-primary text-white shadow-sm'
                   : ranged
-                    ? 'bg-pink-50 text-[#d2145a]'
+                    ? 'bg-pink-50 text-primary'
                     : cell.inMonth
                       ? 'text-slate-700 hover:bg-slate-100'
                       : 'text-slate-300 hover:bg-slate-50'

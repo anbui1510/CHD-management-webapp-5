@@ -15,7 +15,7 @@ export default function DevelopingFeatureView({
 
   return (
     <div className="flex-1 h-full flex items-center justify-center p-8 bg-slate-50 animate-in fade-in duration-200">
-      <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-10 max-w-md text-center">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-10 max-w-md text-center">
         <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Construction className="w-7 h-7 text-amber-600" />
         </div>

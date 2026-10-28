@@ -156,7 +156,7 @@ export default function ArchiveView({
 
   return (
     <div className="flex-1 min-h-0 h-full flex flex-col animate-in fade-in duration-200 bg-slate-50 p-6">
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50 shrink-0 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -234,7 +234,7 @@ export default function ArchiveView({
                       </button>
                     </td>
                     <td className="p-3 font-semibold text-slate-800">
-                      <span className="text-[#d2145a] font-black uppercase text-[12px] block">{pat.PatientName || 'N/A'}</span>
+                      <span className="text-primary font-black uppercase text-[12px] block">{pat.PatientName || 'N/A'}</span>
                       <span className="text-slate-500 font-mono text-[10px] mt-0.5">{pat.PatientID1 || '—'}</span>
                     </td>
                     <td className="p-3 font-medium text-slate-600">

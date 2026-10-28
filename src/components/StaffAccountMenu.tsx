@@ -77,7 +77,7 @@ export default function StaffAccountMenu({
               onViewProfile();
               onClose();
             }}
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-pink-50 hover:text-[#d2145a] transition"
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-pink-50 hover:text-primary transition"
           >
             <UserCircle className="w-4 h-4 shrink-0" />
             Xem Profile

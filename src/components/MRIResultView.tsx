@@ -265,19 +265,19 @@ export default function MRIResultView({
     <div className="flex-1 h-full flex flex-col gap-4 animate-in fade-in duration-200 font-sans min-h-0 p-4 lg:p-6 bg-slate-50">
 
       {/* Title — mobile only */}
-      <div className="shrink-0 md:hidden bg-white p-4 border border-slate-200 rounded-3xl shadow-sm">
-        <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-[#d2145a]">
-          <FileText className="w-5 h-5 text-[#d2145a]" /> Điền kết quả MRI tim
+      <div className="shrink-0 md:hidden bg-white p-4 border border-slate-200 rounded-xl shadow-sm">
+        <h2 className="text-base font-extrabold tracking-tight flex items-center gap-2 uppercase text-primary">
+          <FileText className="w-5 h-5 text-primary" /> Điền kết quả MRI tim
         </h2>
       </div>
 
       {/* Tabs + search */}
-      <div className="shrink-0 bg-white border border-slate-200 rounded-3xl shadow-sm p-4 space-y-3">
+      <div className="shrink-0 bg-white border border-slate-200 rounded-xl shadow-sm p-4 space-y-3">
         <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs font-semibold text-slate-600">
           <button
             onClick={() => setActiveTab('pending')}
             className={`flex-1 text-center py-2 rounded-lg transition-colors cursor-pointer ${
-              activeTab === 'pending' ? 'bg-[#d2145a] text-white font-bold' : 'text-[#d2145a] hover:bg-pink-50'
+              activeTab === 'pending' ? 'bg-primary text-white font-bold' : 'text-primary hover:bg-pink-50'
             }`}
           >
             Chờ điền KQ <span className="text-[10px] opacity-75 font-mono">({segmented.pending.length})</span>
@@ -325,7 +325,7 @@ export default function MRIResultView({
       </div>
 
       {/* List table */}
-      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
         <div className="flex-1 overflow-x-auto overflow-y-auto">
           <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs font-medium text-slate-700">
             <thead className="bg-slate-50/70 text-slate-500 sticky top-0 uppercase text-[9px] font-extrabold tracking-wider z-10 shadow-xs">
@@ -355,7 +355,7 @@ export default function MRIResultView({
                       </span>
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-[9px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">
+                      <span className="text-[9px] text-primary font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">
                         {item.CMRDiagnosisID || '—'}
                       </span>
                       <span className="line-clamp-2">{item.CMRDiagnosis || '—'}</span>
@@ -383,7 +383,7 @@ export default function MRIResultView({
         const patient = selectedItem.__patient;
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden text-xs text-slate-700 font-semibold leading-relaxed animate-in zoom-in-95 duration-150">
 
               <div className="flex items-center justify-between border-b border-slate-150 px-6 py-4 bg-indigo-50/50 shrink-0">
                 <div className="flex items-center gap-2">
@@ -435,7 +435,7 @@ export default function MRIResultView({
                       <div className="col-span-2">
                         <span className="text-slate-400 block font-bold text-[8px] uppercase">Chẩn đoán MRI:</span>
                         <span className="font-bold text-slate-800">
-                          <span className="text-[10px] text-[#d2145a] font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">{selectedItem.CMRDiagnosisID || '—'}</span>
+                          <span className="text-[10px] text-primary font-black bg-pink-50 px-1.5 py-0.5 rounded mr-1">{selectedItem.CMRDiagnosisID || '—'}</span>
                           {selectedItem.CMRDiagnosis || ''}
                         </span>
                       </div>
@@ -448,7 +448,7 @@ export default function MRIResultView({
 
                   {/* Result fields */}
                   <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm space-y-2.5">
-                    <span className="font-extrabold text-[#d2145a] text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5">
+                    <span className="font-extrabold text-primary text-[10px] uppercase tracking-wider block border-b border-slate-100 pb-1.5">
                       Kết quả MRI tim
                     </span>
 

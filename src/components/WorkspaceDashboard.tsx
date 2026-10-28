@@ -56,14 +56,14 @@ export default function WorkspaceDashboard({
             module: 'patients',
             label: 'Hồ sơ bệnh án',
             description: `${patientCount} BN trong hệ thống`,
-            icon: <Heart className="w-6 h-6 text-[#d2145a]" />,
+            icon: <Heart className="w-6 h-6 text-primary" />,
             iconBg: 'bg-pink-50',
           },
           {
             module: 'schedule-view',
             label: 'Lịch thông tim dự kiến',
             description: 'Lịch phòng Cathlab',
-            icon: <Calendar className="w-6 h-6 text-[#d2145a]" />,
+            icon: <Calendar className="w-6 h-6 text-primary" />,
             iconBg: 'bg-rose-50',
           },
           {
@@ -248,7 +248,7 @@ export default function WorkspaceDashboard({
   if (sections.length === 0) {
     return (
       <div className="flex items-center justify-center p-12 animate-in fade-in duration-300">
-        <div className="max-w-md text-center bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+        <div className="max-w-md text-center bg-white border border-slate-200 rounded-xl p-8 shadow-sm">
           <p className="text-sm font-bold text-slate-500">
             Tài khoản chưa được cấp quyền module nào. Liên hệ Admin để được phân quyền.
           </p>
@@ -262,7 +262,7 @@ export default function WorkspaceDashboard({
       {sections.map(section => (
         <div key={section.title}>
           <h2 className="text-[10px] md:text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2 md:mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#d2145a] shrink-0" /> {section.title}
+            <span className="w-2 h-2 rounded-full bg-primary shrink-0" /> {section.title}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
             {section.tiles.map(tile => (
@@ -281,7 +281,7 @@ export default function WorkspaceDashboard({
                 >
                   {tile.icon}
                 </div>
-                <h3 className="font-extrabold text-sm sm:text-base text-[#d2145a] mb-1 leading-snug line-clamp-2">
+                <h3 className="font-extrabold text-sm sm:text-base text-primary mb-1 leading-snug line-clamp-2">
                   {tile.label}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 leading-snug line-clamp-2">
