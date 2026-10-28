@@ -744,10 +744,10 @@ export default function HomeDashboard({
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
-          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-3">
+          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3 items-start content-start">
             {visibleStats.map((stat, idx) => (
-              <Card key={idx} className="gap-0 py-2 shadow-sm">
+              <Card key={idx} className="gap-0 py-2 shadow-sm self-start w-full">
                 <CardContent className="px-3 py-0">
                   <p className="text-xs text-muted-foreground leading-tight">{stat.label}</p>
                   <p className="text-xl font-semibold mt-0.5 font-mono text-foreground leading-none">{stat.value}</p>
@@ -1157,8 +1157,11 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[minmax(140px,200px)_1fr] gap-3 items-start overflow-hidden">
-                <div className="relative w-full max-w-[176px] aspect-square mx-auto shrink-0 self-start" onMouseLeave={() => setHoveredPieSegment(null)}>
+              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[minmax(120px,180px)_1fr] gap-3 items-stretch overflow-hidden">
+                <div
+                  className="relative mx-auto shrink-0 self-center w-full max-w-[160px] aspect-square max-h-full"
+                  onMouseLeave={() => setHoveredPieSegment(null)}
+                >
                   {(() => {
                     const radius = 38;
                     const circumference = 2 * Math.PI * radius;
