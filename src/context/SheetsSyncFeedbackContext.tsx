@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { SheetsSyncContext, SheetsSyncFailure } from '../types';
 import type { AppModule } from '../auth/permissions';
 import {
@@ -7,6 +7,8 @@ import {
   parseMutationResponse,
   withSyncContext
 } from '../utils/sheetsSyncMutation';
+
+export const CHD_SHEETS_PUSH_RESULT_EVENT = 'chd-sheets-push-result';
 
 type SheetsSyncFeedbackContextValue = {
   globalOverlay: { title: string; message: string } | null;
@@ -51,31 +53,9 @@ export function SheetsSyncFeedbackProvider({
   const [globalOverlay, setGlobalOverlay] = useState<{ title: string; message: string } | null>(null);
   const [pendingFailures, setPendingFailures] = useState<SheetsSyncFailure[]>([]);
 
-  const reportMutationResponse = useCallback(
-    (data: unknown, options?: { baseMessage?: string }) => {
-      const feedback = buildMutationFeedback(data, options?.baseMessage);
-      void onRefreshSheetsStatus();
-
-      if (feedback.kind === 'success') {
-        onSuccessBanner(feedback.bannerMessage, false);
-        return;
-      }
-
-      if (feedback.isFailure) {
-        onSuccessBanner(feedback.bannerMessage, true);
-        return;
-      }
-
-      if (feedback.bannerMessage) {
-        onSuccessBanner(feedback.bannerMessage, false);
-      }
-    },
-    [onRefreshNotifications, onRefreshSheetsStatus, onSuccessBanner]
-  );
-
   const loadPendingFailures = useCallback(async () => {
     try {
-      const response = await fetch('/api/sheets-sync/failures');
+      const response = await fetch('/api/sheets-sync/failures', { credentials: 'include' });
       if (!response.ok) return [];
       const data = (await response.json()) as SheetsSyncFailure[];
       setPendingFailures(data);
@@ -86,9 +66,44 @@ export function SheetsSyncFeedbackProvider({
     }
   }, []);
 
+  const reportMutationResponse = useCallback(
+    (data: unknown, options?: { baseMessage?: string }) => {
+      const feedback = buildMutationFeedback(data, options?.baseMessage);
+      void onRefreshSheetsStatus();
+
+      if (feedback.bannerMessage) {
+        onSuccessBanner(feedback.bannerMessage, feedback.isWarning);
+      }
+
+      if (feedback.showOverlay && feedback.overlayTitle) {
+        setGlobalOverlay({
+          title: feedback.overlayTitle,
+          message: feedback.overlayMessage
+        });
+      }
+
+      if (feedback.kind === 'failure' || feedback.kind === 'pending') {
+        void loadPendingFailures();
+        void onRefreshNotifications();
+      }
+    },
+    [loadPendingFailures, onRefreshNotifications, onRefreshSheetsStatus, onSuccessBanner]
+  );
+
+  useEffect(() => {
+    const onPushResult = (event: Event) => {
+      const detail = (event as CustomEvent<{ data?: unknown; baseMessage?: string }>).detail;
+      if (!detail?.data) return;
+      reportMutationResponse(detail.data, { baseMessage: detail.baseMessage });
+    };
+    window.addEventListener(CHD_SHEETS_PUSH_RESULT_EVENT, onPushResult);
+    return () => window.removeEventListener(CHD_SHEETS_PUSH_RESULT_EVENT, onPushResult);
+  }, [reportMutationResponse]);
+
   const acknowledgeFailure = useCallback(async (failureKey: string) => {
     await fetch(`/api/sheets-sync/failures/${encodeURIComponent(failureKey)}/acknowledge`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
     }).catch(err => console.error(err));
     setPendingFailures(prev => prev.filter(item => item.FailureKey !== failureKey));
@@ -97,6 +112,7 @@ export function SheetsSyncFeedbackProvider({
   const acknowledgeAllFailures = useCallback(async () => {
     await fetch('/api/sheets-sync/failures/acknowledge-all', {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
     }).catch(err => console.error(err));
     setPendingFailures([]);
@@ -126,7 +142,7 @@ export function SheetsSyncFeedbackProvider({
         nextInit = {
           ...nextInit,
           headers: { 'Content-Type': 'application/json', ...(nextInit.headers || {}) },
-          body: JSON.stringify(withSyncContext(rawBody as Record<string, unknown>, syncContext))
+          body: JSON.stringify(withSyncContext(rawBody as unknown as Record<string, unknown>, syncContext))
         };
       }
 

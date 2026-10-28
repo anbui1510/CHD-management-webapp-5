@@ -1,6 +1,8 @@
 export type SheetsSyncMeta = {
   configured: boolean;
   ok: boolean;
+  /** Push still running after local save (bridge timeout race). */
+  pending?: boolean;
   message: string;
   at?: number;
 };
@@ -17,6 +19,20 @@ export type SheetsSyncStatus = {
 
 export const SHEETS_SUCCESS_MESSAGE = 'Đã ghi lên Google Sheets';
 
+export const SHEETS_NOT_UPLOADED_TITLE = 'Dữ liệu chưa lên Google Sheets';
+
+export const SHEETS_PENDING_MESSAGE =
+  'Đã lưu tạm trên app — đang đồng bộ Google Sheets. Máy khác có thể chưa thấy cho đến khi đồng bộ xong.';
+
+export const SHEETS_FAILURE_DEFAULT =
+  'Đã lưu tạm trên app nhưng chưa ghi được lên Google Sheets. Máy khác / danh sách chung có thể chưa thấy — bấm Đồng bộ lại hoặc kiểm tra kết nối Sheets.';
+
+export const SHEETS_LOCAL_ONLY_MESSAGE =
+  'Chưa liên kết Google Sheets — dữ liệu chỉ lưu trên app, chưa lên Sheet.';
+
+export const SHEETS_UNCONFIRMED_MESSAGE =
+  'Đã lưu trên app — chưa xác nhận đã lên Google Sheets.';
+
 export function extractSheetsSync(data: unknown): SheetsSyncMeta | undefined {
   if (!data || typeof data !== 'object') return undefined;
   const sync = (data as { _sheetsSync?: SheetsSyncMeta })._sheetsSync;
@@ -25,20 +41,32 @@ export function extractSheetsSync(data: unknown): SheetsSyncMeta | undefined {
 }
 
 export function evaluateSheetsSync(data: unknown): {
-  kind: 'success' | 'failure' | 'local_only' | 'none';
+  kind: 'success' | 'failure' | 'pending' | 'local_only' | 'none';
   message: string;
 } {
   const sync = extractSheetsSync(data);
   if (!sync) {
-    return { kind: 'none', message: '' };
+    return { kind: 'none', message: SHEETS_UNCONFIRMED_MESSAGE };
   }
   if (!sync.configured) {
-    return { kind: 'local_only', message: sync.message };
+    return {
+      kind: 'local_only',
+      message: sync.message || SHEETS_LOCAL_ONLY_MESSAGE
+    };
+  }
+  if (sync.pending) {
+    return {
+      kind: 'pending',
+      message: sync.message || SHEETS_PENDING_MESSAGE
+    };
   }
   if (sync.ok) {
     return { kind: 'success', message: SHEETS_SUCCESS_MESSAGE };
   }
-  return { kind: 'failure', message: sync.message };
+  return {
+    kind: 'failure',
+    message: sync.message || SHEETS_FAILURE_DEFAULT
+  };
 }
 
 export function appendSheetsSyncToSaveMessage(
@@ -52,15 +80,15 @@ export function appendSheetsSyncToSaveMessage(
       isWarning: false
     };
   }
-  if (evaluation.kind === 'failure') {
-    return { message: `${base} — ${evaluation.message}`, isWarning: true };
-  }
-  if (evaluation.kind === 'local_only') {
-    return { message: `${base}. ${evaluation.message}`, isWarning: false };
+  if (evaluation.kind === 'failure' || evaluation.kind === 'pending' || evaluation.kind === 'local_only' || evaluation.kind === 'none') {
+    return {
+      message: base ? `${base} — ${evaluation.message}` : evaluation.message,
+      isWarning: true
+    };
   }
   return {
-    message: `${base} (đã lưu trên máy chủ app — chưa xác nhận Google Sheets)`,
-    isWarning: false
+    message: `${base} — ${SHEETS_UNCONFIRMED_MESSAGE}`,
+    isWarning: true
   };
 }
 

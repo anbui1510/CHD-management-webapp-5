@@ -875,6 +875,7 @@ export default function App() {
     const storedToken = localStorage.getItem('CHD_AUTH_TOKEN') || (['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname) ? 'cookie-session' : '');
     if (storedToken) {
       fetch('/api/auth/me', {
+        credentials: 'include',
         headers: { 'Authorization': `Bearer ${storedToken}` }
       })
         .then(res => {

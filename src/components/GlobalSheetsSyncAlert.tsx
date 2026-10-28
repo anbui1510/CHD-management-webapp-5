@@ -20,9 +20,9 @@ export default function GlobalSheetsSyncAlert({
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-100 text-center space-y-4 font-sans"
+          className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-200 text-center space-y-4 font-sans"
         >
-          <div className="mx-auto bg-amber-50 text-amber-600 rounded-full w-12 h-12 flex items-center justify-center">
+          <div className="mx-auto bg-amber-50 text-amber-700 rounded-full w-12 h-12 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">
@@ -30,6 +30,9 @@ export default function GlobalSheetsSyncAlert({
           </h3>
           <p className="text-xs text-slate-600 font-semibold leading-relaxed whitespace-pre-wrap">
             {message}
+          </p>
+          <p className="text-[11px] text-amber-800/90 font-bold leading-relaxed">
+            Dữ liệu vẫn còn trên máy này — người khác có thể chưa thấy cho đến khi đồng bộ Sheets thành công.
           </p>
           <button
             type="button"
