@@ -2412,9 +2412,15 @@ export default function App() {
       <Sidebar collapsed={!isSidebarExpanded}>
         <SidebarHeader>
           <div className={`flex items-center gap-2 px-2 py-1.5 ${isSidebarExpanded ? '' : 'justify-center px-0'}`}>
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <button
+              type="button"
+              onClick={() => setIsSidebarExpanded(prev => !prev)}
+              title={isSidebarExpanded ? 'Thu gọn sidebar' : 'Mở rộng sidebar'}
+              aria-label={isSidebarExpanded ? 'Thu gọn sidebar' : 'Mở rộng sidebar'}
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+            >
               <Heart className="size-4" />
-            </div>
+            </button>
             {isSidebarExpanded && (
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold leading-none">CHD</p>
@@ -2472,8 +2478,9 @@ export default function App() {
               type="button"
               variant="ghost"
               size="icon"
+              className="md:hidden"
               onClick={handleHeaderMenuToggle}
-              title={isMobile ? 'Mở menu module' : 'Thu gọn sidebar'}
+              title="Mở menu module"
             >
               <PanelLeft className="size-4" />
             </Button>
@@ -4674,7 +4681,7 @@ export default function App() {
 
       {/* Footer bar */}
       <footer className="hidden md:block bg-muted border-t border-border text-muted-foreground text-[10px] py-1.5 shrink-0 text-center font-medium font-sans">
-        <span>© 2026 CHD Management v5.0 | Bệnh viện Tim Tim Mạch &amp; Khoa Phẫu Thuật Tim Nhi (Google Sheets &amp; PDF Sync)</span>
+        <span>© 2026 CHD Management v5.0 | Trung tâm tim mạch - Bệnh viện Nhi Đồng Thành Phố</span>
       </footer>
 
       <MobileBottomNav
