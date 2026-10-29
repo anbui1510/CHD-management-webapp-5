@@ -15,6 +15,7 @@ import {
   SHEETS_FAILURE_DEFAULT,
   SHEETS_LOCAL_ONLY_MESSAGE,
   SHEETS_PENDING_MESSAGE,
+  SHEETS_PUSH_WAIT_SECONDS,
   SHEETS_SUCCESS_MESSAGE,
   type SheetsSyncMeta
 } from '../utils/sheetsSyncFeedback';
@@ -28,7 +29,7 @@ import {
 import { sanitizeNotificationFields } from '../utils/workflowMessages';
 import { hasOsPushBeenDelivered, markOsPushDelivered } from '../utils/notificationPushDelivery';
 
-const SHEETS_PUSH_WAIT_MS = 12000;
+const SHEETS_PUSH_WAIT_MS = SHEETS_PUSH_WAIT_SECONDS * 1000;
 const CHD_SHEETS_PUSH_RESULT_EVENT = 'chd-sheets-push-result';
 
 type SheetData = {
@@ -401,7 +402,8 @@ let clientSheetsPullState = {
   lastPullMessage: '',
   lastPushAt: 0,
   lastPushOk: true,
-  lastPushMessage: ''
+  lastPushMessage: '',
+  lastPushPending: false
 };
 
 const markClientPullOk = (message = 'Đã kéo dữ liệu mới từ Google Sheets.') => {
@@ -428,6 +430,17 @@ const markClientPushOk = (message = SHEETS_SUCCESS_MESSAGE) => {
     ...clientSheetsPullState,
     lastPushAt: Date.now(),
     lastPushOk: true,
+    lastPushPending: false,
+    lastPushMessage: message
+  };
+};
+
+const markClientPushPending = (message: string) => {
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPushAt: Date.now(),
+    lastPushOk: true,
+    lastPushPending: true,
     lastPushMessage: message
   };
 };
@@ -437,6 +450,7 @@ const markClientPushFailed = (message: string) => {
     ...clientSheetsPullState,
     lastPushAt: Date.now(),
     lastPushOk: false,
+    lastPushPending: false,
     lastPushMessage: message
   };
 };
@@ -536,7 +550,7 @@ const awaitSheetsPushWithTimeout = async (
         at,
         message: SHEETS_PENDING_MESSAGE
       };
-      markClientPushFailed(pending.message);
+      markClientPushPending(pending.message);
       void pushPromise
         .then(() => {
           const okResult: SheetsSyncMeta = {
@@ -671,7 +685,8 @@ export const getClientSheetsSyncStatus = () => ({
   lastPullMessage: clientSheetsPullState.lastPullMessage,
   lastPushAt: clientSheetsPullState.lastPushAt,
   lastPushOk: clientSheetsPullState.lastPushOk,
-  lastPushMessage: clientSheetsPullState.lastPushMessage
+  lastPushMessage: clientSheetsPullState.lastPushMessage,
+  lastPushPending: clientSheetsPullState.lastPushPending
 });
 
 const setScriptUrl = (scriptUrl: string): boolean => {

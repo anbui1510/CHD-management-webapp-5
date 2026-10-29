@@ -82,8 +82,8 @@ export function buildMutationFeedback(
     return {
       kind: 'pending',
       bannerMessage: baseMessage
-        ? `${baseMessage} — đang đồng bộ Google Sheets…`
-        : 'Đã lưu tạm — đang đồng bộ Google Sheets…',
+        ? `${baseMessage} — đang đồng bộ Google Sheets (thường vài giây)…`
+        : 'Đã lưu tạm — đang đồng bộ Google Sheets (thường vài giây)…',
       overlayTitle: '',
       overlayMessage: '',
       isWarning: true,

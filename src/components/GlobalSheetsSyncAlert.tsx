@@ -20,13 +20,9 @@ export default function GlobalSheetsSyncAlert({
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-<<<<<<< HEAD
           className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-amber-100 text-center space-y-4 font-sans"
-=======
-          className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-200 text-center space-y-4 font-sans"
->>>>>>> 10716b3 (Warn clearly when saves stay local and Sheets push fails)
         >
-          <div className="mx-auto bg-amber-50 text-amber-700 rounded-full w-12 h-12 flex items-center justify-center">
+          <div className="mx-auto bg-amber-50 text-amber-600 rounded-full w-12 h-12 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">

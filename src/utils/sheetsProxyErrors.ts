@@ -1,11 +1,12 @@
 import { AuthRequiredError } from '../auth/authErrors';
 import { formatAppsScriptHttpError } from './appsScriptRetry';
 
+/** Phrases unique to Cloudflare/Express session 401 JSON — keep specific to avoid false matches. */
 const APP_AUTH_ERROR_MARKERS = [
   'yêu cầu đăng nhập',
   'phiên đăng nhập',
-  'hết hạn',
-  'không hợp lệ',
+  'đăng nhập lại',
+  'hết hạn hoặc không hợp lệ',
 ];
 
 function looksLikeAppAuthBody(text: string): boolean {
@@ -29,10 +30,16 @@ function throwForFailedProxy(response: Response, text: string): never {
   const jsonMessage = parseJsonErrorMessage(text);
 
   if (response.status === 401) {
-    if (jsonMessage && looksLikeAppAuthBody(jsonMessage)) {
-      throw new AuthRequiredError(jsonMessage);
+    // Cloudflare/Express session gate always returns Vietnamese JSON with these markers.
+    // Check the raw body (includes `"error"`) — not only the extracted message string.
+    if (looksLikeAppAuthBody(text)) {
+      throw new AuthRequiredError(jsonMessage || undefined);
     }
-    throw new AuthRequiredError();
+    // Bare/HTML 401 is typically Google Web app ACL (not Anyone), not app session.
+    if (!jsonMessage) {
+      throw new Error(formatAppsScriptHttpError(401));
+    }
+    throw new Error(jsonMessage);
   }
 
   if (response.status === 403 && jsonMessage) {

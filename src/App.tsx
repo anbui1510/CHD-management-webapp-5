@@ -2498,7 +2498,13 @@ export default function App() {
 
             <Badge
               variant={sheetsSyncBadge.tone === 'error' ? 'destructive' : 'secondary'}
-              className="max-w-[7.5rem] sm:max-w-none truncate"
+              className={`max-w-[7.5rem] sm:max-w-none truncate ${
+                sheetsSyncBadge.tone === 'warn'
+                  ? 'border-amber-300 bg-amber-50 text-amber-900'
+                  : sheetsSyncBadge.tone === 'ok'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : ''
+              }`}
               title={sheetsSyncBadge.title}
             >
               {sheetsSyncBadge.label}
