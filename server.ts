@@ -995,7 +995,7 @@ async function pushToGoogleSheetsAwaited(
       ok,
       at,
       message: ok
-        ? 'Đã ghi lên Google Sheets.'
+        ? 'Dữ liệu đã đẩy lên Google Sheets'
         : 'Dữ liệu chưa lên Google Sheets — Google Sheets không xác nhận ghi. Đã lưu tạm trên app; máy khác có thể chưa thấy. Kiểm tra Apps Script hoặc thử Đồng bộ lại.'
     };
     sheetsSyncState.lastPushAt = at;
@@ -1166,7 +1166,7 @@ function mergeSheetsSyncResults(results: SheetsSyncResult[]): SheetsSyncResult {
       configured: true,
       ok: true,
       at,
-      message: 'Đã ghi lên Google Sheets.'
+      message: 'Dữ liệu đã đẩy lên Google Sheets'
     };
   }
   return {
@@ -3226,7 +3226,7 @@ app.post('/api/sources/update-all', requireAuth, async (req, res) => {
           ok,
           at,
           message: ok
-            ? 'Đã ghi lên Google Sheets.'
+            ? 'Dữ liệu đã đẩy lên Google Sheets'
             : 'Dữ liệu chưa lên Google Sheets — Google Sheets không xác nhận ghi. Đã lưu tạm trên app; máy khác có thể chưa thấy. Kiểm tra Apps Script hoặc thử Đồng bộ lại.'
         };
         sheetsSyncState.lastPushAt = at;

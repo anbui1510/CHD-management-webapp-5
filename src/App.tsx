@@ -625,20 +625,37 @@ export default function App() {
     setCustomAlert({ message, title: title || MODAL_TITLE.notify });
   };
 
+  const formSuccessBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearFormSuccessBannerTimer = () => {
+    if (formSuccessBannerTimerRef.current) {
+      clearTimeout(formSuccessBannerTimerRef.current);
+      formSuccessBannerTimerRef.current = null;
+    }
+  };
+
   const showSuccessBanner = (message: string, durationMs = 4000) => {
+    clearFormSuccessBannerTimer();
     setFormSuccessWarning(false);
     setFormSuccessMessage(message);
-    setTimeout(() => setFormSuccessMessage(''), durationMs);
+    formSuccessBannerTimerRef.current = setTimeout(() => setFormSuccessMessage(''), durationMs);
   };
 
   const handleSheetsSuccessBanner = useCallback((message: string, isWarning = false) => {
+    clearFormSuccessBannerTimer();
     setFormSuccessWarning(isWarning);
     setFormSuccessMessage(message);
     void refreshSheetsSyncStatus();
-    setTimeout(() => {
+    // Keep “đang ghi…” visible until the later green/failure event (or a long fallback).
+    const duration = !isWarning
+      ? 6000
+      : /đang ghi|đang đồng bộ/i.test(message)
+        ? 90000
+        : 10000;
+    formSuccessBannerTimerRef.current = setTimeout(() => {
       setFormSuccessMessage('');
       setFormSuccessWarning(false);
-    }, isWarning ? 8000 : 6000);
+    }, duration);
   }, [refreshSheetsSyncStatus]);
 
   const showSaveFeedback = (baseMessage: string, responseData: unknown) => {

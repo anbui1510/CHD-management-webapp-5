@@ -22,12 +22,13 @@ export type SheetsSyncStatus = {
 /** How long the UI waits for Sheets confirmation before showing “đang đồng bộ”. */
 export const SHEETS_PUSH_WAIT_SECONDS = 12;
 
-export const SHEETS_SUCCESS_MESSAGE = 'Đã ghi lên Google Sheets';
+export const SHEETS_SUCCESS_MESSAGE = 'Dữ liệu đã đẩy lên Google Sheets';
 
 export const SHEETS_NOT_UPLOADED_TITLE = 'Dữ liệu chưa lên Google Sheets';
 
+/** Shown immediately after local save while the Apps Script write is still in flight. */
 export const SHEETS_PENDING_MESSAGE =
-  `Đã lưu tạm trên app — đang đồng bộ Google Sheets (thường vài giây, tối đa ~${SHEETS_PUSH_WAIT_SECONDS}s). Badge Sheets sẽ chuyển OK khi xong; máy khác có thể chưa thấy trước đó.`;
+  `Đang ghi dữ liệu vào Google Sheets (thường vài giây, tối đa ~${SHEETS_PUSH_WAIT_SECONDS}s). Banner xanh chỉ hiện khi Sheets đã nhận xong.`;
 
 export const SHEETS_FAILURE_DEFAULT =
   'Đã lưu tạm trên app nhưng chưa ghi được lên Google Sheets. Máy khác / danh sách chung có thể chưa thấy — bấm Đồng bộ lại hoặc kiểm tra kết nối Sheets.';

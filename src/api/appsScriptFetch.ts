@@ -31,6 +31,94 @@ import { hasOsPushBeenDelivered, markOsPushDelivered } from '../utils/notificati
 
 const SHEETS_PUSH_WAIT_MS = SHEETS_PUSH_WAIT_SECONDS * 1000;
 const CHD_SHEETS_PUSH_RESULT_EVENT = 'chd-sheets-push-result';
+/** Keep local edits over stale Sheets pulls until write is visible / TTL expires. */
+const RECENT_LOCAL_EDIT_TTL_MS = 3 * 60 * 1000;
+
+type RecentLocalEdit = {
+  type: SheetType;
+  key: string;
+  collection: keyof SheetData;
+  record: any;
+  at: number;
+};
+
+const recentLocalEdits = new Map<string, RecentLocalEdit>();
+
+const recentEditId = (type: string, key: string) =>
+  `${type}:${String(key).trim().toLowerCase()}`;
+
+const noteRecentLocalEdit = (
+  type: SheetType,
+  key: string,
+  collection: keyof SheetData,
+  record: any
+) => {
+  recentLocalEdits.set(recentEditId(type, key), {
+    type,
+    key: String(key),
+    collection,
+    record,
+    at: Date.now()
+  });
+};
+
+const clearRecentLocalEdit = (type: string, key: string) => {
+  recentLocalEdits.delete(recentEditId(type, key));
+};
+
+const recordKeyForCollection = (collection: keyof SheetData, item: any): string => {
+  switch (collection) {
+    case 'patients':
+      return String(item?.PatientKey || '').trim().toLowerCase();
+    case 'consults':
+      return String(item?.ConsultKey || '').trim().toLowerCase();
+    case 'staff':
+      return String(item?.StaffKey || '').trim().toLowerCase();
+    case 'cathlabs':
+      return String(item?.CathKey || '').trim().toLowerCase();
+    case 'operations':
+      return String(item?.SurgKey || '').trim().toLowerCase();
+    case 'cmrs':
+      return String(item?.CMRKey || item?.CMRkey || '').trim().toLowerCase();
+    case 'transplants':
+      return String(item?.TransKey || '').trim().toLowerCase();
+    case 'sources':
+      return String(item?.DiagnosisID || '').trim().toLowerCase();
+    case 'deviceTemplates':
+      return String(item?.DeviceName || '').trim().toLowerCase();
+    case 'rolePresets':
+      return String(item?.RolePresetID || '').trim().toLowerCase();
+    case 'notifications':
+      return String(item?.NotificationKey || '').trim().toLowerCase();
+    case 'doctorPerformanceMarks':
+      return String(item?.MarkKey || '').trim().toLowerCase();
+    default:
+      return '';
+  }
+};
+
+const overlayRecentLocalEdits = (data: SheetData): SheetData => {
+  const now = Date.now();
+  let next: SheetData = data;
+  for (const [id, edit] of [...recentLocalEdits.entries()]) {
+    if (now - edit.at > RECENT_LOCAL_EDIT_TTL_MS) {
+      recentLocalEdits.delete(id);
+      continue;
+    }
+    const collection = [...((next[edit.collection] as any[]) || [])];
+    const target = String(edit.key).trim().toLowerCase();
+    const index = collection.findIndex(
+      item => recordKeyForCollection(edit.collection, item) === target
+    );
+    if (index >= 0) {
+      collection[index] = { ...collection[index], ...edit.record };
+    } else {
+      collection.push(edit.record);
+    }
+    next = { ...next, [edit.collection]: collection };
+  }
+  return next;
+};
 
 type SheetData = {
   patients: any[];
@@ -504,6 +592,79 @@ const pushPayloadToScript = async (payload: {
   }
 };
 
+/** Fire-and-forget push used after a local save already returned pending to the UI. */
+const runBackgroundSheetsPush = (
+  pushPromise: Promise<void>,
+  options: {
+    staffKey: string;
+    entityType: string;
+    entityKey: string;
+    action: 'insert' | 'update' | 'delete';
+    syncContext?: SheetsSyncContext;
+    baseMessage?: string;
+  }
+): void => {
+  markClientPushPending(SHEETS_PENDING_MESSAGE);
+  void pushPromise
+    .then(() => {
+      const okResult: SheetsSyncMeta = {
+        configured: true,
+        ok: true,
+        at: Date.now(),
+        message: SHEETS_SUCCESS_MESSAGE
+      };
+      markClientPushOk(okResult.message);
+      if (options.staffKey) {
+        clearLocalSheetsSyncFailure(options.staffKey, options.entityType, options.entityKey);
+      }
+      // Keep local overlay briefly so an immediate pull cannot wipe before Sheets is readable.
+      setTimeout(() => clearRecentLocalEdit(options.entityType, options.entityKey), 15000);
+      emitSheetsPushResult({ _sheetsSync: okResult }, options.baseMessage);
+    })
+    .catch((err: unknown) => {
+      if (err instanceof AuthRequiredError) {
+        const fail: SheetsSyncMeta = {
+          configured: true,
+          ok: false,
+          at: Date.now(),
+          message: err.message
+        };
+        markClientPushFailed(fail.message);
+        if (options.staffKey) {
+          recordLocalSheetsSyncFailure(
+            options.staffKey,
+            options.entityType,
+            options.entityKey,
+            options.action,
+            options.syncContext,
+            `${SHEETS_FAILURE_DEFAULT} (${err.message})`
+          );
+        }
+        emitSheetsPushResult({ _sheetsSync: fail }, options.baseMessage);
+        return;
+      }
+      const detail = err instanceof Error ? err.message : String(err || '');
+      const fail: SheetsSyncMeta = {
+        configured: true,
+        ok: false,
+        at: Date.now(),
+        message: detail ? `${SHEETS_FAILURE_DEFAULT} (${detail})` : SHEETS_FAILURE_DEFAULT
+      };
+      markClientPushFailed(fail.message);
+      if (options.staffKey) {
+        recordLocalSheetsSyncFailure(
+          options.staffKey,
+          options.entityType,
+          options.entityKey,
+          options.action,
+          options.syncContext,
+          fail.message
+        );
+      }
+      emitSheetsPushResult({ _sheetsSync: fail }, options.baseMessage);
+    });
+};
+
 const awaitSheetsPushWithTimeout = async (
   pushPromise: Promise<void>,
   options: {
@@ -889,15 +1050,13 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
       }
       const parsed = JSON.parse(text);
       assertAppsScriptJsonOk(parsed);
-      cache = normalizeData(parsed);
+      // Overlay in-flight local saves so a soft refresh cannot wipe edits still traveling to Sheets.
+      cache = overlayRecentLocalEdits(normalizeData(parsed));
       if (Array.isArray(cache.staff)) {
         staffCache = mergeStaffWithBundledPasswords(cache.staff);
         cache.staff = staffCache;
       }
-      void setPersistedData('all_data', {
-        ...parsed,
-        staff: Array.isArray(cache.staff) ? cache.staff.map(stripBridgePassword) : []
-      });
+      void setPersistedData('all_data', sanitizeDataBundle(cache));
       if (Array.isArray(cache.staff)) {
         void setPersistedData('staff_data', cache.staff.map(stripBridgePassword));
       }
@@ -1083,6 +1242,12 @@ const upsertCachedRecord = (config: (typeof endpointMap)[string], record: any, i
     ...cache,
     [config.collection]: collection
   };
+  // Persist immediately so reopen/drawer refresh still sees the local save
+  // while the Sheets push is in flight.
+  void setPersistedData('all_data', sanitizeDataBundle(cache));
+  if (recordKey) {
+    noteRecentLocalEdit(config.type, recordKey, config.collection, record);
+  }
 };
 
 const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): boolean => {
@@ -1355,8 +1520,49 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   const action: 'insert' | 'update' = existing || isUpdate ? 'update' : 'insert';
   upsertCachedRecord(config, record, isInsert);
 
+  if (endpoint === 'notifications' && isInsert && record?.StaffKey) {
+    deliverWebPushForNotification(record);
+  }
+
+  if (endpoint === 'consults') {
+    const previousConsult = existing ? ({ ...existing } as Consult) : undefined;
+    void maybeNotifySchedulerAboutConsultMutation(previousConsult, record as Consult);
+  }
+
   const staffKey = resolveBridgeStaffKey(init);
-  const sheetsSync = await awaitSheetsPushWithTimeout(
+  const scriptUrl = getScriptUrl();
+  const at = Date.now();
+
+  // Honest UX: local save is instant; Sheets confirmation arrives later via event.
+  // Never return ok:true here — that caused a green banner while data was still in flight.
+  if (!scriptUrl) {
+    return jsonResponse(
+      {
+        ...record,
+        _sheetsSync: {
+          configured: false,
+          ok: true,
+          at,
+          message: SHEETS_LOCAL_ONLY_MESSAGE
+        } satisfies SheetsSyncMeta
+      },
+      { status: existing || isUpdate ? 200 : 201 }
+    );
+  }
+
+  const pendingSync: SheetsSyncMeta = {
+    configured: true,
+    ok: false,
+    pending: true,
+    at,
+    message: SHEETS_PENDING_MESSAGE
+  };
+
+  const baseMessage = syncContext?.viewLabel
+    ? `Đã lưu (${syncContext.viewLabel})`
+    : undefined;
+
+  runBackgroundSheetsPush(
     pushPayloadToScript({
       type: config.type,
       action,
@@ -1368,21 +1574,13 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
       entityType: config.type,
       entityKey: String(finalKey),
       action,
-      syncContext
+      syncContext,
+      baseMessage
     }
   );
 
-  if (endpoint === 'notifications' && isInsert && record?.StaffKey) {
-    deliverWebPushForNotification(record);
-  }
-
-  if (endpoint === 'consults') {
-    const previousConsult = existing ? ({ ...existing } as Consult) : undefined;
-    void maybeNotifySchedulerAboutConsultMutation(previousConsult, record as Consult);
-  }
-
   return jsonResponse(
-    { ...record, _sheetsSync: sheetsSync },
+    { ...record, _sheetsSync: pendingSync },
     { status: existing || isUpdate ? 200 : 201 }
   );
 };
@@ -1504,28 +1702,6 @@ const batchWriteRecords = async (init?: RequestInit) => {
   const { syncContext } = extractBridgeSyncContext(
     body && typeof body === 'object' ? body as Record<string, unknown> : {}
   );
-  let sheetsSync: SheetsSyncMeta;
-  try {
-    sheetsSync = await awaitSheetsPushWithTimeout(
-      postBatchToScript(scriptOperations).then(() => undefined),
-      {
-        staffKey,
-        entityType: 'Batch',
-        entityKey: `batch_${Date.now()}`,
-        action: 'insert',
-        syncContext
-      }
-    );
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err || '');
-    sheetsSync = {
-      configured: !!getScriptUrl(),
-      ok: false,
-      at: Date.now(),
-      message: detail ? `${SHEETS_FAILURE_DEFAULT} (${detail})` : SHEETS_FAILURE_DEFAULT
-    };
-    markClientPushFailed(sheetsSync.message);
-  }
 
   for (let i = 0; i < incomingOperations.length; i += 1) {
     const endpoint = String(incomingOperations[i]?.endpoint || '').trim();
@@ -1535,11 +1711,47 @@ const batchWriteRecords = async (init?: RequestInit) => {
     }
   }
 
+  const scriptUrl = getScriptUrl();
+  const at = Date.now();
+  if (!scriptUrl) {
+    return jsonResponse({
+      success: true,
+      count: responseRecords.length,
+      records: responseRecords,
+      _sheetsSync: {
+        configured: false,
+        ok: true,
+        at,
+        message: SHEETS_LOCAL_ONLY_MESSAGE
+      } satisfies SheetsSyncMeta
+    });
+  }
+
+  const pendingSync: SheetsSyncMeta = {
+    configured: true,
+    ok: false,
+    pending: true,
+    at,
+    message: SHEETS_PENDING_MESSAGE
+  };
+  const batchKey = `batch_${at}`;
+  runBackgroundSheetsPush(
+    postBatchToScript(scriptOperations).then(() => undefined),
+    {
+      staffKey,
+      entityType: 'Batch',
+      entityKey: batchKey,
+      action: 'insert',
+      syncContext,
+      baseMessage: 'Đã lưu theo lô'
+    }
+  );
+
   return jsonResponse({
     success: true,
     count: responseRecords.length,
     records: responseRecords,
-    _sheetsSync: sheetsSync
+    _sheetsSync: pendingSync
   });
 };
 

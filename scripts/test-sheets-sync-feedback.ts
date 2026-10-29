@@ -24,7 +24,7 @@ const pending = buildMutationFeedback(
 assert.equal(pending.kind, 'pending');
 assert.equal(pending.isWarning, true);
 assert.equal(pending.showOverlay, false);
-assert.ok(pending.bannerMessage.includes('đang đồng bộ'));
+assert.ok(pending.bannerMessage.includes('đang ghi dữ liệu vào Google Sheets'));
 
 const ok = buildMutationFeedback(
   { _sheetsSync: { configured: true, ok: true, message: 'ok' } },
@@ -33,6 +33,9 @@ const ok = buildMutationFeedback(
 assert.equal(ok.kind, 'success');
 assert.equal(ok.isWarning, false);
 assert.ok(ok.bannerMessage.includes(SHEETS_SUCCESS_MESSAGE));
+assert.ok(SHEETS_SUCCESS_MESSAGE.includes('đã đẩy lên Google Sheets'));
+
+assert.ok(pending.bannerMessage.includes('đang ghi dữ liệu vào Google Sheets'));
 
 assert.equal(
   evaluateSheetsSync({}).kind,
