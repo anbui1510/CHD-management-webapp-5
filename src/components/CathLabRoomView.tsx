@@ -43,6 +43,8 @@ interface Props {
   onAddConsult?: (consult: Consult) => void;
   onAddPatient?: (patient: Patient) => void;
   onSaveSuccess?: (message: string) => void;
+  openCathKey?: string | null;
+  onOpenCathKeyConsumed?: () => void;
 }
 
 const CATH_METHODS_SPECIAL = [
@@ -244,7 +246,7 @@ const buildCathFormSnapshot = (data: Partial<CathLab>, note: string): string =>
     callNote: note
   });
 
-export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerAlert, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient, onSaveSuccess }: Props) {
+export default function CathLabRoomView({ patients, consults, cathlabs, sources, staffList, onRefreshData, triggerAlert, triggerConfirm, onViewPatientRecord, onPatchConsult, onPatchCathlab, onAddCathlab, onAddConsult, onAddPatient, onSaveSuccess, openCathKey, onOpenCathKeyConsumed }: Props) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   // Tabs
   const [activeTab, setActiveTab] = useState<'pending' | 'done'>('pending');
@@ -532,6 +534,16 @@ export default function CathLabRoomView({ patients, consults, cathlabs, sources,
       }
     }
   };
+
+  useEffect(() => {
+    const key = String(openCathKey || '').trim();
+    if (!key) return;
+    const cath = cathlabs.find(c => c.CathKey === key);
+    if (!cath) return;
+    setActiveTab('done');
+    openDoneForm(cath);
+    onOpenCathKeyConsumed?.();
+  }, [openCathKey, cathlabs, onOpenCathKeyConsumed]);
 
   const forceCloseModal = () => {
     cathPlanManuallySetRef.current = false;

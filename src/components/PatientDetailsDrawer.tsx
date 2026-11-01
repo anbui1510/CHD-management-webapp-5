@@ -43,6 +43,8 @@ interface PatientDetailsDrawerProps {
   canOpenSchedule?: boolean;
   onOpenStaffResult?: (consult: Consult) => void;
   onOpenSchedule?: (consult: Consult) => void;
+  canOpenCathLabRoom?: boolean;
+  onOpenCathLab?: (cath: CathLab) => void;
 }
 
 const INTERVENTION_RESULTS = new Set([
@@ -70,7 +72,9 @@ export default function PatientDetailsDrawer({
   canOpenStaffResults = false,
   canOpenSchedule = false,
   onOpenStaffResult,
-  onOpenSchedule
+  onOpenSchedule,
+  canOpenCathLabRoom = false,
+  onOpenCathLab
 }: PatientDetailsDrawerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [summaryConsult, setSummaryConsult] = useState<Consult | null>(null);
@@ -392,6 +396,19 @@ export default function PatientDetailsDrawer({
                         </p>
                       )}
                       {cath.CathNote && <p className="font-semibold text-slate-700 leading-relaxed"><span className="text-slate-400 font-bold">Ghi chú:</span> {cath.CathNote}</p>}
+                      {canOpenCathLabRoom && onOpenCathLab && (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onOpenCathLab(cath)}
+                            className="p-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 transition shadow-sm cursor-pointer"
+                            title="Sửa thông tin thông tim (Phòng thông tim)"
+                            aria-label="Mở sửa ca thông tim tại Phòng thông tim"
+                          >
+                            <PencilLine className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
