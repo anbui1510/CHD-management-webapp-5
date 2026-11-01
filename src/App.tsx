@@ -387,6 +387,10 @@ export default function App() {
 
   // Active Drawer States
   const [selectedPatientForDetail, setSelectedPatientForDetail] = useState<Patient | null>(null);
+  const [pendingConsultDeepLink, setPendingConsultDeepLink] = useState<{
+    target: 'results-staff' | 'schedule-tt';
+    consultKey: string;
+  } | null>(null);
   const [showAddConsultQuick, setShowAddConsultQuick] = useState<boolean>(false);
 
   // Auxiliary Modal Triggers
@@ -3716,6 +3720,10 @@ export default function App() {
               deviceTemplates={deviceTemplates}
               staffList={staffList}
               currentStaff={currentStaff}
+              openConsultKey={pendingConsultDeepLink?.target === 'results-staff' ? pendingConsultDeepLink.consultKey : undefined}
+              onOpenConsultKeyConsumed={() => {
+                setPendingConsultDeepLink(prev => (prev?.target === 'results-staff' ? null : prev));
+              }}
               onRefreshData={refreshConsultData}
               onAddPatient={addPatient}
               onPatchPatient={patchPatient}
@@ -3823,6 +3831,10 @@ export default function App() {
               currentStaff={currentStaff}
               pureCalendarMode={false}
               mobileLeaveGuardRef={scheduleTtMobileLeaveGuardRef}
+              openConsultKey={pendingConsultDeepLink?.target === 'schedule-tt' ? pendingConsultDeepLink.consultKey : undefined}
+              onOpenConsultKeyConsumed={() => {
+                setPendingConsultDeepLink(prev => (prev?.target === 'schedule-tt' ? null : prev));
+              }}
               onRefreshData={refreshClinicalData}
               onPatchConsult={patchConsult}
               onPatchPatient={patchPatient}
@@ -4066,6 +4078,18 @@ export default function App() {
               }));
               setPendingConsultsCount(consults.filter(c => c.PatientKey === pat.PatientKey && isPendingStaffConsult(c)).length);
               setActiveMenu('consult-form');
+            }}
+            canOpenStaffResults={canAccessModule(currentStaff, 'results-staff')}
+            canOpenSchedule={canAccessModule(currentStaff, 'schedule-tt')}
+            onOpenStaffResult={(consult) => {
+              setSelectedPatientForDetail(null);
+              setPendingConsultDeepLink({ target: 'results-staff', consultKey: consult.ConsultKey });
+              setActiveMenu('results-staff');
+            }}
+            onOpenSchedule={(consult) => {
+              setSelectedPatientForDetail(null);
+              setPendingConsultDeepLink({ target: 'schedule-tt', consultKey: consult.ConsultKey });
+              setActiveMenu('schedule-tt');
             }}
           />
         )}
