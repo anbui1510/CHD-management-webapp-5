@@ -387,10 +387,12 @@ export default function App() {
 
   // Active Drawer States
   const [selectedPatientForDetail, setSelectedPatientForDetail] = useState<Patient | null>(null);
-  const [pendingConsultDeepLink, setPendingConsultDeepLink] = useState<{
-    target: 'results-staff' | 'schedule-tt';
-    consultKey: string;
-  } | null>(null);
+  const [pendingConsultDeepLink, setPendingConsultDeepLink] = useState<
+    | { target: 'results-staff'; consultKey: string }
+    | { target: 'schedule-tt'; consultKey: string }
+    | { target: 'cathlab-room'; cathKey: string }
+    | null
+  >(null);
   const [showAddConsultQuick, setShowAddConsultQuick] = useState<boolean>(false);
 
   // Auxiliary Modal Triggers
@@ -3750,6 +3752,10 @@ export default function App() {
               cathlabs={cathlabs}
               sources={sources}
               staffList={staffList}
+              openCathKey={pendingConsultDeepLink?.target === 'cathlab-room' ? pendingConsultDeepLink.cathKey : undefined}
+              onOpenCathKeyConsumed={() => {
+                setPendingConsultDeepLink(prev => (prev?.target === 'cathlab-room' ? null : prev));
+              }}
               onRefreshData={refreshClinicalData}
               triggerAlert={triggerAlert}
               triggerConfirm={triggerConfirm}
@@ -4090,6 +4096,12 @@ export default function App() {
               setSelectedPatientForDetail(null);
               setPendingConsultDeepLink({ target: 'schedule-tt', consultKey: consult.ConsultKey });
               setActiveMenu('schedule-tt');
+            }}
+            canOpenCathLabRoom={canAccessModule(currentStaff, 'cathlab-room')}
+            onOpenCathLab={(cath) => {
+              setSelectedPatientForDetail(null);
+              setPendingConsultDeepLink({ target: 'cathlab-room', cathKey: cath.CathKey });
+              setActiveMenu('cathlab-room');
             }}
           />
         )}
