@@ -23,7 +23,10 @@ import {
   Activity,
   AlertTriangle,
   CalendarDays,
-  Scissors
+  Scissors,
+  Eye,
+  PencilLine,
+  Wrench
 } from 'lucide-react';
 
 interface PatientDetailsDrawerProps {
@@ -36,6 +39,10 @@ interface PatientDetailsDrawerProps {
   onEditPatientAdmin: (patient: Patient) => void;
   onSelectPDF: (consult: Consult, patient: Patient) => void;
   onRegisterNewConsult: (patient: Patient) => void;
+  canOpenStaffResults?: boolean;
+  canOpenSchedule?: boolean;
+  onOpenStaffResult?: (consult: Consult) => void;
+  onOpenSchedule?: (consult: Consult) => void;
 }
 
 const INTERVENTION_RESULTS = new Set([
@@ -59,7 +66,11 @@ export default function PatientDetailsDrawer({
   onClose,
   onEditPatientAdmin,
   onSelectPDF,
-  onRegisterNewConsult
+  onRegisterNewConsult,
+  canOpenStaffResults = false,
+  canOpenSchedule = false,
+  onOpenStaffResult,
+  onOpenSchedule
 }: PatientDetailsDrawerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [summaryConsult, setSummaryConsult] = useState<Consult | null>(null);
@@ -278,11 +289,9 @@ export default function PatientDetailsDrawer({
 
               <div className="space-y-3">
                 {patientConsults.map((c) => (
-                  <button
+                  <div
                     key={c.ConsultKey}
-                    type="button"
-                    onClick={() => setSummaryConsult(c)}
-                    className="w-full text-left bg-white border text-xs border-slate-200 hover:border-pink-300 rounded-2xl p-4 shadow-sm hover:shadow-md transition space-y-2 cursor-pointer active:scale-[0.99]"
+                    className="w-full text-left bg-white border text-xs border-slate-200 rounded-2xl p-4 shadow-sm space-y-2"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-extrabold text-slate-900 uppercase">Ngày staff: {formatVNTime(c.ConsultDate)}</p>
@@ -310,10 +319,40 @@ export default function PatientDetailsDrawer({
                         </button>
                       </div>
                     )}
-                    <p className="text-[10px] font-bold text-emerald-700 uppercase pt-1 border-t border-slate-100">
-                      Bấm để xem tóm tắt &amp; copy ảnh
-                    </p>
-                  </button>
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSummaryConsult(c)}
+                        className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition shadow-sm cursor-pointer"
+                        title="Xem tóm tắt & copy ảnh"
+                        aria-label="Xem tóm tắt và copy ảnh"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {canOpenStaffResults && onOpenStaffResult && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenStaffResult(c)}
+                          className="p-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 transition shadow-sm cursor-pointer"
+                          title="Sửa / nhập kết quả staff"
+                          aria-label="Mở nhập kết quả staff"
+                        >
+                          <PencilLine className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canOpenSchedule && onOpenSchedule && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenSchedule(c)}
+                          className="p-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 transition shadow-sm cursor-pointer"
+                          title="Xếp lịch & dụng cụ"
+                          aria-label="Mở xếp lịch và dụng cụ"
+                        >
+                          <Wrench className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

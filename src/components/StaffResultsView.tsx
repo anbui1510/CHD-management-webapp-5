@@ -111,9 +111,11 @@ interface StaffResultsViewProps {
   triggerAlert: (message: string, title?: string) => void;
   onSaveSuccess?: (message: string) => void;
   onViewPatientRecord?: (patient: Patient) => void;
+  openConsultKey?: string | null;
+  onOpenConsultKeyConsumed?: () => void;
 }
 
-export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert, onSaveSuccess, onViewPatientRecord }: StaffResultsViewProps) {
+export default function StaffResultsView({ patients, consults, cathlabs = [], sources = [], deviceTemplates = [], staffList = [], currentStaff, onRefreshData, onAddPatient, onPatchPatient, onAddConsult, onRemoveConsult, onRemoveConsults, onPatchConsult, onEditPatientAdmin, createDiagnosisSource, triggerAlert, onSaveSuccess, onViewPatientRecord, openConsultKey, onOpenConsultKeyConsumed }: StaffResultsViewProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
@@ -160,6 +162,15 @@ export default function StaffResultsView({ patients, consults, cathlabs = [], so
       setMobileDrawerKey(null);
     }
   }, [isMobile]);
+
+  useEffect(() => {
+    const key = String(openConsultKey || '').trim();
+    if (!key) return;
+    const consult = consults.find(c => c.ConsultKey === key);
+    if (!consult) return;
+    handleOpenConsult(consult);
+    onOpenConsultKeyConsumed?.();
+  }, [openConsultKey, consults, handleOpenConsult, onOpenConsultKeyConsumed]);
 
   const patientsByKey = useMemo(() => {
     const map = new Map<string, Patient>();

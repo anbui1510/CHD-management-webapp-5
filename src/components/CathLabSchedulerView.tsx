@@ -91,6 +91,8 @@ interface CathLabSchedulerViewProps {
   pureCalendarMode?: boolean;
   onTogglePureMode?: () => void;
   mobileLeaveGuardRef?: React.MutableRefObject<((next: () => void) => void) | null>;
+  openConsultKey?: string | null;
+  onOpenConsultKeyConsumed?: () => void;
 }
 
 const CATH_INTERVENTIONIST_DOCTORS = [
@@ -367,7 +369,9 @@ export default function CathLabSchedulerView({
   onViewPatientRecord,
   pureCalendarMode = false,
   onTogglePureMode,
-  mobileLeaveGuardRef
+  mobileLeaveGuardRef,
+  openConsultKey,
+  onOpenConsultKeyConsumed
 }: CathLabSchedulerViewProps) {
   const { reportMutationResponse } = useSheetsSyncFeedback();
 
@@ -2100,6 +2104,15 @@ Xin cảm ơn!`;
     }
     applySelectConsult(c);
   };
+
+  useEffect(() => {
+    const key = String(openConsultKey || '').trim();
+    if (!key) return;
+    const consult = consults.find(c => c.ConsultKey === key);
+    if (!consult) return;
+    applySelectConsult(consult);
+    onOpenConsultKeyConsumed?.();
+  }, [openConsultKey, consults, onOpenConsultKeyConsumed]);
 
   const handleCallStatusSelect = (opt: string) => {
     if (opt === 'Loại' || opt === 'Đã làm nơi khác' || opt === 'Muốn theo dõi nơi khác') {
