@@ -1,0 +1,48 @@
+/** Shared prompt for consult slide Gemini extract (Apps Script duplicates this text). */
+import type { ConsultSlideConsultContext, ConsultSlidePatientContext } from './types';
+
+export function buildConsultSlideExtractPrompt(
+  patient: ConsultSlidePatientContext,
+  consult: ConsultSlideConsultContext
+): string {
+  return [
+    'Bạn là trợ lý lâm sàng tim mạch nhi. Đọc các ảnh/PDF đính kèm (phiếu hành chính, kết quả siêu âm TTE, ECG, CXR nếu có) và trích xuất thông tin cho slide hội chẩn.',
+    '',
+    'Dữ liệu đã có trên hệ thống (ưu tiên giữ nếu ảnh không rõ):',
+    JSON.stringify({ patient, consult }, null, 2),
+    '',
+    'Yêu cầu:',
+    '- Đọc cả chữ in và chữ viết tay (cân nặng, chiều cao, SĐT).',
+    '- KHÔNG đưa tài khoản/mật khẩu RIS, URL đăng nhập, mã QR credentials, hay thông tin đăng nhập vào JSON.',
+    '- Ngày tháng dùng dd/mm/yyyy khi có thể.',
+    '- tteFindings: danh sách bullet ngắn gọn từng ý siêu âm (không gộp một đoạn dài).',
+    '- tteConclusion: kết luận siêu âm.',
+    '- historySummary: tóm tắt bệnh sử ngắn nếu suy ra được từ giấy tờ; nếu không có thì để "".',
+    '- surgNote / cathNote: đề xuất từ kết luận giấy tờ hoặc để trống (app sẽ điền từ kết quả hội chẩn).',
+    '',
+    'Trả về JSON thuần (không markdown) đúng schema:',
+    '{',
+    '  "PatientName": "",',
+    '  "OtherPatientName": "",',
+    '  "PatientID1": "",',
+    '  "PatientID2": "",',
+    '  "PatientSex": "",',
+    '  "PatientDOB": "",',
+    '  "PatientAddress": "",',
+    '  "PatientPhone": "",',
+    '  "PatientWeight": "",',
+    '  "PatientHeight": "",',
+    '  "ageLabel": "",',
+    '  "clinicalSummary": "",',
+    '  "DetailDiagnosis": "",',
+    '  "historySummary": "",',
+    '  "tteDate": "",',
+    '  "tteFindings": [""],',
+    '  "tteConclusion": "",',
+    '  "ecgNote": "",',
+    '  "cxrNote": "",',
+    '  "surgNote": "",',
+    '  "cathNote": ""',
+    '}',
+  ].join('\n');
+}

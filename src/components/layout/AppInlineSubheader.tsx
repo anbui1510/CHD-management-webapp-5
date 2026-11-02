@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { ClipboardList, Download, Heart, LayoutDashboard, Plus, UserCog } from 'lucide-react';
+import { ClipboardList, Download, Heart, LayoutDashboard, Plus, Presentation, UserCog } from 'lucide-react';
 import type { ActiveMenuId } from '../../config/navigation';
 import { getViewSubheaderTitle } from '../../config/viewSubheaderTitles';
 import { useViewSubheaderContext } from '../../context/ViewSubheaderContext';
@@ -21,6 +21,7 @@ interface AppInlineSubheaderProps {
   consultListSearch: string;
   onConsultListSearchChange: (value: string) => void;
   onAddConsult: () => void;
+  onAddConsultAi?: () => void;
   profileName?: string;
 }
 
@@ -32,6 +33,7 @@ export default function AppInlineSubheader({
   consultListSearch,
   onConsultListSearchChange,
   onAddConsult,
+  onAddConsultAi,
   profileName,
 }: AppInlineSubheaderProps) {
   const { setConfig } = useViewSubheaderContext();
@@ -61,15 +63,26 @@ export default function AppInlineSubheader({
 
   const consultActions = useMemo(
     () => (
-      <button
-        type="button"
-        onClick={onAddConsult}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium px-3 py-1.5 rounded-md text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer shrink-0"
-      >
-        <Plus className="w-3.5 h-3.5" /> Đăng kí staff
-      </button>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {onAddConsultAi ? (
+          <button
+            type="button"
+            onClick={onAddConsultAi}
+            className="border border-border bg-background hover:bg-accent text-foreground font-medium px-3 py-1.5 rounded-md text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer"
+          >
+            <Presentation className="w-3.5 h-3.5 text-primary" /> Đăng ký mode AI
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onAddConsult}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium px-3 py-1.5 rounded-md text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" /> Đăng kí staff
+        </button>
+      </div>
     ),
-    [onAddConsult]
+    [onAddConsult, onAddConsultAi]
   );
 
   useEffect(() => {
