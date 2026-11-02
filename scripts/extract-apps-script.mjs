@@ -7,7 +7,8 @@ if (start < 0) throw new Error('start marker not found');
 const codeStart = start + startMarker.length;
 const codeEnd = content.lastIndexOf('`');
 if (codeEnd <= codeStart) throw new Error('end backtick not found');
-const code = content.slice(codeStart, codeEnd);
+const code = content.slice(codeStart, codeEnd)
+  .replace(/\n\/\*\* @consult-slide-prompt:(start|end) \*\//g, '');
 fs.mkdirSync('docs', { recursive: true });
 fs.writeFileSync('docs/Code.gs', code, 'utf8');
 const lines = code.split('\n');

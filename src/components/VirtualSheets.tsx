@@ -650,6 +650,9 @@ export default function VirtualSheets({
                 {copied ? 'Đã sao chép!' : 'Sao chép mã'}
               </button>
             </div>
+            <div className="px-4 py-2 bg-amber-50 text-amber-900 text-[11px] font-semibold border-b border-amber-200">
+              Sao chép toàn bộ Code.gs (Ctrl+A trong khung mã → Copy). Không dán từng đoạn — Apps Script editor tự xuống dòng và gây lỗi cú pháp dòng ~689.
+            </div>
             <pre className="p-4 overflow-auto text-[10px] font-mono leading-relaxed text-emerald-300 flex-1">
               <code>{GOOGLE_APPS_SCRIPT_CODE}</code>
             </pre>

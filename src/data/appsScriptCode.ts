@@ -6,7 +6,7 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * Instructions:
  * 1. Open your Google Sheet (https://docs.google.com/spreadsheets/d/your-sheet-id)
  * 2. In the top menu, go to "Extensions" (Tiện ích mở rộng) -> "Apps Script"
- * 3. Copy code tu docs/Code.gs (hoac nut Copy trong app Virtual Google Sheets). KHONG copy truc tiep file appsScriptCode.ts (co dong export/semicolon dong template gay loi cu phap).
+ * 3. Sao chep TOAN BO Code.gs (nut Copy trong Virtual Google Sheets). KHONG paste tung doan thu cong — editor Apps Script tu xuong dong lam vo chuoi dai. KHONG copy file appsScriptCode.ts.
  * 4. Click the Save icon (orange folder/save icon).
  * 5. Click "Deploy" (Triển khai) -> "New deployment" (Triển khai mới).
  * 6. Select "Web app" (Ứng dụng web) as deployment type (click gear icon next to "Select type").
@@ -680,26 +680,66 @@ function consultSlideExtractJsonFromText(text) {
   return JSON.parse(trimmed);
 }
 
-/** Multi-line string concat — tránh Apps Script editor tự xuống dòng làm vỡ cú pháp khi paste. */
+/** @consult-slide-prompt:start */
+/** Generated from src/consultSlide/appsScriptPromptLines.ts — do not edit by hand. */
 function buildConsultSlidePrompt(patient, consult) {
   patient = patient || {};
   consult = consult || {};
   var ctx = JSON.stringify({ patient: patient, consult: consult }, null, 2);
-  return (
-    "Ban la tro ly lam sang tim mach nhi. Doc cac anh/PDF dinh kem (phieu hanh chinh, ket qua sieu am TTE, ECG, CXR neu co) va trich xuat thong tin cho slide hoi chan.\n\n" +
-    "Du lieu da co tren he thong (uu tien giu neu anh khong ro):\n" +
-    ctx +
-    "\n\nYeu cau:\n" +
-    "- Doc ca chu in va chu viet tay (can nang, chieu cao, SDT).\n" +
-    "- KHONG dua tai khoan/mat khau RIS, URL dang nhap, ma QR credentials, hay thong tin dang nhap vao JSON.\n" +
-    "- Ngay thang dung dd/mm/yyyy khi co the.\n" +
-    "- tteFindings: danh sach bullet ngan gon tung y sieu am.\n" +
-    "- tteConclusion: ket luan sieu am.\n" +
-    "- historySummary: tom tat benh su ngan hoac rong.\n" +
-    "- surgNote / cathNote: co the rong.\n\n" +
-    "Tra ve JSON thuan voi cac truong PatientName, OtherPatientName, PatientID1, PatientID2, PatientSex, PatientDOB, PatientAddress, PatientPhone, PatientWeight, PatientHeight, ageLabel, clinicalSummary, DetailDiagnosis, historySummary, tteDate, tteFindings (mang), tteConclusion, ecgNote, cxrNote, surgNote, cathNote."
-  );
+  var lines = [
+    "Ban la tro ly lam sang tim mach nhi.",
+    "Doc anh/PDF (hanh chinh, TTE, ECG, CXR) cho slide hoi chan.",
+    "",
+    "Du lieu da co tren he thong (uu tien giu neu anh khong ro):",
+    "__CTX__",
+    "",
+    "Yeu cau:",
+    "- Doc chu in va chu viet tay (can nang, chieu cao, SDT).",
+    "- KHONG dua RIS login, URL, QR credentials vao JSON.",
+    "- Ngay thang dung dd/mm/yyyy khi co the.",
+    "- tteFindings: bullet ngan tung y sieu am.",
+    "- tteConclusion: ket luan sieu am.",
+    "- historySummary: tom tat benh su ngan hoac rong.",
+    "- surgNote / cathNote: co the rong.",
+    "",
+    "Tra ve JSON thuan (khong markdown) dung schema:",
+    "{",
+    "  \"PatientName\": \"\",",
+    "  \"OtherPatientName\": \"\",",
+    "  \"PatientID1\": \"\",",
+    "  \"PatientID2\": \"\",",
+    "  \"PatientSex\": \"\",",
+    "  \"PatientDOB\": \"\",",
+    "  \"PatientAddress\": \"\",",
+    "  \"PatientPhone\": \"\",",
+    "  \"PatientWeight\": \"\",",
+    "  \"PatientHeight\": \"\",",
+    "  \"ageLabel\": \"\",",
+    "  \"clinicalSummary\": \"\",",
+    "  \"DetailDiagnosis\": \"\",",
+    "  \"historySummary\": \"\",",
+    "  \"tteDate\": \"\",",
+    "  \"tteFindings\": [\"\"],",
+    "  \"tteConclusion\": \"\",",
+    "  \"ecgNote\": \"\",",
+    "  \"cxrNote\": \"\",",
+    "  \"surgNote\": \"\",",
+    "  \"cathNote\": \"\"",
+    "}",
+  ];
+  var out = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (line === "__CTX__") {
+      out.push(ctx);
+    } else {
+      out.push(line);
+    }
+  }
+  return out.join("\n");
 }
+
+/** @consult-slide-prompt:end */
 
 function consultSlideResolveModels(preferred) {
   var models = [];
