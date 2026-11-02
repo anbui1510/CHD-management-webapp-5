@@ -749,22 +749,36 @@ function buildConsultSlidePrompt(patient, consult) {
 function consultSlideResolveModels(preferred) {
   var models = [];
   var p = String(preferred || "").trim();
-  if (p) models.push(p);
-  if (models.indexOf("gemini-3.8-flash") === -1) models.push("gemini-3.8-flash");
-  if (models.indexOf("gemini-2.5-flash-lite") === -1) models.push("gemini-2.5-flash-lite");
+  var candidates = [];
+  if (p) candidates.push(p);
+  candidates.push("gemini-3.8-flash");
+  candidates.push("gemini-2.5-flash-lite");
+  for (var c = 0; c < candidates.length; c++) {
+    var name = String(candidates[c] || "").trim();
+    if (!name) continue;
+    if (models.indexOf(name) === -1) models.push(name);
+  }
   return models;
 }
 
 function consultSlideFormatGeminiHttpError(httpCode, responseText) {
   var body = String(responseText || "");
+  var message = "";
   try {
     var parsed = JSON.parse(body);
     if (parsed.error && parsed.error.message) {
-      return "HTTP " + httpCode + ": " + parsed.error.message;
+      message = String(parsed.error.message);
     }
   } catch (ignore) {}
-  if (body.length > 320) body = body.substring(0, 320) + "...";
-  return "HTTP " + httpCode + ": " + body;
+  if (!message) {
+    message = body.length > 320 ? body.substring(0, 320) + "..." : body;
+  }
+  if (httpCode === 503 || httpCode === 429) {
+    message =
+      message +
+      " (Google tam qua tai — thu lai sau 2-5 phut; hoac dat GEMINI_MODEL=gemini-3.8-flash va paste Code.gs moi co retry/fallback.)";
+  }
+  return "HTTP " + httpCode + ": " + message;
 }
 
 function consultSlideIsRetryableGeminiCode(code) {
@@ -772,7 +786,7 @@ function consultSlideIsRetryableGeminiCode(code) {
 }
 
 function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts) {
-  var attempts = maxAttempts || 3;
+  var attempts = maxAttempts || 5;
   var url =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
     encodeURIComponent(model) +
@@ -781,7 +795,7 @@ function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts) {
   var lastText = "";
   for (var attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) {
-      Utilities.sleep(1500 * attempt);
+      Utilities.sleep(2000 * attempt);
     }
     var response = UrlFetchApp.fetch(url, {
       method: "post",
@@ -826,7 +840,11 @@ function runConsultSlideGeminiSmokeTest() {
     }
     errors.push(model + ": " + consultSlideFormatGeminiHttpError(result.code, result.text));
   }
-  throw new Error(errors[errors.length - 1] || "Gemini smoke test failed");
+  throw new Error(
+    (errors[errors.length - 1] || "Gemini smoke test failed") +
+      " Da thu: " +
+      models.join(", ")
+  );
 }
 
 function consultSlideExtractGemini(payload) {
