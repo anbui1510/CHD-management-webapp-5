@@ -680,10 +680,25 @@ function consultSlideExtractJsonFromText(text) {
   return JSON.parse(trimmed);
 }
 
+/** Multi-line string concat — tránh Apps Script editor tự xuống dòng làm vỡ cú pháp khi paste. */
 function buildConsultSlidePrompt(patient, consult) {
   patient = patient || {};
   consult = consult || {};
-  return "Bạn là trợ lý lâm sàng tim mạch nhi. Đọc các ảnh/PDF đính kèm (phiếu hành chính, kết quả siêu âm TTE, ECG, CXR nếu có) và trích xuất thông tin cho slide hội chẩn.\n\nDữ liệu đã có trên hệ thống (ưu tiên giữ nếu ảnh không rõ):\n" + JSON.stringify({ patient: patient, consult: consult }, null, 2) + "\n\nYêu cầu:\n- Đọc cả chữ in và chữ viết tay (cân nặng, chiều cao, SĐT).\n- KHÔNG đưa tài khoản/mật khẩu RIS, URL đăng nhập, mã QR credentials, hay thông tin đăng nhập vào JSON.\n- Ngày tháng dùng dd/mm/yyyy khi có thể.\n- tteFindings: danh sách bullet ngắn gọn từng ý siêu âm.\n- tteConclusion: kết luận siêu âm.\n- historySummary: tóm tắt bệnh sử ngắn hoặc rỗng.\n- surgNote / cathNote: có thể rỗng.\n\nTrả về JSON thuần với các trường PatientName, OtherPatientName, PatientID1, PatientID2, PatientSex, PatientDOB, PatientAddress, PatientPhone, PatientWeight, PatientHeight, ageLabel, clinicalSummary, DetailDiagnosis, historySummary, tteDate, tteFindings (mảng), tteConclusion, ecgNote, cxrNote, surgNote, cathNote.";
+  var ctx = JSON.stringify({ patient: patient, consult: consult }, null, 2);
+  return (
+    "Ban la tro ly lam sang tim mach nhi. Doc cac anh/PDF dinh kem (phieu hanh chinh, ket qua sieu am TTE, ECG, CXR neu co) va trich xuat thong tin cho slide hoi chan.\n\n" +
+    "Du lieu da co tren he thong (uu tien giu neu anh khong ro):\n" +
+    ctx +
+    "\n\nYeu cau:\n" +
+    "- Doc ca chu in va chu viet tay (can nang, chieu cao, SDT).\n" +
+    "- KHONG dua tai khoan/mat khau RIS, URL dang nhap, ma QR credentials, hay thong tin dang nhap vao JSON.\n" +
+    "- Ngay thang dung dd/mm/yyyy khi co the.\n" +
+    "- tteFindings: danh sach bullet ngan gon tung y sieu am.\n" +
+    "- tteConclusion: ket luan sieu am.\n" +
+    "- historySummary: tom tat benh su ngan hoac rong.\n" +
+    "- surgNote / cathNote: co the rong.\n\n" +
+    "Tra ve JSON thuan voi cac truong PatientName, OtherPatientName, PatientID1, PatientID2, PatientSex, PatientDOB, PatientAddress, PatientPhone, PatientWeight, PatientHeight, ageLabel, clinicalSummary, DetailDiagnosis, historySummary, tteDate, tteFindings (mang), tteConclusion, ecgNote, cxrNote, surgNote, cathNote."
+  );
 }
 
 function consultSlideResolveModels(preferred) {

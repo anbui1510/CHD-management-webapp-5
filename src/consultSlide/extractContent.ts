@@ -7,6 +7,7 @@ import {
   resolveGeminiModels,
   sleep,
 } from '../chdDailyBrief/geminiModels';
+import { buildConsultSlideExtractPrompt } from './buildPrompt';
 import type {
   ConsultSlideAttachment,
   ConsultSlideConsultContext,
