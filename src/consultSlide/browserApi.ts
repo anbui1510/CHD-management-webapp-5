@@ -13,10 +13,21 @@ import type {
   ConsultSlidePatientContext,
 } from './types';
 
+const OCR_POLL_INTERVAL_MS = 2500;
+const OCR_POLL_MAX_MS = 3 * 60 * 1000;
+
 function parseAppsScriptProxyPayload(
   text: string,
   res: Response
-): { status?: string; message?: string; error?: string; extract?: ConsultSlideExtract } {
+): {
+  status?: string;
+  message?: string;
+  error?: string;
+  extract?: ConsultSlideExtract;
+  jobId?: string;
+  jobStatus?: string;
+  model?: string;
+} {
   const trimmed = text.trim();
   if (
     trimmed.startsWith('<!DOCTYPE') ||
@@ -33,9 +44,17 @@ function parseAppsScriptProxyPayload(
       message?: string;
       error?: string;
       extract?: ConsultSlideExtract;
+      jobId?: string;
+      jobStatus?: string;
+      model?: string;
     };
   } catch {
     const preview = trimmed.length > 220 ? `${trimmed.slice(0, 220)}…` : trimmed;
+    if (res.status === 524 || /error code:\s*524/i.test(trimmed)) {
+      throw new Error(
+        'HTTP 524: Cloudflare cắt kết nối vì đọc AI quá lâu. App đã chuyển sang xếp hàng async — hãy paste Code.gs mới (enqueue/status) và Deploy New version, rồi thử lại với ≤3 ảnh.'
+      );
+    }
     throw new Error(
       `Apps Script trả về không phải JSON (HTTP ${res.status}). Kiểm tra URL /exec và deploy mới (action consult_slide_extract). Chi tiết: ${preview}`
     );
@@ -56,35 +75,82 @@ function appsScriptErrorMessage(
   return 'Gọi Gemini qua Apps Script thất bại. Mở Apps Script → Executions để xem chi tiết; kiểm tra GEMINI_API_KEY và deploy New version.';
 }
 
-async function requestConsultSlideExtractViaAppsScript(opts: {
-  patient: ConsultSlidePatientContext;
-  consult: ConsultSlideConsultContext;
-  attachments: ConsultSlideAttachment[];
-}): Promise<ConsultSlideExtract> {
+async function postSheetsProxy(payload: Record<string, unknown>) {
   const res = await fetch('/api/sheets/proxy', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       kind: 'post',
-      payload: {
-        action: 'consult_slide_extract',
-        patient: opts.patient,
-        consult: opts.consult,
-        attachments: opts.attachments,
-      },
+      payload,
     }),
   });
-
   const text = await res.text();
   const data = parseAppsScriptProxyPayload(text, res);
   if (!res.ok || data.status === 'error') {
     throw new Error(appsScriptErrorMessage(data, res));
   }
-  if (!data.extract) {
-    throw new Error('Apps Script không trả dữ liệu extract.');
+  return data;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function requestConsultSlideExtractViaAppsScript(opts: {
+  patient: ConsultSlidePatientContext;
+  consult: ConsultSlideConsultContext;
+  attachments: ConsultSlideAttachment[];
+  onStatus?: (message: string) => void;
+}): Promise<ConsultSlideExtract> {
+  opts.onStatus?.('Đang xếp hàng đọc AI…');
+  const slimAttachments = opts.attachments.slice(0, 3);
+  const enqueued = await postSheetsProxy({
+    action: 'consult_slide_extract_enqueue',
+    patient: opts.patient,
+    consult: opts.consult,
+    attachments: slimAttachments,
+  });
+  const jobId = String(enqueued.jobId || '').trim();
+  if (!jobId) {
+    // Older Apps Script without enqueue — fall back to sync extract once.
+    if (enqueued.extract) return enqueued.extract;
+    const sync = await postSheetsProxy({
+      action: 'consult_slide_extract',
+      patient: opts.patient,
+      consult: opts.consult,
+      attachments: slimAttachments,
+    });
+    if (!sync.extract) throw new Error('Apps Script không trả dữ liệu extract.');
+    return sync.extract;
   }
-  return data.extract;
+
+  const started = Date.now();
+  let ticks = 0;
+  while (Date.now() - started < OCR_POLL_MAX_MS) {
+    ticks += 1;
+    const elapsedSec = Math.round((Date.now() - started) / 1000);
+    opts.onStatus?.(
+      ticks <= 2
+        ? 'Đang đọc AI… (có thể 30–90 giây)'
+        : `Đang đọc AI… đã chờ ~${elapsedSec}s`
+    );
+    await sleep(OCR_POLL_INTERVAL_MS);
+    const status = await postSheetsProxy({
+      action: 'consult_slide_extract_status',
+      jobId,
+    });
+    const jobStatus = String(status.jobStatus || '').toLowerCase();
+    if (jobStatus === 'done' && status.extract) {
+      return status.extract;
+    }
+    if (jobStatus === 'error') {
+      throw new Error(status.message || 'Đọc AI thất bại (job error).');
+    }
+  }
+  throw new Error(
+    'Đọc AI quá lâu (>3 phút). Thử lại với ít ảnh hơn (hành chính + TTE), hoặc kiểm tra Apps Script Executions.'
+  );
 }
 
 /** Prefer Apps Script (tránh lỗi vùng Cloudflare Worker); fallback Worker khi dev local. */
@@ -93,11 +159,13 @@ export async function requestConsultSlideExtract(opts: {
   consult: ConsultSlideConsultContext;
   attachments: ConsultSlideAttachment[];
   preferOcr?: boolean;
+  onStatus?: (message: string) => void;
 }): Promise<ConsultSlideExtract> {
   let rawExtract: ConsultSlideExtract;
   try {
     rawExtract = await requestConsultSlideExtractViaAppsScript(opts);
   } catch (appsErr) {
+    opts.onStatus?.('Thử dự phòng Worker…');
     const res = await fetch('/api/consult-slide/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,7 +173,7 @@ export async function requestConsultSlideExtract(opts: {
       body: JSON.stringify({
         patient: opts.patient,
         consult: opts.consult,
-        attachments: opts.attachments,
+        attachments: opts.attachments.slice(0, 3),
         preferOcr: opts.preferOcr,
       }),
     });
@@ -215,4 +283,12 @@ export async function prepareAttachmentFile(
     base64,
     fileName: file.name,
   };
+}
+
+/** Smaller JPEG for AI register OCR (faster Apps Script → Gemini). */
+export async function prepareAiRegisterAttachmentFile(
+  file: File,
+  kind: ConsultSlideAttachment['kind']
+): Promise<ConsultSlideAttachment> {
+  return prepareAttachmentFile(file, kind, 1024, 0.55);
 }

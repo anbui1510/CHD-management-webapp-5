@@ -13,7 +13,10 @@ import {
 } from './ui/dialog';
 import { SearchableEnumSelect } from './SearchableEnumSelect';
 import { VNDateInput } from './VNDateInput';
-import { prepareAttachmentFile, requestConsultSlideExtract } from '../consultSlide/browserApi';
+import {
+  prepareAiRegisterAttachmentFile,
+  requestConsultSlideExtract,
+} from '../consultSlide/browserApi';
 import type {
   ConsultSlideAttachment,
   ConsultSlideAttachmentKind,
@@ -110,11 +113,13 @@ export function AiRegisterConsultModal({
     setBusy(true);
     setStatus('Đang đọc ảnh bằng AI…');
     try {
+      setStatus('Đang nén ảnh…');
       const attachments: ConsultSlideAttachment[] = [];
       for (const slot of SLOTS) {
         const file = files[slot.key];
         if (!file) continue;
-        attachments.push(await prepareAttachmentFile(file, slot.kind));
+        if (attachments.length >= 3) break;
+        attachments.push(await prepareAiRegisterAttachmentFile(file, slot.kind));
       }
 
       const extract = await requestConsultSlideExtract({
@@ -126,6 +131,7 @@ export function AiRegisterConsultModal({
         },
         attachments,
         preferOcr: true,
+        onStatus: setStatus,
       });
 
       onComplete({

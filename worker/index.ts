@@ -20,7 +20,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
 
@@ -29,7 +29,7 @@ export default {
     }
 
     if (url.pathname === '/api/sheets/proxy') {
-      return handleCloudflareSheetsProxy(request, env);
+      return handleCloudflareSheetsProxy(request, env, ctx);
     }
 
     if (url.pathname.startsWith('/api/chd-brief')) {
