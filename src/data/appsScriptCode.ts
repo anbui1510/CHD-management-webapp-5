@@ -787,8 +787,9 @@ function consultSlideIsRetryableGeminiCode(code) {
   return code === 429 || code === 503 || code === 500;
 }
 
-function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts) {
-  var attempts = maxAttempts || 5;
+function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts, maxSleepMs) {
+  var attempts = maxAttempts || 3;
+  var capSleep = maxSleepMs || 4000;
   var url =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
     encodeURIComponent(model) +
@@ -797,7 +798,8 @@ function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts) {
   var lastText = "";
   for (var attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) {
-      Utilities.sleep(2000 * attempt);
+      var waitMs = Math.min(800 * attempt, capSleep);
+      Utilities.sleep(waitMs);
     }
     var response = UrlFetchApp.fetch(url, {
       method: "post",
@@ -818,7 +820,27 @@ function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts) {
   return { ok: false, code: lastCode, text: lastText };
 }
 
-/** Chạy thử từ Apps Script (Run) để kiểm tra GEMINI_API_KEY + quyền UrlFetch. Xem Executions / Nhật ký. */
+/** Test nhanh (~10s): 1 model, 1 lan goi — chon ham nay neu UI cu quay hoai. */
+function runConsultSlideGeminiSmokeTestQuick() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) {
+    throw new Error("Thiếu GEMINI_API_KEY trong Script properties.");
+  }
+  var model = String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
+  var body = {
+    contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
+  };
+  var result = consultSlideFetchGeminiGenerate(apiKey, model, body, 1, 0);
+  Logger.log(model + " HTTP " + result.code);
+  Logger.log(result.text);
+  if (result.ok) {
+    return;
+  }
+  throw new Error(consultSlideFormatGeminiHttpError(result.code, result.text));
+}
+
+/** Chay thu day du: retry + fallback model (co the ~30-60s). */
 function runConsultSlideGeminiSmokeTest() {
   var props = PropertiesService.getScriptProperties();
   var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
@@ -827,14 +849,14 @@ function runConsultSlideGeminiSmokeTest() {
   }
   var models = consultSlideResolveModels(
     String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim()
-  );
+  ).slice(0, 2);
   var body = {
     contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
   };
   var errors = [];
   for (var i = 0; i < models.length; i++) {
     var model = models[i];
-    var result = consultSlideFetchGeminiGenerate(apiKey, model, body, 3);
+    var result = consultSlideFetchGeminiGenerate(apiKey, model, body, 2, 2500);
     Logger.log(model + " HTTP " + result.code);
     Logger.log(result.text);
     if (result.ok) {
@@ -885,7 +907,7 @@ function consultSlideExtractGemini(payload) {
   };
   for (var m = 0; m < models.length; m++) {
     var model = models[m];
-    var result = consultSlideFetchGeminiGenerate(apiKey, model, requestBody, 3);
+    var result = consultSlideFetchGeminiGenerate(apiKey, model, requestBody, 3, 4000);
     var code = result.code;
     var responseText = result.text;
     if (result.ok) {
