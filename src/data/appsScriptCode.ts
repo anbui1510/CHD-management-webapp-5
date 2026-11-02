@@ -783,6 +783,16 @@ function consultSlideFormatGeminiHttpError(httpCode, responseText) {
   return "HTTP " + httpCode + ": " + message;
 }
 
+function consultSlideGeminiGenerationConfig(jsonMode) {
+  var config = {
+    thinkingConfig: { thinkingLevel: "LOW" },
+  };
+  if (jsonMode) {
+    config.responseMimeType = "application/json";
+  }
+  return config;
+}
+
 function consultSlideIsRetryableGeminiCode(code) {
   return code === 429 || code === 503 || code === 500;
 }
@@ -830,6 +840,7 @@ function runConsultSlideGeminiSmokeTestQuick() {
   var model = String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
   var body = {
     contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
+    generationConfig: consultSlideGeminiGenerationConfig(false),
   };
   var result = consultSlideFetchGeminiGenerate(apiKey, model, body, 1, 0);
   Logger.log(model + " HTTP " + result.code);
@@ -852,6 +863,7 @@ function runConsultSlideGeminiSmokeTest() {
   ).slice(0, 2);
   var body = {
     contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
+    generationConfig: consultSlideGeminiGenerationConfig(false),
   };
   var errors = [];
   for (var i = 0; i < models.length; i++) {
@@ -903,7 +915,7 @@ function consultSlideExtractGemini(payload) {
   var errors = [];
   var requestBody = {
     contents: [{ role: "user", parts: parts }],
-    generationConfig: { responseMimeType: "application/json" }
+    generationConfig: consultSlideGeminiGenerationConfig(true),
   };
   for (var m = 0; m < models.length; m++) {
     var model = models[m];
