@@ -742,7 +742,8 @@ function consultSlideExtractGemini(payload) {
   var errors = [];
   for (var m = 0; m < models.length; m++) {
     var model = models[m];
-    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiKey);
+    // Auth keys (AQ...) and legacy keys (AIza...) both work with x-goog-api-key; ?key= often fails for AQ keys.
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
     var body = {
       contents: [{ role: "user", parts: parts }],
       generationConfig: { responseMimeType: "application/json" }
@@ -750,6 +751,7 @@ function consultSlideExtractGemini(payload) {
     var response = UrlFetchApp.fetch(url, {
       method: "post",
       contentType: "application/json",
+      headers: { "x-goog-api-key": apiKey },
       payload: JSON.stringify(body),
       muteHttpExceptions: true
     });

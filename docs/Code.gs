@@ -87,7 +87,7 @@ function initializeDatabase() {
     "CheckDeviceBy", "CheckDeviceUpdatedTime", "CheckDeviceUpdatedBy", "CathMethod",
     "PostCathDepart", "Scheduled1stInterventionist",
     "Scheduled2ndInterventionist", "Scheduled3rdInterventionist", "TransferredToCathLab",
-    "Removed"
+    "FilePPTX", "Removed"
   ];
   
   var staffHeaders = [
@@ -364,10 +364,34 @@ function findRowIndexBySheetKey(sheet, keyColIndex, key) {
   return -1;
 }
 
+function ensureSheetHeaders(sheet, requiredHeaders) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) {
+    return String(h || "").trim();
+  });
+  var changed = false;
+  for (var i = 0; i < requiredHeaders.length; i++) {
+    var need = String(requiredHeaders[i] || "").trim();
+    if (!need) continue;
+    if (headers.indexOf(need) === -1) {
+      headers.push(need);
+      changed = true;
+    }
+  }
+  if (changed) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return headers;
+}
+
 function writeRecordToSheet(type, action, key, record) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
   if (!sheet) {
     throw new Error("Sheet not found: " + type);
+  }
+
+  if (type === "Consult") {
+    ensureSheetHeaders(sheet, ["FilePPTX"]);
   }
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -568,7 +592,11 @@ function doPost(e) {
                            .setMimeType(ContentService.MimeType.JSON);
     }
 
-    if (action === "update" || action === "insert") {
+    if (action === "consult_slide_extract") {
+      result = consultSlideExtractGemini(payload);
+    } else if (action === "upload_staff_slide") {
+      result = uploadStaffSlideToDrive(payload);
+    } else if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
     } else if (action === "delete") {
       result = deleteRecordFromSheet(type, key);
@@ -579,6 +607,168 @@ function doPost(e) {
 
   return ContentService.createTextOutput(JSON.stringify(result))
                        .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Upload PPTX slide staff to Drive.
+ * payload: {
+ *   fileName, base64, rootFolderId, yearFolderName, monthFolderName
+ * }
+ */
+function findOrCreateSubfolder(parentFolder, folderName) {
+  var name = String(folderName || "").trim();
+  if (!name) throw new Error("Thiếu tên thư mục Drive");
+  var folders = parentFolder.getFoldersByName(name);
+  if (folders.hasNext()) return folders.next();
+  return parentFolder.createFolder(name);
+}
+
+function uploadStaffSlideToDrive(payload) {
+  var fileName = String(payload.fileName || "").trim();
+  if (!fileName) fileName = "staff-slide.pptx";
+  if (!/\.pptx$/i.test(fileName)) fileName = fileName + ".pptx";
+
+  var base64 = String(payload.base64 || "").replace(/^data:[^;]+;base64,/, "");
+  if (!base64) throw new Error("Thiếu nội dung file PPTX (base64)");
+
+  var rootFolderId = String(payload.rootFolderId || "").trim();
+  var yearFolderName = String(payload.yearFolderName || "").trim();
+  var monthFolderName = String(payload.monthFolderName || "").trim();
+  if (!rootFolderId || !yearFolderName || !monthFolderName) {
+    throw new Error("Thiếu cấu hình thư mục Drive (root/year/month)");
+  }
+
+  var root = DriveApp.getFolderById(rootFolderId);
+  var yearFolder = findOrCreateSubfolder(root, yearFolderName);
+  var monthFolder = findOrCreateSubfolder(yearFolder, monthFolderName);
+
+  var blob = Utilities.newBlob(Utilities.base64Decode(base64), "application/vnd.openxmlformats-officedocument.presentationml.presentation", fileName);
+  var file = monthFolder.createFile(blob);
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (shareErr) {
+    // Ignore share errors; owner can still open the file.
+  }
+
+  return {
+    status: "success",
+    action: "upload_staff_slide",
+    fileId: file.getId(),
+    url: file.getUrl(),
+    name: file.getName(),
+    yearFolderName: yearFolderName,
+    monthFolderName: monthFolderName
+  };
+}
+
+function consultSlideExtractJsonFromText(text) {
+  var trimmed = String(text || "").trim();
+  var tick3 = String.fromCharCode(96, 96, 96);
+  var fenceStart = trimmed.indexOf(tick3);
+  if (fenceStart >= 0) {
+    var fenceEnd = trimmed.indexOf(tick3, fenceStart + 3);
+    if (fenceEnd > fenceStart) {
+      trimmed = trimmed.substring(fenceStart + 3, fenceEnd).trim();
+      if (trimmed.toLowerCase().indexOf("json") === 0) {
+        trimmed = trimmed.replace(/^json\s*/i, "").trim();
+      }
+    }
+  }
+  var start = trimmed.indexOf("{");
+  var end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) trimmed = trimmed.substring(start, end + 1);
+  return JSON.parse(trimmed);
+}
+
+/** Multi-line string concat — tránh Apps Script editor tự xuống dòng làm vỡ cú pháp khi paste. */
+function buildConsultSlidePrompt(patient, consult) {
+  patient = patient || {};
+  consult = consult || {};
+  var ctx = JSON.stringify({ patient: patient, consult: consult }, null, 2);
+  return (
+    "Ban la tro ly lam sang tim mach nhi. Doc cac anh/PDF dinh kem (phieu hanh chinh, ket qua sieu am TTE, ECG, CXR neu co) va trich xuat thong tin cho slide hoi chan.\n\n" +
+    "Du lieu da co tren he thong (uu tien giu neu anh khong ro):\n" +
+    ctx +
+    "\n\nYeu cau:\n" +
+    "- Doc ca chu in va chu viet tay (can nang, chieu cao, SDT).\n" +
+    "- KHONG dua tai khoan/mat khau RIS, URL dang nhap, ma QR credentials, hay thong tin dang nhap vao JSON.\n" +
+    "- Ngay thang dung dd/mm/yyyy khi co the.\n" +
+    "- tteFindings: danh sach bullet ngan gon tung y sieu am.\n" +
+    "- tteConclusion: ket luan sieu am.\n" +
+    "- historySummary: tom tat benh su ngan hoac rong.\n" +
+    "- surgNote / cathNote: co the rong.\n\n" +
+    "Tra ve JSON thuan voi cac truong PatientName, OtherPatientName, PatientID1, PatientID2, PatientSex, PatientDOB, PatientAddress, PatientPhone, PatientWeight, PatientHeight, ageLabel, clinicalSummary, DetailDiagnosis, historySummary, tteDate, tteFindings (mang), tteConclusion, ecgNote, cxrNote, surgNote, cathNote."
+  );
+}
+
+function consultSlideResolveModels(preferred) {
+  var models = [];
+  var p = String(preferred || "").trim();
+  if (p) models.push(p);
+  if (models.indexOf("gemini-2.5-flash") === -1) models.push("gemini-2.5-flash");
+  if (models.indexOf("gemini-2.5-flash-lite") === -1) models.push("gemini-2.5-flash-lite");
+  return models;
+}
+
+function consultSlideExtractGemini(payload) {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) {
+    throw new Error("Thiếu GEMINI_API_KEY trong Apps Script (Project Settings → Script properties). Dán cùng API key Gemini như Cloudflare.");
+  }
+  var patient = payload.patient || {};
+  var consult = payload.consult || {};
+  var attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  if (!attachments.length) throw new Error("Cần ít nhất một ảnh hoặc PDF");
+  if (attachments.length > 6) attachments = attachments.slice(0, 6);
+
+  var preferredModel = String(payload.model || props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash").trim();
+  var models = consultSlideResolveModels(preferredModel);
+  var prompt = buildConsultSlidePrompt(patient, consult);
+  var parts = [{ text: prompt }];
+  for (var i = 0; i < attachments.length; i++) {
+    var att = attachments[i] || {};
+    var b64 = String(att.base64 || "").replace(/^data:[^;]+;base64,/, "");
+    if (!b64) continue;
+    parts.push({
+      inlineData: {
+        mimeType: String(att.mimeType || "image/jpeg"),
+        data: b64
+      }
+    });
+    parts.push({ text: "[File loại: " + String(att.kind || "") + "]" });
+  }
+
+  var errors = [];
+  for (var m = 0; m < models.length; m++) {
+    var model = models[m];
+    // Auth keys (AQ...) and legacy keys (AIza...) both work with x-goog-api-key; ?key= often fails for AQ keys.
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
+    var body = {
+      contents: [{ role: "user", parts: parts }],
+      generationConfig: { responseMimeType: "application/json" }
+    };
+    var response = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-goog-api-key": apiKey },
+      payload: JSON.stringify(body),
+      muteHttpExceptions: true
+    });
+    var code = response.getResponseCode();
+    var responseText = response.getContentText();
+    if (code >= 200 && code < 300) {
+      var parsed = JSON.parse(responseText);
+      var cand = parsed.candidates && parsed.candidates[0];
+      var partText = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
+      if (!partText) throw new Error("Gemini không trả nội dung (model: " + model + ")");
+      var extract = consultSlideExtractJsonFromText(partText);
+      return { status: "success", action: "consult_slide_extract", extract: extract, model: model };
+    }
+    var shortErr = responseText.length > 400 ? responseText.substring(0, 400) + "…" : responseText;
+    errors.push(model + ": " + shortErr);
+  }
+  throw new Error("Gemini lỗi: " + (errors[errors.length - 1] || "unknown"));
 }
 
 // Convert Sheet into Array of JSON Objects
@@ -635,7 +825,7 @@ function readSheetAsJson(ss, sheetName) {
     // Patient
     "PatientKey", "PatientID1", "PatientID2", "PatientName", "OtherPatientName", "PatientDOB", "PatientSex", "PatientAddress", "PatientPhone1", "PatientPhone2", "PatientCreateBy", "PatientCreateTime", "Outcome", "PatientAddressDefaultWarning",
     // Consult
-    "ConsultKey", "ConsultType", "PatientWeight", "PatientHeight", "ConsultDate", "RequestBy", "DiagnosisID", "DetailDiagnosis", "ConsultCreateBy", "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote", "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy", "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback", "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate", "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist", "Scheduled2ndInterventionist", "Scheduled3rdInterventionist",
+    "ConsultKey", "ConsultType", "PatientWeight", "PatientHeight", "ConsultDate", "RequestBy", "DiagnosisID", "DetailDiagnosis", "ConsultCreateBy", "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote", "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy", "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback", "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate", "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist", "Scheduled2ndInterventionist", "Scheduled3rdInterventionist", "FilePPTX",
     // CathLab
     "CathKey", "CathDate", "PostDiagnosisID", "PostDiagnosis", "CathResultID", "CathMethod", "CathPlan", "CathNote", "_1stInterventionist", "_2ndInterventionist", "_3rdInterventionist", "_4thInterventionist", "PlannedFollowUpDate", "CathUpdatedBy", "CathUpdatedTime",
     // Operation
