@@ -752,7 +752,7 @@ function consultSlideResolveModels(preferred) {
   var models = [];
   var p = String(preferred || "").trim();
   if (p) models.push(p);
-  if (models.indexOf("gemini-2.5-flash") === -1) models.push("gemini-2.5-flash");
+  if (models.indexOf("gemini-3.8-flash") === -1) models.push("gemini-3.8-flash");
   if (models.indexOf("gemini-2.5-flash-lite") === -1) models.push("gemini-2.5-flash-lite");
   return models;
 }
@@ -776,7 +776,7 @@ function runConsultSlideGeminiSmokeTest() {
   if (!apiKey) {
     throw new Error("Thiếu GEMINI_API_KEY trong Script properties.");
   }
-  var model = String(props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash").trim();
+  var model = String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
   var url =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
     encodeURIComponent(model) +
@@ -811,7 +811,7 @@ function consultSlideExtractGemini(payload) {
   if (!attachments.length) throw new Error("Cần ít nhất một ảnh hoặc PDF");
   if (attachments.length > 6) attachments = attachments.slice(0, 6);
 
-  var preferredModel = String(payload.model || props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash").trim();
+  var preferredModel = String(payload.model || props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
   var models = consultSlideResolveModels(preferredModel);
   var prompt = buildConsultSlidePrompt(patient, consult);
   var parts = [{ text: prompt }];

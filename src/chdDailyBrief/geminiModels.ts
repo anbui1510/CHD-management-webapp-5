@@ -1,6 +1,6 @@
-/** Models with free-tier quota (gemini-2.0-flash shut down / limit 0 on free tier as of mid-2026). */
+/** Models for Gemini Developer API (new AI Studio users: 2.5-flash often 404 — use 3.8). */
 export const GEMINI_FREE_TIER_MODELS = [
-  'gemini-2.5-flash',
+  'gemini-3.8-flash',
   'gemini-2.5-flash-lite',
 ] as const;
 
@@ -34,11 +34,11 @@ export function formatGeminiUserError(err: unknown, lastModel?: string): string 
   }
 
   if (raw.includes('free_tier') && (raw.includes('limit: 0') || raw.includes('gemini-2.0-flash'))) {
-    return `Model ${lastModel ?? 'gemini-2.0-flash'} không còn trên free tier. Đặt GEMINI_MODEL=gemini-2.5-flash trên Cloudflare (Runtime Secret/Variable) và redeploy.`;
+    return `Model ${lastModel ?? 'gemini-3.8-flash'} không còn khả dụng. Đặt GEMINI_MODEL=gemini-3.8-flash trên Cloudflare (Variable) và Script properties, rồi redeploy.`;
   }
 
   if (raw.includes('free_tier') || raw.includes('Quota exceeded')) {
-    return 'Vượt quota free tier Gemini (RPM/RPD). Đợi ~1 phút rồi thử lại, hoặc xem https://ai.dev/rate-limit . Gợi ý: GEMINI_MODEL=gemini-2.5-flash-lite (nhẹ hơn).';
+    return 'Vượt quota free tier Gemini (RPM/RPD). Đợi ~1 phút rồi thử lại, hoặc xem https://ai.dev/rate-limit . Gợi ý: GEMINI_MODEL=gemini-3.8-flash.';
   }
 
   if (raw.includes('API key not valid') || raw.includes('invalid_api_key')) {
