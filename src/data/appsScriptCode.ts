@@ -87,7 +87,7 @@ function initializeDatabase() {
     "CheckDeviceBy", "CheckDeviceUpdatedTime", "CheckDeviceUpdatedBy", "CathMethod",
     "PostCathDepart", "Scheduled1stInterventionist",
     "Scheduled2ndInterventionist", "Scheduled3rdInterventionist", "TransferredToCathLab",
-    "Removed"
+    "FilePPTX", "Removed"
   ];
   
   var staffHeaders = [
@@ -364,10 +364,34 @@ function findRowIndexBySheetKey(sheet, keyColIndex, key) {
   return -1;
 }
 
+function ensureSheetHeaders(sheet, requiredHeaders) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) {
+    return String(h || "").trim();
+  });
+  var changed = false;
+  for (var i = 0; i < requiredHeaders.length; i++) {
+    var need = String(requiredHeaders[i] || "").trim();
+    if (!need) continue;
+    if (headers.indexOf(need) === -1) {
+      headers.push(need);
+      changed = true;
+    }
+  }
+  if (changed) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return headers;
+}
+
 function writeRecordToSheet(type, action, key, record) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
   if (!sheet) {
     throw new Error("Sheet not found: " + type);
+  }
+
+  if (type === "Consult") {
+    ensureSheetHeaders(sheet, ["FilePPTX"]);
   }
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -568,7 +592,9 @@ function doPost(e) {
                            .setMimeType(ContentService.MimeType.JSON);
     }
 
-    if (action === "update" || action === "insert") {
+    if (action === "upload_staff_slide") {
+      result = uploadStaffSlideToDrive(payload);
+    } else if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
     } else if (action === "delete") {
       result = deleteRecordFromSheet(type, key);
@@ -579,6 +605,58 @@ function doPost(e) {
 
   return ContentService.createTextOutput(JSON.stringify(result))
                        .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Upload PPTX slide staff to Drive.
+ * payload: {
+ *   fileName, base64, rootFolderId, yearFolderName, monthFolderName
+ * }
+ */
+function findOrCreateSubfolder(parentFolder, folderName) {
+  var name = String(folderName || "").trim();
+  if (!name) throw new Error("Thiếu tên thư mục Drive");
+  var folders = parentFolder.getFoldersByName(name);
+  if (folders.hasNext()) return folders.next();
+  return parentFolder.createFolder(name);
+}
+
+function uploadStaffSlideToDrive(payload) {
+  var fileName = String(payload.fileName || "").trim();
+  if (!fileName) fileName = "staff-slide.pptx";
+  if (!/\.pptx$/i.test(fileName)) fileName = fileName + ".pptx";
+
+  var base64 = String(payload.base64 || "").replace(/^data:[^;]+;base64,/, "");
+  if (!base64) throw new Error("Thiếu nội dung file PPTX (base64)");
+
+  var rootFolderId = String(payload.rootFolderId || "").trim();
+  var yearFolderName = String(payload.yearFolderName || "").trim();
+  var monthFolderName = String(payload.monthFolderName || "").trim();
+  if (!rootFolderId || !yearFolderName || !monthFolderName) {
+    throw new Error("Thiếu cấu hình thư mục Drive (root/year/month)");
+  }
+
+  var root = DriveApp.getFolderById(rootFolderId);
+  var yearFolder = findOrCreateSubfolder(root, yearFolderName);
+  var monthFolder = findOrCreateSubfolder(yearFolder, monthFolderName);
+
+  var blob = Utilities.newBlob(Utilities.base64Decode(base64), "application/vnd.openxmlformats-officedocument.presentationml.presentation", fileName);
+  var file = monthFolder.createFile(blob);
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (shareErr) {
+    // Ignore share errors; owner can still open the file.
+  }
+
+  return {
+    status: "success",
+    action: "upload_staff_slide",
+    fileId: file.getId(),
+    url: file.getUrl(),
+    name: file.getName(),
+    yearFolderName: yearFolderName,
+    monthFolderName: monthFolderName
+  };
 }
 
 // Convert Sheet into Array of JSON Objects
@@ -635,7 +713,7 @@ function readSheetAsJson(ss, sheetName) {
     // Patient
     "PatientKey", "PatientID1", "PatientID2", "PatientName", "OtherPatientName", "PatientDOB", "PatientSex", "PatientAddress", "PatientPhone1", "PatientPhone2", "PatientCreateBy", "PatientCreateTime", "Outcome", "PatientAddressDefaultWarning",
     // Consult
-    "ConsultKey", "ConsultType", "PatientWeight", "PatientHeight", "ConsultDate", "RequestBy", "DiagnosisID", "DetailDiagnosis", "ConsultCreateBy", "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote", "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy", "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback", "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate", "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist", "Scheduled2ndInterventionist", "Scheduled3rdInterventionist",
+    "ConsultKey", "ConsultType", "PatientWeight", "PatientHeight", "ConsultDate", "RequestBy", "DiagnosisID", "DetailDiagnosis", "ConsultCreateBy", "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote", "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy", "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback", "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate", "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist", "Scheduled2ndInterventionist", "Scheduled3rdInterventionist", "FilePPTX",
     // CathLab
     "CathKey", "CathDate", "PostDiagnosisID", "PostDiagnosis", "CathResultID", "CathMethod", "CathPlan", "CathNote", "_1stInterventionist", "_2ndInterventionist", "_3rdInterventionist", "_4thInterventionist", "PlannedFollowUpDate", "CathUpdatedBy", "CathUpdatedTime",
     // Operation
