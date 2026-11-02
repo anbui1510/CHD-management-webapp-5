@@ -951,11 +951,13 @@ export default function App() {
     if (!currentStaff?.StaffKey) return;
     const onVisible = () => {
       if (document.hidden) return;
-      void refreshMedicalData('full', false, { silent: true }).catch(() => undefined);
+      void refreshMedicalData('full', false, { silent: true }).catch(err => {
+        if (err instanceof AuthRequiredError) handleAuthDataFailure(err);
+      });
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [currentStaff?.StaffKey, refreshMedicalData]);
+  }, [currentStaff?.StaffKey, refreshMedicalData, handleAuthDataFailure]);
 
   // Background Clinical Data Polling (Refresh every 60 seconds when logged in)
   useEffect(() => {
@@ -964,12 +966,26 @@ export default function App() {
     const interval = setInterval(() => {
       if (document.hidden) return;
       void refreshMedicalData('full', false, { silent: true }).catch(err => {
+        if (err instanceof AuthRequiredError) {
+          handleAuthDataFailure(err);
+          return;
+        }
         console.warn('Background auto data sync failed:', err);
       });
     }, 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [currentStaff?.StaffKey, refreshMedicalData]);
+  }, [currentStaff?.StaffKey, refreshMedicalData, handleAuthDataFailure]);
+
+  // Mutation paths (e.g. save kết quả staff) may clear the session token on proxy 401.
+  useEffect(() => {
+    const onAuthRequired = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      handleAuthDataFailure(new AuthRequiredError(detail?.message));
+    };
+    window.addEventListener('chd-auth-required', onAuthRequired);
+    return () => window.removeEventListener('chd-auth-required', onAuthRequired);
+  }, [handleAuthDataFailure]);
 
   useEffect(() => {
     if (!currentStaff?.StaffKey) return;

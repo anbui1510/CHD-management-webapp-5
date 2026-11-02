@@ -73,3 +73,29 @@ export function readCookieToken(cookieHeader: string): string | null {
   const match = String(cookieHeader || '').match(/(?:^|;)\s*CHD_AUTH_TOKEN\s*=\s*([^;]+)/);
   return match ? decodeURIComponent(match[1].trim()) : null;
 }
+
+/** Prefer HttpOnly cookie; fall back to Authorization Bearer / x-auth-token (mobile Safari often drops cookies). */
+export function readRequestAuthToken(request: Request): string | null {
+  const cookieToken = readCookieToken(request.headers.get('cookie') || '');
+  if (cookieToken && cookieToken !== 'cookie-session') return cookieToken;
+
+  const auth = request.headers.get('authorization') || request.headers.get('Authorization') || '';
+  if (auth.startsWith('Bearer ')) {
+    const bearer = auth.slice(7).trim();
+    if (bearer && bearer !== 'cookie-session') return bearer;
+  }
+
+  const xToken = (request.headers.get('x-auth-token') || request.headers.get('X-Auth-Token') || '').trim();
+  if (xToken && xToken !== 'cookie-session') return xToken;
+
+  return null;
+}
+
+export function slideSessionClaims(claims: SessionClaims, ttlMs: number): SessionClaims {
+  return {
+    ...claims,
+    exp: Date.now() + ttlMs,
+  };
+}
+
+export const CHD_AUTH_TOKEN_HEADER = 'X-CHD-Auth-Token';

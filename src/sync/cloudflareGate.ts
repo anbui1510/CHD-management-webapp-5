@@ -1,7 +1,15 @@
 import { denialForSheetsPayload, isAdminRole, type StaffActor } from '../auth/staffUpdateGuard';
 import { forwardToAppsScript } from './sheetsProxy';
 import { readSyncConfig, type CloudflareSyncConfigEnv } from './cloudflareSyncConfigApi';
-import { readCookieToken, readSession, sessionCookie, signSession, type SessionClaims } from './signedSession';
+import {
+  CHD_AUTH_TOKEN_HEADER,
+  readRequestAuthToken,
+  readSession,
+  sessionCookie,
+  signSession,
+  slideSessionClaims,
+  type SessionClaims,
+} from './signedSession';
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const LOGIN_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -42,11 +50,46 @@ async function signingSecret(env: CloudflareGateEnv): Promise<string> {
 }
 
 export async function readRequestSession(request: Request, env: CloudflareGateEnv): Promise<SessionClaims | null> {
-  const token = readCookieToken(request.headers.get('cookie') || '');
-  if (!token || token === 'cookie-session') return null;
+  const token = readRequestAuthToken(request);
+  if (!token) return null;
   const secret = await signingSecret(env);
   if (!secret) return null;
   return readSession(token, secret);
+}
+
+async function attachSlidSession(
+  response: Response,
+  session: SessionClaims,
+  env: CloudflareGateEnv,
+  request: Request
+): Promise<Response> {
+  const secret = await signingSecret(env);
+  if (!secret) return response;
+
+  const nextClaims = slideSessionClaims(session, SESSION_TTL_MS);
+  const token = await signSession(nextClaims, secret);
+  const secure = new URL(request.url).protocol === 'https:';
+  const headers = new Headers(response.headers);
+  headers.set('Set-Cookie', sessionCookie(token, SESSION_TTL_MS / 1000, secure));
+  headers.set(CHD_AUTH_TOKEN_HEADER, token);
+  const exposed = headers.get('Access-Control-Expose-Headers');
+  headers.set(
+    'Access-Control-Expose-Headers',
+    exposed ? `${exposed}, ${CHD_AUTH_TOKEN_HEADER}` : CHD_AUTH_TOKEN_HEADER
+  );
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function sessionAuthHeaders(token: string, secure: boolean): HeadersInit {
+  return {
+    'Set-Cookie': sessionCookie(token, SESSION_TTL_MS / 1000, secure),
+    [CHD_AUTH_TOKEN_HEADER]: token,
+    'Access-Control-Expose-Headers': CHD_AUTH_TOKEN_HEADER,
+  };
 }
 
 function tooManyAttempts(key: string): boolean {
@@ -122,7 +165,8 @@ export async function handleCloudflareAuthRequest(request: Request, env: Cloudfl
   if (action === 'me' && method === 'GET') {
     const session = await readRequestSession(request, env);
     if (!session) return json({ error: 'Yêu cầu đăng nhập.' }, 401);
-    return json({ StaffKey: session.staffKey, Role: session.role });
+    const body = json({ StaffKey: session.staffKey, Role: session.role });
+    return attachSlidSession(body, session, env, request);
   }
 
   if (action !== 'login' || method !== 'POST') {
@@ -161,10 +205,11 @@ export async function handleCloudflareAuthRequest(request: Request, env: Cloudfl
     };
     const token = await signSession(claims, secret);
     loginAttempts.delete(`${ip}:${staffKey}`);
+    // Return the signed JWT (not opaque cookie-session) so mobile can send Bearer when cookies drop.
     return json(
-      { token: 'cookie-session', staff: cached.staff },
+      { token, staff: cached.staff },
       200,
-      { 'Set-Cookie': sessionCookie(token, SESSION_TTL_MS / 1000, secure) }
+      sessionAuthHeaders(token, secure)
     );
   }
 
@@ -193,9 +238,9 @@ export async function handleCloudflareAuthRequest(request: Request, env: Cloudfl
   const token = await signSession(claims, secret);
   loginAttempts.delete(`${ip}:${staffKey}`);
   return json(
-    { token: 'cookie-session', staff: result.staff },
+    { token, staff: result.staff },
     200,
-    { 'Set-Cookie': sessionCookie(token, SESSION_TTL_MS / 1000, secure) }
+    sessionAuthHeaders(token, secure)
   );
 }
 
@@ -216,9 +261,10 @@ export async function handleCloudflareSheetsProxy(request: Request, env: Cloudfl
   }
 
   const config = await readSyncConfig(env);
-  return forwardToAppsScript(config, {
+  const upstream = await forwardToAppsScript(config, {
     kind: body.kind,
     action: body.action,
     payload: body.payload,
   });
+  return attachSlidSession(upstream, session, env, request);
 }

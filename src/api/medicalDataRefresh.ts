@@ -168,7 +168,9 @@ export async function fetchMedicalDataBundle(force = false): Promise<MedicalData
   }
   if (res.status === 401) {
     localStorage.removeItem('CHD_AUTH_TOKEN');
-    throw new AuthRequiredError();
+    localStorage.removeItem('CHD_AUTH_STAFF_KEY');
+    const err = await res.json().catch(() => ({})) as { error?: string };
+    throw new AuthRequiredError(err.error || undefined);
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: string; _syncWarning?: string };

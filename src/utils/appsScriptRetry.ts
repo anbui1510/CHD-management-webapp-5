@@ -1,13 +1,15 @@
+import { SheetsProxyAuthError, classifyProxyHttpError } from './sheetsProxyAuth';
+
 const RETRYABLE_HTTP_STATUSES = new Set([404, 408, 429, 500, 502, 503, 504]);
 
-export function formatAppsScriptHttpError(status: number): string {
-  if (status === 404) {
-    return 'Không kết nối được Google Sheets (HTTP 404) — URL Web app có thể sai, chưa deploy, hoặc Google đang lỗi tạm. App vẫn dùng dữ liệu đã lưu; bấm Đồng bộ lại để thử.';
-  }
-  return `Apps Script trả về HTTP ${status}`;
+export function formatAppsScriptHttpError(status: number, bodyText = ''): string {
+  return classifyProxyHttpError(status, bodyText).message;
 }
 
 export function formatAppsScriptFetchError(error: unknown): string {
+  if (error instanceof SheetsProxyAuthError) {
+    return error.message;
+  }
   if (error instanceof Error) {
     const match = error.message.match(/HTTP (\d+)/i);
     if (match) {
