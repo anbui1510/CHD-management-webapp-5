@@ -594,15 +594,22 @@ function doPost(e) {
 
     if (action === "consult_slide_extract") {
       result = consultSlideExtractGemini(payload);
-    } else if (action === "upload_staff_slide") {
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "upload_staff_slide") {
       result = uploadStaffSlideToDrive(payload);
-    } else if (action === "update" || action === "insert") {
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
     } else if (action === "delete") {
       result = deleteRecordFromSheet(type, key);
     }
   } catch (err) {
-    result = { status: "error", message: err.toString() };
+    var errMsg = err && err.message ? String(err.message) : String(err);
+    result = { status: "error", message: errMsg };
   }
 
   return ContentService.createTextOutput(JSON.stringify(result))
@@ -748,6 +755,48 @@ function consultSlideResolveModels(preferred) {
   return models;
 }
 
+function consultSlideFormatGeminiHttpError(httpCode, responseText) {
+  var body = String(responseText || "");
+  try {
+    var parsed = JSON.parse(body);
+    if (parsed.error && parsed.error.message) {
+      return "HTTP " + httpCode + ": " + parsed.error.message;
+    }
+  } catch (ignore) {}
+  if (body.length > 320) body = body.substring(0, 320) + "...";
+  return "HTTP " + httpCode + ": " + body;
+}
+
+/** Chạy thử từ Apps Script (Run) để kiểm tra GEMINI_API_KEY + quyền UrlFetch. Xem Executions / Nhật ký. */
+function runConsultSlideGeminiSmokeTest() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) {
+    throw new Error("Thiếu GEMINI_API_KEY trong Script properties.");
+  }
+  var model = String(props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash").trim();
+  var url =
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(model) +
+    ":generateContent";
+  var response = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    headers: { "x-goog-api-key": apiKey },
+    payload: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
+    }),
+    muteHttpExceptions: true,
+  });
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+  Logger.log("HTTP " + code);
+  Logger.log(text);
+  if (code < 200 || code >= 300) {
+    throw new Error(consultSlideFormatGeminiHttpError(code, text));
+  }
+}
+
 function consultSlideExtractGemini(payload) {
   var props = PropertiesService.getScriptProperties();
   var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
@@ -803,10 +852,10 @@ function consultSlideExtractGemini(payload) {
       var extract = consultSlideExtractJsonFromText(partText);
       return { status: "success", action: "consult_slide_extract", extract: extract, model: model };
     }
-    var shortErr = responseText.length > 400 ? responseText.substring(0, 400) + "…" : responseText;
+    var shortErr = consultSlideFormatGeminiHttpError(code, responseText);
     errors.push(model + ": " + shortErr);
   }
-  throw new Error("Gemini lỗi: " + (errors[errors.length - 1] || "unknown"));
+  throw new Error("Gemini lỗi — " + (errors[errors.length - 1] || "unknown"));
 }
 
 // Convert Sheet into Array of JSON Objects

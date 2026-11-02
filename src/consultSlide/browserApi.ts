@@ -13,6 +13,49 @@ import type {
   ConsultSlidePatientContext,
 } from './types';
 
+function parseAppsScriptProxyPayload(
+  text: string,
+  res: Response
+): { status?: string; message?: string; error?: string; extract?: ConsultSlideExtract } {
+  const trimmed = text.trim();
+  if (
+    trimmed.startsWith('<!DOCTYPE') ||
+    trimmed.startsWith('<html') ||
+    trimmed.startsWith('<!doctype')
+  ) {
+    throw new Error(
+      `Apps Script trả về trang HTML (HTTP ${res.status}), không phải JSON. URL Web app sai, chưa deploy quyền Anyone, hoặc đang trỏ deployment cũ. Hãy dán lại URL /exec mới và Lưu kết nối Virtual Google Sheets.`
+    );
+  }
+  try {
+    return JSON.parse(text) as {
+      status?: string;
+      message?: string;
+      error?: string;
+      extract?: ConsultSlideExtract;
+    };
+  } catch {
+    const preview = trimmed.length > 220 ? `${trimmed.slice(0, 220)}…` : trimmed;
+    throw new Error(
+      `Apps Script trả về không phải JSON (HTTP ${res.status}). Kiểm tra URL /exec và deploy mới (action consult_slide_extract). Chi tiết: ${preview}`
+    );
+  }
+}
+
+function appsScriptErrorMessage(
+  data: { status?: string; message?: string; error?: string },
+  res: Response
+): string {
+  const fromBody =
+    String(data.message || data.error || '').trim() ||
+    (data.status === 'error' ? 'Apps Script báo lỗi nhưng không gửi message.' : '');
+  if (fromBody) return fromBody;
+  if (!res.ok) {
+    return `Proxy Sheets thất bại (HTTP ${res.status}). Kiểm tra URL Web app và khóa API_KEY khớp Script properties.`;
+  }
+  return 'Gọi Gemini qua Apps Script thất bại. Mở Apps Script → Executions để xem chi tiết; kiểm tra GEMINI_API_KEY và deploy New version.';
+}
+
 async function requestConsultSlideExtractViaAppsScript(opts: {
   patient: ConsultSlidePatientContext;
   consult: ConsultSlideConsultContext;
@@ -34,23 +77,9 @@ async function requestConsultSlideExtractViaAppsScript(opts: {
   });
 
   const text = await res.text();
-  let data: {
-    status?: string;
-    message?: string;
-    extract?: ConsultSlideExtract;
-  };
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      'Apps Script trả về không phải JSON khi đọc ảnh AI. Hãy deploy lại Apps Script (action consult_slide_extract).'
-    );
-  }
+  const data = parseAppsScriptProxyPayload(text, res);
   if (!res.ok || data.status === 'error') {
-    throw new Error(
-      data.message ||
-        'Gọi Gemini qua Apps Script thất bại. Kiểm tra GEMINI_API_KEY trong Script properties và deploy Apps Script mới.'
-    );
+    throw new Error(appsScriptErrorMessage(data, res));
   }
   if (!data.extract) {
     throw new Error('Apps Script không trả dữ liệu extract.');
