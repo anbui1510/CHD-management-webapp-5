@@ -27,3 +27,4 @@ data/backup-*/
 # Cache dev
 .vite/
 .wrangler/
+tmp/

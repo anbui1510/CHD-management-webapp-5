@@ -30,6 +30,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { useLockBodyScroll, usePreventBackgroundTouchScroll } from '../hooks/useLockBodyScroll';
 import { useMobileKeyboardInset } from '../hooks/useMobileKeyboardInset';
 import { StaffSummaryExportActions } from './ConsultSummaryModal';
+import { StaffSlidePanel } from './StaffSlidePanel';
 
 const CONCLUSION_OPTIONS = [
   'Can thiệp thông tim',
@@ -757,6 +758,19 @@ export default function ResultStaffDrawer({
 
                       {/* Action buttons area — sticky footer */}
                       <div className={`max-md:pt-1.5 pt-2 border-t border-slate-100 shrink-0 mt-auto pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] md:pb-4 bg-white ${isPanelLayout ? 'px-3 lg:px-4 xl:px-5' : 'max-md:px-3 px-4 md:px-6'}`}>
+                        <div className="w-full flex flex-col gap-2">
+                          <StaffSlidePanel
+                            patient={patient}
+                            consult={{ ...consult, ...summaryConsultOverride }}
+                            requestByDisplay={
+                              formData.RequestBy ||
+                              consult.RequestBy ||
+                              ''
+                            }
+                            onPatchConsult={onPatchConsult}
+                            triggerAlert={triggerAlert}
+                            onSaveSuccess={onSaveSuccess}
+                          />
                         <div className="w-full flex flex-wrap items-center gap-2">
                           <StaffSummaryExportActions
                             patient={patient}
@@ -802,6 +816,7 @@ export default function ResultStaffDrawer({
                               </button>
                             </div>
                           )}
+                        </div>
                         </div>
                       </div>
 

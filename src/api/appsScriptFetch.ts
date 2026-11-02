@@ -1448,6 +1448,11 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return handleChdBriefRequest(parts, method, init, nativeFetch || fetch);
   }
 
+  // AI staff slide — always hit real Worker/Node API
+  if (endpoint === 'consult-slide') {
+    return null;
+  }
+
   if (endpoint === 'workflow-monitor') {
     return null;
   }

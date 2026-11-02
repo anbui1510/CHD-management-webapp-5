@@ -60,7 +60,7 @@ import {
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5173;
 
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -2471,6 +2471,30 @@ app.post('/api/chd-brief/generate', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error in POST /api/chd-brief/generate:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Internal server error' });
+  }
+});
+
+app.get('/api/consult-slide/health', (_req, res) => {
+  res.json({ ok: true, hasGeminiKey: Boolean(process.env.GEMINI_API_KEY) });
+});
+
+app.post('/api/consult-slide/generate', requireAuth, async (req, res) => {
+  try {
+    const { handleConsultSlideRequest } = await import('./src/consultSlide/cloudflareApi');
+    const request = new Request(`http://localhost/api/consult-slide/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body || {}),
+    });
+    const response = await handleConsultSlideRequest(request, {
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GEMINI_MODEL: process.env.GEMINI_MODEL,
+    });
+    const text = await response.text();
+    res.status(response.status).type('application/json').send(text);
+  } catch (err) {
+    console.error('Error in POST /api/consult-slide/generate:', err);
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'Internal server error' });
   }
 });
 

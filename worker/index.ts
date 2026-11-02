@@ -1,4 +1,5 @@
 import { handleChdBriefRequest, type ChdBriefEnv } from '../src/chdDailyBrief/cloudflareApi';
+import { handleConsultSlideRequest, type ConsultSlideEnv } from '../src/consultSlide/cloudflareApi';
 import { handleCloudflarePushRequest, type CloudflarePushEnv } from '../src/push/cloudflarePushApi';
 import { handleCloudflareSyncConfigRequest, readSyncConfig, type CloudflareSyncConfigEnv } from '../src/sync/cloudflareSyncConfigApi';
 import {
@@ -7,7 +8,7 @@ import {
   readRequestSession,
   type CloudflareGateEnv,
 } from '../src/sync/cloudflareGate';
-interface Env extends ChdBriefEnv, CloudflarePushEnv, CloudflareSyncConfigEnv, CloudflareGateEnv {
+interface Env extends ChdBriefEnv, ConsultSlideEnv, CloudflarePushEnv, CloudflareSyncConfigEnv, CloudflareGateEnv {
   ASSETS: Fetcher;
 }
 
@@ -38,6 +39,15 @@ export default {
         if (!session) return json({ error: 'Yêu cầu đăng nhập để tạo bản tin.' }, 401);
       }
       return handleChdBriefRequest(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/consult-slide')) {
+      const generate = method === 'POST' && /\/generate\/?$/.test(url.pathname);
+      if (generate) {
+        const session = await readRequestSession(request, env);
+        if (!session) return json({ error: 'Yêu cầu đăng nhập để tạo slide staff.' }, 401);
+      }
+      return handleConsultSlideRequest(request, env);
     }
 
     if (url.pathname.startsWith('/api/push')) {

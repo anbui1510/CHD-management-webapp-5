@@ -165,6 +165,8 @@ export interface Consult {
   Scheduled2ndInterventionist?: string;
   Scheduled3rdInterventionist?: string;
   TransferredToCathLab?: boolean;
+  /** URL Google Drive của slide staff PPTX (AI tạo). */
+  FilePPTX?: string;
 }
 
 export interface Operation {

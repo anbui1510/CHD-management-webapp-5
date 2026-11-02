@@ -71,6 +71,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `Scheduled1stInterventionist`| PTV chính dự kiến | Enum | Danh sách bác sĩ | | |
 | `Scheduled2ndInterventionist`| PTV phụ 1 dự kiến | Enum | Danh sách bác sĩ | | |
 | `Scheduled3rdInterventionist`| PTV phụ 2 dự kiến | Enum | Danh sách bác sĩ | | |
+| `FilePPTX` | Link slide staff PPTX | Text | | | URL Google Drive của file PPTX slide hội chẩn (AI tạo); chỉ lưu link, không lưu file trong Sheets. |
 
 ### 3. Bảng CathLab (Can thiệp tim mạch)
 
