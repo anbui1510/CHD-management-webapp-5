@@ -767,6 +767,41 @@ function consultSlideFormatGeminiHttpError(httpCode, responseText) {
   return "HTTP " + httpCode + ": " + body;
 }
 
+function consultSlideIsRetryableGeminiCode(code) {
+  return code === 429 || code === 503 || code === 500;
+}
+
+function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts) {
+  var attempts = maxAttempts || 3;
+  var url =
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(model) +
+    ":generateContent";
+  var lastCode = 0;
+  var lastText = "";
+  for (var attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) {
+      Utilities.sleep(1500 * attempt);
+    }
+    var response = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-goog-api-key": apiKey },
+      payload: JSON.stringify(body),
+      muteHttpExceptions: true,
+    });
+    lastCode = response.getResponseCode();
+    lastText = response.getContentText();
+    if (lastCode >= 200 && lastCode < 300) {
+      return { ok: true, code: lastCode, text: lastText };
+    }
+    if (!consultSlideIsRetryableGeminiCode(lastCode) || attempt === attempts - 1) {
+      return { ok: false, code: lastCode, text: lastText };
+    }
+  }
+  return { ok: false, code: lastCode, text: lastText };
+}
+
 /** Chạy thử từ Apps Script (Run) để kiểm tra GEMINI_API_KEY + quyền UrlFetch. Xem Executions / Nhật ký. */
 function runConsultSlideGeminiSmokeTest() {
   var props = PropertiesService.getScriptProperties();
@@ -774,27 +809,24 @@ function runConsultSlideGeminiSmokeTest() {
   if (!apiKey) {
     throw new Error("Thiếu GEMINI_API_KEY trong Script properties.");
   }
-  var model = String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
-  var url =
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-    encodeURIComponent(model) +
-    ":generateContent";
-  var response = UrlFetchApp.fetch(url, {
-    method: "post",
-    contentType: "application/json",
-    headers: { "x-goog-api-key": apiKey },
-    payload: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
-    }),
-    muteHttpExceptions: true,
-  });
-  var code = response.getResponseCode();
-  var text = response.getContentText();
-  Logger.log("HTTP " + code);
-  Logger.log(text);
-  if (code < 200 || code >= 300) {
-    throw new Error(consultSlideFormatGeminiHttpError(code, text));
+  var models = consultSlideResolveModels(
+    String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim()
+  );
+  var body = {
+    contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
+  };
+  var errors = [];
+  for (var i = 0; i < models.length; i++) {
+    var model = models[i];
+    var result = consultSlideFetchGeminiGenerate(apiKey, model, body, 3);
+    Logger.log(model + " HTTP " + result.code);
+    Logger.log(result.text);
+    if (result.ok) {
+      return;
+    }
+    errors.push(model + ": " + consultSlideFormatGeminiHttpError(result.code, result.text));
   }
+  throw new Error(errors[errors.length - 1] || "Gemini smoke test failed");
 }
 
 function consultSlideExtractGemini(payload) {
@@ -827,24 +859,16 @@ function consultSlideExtractGemini(payload) {
   }
 
   var errors = [];
+  var requestBody = {
+    contents: [{ role: "user", parts: parts }],
+    generationConfig: { responseMimeType: "application/json" }
+  };
   for (var m = 0; m < models.length; m++) {
     var model = models[m];
-    // Auth keys (AQ...) and legacy keys (AIza...) both work with x-goog-api-key; ?key= often fails for AQ keys.
-    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
-    var body = {
-      contents: [{ role: "user", parts: parts }],
-      generationConfig: { responseMimeType: "application/json" }
-    };
-    var response = UrlFetchApp.fetch(url, {
-      method: "post",
-      contentType: "application/json",
-      headers: { "x-goog-api-key": apiKey },
-      payload: JSON.stringify(body),
-      muteHttpExceptions: true
-    });
-    var code = response.getResponseCode();
-    var responseText = response.getContentText();
-    if (code >= 200 && code < 300) {
+    var result = consultSlideFetchGeminiGenerate(apiKey, model, requestBody, 3);
+    var code = result.code;
+    var responseText = result.text;
+    if (result.ok) {
       var parsed = JSON.parse(responseText);
       var cand = parsed.candidates && parsed.candidates[0];
       var partText = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
