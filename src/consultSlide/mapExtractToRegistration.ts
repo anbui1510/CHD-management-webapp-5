@@ -18,13 +18,48 @@ export function matchProvinceAddress(
   );
   if (caseInsensitive) return { value: caseInsensitive, unmatched: false };
 
+  // Prefer longest province name contained in full OCR address (e.g. "... Can Tho").
+  let best = '';
+  let bestLen = 0;
+  for (const p of provinceOptions) {
+    const pn = removeDiacritics(p).toLowerCase().trim();
+    if (!pn) continue;
+    const bare = pn.replace(/^(tp|tinh|thanh pho)\s+/i, '').trim();
+    const hit = norm.includes(pn) || (bare.length >= 4 && norm.includes(bare));
+    if (hit && bare.length >= bestLen) {
+      best = p;
+      bestLen = bare.length;
+    }
+  }
+  if (best) return { value: best, unmatched: false };
+
   const contains = provinceOptions.find(p => {
     const pn = removeDiacritics(p).toLowerCase();
-    return pn.includes(norm) || norm.includes(pn);
+    return pn.includes(norm);
   });
   if (contains) return { value: contains, unmatched: false };
 
   return { value: '', unmatched: true };
+}
+
+/** Prefer Mã NB / numeric BN for PatientID1; keep HS-like ids in PatientID2. */
+export function normalizePatientIds(opts: {
+  PatientID1?: string;
+  PatientID2?: string;
+}): { PatientID1: string; PatientID2: string } {
+  let id1 = String(opts.PatientID1 || '').trim();
+  let id2 = String(opts.PatientID2 || '').trim();
+  const looksLikeHs = (v: string) => /hs|ma\s*hs|hoso/i.test(v) || (v.length >= 10 && v.startsWith('26') && id1 && v !== id1);
+  if (!id1 && id2 && /^\d{8,}$/.test(id2)) {
+    id1 = id2;
+    id2 = '';
+  }
+  if (id1 && id2 && looksLikeHs(id1) && /^\d{8,}$/.test(id2) && !looksLikeHs(id2)) {
+    const swap = id1;
+    id1 = id2;
+    id2 = swap;
+  }
+  return { PatientID1: id1, PatientID2: id2 };
 }
 
 export function normalizePatientSex(value?: string): 'Nam' | 'Nữ' {
@@ -76,9 +111,14 @@ export function buildRegistrationDraftFromExtract(opts: {
 }) {
   const { extract, provinceOptions, consultType, consultDate, requestBy } = opts;
   const addressMatch = matchProvinceAddress(extract.PatientAddress, provinceOptions);
+  const ids = normalizePatientIds({
+    PatientID1: extract.PatientID1,
+    PatientID2: extract.PatientID2,
+  });
   const detailFromTte =
     extract.DetailDiagnosis ||
-    [extract.tteConclusion, ...(extract.tteFindings || [])].filter(Boolean).join('\n') ||
+    extract.tteConclusion ||
+    (extract.tteFindings || []).filter(Boolean).join('\n') ||
     extract.clinicalSummary ||
     '';
 
@@ -92,8 +132,8 @@ export function buildRegistrationDraftFromExtract(opts: {
       DetailDiagnosis: String(detailFromTte).trim(),
     },
     patientDraft: {
-      PatientID1: String(extract.PatientID1 || '').trim(),
-      PatientID2: String(extract.PatientID2 || '').trim(),
+      PatientID1: ids.PatientID1,
+      PatientID2: ids.PatientID2,
       PatientName: String(extract.PatientName || '').trim(),
       OtherPatientName: String(extract.OtherPatientName || '').trim(),
       PatientDOB: normalizeVnDate(extract.PatientDOB),

@@ -17,9 +17,22 @@ function matchProvinceAddress(ocrAddress, provinceOptions) {
   const norm = removeDiacritics(raw).toLowerCase();
   const caseInsensitive = provinceOptions.find(p => removeDiacritics(p).toLowerCase() === norm);
   if (caseInsensitive) return { value: caseInsensitive, unmatched: false };
+  let best = '';
+  let bestLen = 0;
+  for (const p of provinceOptions) {
+    const pn = removeDiacritics(p).toLowerCase().trim();
+    if (!pn) continue;
+    const bare = pn.replace(/^(tp|tinh|thanh pho)\s+/i, '').trim();
+    const hit = norm.includes(pn) || (bare.length >= 4 && norm.includes(bare));
+    if (hit && bare.length >= bestLen) {
+      best = p;
+      bestLen = bare.length;
+    }
+  }
+  if (best) return { value: best, unmatched: false };
   const contains = provinceOptions.find(p => {
     const pn = removeDiacritics(p).toLowerCase();
-    return pn.includes(norm) || norm.includes(pn);
+    return pn.includes(norm);
   });
   if (contains) return { value: contains, unmatched: false };
   return { value: '', unmatched: true };
@@ -43,6 +56,10 @@ function findPatientById1(patients, patientId1) {
 
 assert.equal(matchProvinceAddress('TP Hồ Chí Minh', ['TP Hồ Chí Minh', 'TP Hà Nội']).value, 'TP Hồ Chí Minh');
 assert.equal(matchProvinceAddress('ho chi minh', ['TP Hồ Chí Minh']).value, 'TP Hồ Chí Minh');
+assert.equal(
+  matchProvinceAddress('Ap Tam Soc A, Xa My Tu, Can Tho, Viet Nam', ['TP Cần Thơ', 'TP Hà Nội']).value,
+  'TP Cần Thơ'
+);
 assert.equal(matchProvinceAddress('Không tồn tại XYZ', ['TP Hà Nội']).unmatched, true);
 
 const matched = findPatientById1(
@@ -64,7 +81,11 @@ assert.match(code, /function buildConsultSlidePrompt/);
 assert.match(code, /var lines = \[/);
 assert.match(code, /out\.join\("\\n"\)/);
 assert.match(code, /consult_slide_extract/);
+assert.match(code, /consult_slide_extract_enqueue/);
+assert.match(code, /consult_slide_extract_status/);
+assert.match(code, /consult_slide_extract_process/);
 assert.match(codeGs, /function buildConsultSlidePrompt/);
+assert.match(codeGs, /consult_slide_extract_enqueue/);
 assert.doesNotMatch(codeGs, /@consult-slide-prompt/);
 
 const promptFn = codeGs.slice(

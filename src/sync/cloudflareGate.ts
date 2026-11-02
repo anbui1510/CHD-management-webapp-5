@@ -199,7 +199,11 @@ export async function handleCloudflareAuthRequest(request: Request, env: Cloudfl
   );
 }
 
-export async function handleCloudflareSheetsProxy(request: Request, env: CloudflareGateEnv): Promise<Response> {
+export async function handleCloudflareSheetsProxy(
+  request: Request,
+  env: CloudflareGateEnv,
+  ctx?: { waitUntil?: (promise: Promise<unknown>) => void }
+): Promise<Response> {
   if (request.method.toUpperCase() !== 'POST') {
     return json({ error: 'Method not allowed' }, 405);
   }
@@ -216,9 +220,33 @@ export async function handleCloudflareSheetsProxy(request: Request, env: Cloudfl
   }
 
   const config = await readSyncConfig(env);
-  return forwardToAppsScript(config, {
+  const upstream = await forwardToAppsScript(config, {
     kind: body.kind,
     action: body.action,
     payload: body.payload,
   });
+
+  // Kick Gemini processing in background so browser only polls short status calls (avoid HTTP 524).
+  const payloadAction = String(body.payload?.action || '');
+  if (body.kind === 'post' && payloadAction === 'consult_slide_extract_enqueue' && ctx?.waitUntil) {
+    const clone = upstream.clone();
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const text = await clone.text();
+          const parsed = JSON.parse(text) as { status?: string; jobId?: string };
+          const jobId = String(parsed.jobId || '').trim();
+          if (parsed.status !== 'success' || !jobId) return;
+          await forwardToAppsScript(config, {
+            kind: 'post',
+            payload: { action: 'consult_slide_extract_process', jobId },
+          });
+        } catch (err) {
+          console.warn('OCR background process failed', err);
+        }
+      })()
+    );
+  }
+
+  return upstream;
 }
