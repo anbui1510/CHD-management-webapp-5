@@ -1,3 +1,5 @@
+import { mergeSlideExtract } from './mergeExtract';
+import type { ConsultSlideExtract } from './types';
 import { buildStaffSlideFileName, resolveStaffSlideDriveTarget } from './driveFolders';
 import {
   downloadPptxBase64,
@@ -8,41 +10,97 @@ import {
 import type {
   ConsultSlideAttachment,
   ConsultSlideConsultContext,
-  ConsultSlideExtract,
   ConsultSlidePatientContext,
 } from './types';
 
+async function requestConsultSlideExtractViaAppsScript(opts: {
+  patient: ConsultSlidePatientContext;
+  consult: ConsultSlideConsultContext;
+  attachments: ConsultSlideAttachment[];
+}): Promise<ConsultSlideExtract> {
+  const res = await fetch('/api/sheets/proxy', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      kind: 'post',
+      payload: {
+        action: 'consult_slide_extract',
+        patient: opts.patient,
+        consult: opts.consult,
+        attachments: opts.attachments,
+      },
+    }),
+  });
+
+  const text = await res.text();
+  let data: {
+    status?: string;
+    message?: string;
+    extract?: ConsultSlideExtract;
+  };
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      'Apps Script trả về không phải JSON khi đọc ảnh AI. Hãy deploy lại Apps Script (action consult_slide_extract).'
+    );
+  }
+  if (!res.ok || data.status === 'error') {
+    throw new Error(
+      data.message ||
+        'Gọi Gemini qua Apps Script thất bại. Kiểm tra GEMINI_API_KEY trong Script properties và deploy Apps Script mới.'
+    );
+  }
+  if (!data.extract) {
+    throw new Error('Apps Script không trả dữ liệu extract.');
+  }
+  return data.extract;
+}
+
+/** Prefer Apps Script (tránh lỗi vùng Cloudflare Worker); fallback Worker khi dev local. */
 export async function requestConsultSlideExtract(opts: {
   patient: ConsultSlidePatientContext;
   consult: ConsultSlideConsultContext;
   attachments: ConsultSlideAttachment[];
   preferOcr?: boolean;
 }): Promise<ConsultSlideExtract> {
-  const res = await fetch('/api/consult-slide/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      patient: opts.patient,
-      consult: opts.consult,
-      attachments: opts.attachments,
-      preferOcr: opts.preferOcr,
-    }),
-  });
-
-  const text = await res.text();
-  let data: { success?: boolean; extract?: ConsultSlideExtract; error?: string };
+  let rawExtract: ConsultSlideExtract;
   try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      'API tạo slide trả về không phải JSON. Kiểm tra Cloudflare Worker / GEMINI_API_KEY.'
-    );
+    rawExtract = await requestConsultSlideExtractViaAppsScript(opts);
+  } catch (appsErr) {
+    const res = await fetch('/api/consult-slide/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        patient: opts.patient,
+        consult: opts.consult,
+        attachments: opts.attachments,
+        preferOcr: opts.preferOcr,
+      }),
+    });
+    const text = await res.text();
+    let data: { success?: boolean; extract?: ConsultSlideExtract; error?: string };
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw appsErr instanceof Error ? appsErr : new Error(String(appsErr));
+    }
+    if (!res.ok || !data.success || !data.extract) {
+      const workerMsg = data.error || `Tạo slide thất bại (HTTP ${res.status})`;
+      const appsMsg = appsErr instanceof Error ? appsErr.message : String(appsErr);
+      throw new Error(`${appsMsg}\n\n(Dự phòng Worker: ${workerMsg})`);
+    }
+    rawExtract = data.extract;
   }
-  if (!res.ok || !data.success || !data.extract) {
-    throw new Error(data.error || `Tạo slide thất bại (HTTP ${res.status})`);
-  }
-  return data.extract;
+
+  return mergeSlideExtract({
+    patient: opts.patient,
+    consult: opts.consult,
+    extract: rawExtract,
+    preferOcr: Boolean(opts.preferOcr),
+  });
 }
 
 export async function buildStaffPptxBase64(opts: {

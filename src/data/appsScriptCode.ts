@@ -592,7 +592,9 @@ function doPost(e) {
                            .setMimeType(ContentService.MimeType.JSON);
     }
 
-    if (action === "upload_staff_slide") {
+    if (action === "consult_slide_extract") {
+      result = consultSlideExtractGemini(payload);
+    } else if (action === "upload_staff_slide") {
       result = uploadStaffSlideToDrive(payload);
     } else if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
@@ -657,6 +659,99 @@ function uploadStaffSlideToDrive(payload) {
     yearFolderName: yearFolderName,
     monthFolderName: monthFolderName
   };
+}
+
+function consultSlideExtractJsonFromText(text) {
+  var trimmed = String(text || "").trim();
+  var tick3 = String.fromCharCode(96, 96, 96);
+  var fenceStart = trimmed.indexOf(tick3);
+  if (fenceStart >= 0) {
+    var fenceEnd = trimmed.indexOf(tick3, fenceStart + 3);
+    if (fenceEnd > fenceStart) {
+      trimmed = trimmed.substring(fenceStart + 3, fenceEnd).trim();
+      if (trimmed.toLowerCase().indexOf("json") === 0) {
+        trimmed = trimmed.replace(/^json\s*/i, "").trim();
+      }
+    }
+  }
+  var start = trimmed.indexOf("{");
+  var end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) trimmed = trimmed.substring(start, end + 1);
+  return JSON.parse(trimmed);
+}
+
+function buildConsultSlidePrompt(patient, consult) {
+  patient = patient || {};
+  consult = consult || {};
+  return "Bạn là trợ lý lâm sàng tim mạch nhi. Đọc các ảnh/PDF đính kèm (phiếu hành chính, kết quả siêu âm TTE, ECG, CXR nếu có) và trích xuất thông tin cho slide hội chẩn.\n\nDữ liệu đã có trên hệ thống (ưu tiên giữ nếu ảnh không rõ):\n" + JSON.stringify({ patient: patient, consult: consult }, null, 2) + "\n\nYêu cầu:\n- Đọc cả chữ in và chữ viết tay (cân nặng, chiều cao, SĐT).\n- KHÔNG đưa tài khoản/mật khẩu RIS, URL đăng nhập, mã QR credentials, hay thông tin đăng nhập vào JSON.\n- Ngày tháng dùng dd/mm/yyyy khi có thể.\n- tteFindings: danh sách bullet ngắn gọn từng ý siêu âm.\n- tteConclusion: kết luận siêu âm.\n- historySummary: tóm tắt bệnh sử ngắn hoặc rỗng.\n- surgNote / cathNote: có thể rỗng.\n\nTrả về JSON thuần với các trường PatientName, OtherPatientName, PatientID1, PatientID2, PatientSex, PatientDOB, PatientAddress, PatientPhone, PatientWeight, PatientHeight, ageLabel, clinicalSummary, DetailDiagnosis, historySummary, tteDate, tteFindings (mảng), tteConclusion, ecgNote, cxrNote, surgNote, cathNote.";
+}
+
+function consultSlideResolveModels(preferred) {
+  var models = [];
+  var p = String(preferred || "").trim();
+  if (p) models.push(p);
+  if (models.indexOf("gemini-2.5-flash") === -1) models.push("gemini-2.5-flash");
+  if (models.indexOf("gemini-2.5-flash-lite") === -1) models.push("gemini-2.5-flash-lite");
+  return models;
+}
+
+function consultSlideExtractGemini(payload) {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) {
+    throw new Error("Thiếu GEMINI_API_KEY trong Apps Script (Project Settings → Script properties). Dán cùng API key Gemini như Cloudflare.");
+  }
+  var patient = payload.patient || {};
+  var consult = payload.consult || {};
+  var attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  if (!attachments.length) throw new Error("Cần ít nhất một ảnh hoặc PDF");
+  if (attachments.length > 6) attachments = attachments.slice(0, 6);
+
+  var preferredModel = String(payload.model || props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash").trim();
+  var models = consultSlideResolveModels(preferredModel);
+  var prompt = buildConsultSlidePrompt(patient, consult);
+  var parts = [{ text: prompt }];
+  for (var i = 0; i < attachments.length; i++) {
+    var att = attachments[i] || {};
+    var b64 = String(att.base64 || "").replace(/^data:[^;]+;base64,/, "");
+    if (!b64) continue;
+    parts.push({
+      inlineData: {
+        mimeType: String(att.mimeType || "image/jpeg"),
+        data: b64
+      }
+    });
+    parts.push({ text: "[File loại: " + String(att.kind || "") + "]" });
+  }
+
+  var errors = [];
+  for (var m = 0; m < models.length; m++) {
+    var model = models[m];
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiKey);
+    var body = {
+      contents: [{ role: "user", parts: parts }],
+      generationConfig: { responseMimeType: "application/json" }
+    };
+    var response = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(body),
+      muteHttpExceptions: true
+    });
+    var code = response.getResponseCode();
+    var responseText = response.getContentText();
+    if (code >= 200 && code < 300) {
+      var parsed = JSON.parse(responseText);
+      var cand = parsed.candidates && parsed.candidates[0];
+      var partText = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
+      if (!partText) throw new Error("Gemini không trả nội dung (model: " + model + ")");
+      var extract = consultSlideExtractJsonFromText(partText);
+      return { status: "success", action: "consult_slide_extract", extract: extract, model: model };
+    }
+    var shortErr = responseText.length > 400 ? responseText.substring(0, 400) + "…" : responseText;
+    errors.push(model + ": " + shortErr);
+  }
+  throw new Error("Gemini lỗi: " + (errors[errors.length - 1] || "unknown"));
 }
 
 // Convert Sheet into Array of JSON Objects

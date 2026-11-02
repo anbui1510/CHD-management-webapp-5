@@ -45,6 +45,14 @@ export function formatGeminiUserError(err: unknown, lastModel?: string): string 
     return 'API key Gemini không hợp lệ. Kiểm tra GEMINI_API_KEY trên Cloudflare Runtime Secrets.';
   }
 
+  if (
+    raw.includes('User location is not supported') ||
+    raw.includes('FAILED_PRECONDITION') ||
+    raw.toLowerCase().includes('location is not supported')
+  ) {
+    return 'Gemini từ Cloudflare Worker bị giới hạn vùng (User location is not supported). App đã chuyển sang gọi qua Apps Script — hãy deploy Apps Script mới và thêm GEMINI_API_KEY vào Project Settings → Script properties.';
+  }
+
   const short = raw.length > 280 ? `${raw.slice(0, 280)}…` : raw;
   return `Gemini lỗi${lastModel ? ` (model: ${lastModel})` : ''}: ${short}`;
 }
