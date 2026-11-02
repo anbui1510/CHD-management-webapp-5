@@ -6,7 +6,7 @@
  * Instructions:
  * 1. Open your Google Sheet (https://docs.google.com/spreadsheets/d/your-sheet-id)
  * 2. In the top menu, go to "Extensions" (Tiện ích mở rộng) -> "Apps Script"
- * 3. Copy code tu docs/Code.gs (hoac nut Copy trong app Virtual Google Sheets). KHONG copy truc tiep file appsScriptCode.ts (co dong export/semicolon dong template gay loi cu phap).
+ * 3. Sao chep TOAN BO Code.gs (nut Copy trong Virtual Google Sheets). KHONG paste tung doan thu cong — editor Apps Script tu xuong dong lam vo chuoi dai. KHONG copy file appsScriptCode.ts.
  * 4. Click the Save icon (orange folder/save icon).
  * 5. Click "Deploy" (Triển khai) -> "New deployment" (Triển khai mới).
  * 6. Select "Web app" (Ứng dụng web) as deployment type (click gear icon next to "Select type").
@@ -87,7 +87,7 @@ function initializeDatabase() {
     "CheckDeviceBy", "CheckDeviceUpdatedTime", "CheckDeviceUpdatedBy", "CathMethod",
     "PostCathDepart", "Scheduled1stInterventionist",
     "Scheduled2ndInterventionist", "Scheduled3rdInterventionist", "TransferredToCathLab",
-    "Removed"
+    "FilePPTX", "Removed"
   ];
   
   var staffHeaders = [
@@ -364,10 +364,34 @@ function findRowIndexBySheetKey(sheet, keyColIndex, key) {
   return -1;
 }
 
+function ensureSheetHeaders(sheet, requiredHeaders) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) {
+    return String(h || "").trim();
+  });
+  var changed = false;
+  for (var i = 0; i < requiredHeaders.length; i++) {
+    var need = String(requiredHeaders[i] || "").trim();
+    if (!need) continue;
+    if (headers.indexOf(need) === -1) {
+      headers.push(need);
+      changed = true;
+    }
+  }
+  if (changed) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return headers;
+}
+
 function writeRecordToSheet(type, action, key, record) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(type);
   if (!sheet) {
     throw new Error("Sheet not found: " + type);
+  }
+
+  if (type === "Consult") {
+    ensureSheetHeaders(sheet, ["FilePPTX"]);
   }
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -568,17 +592,346 @@ function doPost(e) {
                            .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === "consult_slide_extract") {
+      result = consultSlideExtractGemini(payload);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "upload_staff_slide") {
+      result = uploadStaffSlideToDrive(payload);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     if (action === "update" || action === "insert") {
       result = writeRecordToSheet(type, action, key, record);
     } else if (action === "delete") {
       result = deleteRecordFromSheet(type, key);
     }
   } catch (err) {
-    result = { status: "error", message: err.toString() };
+    var errMsg = err && err.message ? String(err.message) : String(err);
+    result = { status: "error", message: errMsg };
   }
 
   return ContentService.createTextOutput(JSON.stringify(result))
                        .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Upload PPTX slide staff to Drive.
+ * payload: {
+ *   fileName, base64, rootFolderId, yearFolderName, monthFolderName
+ * }
+ */
+function findOrCreateSubfolder(parentFolder, folderName) {
+  var name = String(folderName || "").trim();
+  if (!name) throw new Error("Thiếu tên thư mục Drive");
+  var folders = parentFolder.getFoldersByName(name);
+  if (folders.hasNext()) return folders.next();
+  return parentFolder.createFolder(name);
+}
+
+function uploadStaffSlideToDrive(payload) {
+  var fileName = String(payload.fileName || "").trim();
+  if (!fileName) fileName = "staff-slide.pptx";
+  if (!/\.pptx$/i.test(fileName)) fileName = fileName + ".pptx";
+
+  var base64 = String(payload.base64 || "").replace(/^data:[^;]+;base64,/, "");
+  if (!base64) throw new Error("Thiếu nội dung file PPTX (base64)");
+
+  var rootFolderId = String(payload.rootFolderId || "").trim();
+  var yearFolderName = String(payload.yearFolderName || "").trim();
+  var monthFolderName = String(payload.monthFolderName || "").trim();
+  if (!rootFolderId || !yearFolderName || !monthFolderName) {
+    throw new Error("Thiếu cấu hình thư mục Drive (root/year/month)");
+  }
+
+  var root = DriveApp.getFolderById(rootFolderId);
+  var yearFolder = findOrCreateSubfolder(root, yearFolderName);
+  var monthFolder = findOrCreateSubfolder(yearFolder, monthFolderName);
+
+  var blob = Utilities.newBlob(Utilities.base64Decode(base64), "application/vnd.openxmlformats-officedocument.presentationml.presentation", fileName);
+  var file = monthFolder.createFile(blob);
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (shareErr) {
+    // Ignore share errors; owner can still open the file.
+  }
+
+  return {
+    status: "success",
+    action: "upload_staff_slide",
+    fileId: file.getId(),
+    url: file.getUrl(),
+    name: file.getName(),
+    yearFolderName: yearFolderName,
+    monthFolderName: monthFolderName
+  };
+}
+
+function consultSlideExtractJsonFromText(text) {
+  var trimmed = String(text || "").trim();
+  var tick3 = String.fromCharCode(96, 96, 96);
+  var fenceStart = trimmed.indexOf(tick3);
+  if (fenceStart >= 0) {
+    var fenceEnd = trimmed.indexOf(tick3, fenceStart + 3);
+    if (fenceEnd > fenceStart) {
+      trimmed = trimmed.substring(fenceStart + 3, fenceEnd).trim();
+      if (trimmed.toLowerCase().indexOf("json") === 0) {
+        trimmed = trimmed.replace(/^json\s*/i, "").trim();
+      }
+    }
+  }
+  var start = trimmed.indexOf("{");
+  var end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) trimmed = trimmed.substring(start, end + 1);
+  return JSON.parse(trimmed);
+}
+
+/** Generated from src/consultSlide/appsScriptPromptLines.ts — do not edit by hand. */
+function buildConsultSlidePrompt(patient, consult) {
+  patient = patient || {};
+  consult = consult || {};
+  var ctx = JSON.stringify({ patient: patient, consult: consult }, null, 2);
+  var lines = [
+    "Ban la tro ly lam sang tim mach nhi.",
+    "Doc anh/PDF (hanh chinh, TTE, ECG, CXR) cho slide hoi chan.",
+    "",
+    "Du lieu da co tren he thong (uu tien giu neu anh khong ro):",
+    "__CTX__",
+    "",
+    "Yeu cau:",
+    "- Doc chu in va chu viet tay (can nang, chieu cao, SDT).",
+    "- KHONG dua RIS login, URL, QR credentials vao JSON.",
+    "- Ngay thang dung dd/mm/yyyy khi co the.",
+    "- tteFindings: bullet ngan tung y sieu am.",
+    "- tteConclusion: ket luan sieu am.",
+    "- historySummary: tom tat benh su ngan hoac rong.",
+    "- surgNote / cathNote: co the rong.",
+    "",
+    "Tra ve JSON thuan (khong markdown) dung schema:",
+    "{",
+    "  \"PatientName\": \"\",",
+    "  \"OtherPatientName\": \"\",",
+    "  \"PatientID1\": \"\",",
+    "  \"PatientID2\": \"\",",
+    "  \"PatientSex\": \"\",",
+    "  \"PatientDOB\": \"\",",
+    "  \"PatientAddress\": \"\",",
+    "  \"PatientPhone\": \"\",",
+    "  \"PatientWeight\": \"\",",
+    "  \"PatientHeight\": \"\",",
+    "  \"ageLabel\": \"\",",
+    "  \"clinicalSummary\": \"\",",
+    "  \"DetailDiagnosis\": \"\",",
+    "  \"historySummary\": \"\",",
+    "  \"tteDate\": \"\",",
+    "  \"tteFindings\": [\"\"],",
+    "  \"tteConclusion\": \"\",",
+    "  \"ecgNote\": \"\",",
+    "  \"cxrNote\": \"\",",
+    "  \"surgNote\": \"\",",
+    "  \"cathNote\": \"\"",
+    "}",
+  ];
+  var out = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (line === "__CTX__") {
+      out.push(ctx);
+    } else {
+      out.push(line);
+    }
+  }
+  return out.join("\n");
+}
+
+
+function consultSlideResolveModels(preferred) {
+  var models = [];
+  var p = String(preferred || "").trim();
+  var candidates = [];
+  if (p) candidates.push(p);
+  candidates.push("gemini-3.8-flash");
+  candidates.push("gemini-2.5-flash-lite");
+  for (var c = 0; c < candidates.length; c++) {
+    var name = String(candidates[c] || "").trim();
+    if (!name) continue;
+    if (models.indexOf(name) === -1) models.push(name);
+  }
+  return models;
+}
+
+function consultSlideFormatGeminiHttpError(httpCode, responseText) {
+  var body = String(responseText || "");
+  var message = "";
+  try {
+    var parsed = JSON.parse(body);
+    if (parsed.error && parsed.error.message) {
+      message = String(parsed.error.message);
+    }
+  } catch (ignore) {}
+  if (!message) {
+    message = body.length > 320 ? body.substring(0, 320) + "..." : body;
+  }
+  if (httpCode === 503 || httpCode === 429) {
+    message =
+      message +
+      " (Google tam qua tai — thu lai sau 2-5 phut; hoac dat GEMINI_MODEL=gemini-3.8-flash va paste Code.gs moi co retry/fallback.)";
+  }
+  return "HTTP " + httpCode + ": " + message;
+}
+
+function consultSlideGeminiGenerationConfig(jsonMode) {
+  var config = {
+    thinkingConfig: { thinkingLevel: "LOW" },
+  };
+  if (jsonMode) {
+    config.responseMimeType = "application/json";
+  }
+  return config;
+}
+
+function consultSlideIsRetryableGeminiCode(code) {
+  return code === 429 || code === 503 || code === 500;
+}
+
+function consultSlideFetchGeminiGenerate(apiKey, model, body, maxAttempts, maxSleepMs) {
+  var attempts = maxAttempts || 3;
+  var capSleep = maxSleepMs || 4000;
+  var url =
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(model) +
+    ":generateContent";
+  var lastCode = 0;
+  var lastText = "";
+  for (var attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) {
+      var waitMs = Math.min(800 * attempt, capSleep);
+      Utilities.sleep(waitMs);
+    }
+    var response = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: { "x-goog-api-key": apiKey },
+      payload: JSON.stringify(body),
+      muteHttpExceptions: true,
+    });
+    lastCode = response.getResponseCode();
+    lastText = response.getContentText();
+    if (lastCode >= 200 && lastCode < 300) {
+      return { ok: true, code: lastCode, text: lastText };
+    }
+    if (!consultSlideIsRetryableGeminiCode(lastCode) || attempt === attempts - 1) {
+      return { ok: false, code: lastCode, text: lastText };
+    }
+  }
+  return { ok: false, code: lastCode, text: lastText };
+}
+
+/** Test nhanh (~10s): 1 model, 1 lan goi — chon ham nay neu UI cu quay hoai. */
+function runConsultSlideGeminiSmokeTestQuick() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) {
+    throw new Error("Thiếu GEMINI_API_KEY trong Script properties.");
+  }
+  var model = String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
+  var body = {
+    contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
+    generationConfig: consultSlideGeminiGenerationConfig(false),
+  };
+  var result = consultSlideFetchGeminiGenerate(apiKey, model, body, 1, 0);
+  Logger.log(model + " HTTP " + result.code);
+  Logger.log(result.text);
+  if (result.ok) {
+    return;
+  }
+  throw new Error(consultSlideFormatGeminiHttpError(result.code, result.text));
+}
+
+/** Chay thu day du: retry + fallback model (co the ~30-60s). */
+function runConsultSlideGeminiSmokeTest() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) {
+    throw new Error("Thiếu GEMINI_API_KEY trong Script properties.");
+  }
+  var models = consultSlideResolveModels(
+    String(props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim()
+  ).slice(0, 2);
+  var body = {
+    contents: [{ role: "user", parts: [{ text: "Tra loi bang mot tu: OK" }] }],
+    generationConfig: consultSlideGeminiGenerationConfig(false),
+  };
+  var errors = [];
+  for (var i = 0; i < models.length; i++) {
+    var model = models[i];
+    var result = consultSlideFetchGeminiGenerate(apiKey, model, body, 2, 2500);
+    Logger.log(model + " HTTP " + result.code);
+    Logger.log(result.text);
+    if (result.ok) {
+      return;
+    }
+    errors.push(model + ": " + consultSlideFormatGeminiHttpError(result.code, result.text));
+  }
+  throw new Error(
+    (errors[errors.length - 1] || "Gemini smoke test failed") +
+      " Da thu: " +
+      models.join(", ")
+  );
+}
+
+function consultSlideExtractGemini(payload) {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) {
+    throw new Error("Thiếu GEMINI_API_KEY trong Apps Script (Project Settings → Script properties). Dán cùng API key Gemini như Cloudflare.");
+  }
+  var patient = payload.patient || {};
+  var consult = payload.consult || {};
+  var attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  if (!attachments.length) throw new Error("Cần ít nhất một ảnh hoặc PDF");
+  if (attachments.length > 6) attachments = attachments.slice(0, 6);
+
+  var preferredModel = String(payload.model || props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
+  var models = consultSlideResolveModels(preferredModel);
+  var prompt = buildConsultSlidePrompt(patient, consult);
+  var parts = [{ text: prompt }];
+  for (var i = 0; i < attachments.length; i++) {
+    var att = attachments[i] || {};
+    var b64 = String(att.base64 || "").replace(/^data:[^;]+;base64,/, "");
+    if (!b64) continue;
+    parts.push({
+      inlineData: {
+        mimeType: String(att.mimeType || "image/jpeg"),
+        data: b64
+      }
+    });
+    parts.push({ text: "[File loại: " + String(att.kind || "") + "]" });
+  }
+
+  var errors = [];
+  var requestBody = {
+    contents: [{ role: "user", parts: parts }],
+    generationConfig: consultSlideGeminiGenerationConfig(true),
+  };
+  for (var m = 0; m < models.length; m++) {
+    var model = models[m];
+    var result = consultSlideFetchGeminiGenerate(apiKey, model, requestBody, 3, 4000);
+    var code = result.code;
+    var responseText = result.text;
+    if (result.ok) {
+      var parsed = JSON.parse(responseText);
+      var cand = parsed.candidates && parsed.candidates[0];
+      var partText = cand && cand.content && cand.content.parts && cand.content.parts[0] && cand.content.parts[0].text;
+      if (!partText) throw new Error("Gemini không trả nội dung (model: " + model + ")");
+      var extract = consultSlideExtractJsonFromText(partText);
+      return { status: "success", action: "consult_slide_extract", extract: extract, model: model };
+    }
+    var shortErr = consultSlideFormatGeminiHttpError(code, responseText);
+    errors.push(model + ": " + shortErr);
+  }
+  throw new Error("Gemini lỗi — " + (errors[errors.length - 1] || "unknown"));
 }
 
 // Convert Sheet into Array of JSON Objects
@@ -635,7 +988,7 @@ function readSheetAsJson(ss, sheetName) {
     // Patient
     "PatientKey", "PatientID1", "PatientID2", "PatientName", "OtherPatientName", "PatientDOB", "PatientSex", "PatientAddress", "PatientPhone1", "PatientPhone2", "PatientCreateBy", "PatientCreateTime", "Outcome", "PatientAddressDefaultWarning",
     // Consult
-    "ConsultKey", "ConsultType", "PatientWeight", "PatientHeight", "ConsultDate", "RequestBy", "DiagnosisID", "DetailDiagnosis", "ConsultCreateBy", "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote", "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy", "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback", "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate", "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist", "Scheduled2ndInterventionist", "Scheduled3rdInterventionist",
+    "ConsultKey", "ConsultType", "PatientWeight", "PatientHeight", "ConsultDate", "RequestBy", "DiagnosisID", "DetailDiagnosis", "ConsultCreateBy", "ConsultCreateTime", "ConsultMember", "ConsultResultID", "DetailConsultResult", "ConsultNote", "PlannedDevice", "PlannedPrice", "PriorityOrder", "RiskFactor", "ConsultResultCreateBy", "ConsultResultCreateTime", "CheckDevice", "OperationFeedback", "SupplyDepFeedback", "CallStatus", "CallNote", "PlannedCathLabDate", "FundingRequest", "CheckDeviceDate", "CheckDeviceBy", "CathMethod", "PostCathDepart", "Scheduled1stInterventionist", "Scheduled2ndInterventionist", "Scheduled3rdInterventionist", "FilePPTX",
     // CathLab
     "CathKey", "CathDate", "PostDiagnosisID", "PostDiagnosis", "CathResultID", "CathMethod", "CathPlan", "CathNote", "_1stInterventionist", "_2ndInterventionist", "_3rdInterventionist", "_4thInterventionist", "PlannedFollowUpDate", "CathUpdatedBy", "CathUpdatedTime",
     // Operation

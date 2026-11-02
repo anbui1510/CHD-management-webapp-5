@@ -39,20 +39,23 @@ function json(body: unknown, status = 200): Response {
 }
 
 export async function readSyncConfig(env: CloudflareSyncConfigEnv): Promise<SyncConfigRecord> {
+  const envDefaults = readEnvScriptConfig(env);
   const raw = await env.PUSH_KV.get(SYNC_CONFIG_KEY);
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as SyncConfigRecord;
-      return {
-        scriptUrl: String(parsed.scriptUrl || '').trim(),
-        scriptSecret: String(parsed.scriptSecret || '').trim(),
-      };
-    } catch {
-      // fall through to env defaults
-    }
+  if (!raw) {
+    return envDefaults;
   }
-
-  return readEnvScriptConfig(env);
+  try {
+    const parsed = JSON.parse(raw) as SyncConfigRecord;
+    const kvUrl = String(parsed.scriptUrl || '').trim();
+    const kvSecret = String(parsed.scriptSecret || '').trim();
+    // Runtime env (Cloudflare Variables) overrides KV when set — avoids stale URL after redeploy.
+    return {
+      scriptUrl: envDefaults.scriptUrl || kvUrl,
+      scriptSecret: envDefaults.scriptSecret || kvSecret,
+    };
+  } catch {
+    return envDefaults;
+  }
 }
 
 async function writeSyncConfig(env: CloudflareSyncConfigEnv, config: SyncConfigRecord): Promise<void> {
