@@ -1,5 +1,5 @@
 /**
- * SCRIPT_VERSION: 2026-10-09-security
+ * SCRIPT_VERSION: 2026-11-03-drive-scope
  * Google Apps Script for Pediatric Cardiac (CHD) Patient Management System
  * Hook this script into your Google Sheets to sync with Cloud Run in real-time.
  * 
@@ -8,16 +8,18 @@
  * 2. In the top menu, go to "Extensions" (Tiện ích mở rộng) -> "Apps Script"
  * 3. Sao chep TOAN BO Code.gs (nut Copy trong Virtual Google Sheets). KHONG paste tung doan thu cong — editor Apps Script tu xuong dong lam vo chuoi dai. KHONG copy file appsScriptCode.ts.
  * 4. Click the Save icon (orange folder/save icon).
- * 5. Click "Deploy" (Triển khai) -> "New deployment" (Triển khai mới).
- * 6. Select "Web app" (Ứng dụng web) as deployment type (click gear icon next to "Select type").
- * 7. Configure:
+ * 5. (Bat buoc cho slide PPTX) Project Settings -> hien appsscript.json -> dan GOOGLE_APPS_SCRIPT_MANIFEST (co scope auth/drive) -> Save.
+ * 6. Chay ham authorizeStaffSlideDrive trong editor, bam Review permissions / Allow (quyen Google Drive).
+ * 7. Click "Deploy" (Triển khai) -> "New deployment" (hoac Manage deployments -> Edit -> New version).
+ * 8. Select "Web app" (Ứng dụng web) as deployment type (click gear icon next to "Select type").
+ * 9. Configure:
  *    - Description: CHD Direct Web Sync
  *    - Execute as: "Me" (Tôi - your own email)
  *    - Who has access: "Anyone" (Bất kỳ ai) -> This is required so the webapp can talk to it.
- * 8. Click "Deploy" (Triển khai).
- * 9. Authorize Permissions (click Advanced -> Go to Untitled project / Allow).
- * 10. Copy the "Web app URL" (starts with https://script.google.com/macros/s/...)
- * 11. Paste this URL into the Connect Settings in your Web app!
+ * 10. Click "Deploy" (Triển khai).
+ * 11. Authorize Permissions (click Advanced -> Go to Untitled project / Allow).
+ * 12. Copy the "Web app URL" (starts with https://script.google.com/macros/s/...)
+ * 13. Paste this URL into the Connect Settings in your Web app!
  */
 
 // Helper to get or create a Sheet with headers
@@ -636,13 +638,54 @@ function doPost(e) {
  * payload: {
  *   fileName, base64, rootFolderId, yearFolderName, monthFolderName
  * }
+ *
+ * Canh bao: can oauthScopes https://www.googleapis.com/auth/drive
+ * (xem GOOGLE_APPS_SCRIPT_MANIFEST / ham authorizeStaffSlideDrive).
  */
+function isDriveAuthError(err) {
+  var msg = err && err.message ? String(err.message) : String(err || "");
+  return /auth\/drive/i.test(msg) ||
+    /DriveApp\.Folder\.createFolder/i.test(msg) ||
+    /DriveApp\.createFolder/i.test(msg) ||
+    /DriveApp\.File\.setSharing/i.test(msg) ||
+    /DriveApp\.Folder\.createFile/i.test(msg) ||
+    /不具有呼叫.*DriveApp/i.test(msg) ||
+    /無權呼叫.*DriveApp/i.test(msg) ||
+    /do not have permission to call.*DriveApp/i.test(msg);
+}
+
+function driveAuthHelpMessage(originalMsg) {
+  return "Apps Script chưa có quyền Google Drive (oauth scope auth/drive). " +
+    "Cách sửa: mở Apps Script → Project Settings → bật appsscript.json → dán manifest có " +
+    "https://www.googleapis.com/auth/drive → Lưu → chạy hàm authorizeStaffSlideDrive → Allow → " +
+    "Deploy → Manage deployments → Edit → New version. Chi tiết gốc: " +
+    String(originalMsg || "");
+}
+
+/**
+ * Chạy thủ công trong Apps Script editor (dropdown hàm → Run) để Google hiện lại màn hình cấp quyền Drive.
+ * Sau khi Allow, Deploy lại Web app (New version).
+ */
+function authorizeStaffSlideDrive() {
+  // Touch DriveApp so the project requests the full Drive scope.
+  var root = DriveApp.getRootFolder();
+  var name = root.getName();
+  return "OK: đã có quyền Drive (" + name + "). Hãy Deploy → Manage deployments → New version.";
+}
+
 function findOrCreateSubfolder(parentFolder, folderName) {
   var name = String(folderName || "").trim();
   if (!name) throw new Error("Thiếu tên thư mục Drive");
   var folders = parentFolder.getFoldersByName(name);
   if (folders.hasNext()) return folders.next();
-  return parentFolder.createFolder(name);
+  try {
+    return parentFolder.createFolder(name);
+  } catch (err) {
+    if (isDriveAuthError(err)) {
+      throw new Error(driveAuthHelpMessage(err && err.message ? err.message : err));
+    }
+    throw err;
+  }
 }
 
 function uploadStaffSlideToDrive(payload) {
@@ -660,27 +703,34 @@ function uploadStaffSlideToDrive(payload) {
     throw new Error("Thiếu cấu hình thư mục Drive (root/year/month)");
   }
 
-  var root = DriveApp.getFolderById(rootFolderId);
-  var yearFolder = findOrCreateSubfolder(root, yearFolderName);
-  var monthFolder = findOrCreateSubfolder(yearFolder, monthFolderName);
-
-  var blob = Utilities.newBlob(Utilities.base64Decode(base64), "application/vnd.openxmlformats-officedocument.presentationml.presentation", fileName);
-  var file = monthFolder.createFile(blob);
   try {
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (shareErr) {
-    // Ignore share errors; owner can still open the file.
-  }
+    var root = DriveApp.getFolderById(rootFolderId);
+    var yearFolder = findOrCreateSubfolder(root, yearFolderName);
+    var monthFolder = findOrCreateSubfolder(yearFolder, monthFolderName);
 
-  return {
-    status: "success",
-    action: "upload_staff_slide",
-    fileId: file.getId(),
-    url: file.getUrl(),
-    name: file.getName(),
-    yearFolderName: yearFolderName,
-    monthFolderName: monthFolderName
-  };
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64), "application/vnd.openxmlformats-officedocument.presentationml.presentation", fileName);
+    var file = monthFolder.createFile(blob);
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      // Ignore share errors; owner can still open the file.
+    }
+
+    return {
+      status: "success",
+      action: "upload_staff_slide",
+      fileId: file.getId(),
+      url: file.getUrl(),
+      name: file.getName(),
+      yearFolderName: yearFolderName,
+      monthFolderName: monthFolderName
+    };
+  } catch (err) {
+    if (isDriveAuthError(err)) {
+      throw new Error(driveAuthHelpMessage(err && err.message ? err.message : err));
+    }
+    throw err;
+  }
 }
 
 function consultSlideExtractJsonFromText(text) {

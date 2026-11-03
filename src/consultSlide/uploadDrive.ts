@@ -1,5 +1,27 @@
 import type { StaffSlideDriveTarget } from './types';
 
+const DRIVE_AUTH_HELP =
+  'Apps Script chưa có quyền Google Drive (cần scope auth/drive). ' +
+  'Mở Apps Script → Project Settings → bật appsscript.json → dán manifest có ' +
+  'https://www.googleapis.com/auth/drive → Lưu → chạy authorizeStaffSlideDrive → Allow → ' +
+  'Deploy → Manage deployments → New version.';
+
+export function formatStaffSlideUploadError(raw: string): string {
+  const msg = String(raw || '');
+  if (
+    /auth\/drive/i.test(msg) ||
+    /DriveApp\.Folder\.createFolder/i.test(msg) ||
+    /DriveApp\.createFolder/i.test(msg) ||
+    /DriveApp\.Folder\.createFile/i.test(msg) ||
+    /不具有呼叫.*DriveApp/i.test(msg) ||
+    /無權呼叫.*DriveApp/i.test(msg) ||
+    /do not have permission to call.*DriveApp/i.test(msg)
+  ) {
+    return DRIVE_AUTH_HELP;
+  }
+  return msg || 'Upload Drive thất bại. Kiểm tra Apps Script upload_staff_slide và quyền Drive.';
+}
+
 export async function uploadStaffSlideToDrive(opts: {
   fileName: string;
   base64: string;
@@ -40,12 +62,14 @@ export async function uploadStaffSlideToDrive(opts: {
   }
 
   if (!res.ok) {
-    throw new Error(data.error || data.message || `Upload Drive HTTP ${res.status}`);
+    throw new Error(formatStaffSlideUploadError(data.error || data.message || `Upload Drive HTTP ${res.status}`));
   }
   if (data.status === 'error') {
     throw new Error(
-      data.message ||
-        'Upload Drive thất bại. Kiểm tra Apps Script đã deploy action upload_staff_slide và quyền Drive.'
+      formatStaffSlideUploadError(
+        data.message ||
+          'Upload Drive thất bại. Kiểm tra Apps Script đã deploy action upload_staff_slide và quyền Drive.'
+      )
     );
   }
   if (!data.url) {

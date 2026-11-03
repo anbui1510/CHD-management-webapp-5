@@ -5,7 +5,7 @@ import {
   Copy, Unlink, RefreshCw, AlertTriangle, CheckCircle2, Loader2, Info, Code,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitCompareArrows
 } from 'lucide-react';
-import { GOOGLE_APPS_SCRIPT_CODE } from '../data/appsScriptCode';
+import { GOOGLE_APPS_SCRIPT_CODE, GOOGLE_APPS_SCRIPT_MANIFEST } from '../data/appsScriptCode';
 import { useModuleSubheaderTitleOnly } from '../hooks/useModuleSubheader';
 import { WEEKLY_SCHEDULE_APPS_SCRIPT_CODE } from '../data/weeklyScheduleAppsScriptCode';
 import {
@@ -68,6 +68,7 @@ export default function VirtualSheets({
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+  const [copiedManifest, setCopiedManifest] = useState<boolean>(false);
   const [copiedWeeklyScheduler, setCopiedWeeklyScheduler] = useState<boolean>(false);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [reconcileResults, setReconcileResults] = useState<ReconciliationItem[] | null>(null);
@@ -211,6 +212,12 @@ export default function VirtualSheets({
     navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyManifestToClipboard = () => {
+    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_MANIFEST);
+    setCopiedManifest(true);
+    setTimeout(() => setCopiedManifest(false), 2000);
   };
 
   const copyWeeklySchedulerToClipboard = () => {
@@ -561,6 +568,9 @@ export default function VirtualSheets({
                 Xóa sạch code mặc định trong đó và dán toàn bộ đoạn mã trong ô bên phải vào <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-pink-600">Code.gs</code>. Nhấp lưu tài liệu.
               </li>
               <li>
+                <strong className="text-rose-700">Bắt buộc cho tạo slide PPTX:</strong> Project Settings (⚙️) → bật <em>Show &quot;appsscript.json&quot; manifest in editor</em> → mở file <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-pink-600">appsscript.json</code> → dán manifest (ô bên phải, có scope <code className="font-mono text-[10px]">auth/drive</code>) → Lưu → chạy hàm <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-pink-600">authorizeStaffSlideDrive</code> → Allow quyền Google Drive → Deploy lại (New version).
+              </li>
+              <li>
                 Chọn nút <strong className="text-gray-800">Triển khai (Deploy)</strong> &rarr; <strong className="text-gray-800">Triển khai mới (New deployment)</strong>.
               </li>
               <li>
@@ -655,6 +665,30 @@ export default function VirtualSheets({
             </div>
             <pre className="p-4 overflow-auto text-[10px] font-mono leading-relaxed text-emerald-300 flex-1">
               <code>{GOOGLE_APPS_SCRIPT_CODE}</code>
+            </pre>
+          </div>
+          <div className="bg-indigo-950 rounded-2xl overflow-hidden text-slate-100 flex flex-col max-h-[220px] border border-indigo-800">
+            <div className="bg-indigo-900 px-4 py-2.5 border-b border-indigo-800 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+                <span className="text-xs font-mono text-indigo-200 select-none ml-2">appsscript.json (Drive scope)</span>
+              </div>
+              <button
+                type="button"
+                onClick={copyManifestToClipboard}
+                className="bg-indigo-800 hover:bg-indigo-700 rounded px-2.5 py-1 text-[11px] font-sans font-semibold transition flex items-center gap-1"
+              >
+                {copiedManifest ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedManifest ? 'Đã sao chép!' : 'Sao chép manifest'}
+              </button>
+            </div>
+            <div className="px-4 py-2 bg-rose-50 text-rose-900 text-[11px] font-semibold border-b border-rose-200">
+              Cần scope <code className="font-mono">https://www.googleapis.com/auth/drive</code> để tạo thư mục/năm-tháng và upload PPTX. Sau khi dán: chạy <code className="font-mono">authorizeStaffSlideDrive</code> rồi Deploy New version.
+            </div>
+            <pre className="p-4 overflow-auto text-[10px] font-mono leading-relaxed text-indigo-200 flex-1">
+              <code>{GOOGLE_APPS_SCRIPT_MANIFEST}</code>
             </pre>
           </div>
           <div className="bg-slate-950 rounded-2xl overflow-hidden text-slate-100 flex flex-col max-h-[360px] border border-slate-800">
