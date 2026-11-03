@@ -13,7 +13,7 @@ import type {
   ConsultSlidePatientContext,
 } from './types';
 
-const OCR_POLL_INTERVAL_MS = 2500;
+const OCR_POLL_INTERVAL_MS = 2000;
 const OCR_POLL_MAX_MS = 3 * 60 * 1000;
 
 function parseAppsScriptProxyPayload(
@@ -285,10 +285,14 @@ export async function prepareAttachmentFile(
   };
 }
 
-/** Smaller JPEG for AI register OCR (faster Apps Script → Gemini). */
+/** JPEG for AI register OCR — balance speed vs chữ nhỏ trên phiếu. */
 export async function prepareAiRegisterAttachmentFile(
   file: File,
   kind: ConsultSlideAttachment['kind']
 ): Promise<ConsultSlideAttachment> {
-  return prepareAttachmentFile(file, kind, 1024, 0.55);
+  // Admin sheet needs readable small print; TTE/ECG can be smaller.
+  if (kind === 'admin' || kind === 'tte') {
+    return prepareAttachmentFile(file, kind, 1280, 0.68);
+  }
+  return prepareAttachmentFile(file, kind, 960, 0.55);
 }

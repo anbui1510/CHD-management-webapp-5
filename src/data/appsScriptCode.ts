@@ -709,26 +709,27 @@ function buildConsultSlidePrompt(patient, consult) {
   consult = consult || {};
   var ctx = JSON.stringify({ patient: patient, consult: consult }, null, 2);
   var lines = [
-    "Ban la tro ly lam sang tim mach nhi.",
-    "Doc anh/PDF (hanh chinh, TTE, ECG, CXR) cho slide hoi chan.",
+    "Ban la tro ly OCR phieu hanh chinh + TTE nhi khoa VN.",
+    "Trich xuat DUNG chu tren anh; khong doan bua.",
     "",
-    "Du lieu da co tren he thong (uu tien giu neu anh khong ro):",
+    "Du lieu he thong (chi dung khi anh mo):",
     "__CTX__",
     "",
-    "Yeu cau trich xuat:",
-    "- PatientName = ten BENH NHI, KHONG lay ten me/nguoi nha.",
-    "- PatientID1 = Ma NB / Ma BN (uu tien).",
-    "- PatientID2 = Ma HS / ma khac neu co; khong thi \"\".",
-    "- Doc chu in va chu viet tay (can nang, chieu cao, SDT).",
-    "- Can nang/chieu cao uu tien phieu hanh chinh.",
-    "- PatientAddress: tra tinh/thanh pho neu suy ra duoc.",
+    "Quy tac bat buoc:",
+    "- PatientName = ten BE/BENH NHI (dong Ho va ten).",
+    "- KHONG lay ten Me/Bo/Nguoi nha/BS chi dinh.",
+    "- PatientID1 = Ma NB hoac Ma BN (chu so, thuong 8-12 so).",
+    "- PatientID2 = Ma HS neu co; khong thi \"\".",
+    "- CAM: ma TE..., barcode, QR, RIS, PID ky tu la.",
+    "- PatientDOB bat buoc neu co tren phieu (dd/mm/yyyy).",
+    "- PatientPhone = SDT tren phieu (thuong 10 so).",
+    "- PatientWeight/Height uu tien phieu hanh chinh/viet tay.",
+    "- PatientAddress = dia chi NHA BN (xa/huyen/tinh).",
+    "- KHONG lay dia chi benh vien / \"TP\" tren tieu de BV.",
+    "- PatientAddress: neu duoc, ghi ten TINH/TP cuoi dia chi.",
     "- KHONG dua RIS login, URL, QR credentials vao JSON.",
-    "- Ngay thang dung dd/mm/yyyy khi co the.",
-    "- tteFindings: bullet ngan tung y sieu am.",
-    "- tteConclusion: ket luan sieu am (tach rieng).",
-    "- DetailDiagnosis: uu tien ket luan TTE khi co.",
-    "- historySummary: tom tat benh su ngan hoac \"\".",
-    "- surgNote / cathNote: co the rong.",
+    "- tteFindings: bullet tung y; tteConclusion tach rieng.",
+    "- DetailDiagnosis uu tien ket luan TTE.",
     "",
     "Tra ve JSON thuan (khong markdown) dung schema:",
     "{",
@@ -806,6 +807,7 @@ function consultSlideFormatGeminiHttpError(httpCode, responseText) {
 
 function consultSlideGeminiGenerationConfig(jsonMode) {
   var config = {
+    temperature: 0,
     thinkingConfig: { thinkingLevel: "LOW" },
   };
   if (jsonMode) {

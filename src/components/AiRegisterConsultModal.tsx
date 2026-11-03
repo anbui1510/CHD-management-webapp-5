@@ -114,11 +114,14 @@ export function AiRegisterConsultModal({
     setStatus('Đang đọc ảnh bằng AI…');
     try {
       setStatus('Đang nén ảnh…');
+      // Ưu tiên hành chính + TTE (đủ cho đăng ký); ECG/CXR thêm nếu còn chỗ.
+      const preferredOrder = ['admin', 'tte', 'ecg', 'cxr', 'pdf'] as const;
       const attachments: ConsultSlideAttachment[] = [];
-      for (const slot of SLOTS) {
-        const file = files[slot.key];
-        if (!file) continue;
-        if (attachments.length >= 3) break;
+      for (const key of preferredOrder) {
+        const slot = SLOTS.find(s => s.key === key);
+        const file = files[key];
+        if (!slot || !file) continue;
+        if (attachments.length >= 2) break;
         attachments.push(await prepareAiRegisterAttachmentFile(file, slot.kind));
       }
 

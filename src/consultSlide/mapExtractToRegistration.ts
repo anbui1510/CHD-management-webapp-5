@@ -42,6 +42,17 @@ export function matchProvinceAddress(
   return { value: '', unmatched: true };
 }
 
+/** Reject RIS/TE/barcode-like tokens; prefer numeric Mã NB for PatientID1. */
+export function isLikelyGarbagePatientId(value: string): boolean {
+  const v = String(value || '').trim();
+  if (!v) return true;
+  // TE1929… / PID… / QR tokens — not Mã NB
+  if (/^(te|pid|ris|qr|id)[a-z0-9_-]*\d+/i.test(v)) return true;
+  if (/[a-zA-Z]/.test(v) && !/^(bn|mbn|hs)[-_]?\d+$/i.test(v)) return true;
+  if (v.length > 16) return true;
+  return false;
+}
+
 /** Prefer Mã NB / numeric BN for PatientID1; keep HS-like ids in PatientID2. */
 export function normalizePatientIds(opts: {
   PatientID1?: string;
@@ -49,15 +60,30 @@ export function normalizePatientIds(opts: {
 }): { PatientID1: string; PatientID2: string } {
   let id1 = String(opts.PatientID1 || '').trim();
   let id2 = String(opts.PatientID2 || '').trim();
-  const looksLikeHs = (v: string) => /hs|ma\s*hs|hoso/i.test(v) || (v.length >= 10 && v.startsWith('26') && id1 && v !== id1);
-  if (!id1 && id2 && /^\d{8,}$/.test(id2)) {
+
+  if (isLikelyGarbagePatientId(id1)) id1 = '';
+  if (isLikelyGarbagePatientId(id2) && !/^\d{8,14}$/.test(id2)) id2 = '';
+
+  // Strip BN-/HS- prefixes
+  id1 = id1.replace(/^(bn|mbn|ma\s*bn)[-_:\s]*/i, '').trim();
+  id2 = id2.replace(/^(hs|ma\s*hs|ma\s*ho\s*so)[-_:\s]*/i, '').trim();
+
+  const looksLikeHs = (v: string) => /hs|ma\s*hs|hoso/i.test(v);
+  const looksNumericNb = (v: string) => /^\d{8,14}$/.test(v);
+
+  if (!id1 && looksNumericNb(id2) && !looksLikeHs(String(opts.PatientID2 || ''))) {
     id1 = id2;
     id2 = '';
   }
-  if (id1 && id2 && looksLikeHs(id1) && /^\d{8,}$/.test(id2) && !looksLikeHs(id2)) {
+  if (id1 && id2 && looksLikeHs(id1) && looksNumericNb(id2)) {
     const swap = id1;
     id1 = id2;
     id2 = swap;
+  }
+  // Prefer pure numeric as PatientID1 when both present and id1 is garbage-ish
+  if (!looksNumericNb(id1) && looksNumericNb(id2)) {
+    id1 = id2;
+    id2 = '';
   }
   return { PatientID1: id1, PatientID2: id2 };
 }
@@ -138,12 +164,13 @@ export function buildRegistrationDraftFromExtract(opts: {
       OtherPatientName: String(extract.OtherPatientName || '').trim(),
       PatientDOB: normalizeVnDate(extract.PatientDOB),
       PatientSex: normalizePatientSex(extract.PatientSex),
-      PatientAddress: addressMatch.value || 'TP Hà Nội',
-      PatientPhone1: String(extract.PatientPhone || '').trim(),
+      // Do not invent a province (old default TP Hà Nội caused wrong address).
+      PatientAddress: addressMatch.value || '',
+      PatientPhone1: String(extract.PatientPhone || '').trim().replace(/[^\d]/g, ''),
       PatientPhone2: '',
       Outcome: '' as const,
     },
-    addressUnmatched: addressMatch.unmatched,
+    addressUnmatched: Boolean(addressMatch.unmatched || (!addressMatch.value && extract.PatientAddress)),
     ocrAddressRaw: String(extract.PatientAddress || '').trim(),
   };
 }

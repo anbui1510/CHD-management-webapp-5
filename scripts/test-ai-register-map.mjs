@@ -62,6 +62,17 @@ assert.equal(
 );
 assert.equal(matchProvinceAddress('Không tồn tại XYZ', ['TP Hà Nội']).unmatched, true);
 
+function isLikelyGarbagePatientId(value) {
+  const v = String(value || '').trim();
+  if (!v) return true;
+  if (/^(te|pid|ris|qr|id)[a-z0-9_-]*\d+/i.test(v)) return true;
+  if (/[a-zA-Z]/.test(v) && !/^(bn|mbn|hs)[-_]?\d+$/i.test(v)) return true;
+  if (v.length > 16) return true;
+  return false;
+}
+assert.equal(isLikelyGarbagePatientId('TE192925233228'), true);
+assert.equal(isLikelyGarbagePatientId('2610011808'), false);
+
 const matched = findPatientById1(
   [{ PatientKey: 'p1', PatientID1: '25001234', PatientName: 'A' }],
   '25001234'
