@@ -34,6 +34,7 @@ export interface ConsultSlideConsultContext {
   DetailConsultResult?: string;
   ConsultNote?: string;
   PlannedDevice?: string;
+  PlannedCathLabDate?: string;
 }
 
 export interface ConsultSlideExtract {
@@ -57,7 +58,10 @@ export interface ConsultSlideExtract {
   ecgNote?: string;
   cxrNote?: string;
   surgNote?: string;
+  /** Nội dung ghi chú thông tim (body). Không dùng cho tiêu đề slide. */
   cathNote?: string;
+  /** Ngày thông tim cho tiêu đề CathLab Note (dd/mm/yyyy hoặc ISO). */
+  CathDate?: string;
 }
 
 export interface ConsultSlideGenerateRequest {

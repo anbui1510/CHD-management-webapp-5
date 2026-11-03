@@ -44,6 +44,9 @@ const extract = mergeSlideExtract({
     historySummary: 'BN 4 thang, phat hien hep van DMP',
     ecgNote: 'Sinus',
     cxrNote: '',
+    clinicalSummary: '',
+    CathDate: '2026-10-26',
+    cathNote: 'KHONG-HIEN-TREN-TIEU-DE',
   },
 });
 
@@ -61,12 +64,18 @@ const zip = await JSZip.loadAsync(out);
 const slide1 = await zip.file('ppt/slides/slide1.xml').async('string');
 const slide2 = await zip.file('ppt/slides/slide2.xml').async('string');
 const slide5 = await zip.file('ppt/slides/slide5.xml').async('string');
+const slide8 = await zip.file('ppt/slides/slide8.xml').async('string');
+const slide9 = await zip.file('ppt/slides/slide9.xml').async('string');
 
 const checks = [
   ['slide1 has name', slide1.includes('MAI CHI THANH')],
   ['slide1 no placeholder PATIENTNAME', !slide1.includes('[PATIENTNAME]')],
   ['slide2 has weight', slide2.includes('7.6')],
+  ['slide2 no DOB instruction leftover', !slide2.includes('Today – DOB') && !slide2.includes('x tuổi y tháng')],
+  ['slide2 no (trống)', !slide2.includes('(trống)')],
   ['slide5 has conclusion', slide5.includes('Hep van DMP') || slide5.includes('KẾT LUẬN')],
+  ['slide8 CathDate only', slide8.includes('(26/10/2026)') && !slide8.includes('KHONG-HIEN-TREN-TIEU-DE') && !slide8.includes('CathDate')],
+  ['slide9 CathDate only', slide9.includes('(26/10/2026)') && !slide9.includes('KHONG-HIEN-TREN-TIEU-DE') && !slide9.includes('CathDate')],
 ];
 
 const targetThong = resolveStaffSlideDriveTarget('Staff thông', '26/10/2026');

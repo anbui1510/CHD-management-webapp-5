@@ -92,11 +92,7 @@ export function mergeSlideExtract(opts: {
         .filter(Boolean)
         .join('\n') ||
       '',
-    cathNote:
-      extract.cathNote ||
-      [consult.ConsultResultID, consult.DetailConsultResult, consult.PlannedDevice]
-        .filter(Boolean)
-        .join('\n') ||
-      '',
+    cathNote: extract.cathNote || '',
+    CathDate: extract.CathDate || consult.PlannedCathLabDate || '',
   };
 }

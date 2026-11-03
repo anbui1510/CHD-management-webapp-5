@@ -26,12 +26,15 @@ export function buildExtractFromRegistration(
     | 'DetailConsultResult'
     | 'ConsultNote'
     | 'PlannedDevice'
-  >
+    | 'PlannedCathLabDate'
+  >,
+  opts?: { CathDate?: string }
 ): ConsultSlideExtract {
   const dob = String(patient.PatientDOB || '').trim();
   const detailDiagnosis =
     [consult.DiagnosisID, consult.DetailDiagnosis].filter(Boolean).join(' — ') ||
     String(consult.DetailDiagnosis || '').trim();
+  const cathDate = String(opts?.CathDate || consult.PlannedCathLabDate || '').trim();
 
   return {
     PatientName: String(patient.PatientName || '').trim(),
@@ -56,8 +59,8 @@ export function buildExtractFromRegistration(
     surgNote: [consult.ConsultResultID, consult.DetailConsultResult, consult.ConsultNote]
       .filter(Boolean)
       .join('\n'),
-    cathNote: [consult.ConsultResultID, consult.DetailConsultResult, consult.PlannedDevice]
-      .filter(Boolean)
-      .join('\n'),
+    // Không nhét kết luận staff vào tiêu đề CathLab Note — chỉ dùng CathDate.
+    cathNote: '',
+    CathDate: cathDate,
   };
 }

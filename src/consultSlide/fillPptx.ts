@@ -199,6 +199,21 @@ async function addImageToSlide(
   zip.file(slidePath, newSlideXml);
 }
 
+/** Normalize date to dd/mm/yyyy for slide titles; empty if missing/invalid. */
+export function formatSlideDateDdMmYyyy(value?: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const vn = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (vn) {
+    return `${vn[1].padStart(2, '0')}/${vn[2].padStart(2, '0')}/${vn[3]}`;
+  }
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    return `${iso[3].padStart(2, '0')}/${iso[2].padStart(2, '0')}/${iso[1]}`;
+  }
+  return raw;
+}
+
 function buildPlaceholderMap(
   extract: ConsultSlideExtract,
   requestBy?: string
@@ -207,6 +222,7 @@ function buildPlaceholderMap(
   const dobAge = extract.PatientDOB
     ? `${extract.PatientDOB}${extract.ageLabel ? ` (${extract.ageLabel})` : ''}`
     : extract.ageLabel || '';
+  const cathDate = formatSlideDateDdMmYyyy(extract.CathDate);
 
   return {
     '[PATIENTNAME]': extract.PatientName || '',
@@ -216,13 +232,24 @@ function buildPlaceholderMap(
     '[PatientID1] – [PatientID2]': idLine || '–',
     '[REQUESTEDBY]': requestBy || '',
     '[PatientSex]': extract.PatientSex || '',
+    // Full DOB+age token including template instruction suffix — do not leave "x tuổi y tháng = Today – DOB"
+    '[DOB – dd/mm/yyyy] (x tuổi y tháng = Today – DOB)': dobAge,
     '[DOB – dd/mm/yyyy]': extract.PatientDOB || '',
-    '[DOB – dd/mm/yyyy] (': dobAge ? `${dobAge} (` : '(',
     '[PatientAddress]': extract.PatientAddress || '',
     '[PatientWeight]': extract.PatientWeight || '',
     '[PatientHeight]': extract.PatientHeight || '',
     '[DetailDiagnosis]': extract.DetailDiagnosis || '',
     '[OtherPaitentName]': extract.OtherPatientName || '',
+    // Empty clinical summary must be blank, never literal "(trống)"
+    '(trống)': extract.clinicalSummary || '',
+    // CathLab Note titles: replace full title tokens (placeholder is mid-run; avoid mid-run inject)
+    'CathLab Note 1 (CathDate – dd/mm/yyyy)': cathDate
+      ? `CathLab Note 1 (${cathDate})`
+      : 'CathLab Note 1',
+    'CathLab Note 2 (CathDate – dd/mm/yyyy)': cathDate
+      ? `CathLab Note 2 (${cathDate})`
+      : 'CathLab Note 2',
+    '(CathDate – dd/mm/yyyy)': cathDate ? `(${cathDate})` : '',
     // title pattern pieces
     '[PATIENTNAME] – [PAITENTID1] – [REQUESTEDBY]': [
       extract.PatientName,
@@ -279,13 +306,8 @@ export async function fillStaffPptxTemplate(opts: {
       xml = setSlideBodyLines(xml, 'Surg Note', [opts.extract.surgNote]);
     }
 
-    if (i === 8 && opts.extract.cathNote) {
-      xml = setSlideBodyLines(xml, 'CathLab Note 2', [opts.extract.cathNote]);
-    }
-
-    if (i === 9 && opts.extract.cathNote) {
-      xml = setSlideBodyLines(xml, 'CathLab Note 1', [opts.extract.cathNote]);
-    }
+    // Slides 8–9 only have a title text run: "CathLab Note N (CathDate – dd/mm/yyyy)".
+    // Date is filled via placeholders above — never inject cathNote into the title.
 
     zip.file(path, xml);
   }
