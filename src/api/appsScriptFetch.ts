@@ -1453,6 +1453,11 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return null;
   }
 
+  // Gemini extract + Drive upload via server proxy (not client-side Sheets bridge)
+  if (endpoint === 'sheets' && parts[1] === 'proxy') {
+    return null;
+  }
+
   if (endpoint === 'workflow-monitor') {
     return null;
   }

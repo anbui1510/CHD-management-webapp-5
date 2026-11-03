@@ -597,6 +597,21 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    if (action === "consult_slide_extract_enqueue") {
+      result = consultSlideEnqueueExtract(payload);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "consult_slide_extract_process") {
+      result = consultSlideProcessExtractJob(payload);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "consult_slide_extract_status") {
+      result = consultSlideExtractJobStatus(payload);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     if (action === "upload_staff_slide") {
       result = uploadStaffSlideToDrive(payload);
       return ContentService.createTextOutput(JSON.stringify(result))
@@ -693,20 +708,27 @@ function buildConsultSlidePrompt(patient, consult) {
   consult = consult || {};
   var ctx = JSON.stringify({ patient: patient, consult: consult }, null, 2);
   var lines = [
-    "Ban la tro ly lam sang tim mach nhi.",
-    "Doc anh/PDF (hanh chinh, TTE, ECG, CXR) cho slide hoi chan.",
+    "Ban la tro ly OCR phieu hanh chinh + TTE nhi khoa VN.",
+    "Trich xuat DUNG chu tren anh; khong doan bua.",
     "",
-    "Du lieu da co tren he thong (uu tien giu neu anh khong ro):",
+    "Du lieu he thong (chi dung khi anh mo):",
     "__CTX__",
     "",
-    "Yeu cau:",
-    "- Doc chu in va chu viet tay (can nang, chieu cao, SDT).",
+    "Quy tac bat buoc:",
+    "- PatientName = ten BE/BENH NHI (dong Ho va ten).",
+    "- KHONG lay ten Me/Bo/Nguoi nha/BS chi dinh.",
+    "- PatientID1 = Ma NB hoac Ma BN (chu so, thuong 8-12 so).",
+    "- PatientID2 = Ma HS neu co; khong thi \"\".",
+    "- CAM: ma TE..., barcode, QR, RIS, PID ky tu la.",
+    "- PatientDOB bat buoc neu co tren phieu (dd/mm/yyyy).",
+    "- PatientPhone = SDT tren phieu (thuong 10 so).",
+    "- PatientWeight/Height uu tien phieu hanh chinh/viet tay.",
+    "- PatientAddress = dia chi NHA BN (xa/huyen/tinh).",
+    "- KHONG lay dia chi benh vien / \"TP\" tren tieu de BV.",
+    "- PatientAddress: neu duoc, ghi ten TINH/TP cuoi dia chi.",
     "- KHONG dua RIS login, URL, QR credentials vao JSON.",
-    "- Ngay thang dung dd/mm/yyyy khi co the.",
-    "- tteFindings: bullet ngan tung y sieu am.",
-    "- tteConclusion: ket luan sieu am.",
-    "- historySummary: tom tat benh su ngan hoac rong.",
-    "- surgNote / cathNote: co the rong.",
+    "- tteFindings: bullet tung y; tteConclusion tach rieng.",
+    "- DetailDiagnosis uu tien ket luan TTE.",
     "",
     "Tra ve JSON thuan (khong markdown) dung schema:",
     "{",
@@ -783,6 +805,7 @@ function consultSlideFormatGeminiHttpError(httpCode, responseText) {
 
 function consultSlideGeminiGenerationConfig(jsonMode) {
   var config = {
+    temperature: 0,
     thinkingConfig: { thinkingLevel: "LOW" },
   };
   if (jsonMode) {
@@ -881,6 +904,238 @@ function runConsultSlideGeminiSmokeTest() {
   );
 }
 
+function consultSlideGetOcrJobsRoot() {
+  var rootName = "CHD_OCR_Jobs";
+  var folders = DriveApp.getFoldersByName(rootName);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(rootName);
+}
+
+function consultSlideWriteJobMeta(jobFolder, meta) {
+  var files = jobFolder.getFilesByName("job.json");
+  while (files.hasNext()) {
+    files.next().setTrashed(true);
+  }
+  jobFolder.createFile(
+    Utilities.newBlob(JSON.stringify(meta), "application/json", "job.json")
+  );
+}
+
+function consultSlideReadJobMeta(jobFolder) {
+  var files = jobFolder.getFilesByName("job.json");
+  if (!files.hasNext()) throw new Error("Khong tim thay job.json");
+  return JSON.parse(files.next().getBlob().getDataAsString());
+}
+
+function consultSlideFindJobFolder(jobId) {
+  var id = String(jobId || "").trim();
+  if (!id) throw new Error("Thieu jobId");
+  var root = consultSlideGetOcrJobsRoot();
+  var folders = root.getFoldersByName(id);
+  if (!folders.hasNext()) throw new Error("Khong tim thay job: " + id);
+  return folders.next();
+}
+
+function consultSlideScheduleOcrProcess(jobId) {
+  var props = PropertiesService.getScriptProperties();
+  var queueRaw = String(props.getProperty("OCR_JOB_QUEUE") || "").trim();
+  var queue = [];
+  if (queueRaw) {
+    try {
+      queue = JSON.parse(queueRaw);
+    } catch (ignore) {
+      queue = [];
+    }
+  }
+  if (!Array.isArray(queue)) queue = [];
+  if (queue.indexOf(jobId) === -1) queue.push(jobId);
+  props.setProperty("OCR_JOB_QUEUE", JSON.stringify(queue.slice(-20)));
+  try {
+    ScriptApp.newTrigger("consultSlideDrainOcrQueue")
+      .timeBased()
+      .after(1000)
+      .create();
+  } catch (triggerErr) {
+    console.warn("Khong tao duoc OCR trigger: " + triggerErr);
+  }
+}
+
+/** Trigger handler — process queued OCR jobs after enqueue. */
+function consultSlideDrainOcrQueue() {
+  var props = PropertiesService.getScriptProperties();
+  var queueRaw = String(props.getProperty("OCR_JOB_QUEUE") || "").trim();
+  var queue = [];
+  if (queueRaw) {
+    try {
+      queue = JSON.parse(queueRaw);
+    } catch (ignore) {
+      queue = [];
+    }
+  }
+  if (!Array.isArray(queue) || !queue.length) return;
+  var jobId = String(queue.shift() || "").trim();
+  props.setProperty("OCR_JOB_QUEUE", JSON.stringify(queue));
+  if (!jobId) return;
+  try {
+    consultSlideProcessExtractJob({ jobId: jobId });
+  } catch (err) {
+    console.error("OCR job failed " + jobId + ": " + err);
+  }
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var t = 0; t < triggers.length; t++) {
+      if (triggers[t].getHandlerFunction() === "consultSlideDrainOcrQueue") {
+        ScriptApp.deleteTrigger(triggers[t]);
+      }
+    }
+  } catch (delErr) {}
+  if (queue.length) {
+    consultSlideScheduleOcrProcess(queue[0]);
+  }
+}
+
+function consultSlideEnqueueExtract(payload) {
+  var attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  if (!attachments.length) throw new Error("Can it nhat mot anh hoac PDF");
+  if (attachments.length > 3) attachments = attachments.slice(0, 3);
+
+  var jobId = Utilities.getUuid().replace(/-/g, "").substring(0, 20);
+  var root = consultSlideGetOcrJobsRoot();
+  var jobFolder = root.createFolder(jobId);
+  var fileIds = [];
+
+  for (var i = 0; i < attachments.length; i++) {
+    var att = attachments[i] || {};
+    var b64 = String(att.base64 || "").replace(/^data:[^;]+;base64,/, "");
+    if (!b64) continue;
+    var mime = String(att.mimeType || "image/jpeg");
+    var kind = String(att.kind || "file");
+    var name = String(att.fileName || (kind + "_" + i + ".jpg")).replace(/[^\w.\-]+/g, "_");
+    var blob = Utilities.newBlob(Utilities.base64Decode(b64), mime, name);
+    var file = jobFolder.createFile(blob);
+    fileIds.push({
+      fileId: file.getId(),
+      kind: kind,
+      mimeType: mime,
+      fileName: name
+    });
+  }
+  if (!fileIds.length) throw new Error("Khong luu duoc anh OCR");
+
+  var meta = {
+    jobId: jobId,
+    status: "queued",
+    patient: payload.patient || {},
+    consult: payload.consult || {},
+    fileIds: fileIds,
+    createdAt: new Date().toISOString(),
+    message: ""
+  };
+  consultSlideWriteJobMeta(jobFolder, meta);
+  consultSlideScheduleOcrProcess(jobId);
+  return {
+    status: "success",
+    action: "consult_slide_extract_enqueue",
+    jobId: jobId,
+    jobStatus: "queued"
+  };
+}
+
+function consultSlideLoadAttachmentsFromJob(meta) {
+  var out = [];
+  var files = Array.isArray(meta.fileIds) ? meta.fileIds : [];
+  for (var i = 0; i < files.length; i++) {
+    var item = files[i] || {};
+    var file = DriveApp.getFileById(String(item.fileId || ""));
+    var blob = file.getBlob();
+    out.push({
+      kind: String(item.kind || ""),
+      mimeType: String(item.mimeType || blob.getContentType() || "image/jpeg"),
+      fileName: String(item.fileName || file.getName() || ""),
+      base64: Utilities.base64Encode(blob.getBytes())
+    });
+  }
+  return out;
+}
+
+function consultSlideProcessExtractJob(payload) {
+  var jobId = String(payload.jobId || "").trim();
+  var jobFolder = consultSlideFindJobFolder(jobId);
+  var meta = consultSlideReadJobMeta(jobFolder);
+  if (meta.status === "done" && meta.extract) {
+    return {
+      status: "success",
+      action: "consult_slide_extract_process",
+      jobId: jobId,
+      jobStatus: "done",
+      extract: meta.extract,
+      model: meta.model || ""
+    };
+  }
+  if (meta.status === "running") {
+    return {
+      status: "success",
+      action: "consult_slide_extract_process",
+      jobId: jobId,
+      jobStatus: "running"
+    };
+  }
+
+  meta.status = "running";
+  meta.message = "";
+  consultSlideWriteJobMeta(jobFolder, meta);
+
+  try {
+    var attachments = consultSlideLoadAttachmentsFromJob(meta);
+    var geminiResult = consultSlideExtractGemini({
+      patient: meta.patient || {},
+      consult: meta.consult || {},
+      attachments: attachments
+    });
+    meta.status = "done";
+    meta.extract = geminiResult.extract;
+    meta.model = geminiResult.model || "";
+    meta.finishedAt = new Date().toISOString();
+    consultSlideWriteJobMeta(jobFolder, meta);
+    return {
+      status: "success",
+      action: "consult_slide_extract_process",
+      jobId: jobId,
+      jobStatus: "done",
+      extract: meta.extract,
+      model: meta.model
+    };
+  } catch (err) {
+    meta.status = "error";
+    meta.message = err && err.message ? String(err.message) : String(err);
+    meta.finishedAt = new Date().toISOString();
+    consultSlideWriteJobMeta(jobFolder, meta);
+    return {
+      status: "error",
+      action: "consult_slide_extract_process",
+      jobId: jobId,
+      jobStatus: "error",
+      message: meta.message
+    };
+  }
+}
+
+function consultSlideExtractJobStatus(payload) {
+  var jobId = String(payload.jobId || "").trim();
+  var jobFolder = consultSlideFindJobFolder(jobId);
+  var meta = consultSlideReadJobMeta(jobFolder);
+  var out = {
+    status: "success",
+    action: "consult_slide_extract_status",
+    jobId: jobId,
+    jobStatus: String(meta.status || "unknown")
+  };
+  if (meta.extract) out.extract = meta.extract;
+  if (meta.model) out.model = meta.model;
+  if (meta.message) out.message = meta.message;
+  return out;
+}
+
 function consultSlideExtractGemini(payload) {
   var props = PropertiesService.getScriptProperties();
   var apiKey = String(props.getProperty("GEMINI_API_KEY") || "").trim();
@@ -891,10 +1146,11 @@ function consultSlideExtractGemini(payload) {
   var consult = payload.consult || {};
   var attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
   if (!attachments.length) throw new Error("Cần ít nhất một ảnh hoặc PDF");
-  if (attachments.length > 6) attachments = attachments.slice(0, 6);
+  if (attachments.length > 3) attachments = attachments.slice(0, 3);
 
+  // Web OCR path: one preferred model, one attempt (avoid CF/Worker timeouts).
   var preferredModel = String(payload.model || props.getProperty("GEMINI_MODEL") || "gemini-3.8-flash").trim();
-  var models = consultSlideResolveModels(preferredModel);
+  var models = [preferredModel];
   var prompt = buildConsultSlidePrompt(patient, consult);
   var parts = [{ text: prompt }];
   for (var i = 0; i < attachments.length; i++) {
@@ -917,7 +1173,7 @@ function consultSlideExtractGemini(payload) {
   };
   for (var m = 0; m < models.length; m++) {
     var model = models[m];
-    var result = consultSlideFetchGeminiGenerate(apiKey, model, requestBody, 3, 4000);
+    var result = consultSlideFetchGeminiGenerate(apiKey, model, requestBody, 1, 0);
     var code = result.code;
     var responseText = result.text;
     if (result.ok) {
