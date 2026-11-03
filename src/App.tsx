@@ -64,21 +64,14 @@ import { SheetsSyncFeedbackProvider } from './context/SheetsSyncFeedbackContext'
 import { ViewSubheaderProvider } from './context/ViewSubheaderContext';
 import { SubheaderRenderer } from './components/layout/DesktopViewSubheader';
 import AppInlineSubheader from './components/layout/AppInlineSubheader';
-import AiRegisterConsultModal, { type AiRegisterConsultResult } from './components/AiRegisterConsultModal';
 import { SearchTextInput } from './components/SearchTextInput';
 import {
   buildStaffPptxBase64,
-  downloadPptxBase64,
   resolveStaffSlideDriveTarget,
   buildStaffSlideFileName,
 } from './consultSlide/browserApi';
 import { uploadStaffSlideToDrive } from './consultSlide/uploadDrive';
-import {
-  buildRegistrationDraftFromExtract,
-  findPatientById1,
-} from './consultSlide/mapExtractToRegistration';
-import type { ConsultSlideAttachment, ConsultSlideExtract } from './consultSlide/types';
-import { mergeSlideExtract } from './consultSlide/mergeExtract';
+import { buildExtractFromRegistration } from './consultSlide/fromRegistration';
 import { MAIN_HEADER_TITLE } from './constants/appHeader';
 import { SheetsSyncBridge } from './components/SheetsSyncBridge';
 import { AuthRequiredError, getMedicalDataFetchTimeout, peekCachedMedicalDataBundle, peekInMemoryMedicalDataBundle, applyMedicalDataBundle } from './api/medicalDataRefresh';
@@ -171,7 +164,6 @@ import {
   TrendingUp, 
   ClipboardCheck, 
   ClipboardList,
-  Presentation,
   Cpu, 
   Clock, 
   Workflow, 
@@ -468,20 +460,8 @@ export default function App() {
       })[0]?.DetailDiagnosis || '';
   };
 
-  const [skipPriorDiagnosisAutofill, setSkipPriorDiagnosisAutofill] = useState(false);
-  const [showAiRegisterConsult, setShowAiRegisterConsult] = useState(false);
-  const [aiPrefillBanner, setAiPrefillBanner] = useState<string>('');
-  const [aiPendingSlide, setAiPendingSlide] = useState<{
-    extract: ConsultSlideExtract;
-    attachments: ConsultSlideAttachment[];
-    ConsultType: ConsultTypeEnum;
-    ConsultDate: string;
-    RequestBy: string;
-  } | null>(null);
-
   useEffect(() => {
     if (!newConsultData.PatientKey) return;
-    if (skipPriorDiagnosisAutofill) return;
     const previousDiagnosis = getLatestPriorDetailDiagnosis(newConsultData.PatientKey, newConsultData.ConsultDate);
     setNewConsultData(prev => ({
       ...prev,
@@ -1511,9 +1491,8 @@ export default function App() {
         addPatient(payload);
       }
 
-      // Auto-select newly created/edited patient when đăng ký staff form is open (AI or thủ công).
+      // Auto-select newly created/edited patient when đăng ký staff form is open.
       if (showAddConsult) {
-        setSkipPriorDiagnosisAutofill(Boolean(aiPendingSlide));
         setNewConsultData(prev => ({ ...prev, PatientKey: patientKey }));
         setSearchPatientQuery('');
       }
@@ -1617,7 +1596,6 @@ export default function App() {
     }
 
     const proceedSave = () => {
-      const pendingSlide = aiPendingSlide;
       const payload: Consult = {
         ConsultKey: `con_${Date.now()}`,
         PatientKey: newConsultData.PatientKey,
@@ -1662,8 +1640,6 @@ export default function App() {
       setCustomDocVal('');
       setPendingConsultsCount(0);
       setShowAddConsult(false);
-      setAiPrefillBanner('');
-      setSkipPriorDiagnosisAutofill(false);
       setActiveMenu('consult-list');
 
       fetch('/api/consults', {
@@ -1679,17 +1655,14 @@ export default function App() {
           return res.json();
         })
         .then(async data => {
-          if (pendingSlide && patientForSlide) {
-            await generateAiPendingSlideAfterSave(payload, patientForSlide, pendingSlide);
-          } else {
-            clearAiRegisterState();
-            showSaveFeedback('Đã gửi thông tin đăng ký hội chẩn thành công', data);
+          showSaveFeedback('Đã gửi thông tin đăng ký hội chẩn thành công', data);
+          if (patientForSlide) {
+            await generateStaffSlideAfterConsultSave(payload, patientForSlide);
           }
           return refreshConsultData();
         })
         .catch(err => {
           console.error(err);
-          clearAiRegisterState();
           triggerAlert(err instanceof Error ? err.message : 'Không thể đăng ký hội chẩn', MODAL_TITLE.saveError);
           refreshConsultData();
         });
@@ -2281,14 +2254,7 @@ export default function App() {
     setShowAddPatient(true);
   }, []);
 
-  const clearAiRegisterState = useCallback(() => {
-    setAiPendingSlide(null);
-    setAiPrefillBanner('');
-    setSkipPriorDiagnosisAutofill(false);
-  }, []);
-
   const openAddConsultForm = useCallback(() => {
-    clearAiRegisterState();
     setNewConsultData({
       PatientKey: '',
       ConsultType: 'Staff mổ',
@@ -2308,129 +2274,25 @@ export default function App() {
     });
     setPendingConsultsCount(0);
     setShowAddConsult(true);
-  }, [clearAiRegisterState, currentStaff?.StaffName]);
+  }, [currentStaff?.StaffName]);
 
-  const openAiRegisterConsult = useCallback(() => {
-    setShowAiRegisterConsult(true);
-  }, []);
-
-  const handleAiRegisterComplete = useCallback((result: AiRegisterConsultResult) => {
-    const draft = buildRegistrationDraftFromExtract({
-      extract: result.extract,
-      provinceOptions,
-      consultType: result.ConsultType,
-      consultDate: result.ConsultDate,
-      requestBy: result.RequestBy,
-    });
-    const matched = findPatientById1(patients, draft.patientDraft.PatientID1);
-
-    setSkipPriorDiagnosisAutofill(true);
-    setAiPendingSlide({
-      extract: result.extract,
-      attachments: result.attachments,
-      ConsultType: result.ConsultType,
-      ConsultDate: result.ConsultDate,
-      RequestBy: result.RequestBy,
-    });
-
-    setNewConsultData({
-      PatientKey: matched?.PatientKey || '',
-      ConsultType: result.ConsultType,
-      PatientWeight: draft.consult.PatientWeight,
-      PatientHeight: draft.consult.PatientHeight,
-      ConsultDate: draft.consult.ConsultDate || result.ConsultDate,
-      RequestBy: draft.consult.RequestBy || currentStaff?.StaffName || '',
-      DiagnosisID: '',
-      DetailDiagnosis: draft.consult.DetailDiagnosis,
-      Department: 'Tim Mạch',
-      PriorityOrder: 'Chương trình',
-      RiskFactor: '3 - Không HF, HF độ I-II / có chỉ định mổ',
-      CheckDevice: '',
-      ConsultNote: '',
-      PlannedDevice: '',
-      PlannedPrice: ''
-    });
-
-    if (matched) {
-      setSearchPatientQuery('');
-      setAiPrefillBanner(
-        `Đã điền từ AI — đã khớp BN ${matched.PatientName} (${matched.PatientID1}). Kiểm tra trước khi lưu.`
-      );
-    } else {
-      setNewPatientData({
-        PatientID1: draft.patientDraft.PatientID1,
-        PatientID2: draft.patientDraft.PatientID2,
-        PatientName: draft.patientDraft.PatientName,
-        OtherPatientName: draft.patientDraft.OtherPatientName,
-        PatientDOB: draft.patientDraft.PatientDOB,
-        PatientSex: draft.patientDraft.PatientSex,
-        PatientAddress: draft.patientDraft.PatientAddress,
-        PatientPhone1: draft.patientDraft.PatientPhone1,
-        PatientPhone2: '',
-        Outcome: ''
-      });
-      setEditingPatientKey(null);
-      setShowAddPatient(true);
-      const addrNote = draft.addressUnmatched && draft.ocrAddressRaw
-        ? ` Địa chỉ OCR "${draft.ocrAddressRaw}" chưa khớp danh mục — hãy chọn tỉnh/TP.`
-        : '';
-      setAiPrefillBanner(
-        `Đã điền từ AI — chưa thấy BN theo mã ${draft.patientDraft.PatientID1 || '(trống)'}. Hãy tạo BN mới rồi lưu đăng ký.${addrNote}`
-      );
-    }
-
-    setPendingConsultsCount(0);
-    setShowAddConsult(true);
-  }, [patients, provinceOptions, currentStaff?.StaffName]);
-
-  const generateAiPendingSlideAfterSave = useCallback(async (
+  /** After consult registration: PPTX from form fields → Drive → FilePPTX (no AI, no auto-download). */
+  const generateStaffSlideAfterConsultSave = useCallback(async (
     payload: Consult,
-    patient: Patient,
-    pending: {
-      extract: ConsultSlideExtract;
-      attachments: ConsultSlideAttachment[];
-    }
+    patient: Patient
   ) => {
     try {
-      const merged = mergeSlideExtract({
-        patient: {
-          PatientName: patient.PatientName,
-          OtherPatientName: patient.OtherPatientName,
-          PatientID1: patient.PatientID1,
-          PatientID2: patient.PatientID2,
-          PatientSex: patient.PatientSex,
-          PatientDOB: patient.PatientDOB,
-          PatientAddress: patient.PatientAddress,
-          PatientPhone1: patient.PatientPhone1,
-          PatientPhone2: patient.PatientPhone2,
-        },
-        consult: {
-          ConsultKey: payload.ConsultKey,
-          ConsultType: payload.ConsultType,
-          ConsultDate: payload.ConsultDate,
-          RequestBy: payload.RequestBy,
-          DiagnosisID: payload.DiagnosisID,
-          DetailDiagnosis: payload.DetailDiagnosis,
-          PatientWeight: payload.PatientWeight,
-          PatientHeight: payload.PatientHeight,
-        },
-        extract: pending.extract,
-        preferOcr: false,
-      });
-
-      const imageAttachments = pending.attachments.filter(a => a.mimeType.startsWith('image/'));
+      const extract = buildExtractFromRegistration(patient, payload);
       const built = await buildStaffPptxBase64({
-        extract: merged,
+        extract,
         requestBy: payload.RequestBy,
         consultDate: payload.ConsultDate,
-        attachments: imageAttachments,
       });
       const fileName = buildStaffSlideFileName({
-        patientName: merged.PatientName || patient.PatientName,
-        patientId: merged.PatientID1 || patient.PatientID1,
+        patientName: extract.PatientName || patient.PatientName,
+        patientId: extract.PatientID1 || patient.PatientID1,
         consultDate: payload.ConsultDate,
       });
-      downloadPptxBase64(fileName, built.base64);
 
       const target = resolveStaffSlideDriveTarget(payload.ConsultType, payload.ConsultDate);
       const uploaded = await uploadStaffSlideToDrive({
@@ -2453,23 +2315,21 @@ export default function App() {
       });
       if (!response.ok) {
         const d = await response.json().catch(() => ({}));
-        throw new Error((d as any).error || 'Đã tạo slide nhưng không lưu được FilePPTX trên hồ sơ');
+        throw new Error((d as { error?: string }).error || 'Đã tạo slide nhưng không lưu được FilePPTX trên hồ sơ');
       }
 
       showSaveFeedback(
-        `Đã đăng ký + tạo slide AI và lưu Drive (${target.monthFolderName}). File cũng đã tải về máy.`,
+        `Đã đăng ký và tạo slide Drive (${target.monthFolderName}). Mở hồ sơ để tải về / xem Drive.`,
         { ok: true }
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       triggerAlert(
-        `Đăng ký đã lưu nhưng tạo slide AI lỗi: ${message}`,
+        `Đăng ký đã lưu nhưng tạo slide lỗi: ${message}`,
         MODAL_TITLE.warning
       );
-    } finally {
-      clearAiRegisterState();
     }
-  }, [patchConsult, clearAiRegisterState]);
+  }, [patchConsult]);
 
   const handlePatientSubheaderSearch = useCallback((value: string) => {
     setPatientSearch(value);
@@ -2777,17 +2637,7 @@ export default function App() {
         consultListSearch={consultListSearch}
         onConsultListSearchChange={handleConsultSubheaderSearch}
         onAddConsult={openAddConsultForm}
-        onAddConsultAi={openAiRegisterConsult}
         profileName={currentStaff?.StaffName}
-      />
-
-      <AiRegisterConsultModal
-        open={showAiRegisterConsult}
-        onOpenChange={setShowAiRegisterConsult}
-        doctorOptions={registrationDoctorOptions}
-        defaultRequestBy={currentStaff?.StaffName || ''}
-        triggerAlert={triggerAlert}
-        onComplete={handleAiRegisterComplete}
       />
 
       {/* Hero success/error notifications */}
@@ -3136,17 +2986,11 @@ export default function App() {
                   <div className="flex items-center justify-between border-b border-slate-150 px-6 py-3.5 text-primary shrink-0">
                     <h3 className="font-extrabold text-sm uppercase flex items-center gap-1.5 font-sans">
                       <ClipboardList className="w-5 h-5 animate-pulse" /> Đăng ký staff
-                      {aiPendingSlide ? (
-                        <Badge variant="secondary" className="normal-case font-bold text-[10px]">
-                          Mode AI
-                        </Badge>
-                      ) : null}
                     </h3>
                     <button 
                       type="button"
                       onClick={() => {
                         triggerConfirm("Bạn có chắc chắn muốn Hủy đăng ký không?", () => {
-                          clearAiRegisterState();
                           setShowAddConsult(false);
                         }, MODAL_TITLE.confirm);
                       }}
@@ -3160,12 +3004,6 @@ export default function App() {
                     
                     {/* Scrollable Form body */}
                     <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-3.5 scrollbar-thin min-h-0">
-
-                    {aiPrefillBanner ? (
-                      <div className="rounded-xl border border-border bg-muted/60 px-3 py-2 text-[11px] font-semibold text-foreground leading-relaxed">
-                        {aiPrefillBanner}
-                      </div>
-                    ) : null}
                     
                     {/* Searchable Patient Selection Block */}
                     <div className="bg-slate-50 border border-slate-150 p-4 rounded-2xl space-y-3">
@@ -3439,7 +3277,6 @@ export default function App() {
                       type="button"
                       onClick={() => {
                         triggerConfirm("Bạn có chắc chắn muốn Hủy đăng ký không?", () => {
-                          clearAiRegisterState();
                           setShowAddConsult(false);
                         }, MODAL_TITLE.confirm);
                       }}
@@ -3508,16 +3345,6 @@ export default function App() {
                       aria-label="Bộ lọc"
                     >
                       <Filter className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={openAiRegisterConsult}
-                      title="Đăng ký mode AI"
-                      aria-label="Đăng ký mode AI"
-                    >
-                      <Presentation className="w-4 h-4 text-primary" />
                     </Button>
                     <Button
                       type="button"
