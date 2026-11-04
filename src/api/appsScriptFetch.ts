@@ -1299,6 +1299,11 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
   // ─── AUTH ENDPOINTS (Bridge implementation) ─────────────────────────────
 
   if (endpoint === 'auth') {
+    // On localhost the Express dev server (server.ts) owns authentication and
+    // issues the session cookie that all other /api endpoints require. Let auth
+    // requests pass through to it instead of the client-side bridge, matching the
+    // localhost passthrough used by every other endpoint in this handler.
+    if (isLocalHost()) return null;
     const subAction = parts[1];
 
     // POST /api/auth/login
