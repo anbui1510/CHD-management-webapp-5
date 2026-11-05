@@ -68,6 +68,7 @@ const emptyDraft = (): StaffDraft => ({
   Password: '',
   Role: 'User',
   FireDate: '',
+  ShowInLichKhoa: 'On',
   StaffRolePreset: 'dang-ky',
   Permissions: '',
   moduleSet: new Set<AppModule>(['home', 'workspace']),
@@ -211,6 +212,7 @@ export default function StaffManagementView({
       StaffName: staff.StaffName || '',
       Name: staff.Name || '',
       Department: staff.Department || '',
+      ShowInLichKhoa: staff.ShowInLichKhoa || 'On',
       Career: staff.Career || '',
       Email: staff.Email || '',
       StaffPhone: staff.StaffPhone || '',
@@ -290,6 +292,7 @@ export default function StaffManagementView({
       StaffName: draft.StaffName?.trim(),
       Name: draft.Name?.trim() || '',
       Department: draft.Department?.trim() || '',
+      ShowInLichKhoa: draft.ShowInLichKhoa === 'Off' ? 'Off' : 'On',
       Career: draft.Career?.trim() || '',
       Email: draft.Email?.trim() || '',
       StaffPhone: draft.StaffPhone?.trim() || '',
@@ -878,6 +881,17 @@ export default function StaffManagementView({
                         onChange={(e) => setDraft(prev => ({ ...prev, Department: e.target.value }))}
                         className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
                       />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">ShowInLichKhoa (Module 7)</span>
+                      <select
+                        value={draft.ShowInLichKhoa === 'Off' ? 'Off' : 'On'}
+                        onChange={(e) => setDraft(prev => ({ ...prev, ShowInLichKhoa: e.target.value as 'On' | 'Off' }))}
+                        className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white"
+                      >
+                        <option value="On">On — hiển thị trong Quản lý lịch làm việc</option>
+                        <option value="Off">Off — không đưa vào module lịch</option>
+                      </select>
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-bold uppercase text-slate-400">Career</span>

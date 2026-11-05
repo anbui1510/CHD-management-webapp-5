@@ -3,6 +3,7 @@ import { UserPlus, Upload, Trash2, Pencil, X, Plus, ChevronRight } from 'lucide-
 import { TITLE_OPTIONS, POSITION_OPTIONS, derivePositionFromTitle, getQuotaForTitle } from '../store/constants';
 import { ACCESS_LEVELS, ACCESS_TABS, accessRoleLabel, normalizeAccess } from '../logic/access';
 import { DUTY_WEEKDAYS, dutyScheduleTask, normalizeDuties } from '../logic/staffDuties';
+import { showInLichKhoaLabel } from '../logic/showInLichKhoa.js';
 import { useConfirm } from './ConfirmDialog';
 import { ModalPortal } from './ModalPortal';
 
@@ -268,7 +269,7 @@ export function StaffManager({
         )}
         {chdSynced && (
           <div className="sub-header-info" style={{ marginTop: 4 }}>
-            Danh sách đồng bộ từ CHD Staff — chỉ sửa thuộc tính lịch (quota, quyền tab…).
+            Danh sách từ CHD Staff (ShowInLichKhoa = On). Khoa/Phòng = cột Department trên Sheet Staff; chỉ sửa thuộc tính lịch tại đây.
           </div>
         )}
       </div>
@@ -287,6 +288,8 @@ export function StaffManager({
               <th>Quỹ Bù</th>
               <th>Quỹ Phép</th>
               <th>Email</th>
+              <th>Khoa / Phòng</th>
+              <th>Hiển thị lịch</th>
               <th>Tài khoản liên kết</th>
               <th>Quyền</th>
               {!readOnly && <th className="col-actions">Thao Tác</th>}
@@ -353,6 +356,12 @@ export function StaffManager({
                 <td className="num-positive">{s.buBalance}</td>
                 <td className="num-negative">{s.phepBalance}</td>
                 <td className="text-muted-cell">{s.email}</td>
+                <td className="text-muted-cell">{s.deptLabel || '—'}</td>
+                <td>
+                  <span className={`role-pill${showInLichKhoaLabel(s.showInLichKhoa) === 'Off' ? ' muted' : ''}`}>
+                    {showInLichKhoaLabel(s.showInLichKhoa)}
+                  </span>
+                </td>
                 <td className="text-muted-cell">{s.loginEmail || 'Chưa liên kết'}</td>
                 <td><span className="role-pill">{accessRoleLabel(s)}</span></td>
                 {!readOnly && (
@@ -371,7 +380,7 @@ export function StaffManager({
             ))}
             {staffList.length === 0 && (
               <tr>
-                <td colSpan={readOnly ? 11 : 12} className="empty-cell">Chưa có nhân sự nào. Bấm “Thêm Bác Sĩ Mới” để bắt đầu.</td>
+                <td colSpan={readOnly ? 13 : 14} className="empty-cell">Chưa có nhân sự nào. Bấm “Thêm Bác Sĩ Mới” để bắt đầu.</td>
               </tr>
             )}
           </tbody>

@@ -1,4 +1,5 @@
 import { MEMBER_DEFAULT } from '../logic/access.js';
+import { formatShowInLichKhoa, parseShowInLichKhoa } from '../logic/showInLichKhoa.js';
 
 function isActiveChdStaff(staff) {
   return staff && !String(staff.FireDate || '').trim();
@@ -16,9 +17,13 @@ function deriveShortName(staff, used) {
   return `${base}${i}`;
 }
 
+function chdDepartmentLabel(chd) {
+  return String(chd?.Department || '').trim();
+}
+
 /**
  * Merge CHD Staff list into schedule department staff (NhanSu).
- * Identity from CHD; preserve schedule fields already on the row.
+ * Identity + Department + ShowInLichKhoa from CHD; preserve schedule fields on the row.
  */
 export function mergeChdStaffIntoDept(dept, chdStaffList) {
   const existing = Array.isArray(dept?.staff) ? dept.staff : [];
@@ -31,6 +36,9 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
     const id = String(chd.StaffKey || '').trim();
     if (!id) continue;
     const prev = byId.get(id) || {};
+    const visible = parseShowInLichKhoa(chd.ShowInLichKhoa ?? prev.showInLichKhoa);
+    if (!visible) continue;
+
     let shortName = String(prev.shortName || '').trim().toUpperCase();
     if (!shortName || usedShort.has(shortName)) {
       shortName = deriveShortName(chd, usedShort);
@@ -38,6 +46,8 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
     usedShort.add(shortName);
 
     const isAdmin = chd.Role === 'Admin';
+    const deptLabel = chdDepartmentLabel(chd) || String(prev.deptLabel || '').trim() || dept.name;
+
     next.push({
       ...prev,
       id,
@@ -55,7 +65,8 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
         Object.keys(MEMBER_DEFAULT).map((k) => [k, 'edit'])
       ) : {}) },
       deptId: dept.id,
-      deptLabel: dept.name,
+      deptLabel,
+      showInLichKhoa: formatShowInLichKhoa(true),
     });
   }
 
