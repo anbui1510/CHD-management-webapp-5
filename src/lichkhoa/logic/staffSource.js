@@ -8,6 +8,19 @@ export function isLocalScheduleStaff(person) {
   return id.startsWith('local_') || id.startsWith('doc_');
 }
 
+/** Bác sĩ từ file sao lưu JSON cũ (`doc_*`), trùng CHD Staff — khác HV thêm tay `local_*`. */
+export function isBackupImportedStaff(person) {
+  if (!person || person.source === 'chd') return false;
+  const id = String(person.id || '');
+  if (id.startsWith('doc_')) return true;
+  if (person.source === 'local' && !id.startsWith('local_')) return true;
+  return false;
+}
+
+export function purgeBackupImportedStaff(staffList) {
+  return (staffList || []).filter((person) => !isBackupImportedStaff(person));
+}
+
 export function markChdScheduleStaff(person) {
   return { ...person, source: 'chd' };
 }

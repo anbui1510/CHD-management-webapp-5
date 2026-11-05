@@ -4,7 +4,12 @@ import { TITLE_OPTIONS, POSITION_OPTIONS, derivePositionFromTitle, getQuotaForTi
 import { ACCESS_LEVELS, ACCESS_TABS, accessRoleLabel, normalizeAccess } from '../logic/access';
 import { DUTY_WEEKDAYS, dutyScheduleTask, normalizeDuties } from '../logic/staffDuties';
 import { showInLichKhoaLabel } from '../logic/showInLichKhoa.js';
-import { isLocalScheduleStaff, markLocalScheduleStaff, newLocalStaffId } from '../logic/staffSource.js';
+import {
+  isBackupImportedStaff,
+  isLocalScheduleStaff,
+  markLocalScheduleStaff,
+  newLocalStaffId,
+} from '../logic/staffSource.js';
 import { useConfirm } from './ConfirmDialog';
 import { ModalPortal } from './ModalPortal';
 
@@ -50,6 +55,7 @@ export function StaffManager({
   onAddStaff,
   onUpdateStaff,
   onDeleteStaff,
+  onPurgeBackupStaff,
   onReorderStaff,
   onBulkImport,
   autoOpenAdd,
@@ -63,6 +69,8 @@ export function StaffManager({
 }) {
   const canAddLocal = !readOnly && typeof onAddStaff === 'function';
   const canBulkImport = !chdSynced && !readOnly && typeof onBulkImport === 'function';
+  const backupLocalCount = staffList.filter(isBackupImportedStaff).length;
+  const canPurgeBackup = chdSynced && !readOnly && typeof onPurgeBackupStaff === 'function' && backupLocalCount > 0;
   // editing: null (đóng) | 'NEW' (thêm mới) | object nhân sự đang sửa
   const [editing, setEditing] = useState(null);
   const [dragId, setDragId] = useState(null);
@@ -222,10 +230,21 @@ export function StaffManager({
     const ok = await confirm({
       variant: 'danger',
       title: 'Xác nhận xóa nhân sự',
-      message: <>Bạn có chắc muốn xóa <strong>{s.name}</strong> ({s.shortName}) khỏi danh sách lịch? Thao tác này không thể hoàn tác.</>,
+      message: <>Bạn có chắc muốn xóa <strong>{s.name}</strong> ({s.shortName}) khỏi danh sách lịch và ghi lên Google Sheet? Thao tác này không thể hoàn tác.</>,
       confirmText: 'Xóa'
     });
-    if (ok) onDeleteStaff(s.id);
+    if (ok) await onDeleteStaff(s.id);
+  };
+
+  const handlePurgeBackup = async () => {
+    if (!canPurgeBackup) return;
+    const ok = await confirm({
+      variant: 'danger',
+      title: 'Gỡ nhân sự trùng từ file sao lưu',
+      message: <>Xóa <strong>{backupLocalCount}</strong> dòng «Lịch cục bộ» kiểu <code>doc_*</code> (trùng bác sĩ CHD từ JSON), giữ HV/hỗ trợ <code>local_*</code> và nhân sự CHD. Ghi ngay lên Sheet.</>,
+      confirmText: 'Gỡ hết trùng'
+    });
+    if (ok) await onPurgeBackupStaff();
   };
 
   const handleBulkSubmit = () => {
@@ -281,7 +300,7 @@ export function StaffManager({
           <div className="sub-header-info">{staffList.length} nhân sự trong khoa</div>
         </div>
 
-        {!readOnly && (canAddLocal || canBulkImport) && (
+        {!readOnly && (canAddLocal || canBulkImport || canPurgeBackup) && (
           <div className="manager-toolbar">
             {canAddLocal && (
               <button
@@ -294,6 +313,17 @@ export function StaffManager({
                 aria-label="Thêm nhân sự lịch"
               >
                 <UserPlus size={16} /> {chdSynced ? 'Thêm HV / hỗ trợ' : 'Thêm'}
+              </button>
+            )}
+            {canPurgeBackup && (
+              <button
+                type="button"
+                className="action-btn"
+                onClick={handlePurgeBackup}
+                title="Xóa các dòng Lịch cục bộ trùng bác sĩ CHD (từ file JSON sao lưu)"
+                aria-label="Gỡ nhân sự trùng từ file sao lưu"
+              >
+                <Trash2 size={16} /> Gỡ trùng sao lưu ({backupLocalCount})
               </button>
             )}
             {canBulkImport && (
@@ -313,6 +343,9 @@ export function StaffManager({
           <div className="sub-header-info" style={{ marginTop: 4 }}>
             Nhân sự CHD (ShowInLichKhoa = On) + học viên/hỗ trợ thêm tay. Khoa/Phòng CHD = cột Department trên Sheet Staff.
             Nhân sự thêm tay chỉ có trên lịch khoa, không tạo tài khoản CHD.
+            {backupLocalCount > 0
+              ? ` Đang có ${backupLocalCount} dòng trùng từ file sao lưu — dùng «Gỡ trùng sao lưu» hoặc nút thùng rác (sẽ ghi Sheet).`
+              : ''}
           </div>
         )}
       </div>
