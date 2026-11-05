@@ -42,6 +42,7 @@ import { resolveTenant, tenantDepartmentOptions } from './config/tenant';
 import { ensureLichKhoaSheetLibs, isLichKhoaSheetEngineReady } from './loadSheetLibs';
 
 const DEFAULT_START_DATE = '2026-09-14'; // Monday 14/09/2026
+const CARDIOLOGY_DEPT_ID = 'dept_tim_mach';
 
 // ---------- Sheet helpers ----------
 function blankSheetContent(dept, startDate) {
@@ -157,37 +158,58 @@ function nextSheetName(sheets, base = 'Sheet') {
   return `${base} ${n}`;
 }
 
+function emptySheetState(dept) {
+  const id = `sheet_${dept?.id || 'dept'}_1`;
+  return {
+    activeSheetId: id,
+    sheets: [{ id, name: 'Sheet 1', ...blankSheetContent(dept || { staff: [] }, DEFAULT_START_DATE) }]
+  };
+}
+
 // Đảm bảo mỗi khoa có ít nhất 1 sheet
 function ensureSheets(store) {
-  const sheetsByDept = { ...(store.sheetsByDept || {}) };
-  let departments = store.departments;
-  store.departments.forEach(dept => {
+  const base = store && typeof store === 'object' ? store : {};
+  let departments = Array.isArray(base.departments) ? base.departments.filter((dept) => dept && dept.id) : [];
+  if (!departments.length) {
+    departments = [{
+      id: CARDIOLOGY_DEPT_ID,
+      name: 'Khoa Tim Mạch',
+      code: 'TIM_MACH',
+      staff: [],
+      tasks: [],
+      customCategories: [],
+      leaveEntries: [],
+      studyEntries: [],
+    }];
+  }
+  const sheetsByDept = { ...(base.sheetsByDept || {}) };
+  departments.forEach((dept) => {
     const st = sheetsByDept[dept.id];
-    if (!st || !st.sheets || st.sheets.length === 0) {
-      const id = `sheet_${dept.id}_1`;
-      sheetsByDept[dept.id] = {
-        activeSheetId: id,
-        sheets: [{ id, name: 'Sheet 1', ...blankSheetContent(dept, DEFAULT_START_DATE) }]
-      };
+    const sheetList = Array.isArray(st?.sheets) ? st.sheets.filter(Boolean) : [];
+    if (!sheetList.length) {
+      sheetsByDept[dept.id] = emptySheetState(dept);
       return;
     }
-    const activeId = st.sheets.some(s => s.id === st.activeSheetId) ? st.activeSheetId : st.sheets[0].id;
+    const activeId = sheetList.some((s) => s.id === st.activeSheetId) ? st.activeSheetId : sheetList[0].id;
     let sheetChanged = false;
-    const sheets = st.sheets.map((sh) => {
+    const sheets = sheetList.map((sh) => {
       const { sheet, deltas } = settleSheetLedger(sh, sh.id === activeId);
       if (sheet !== sh) sheetChanged = true;
       if (sh.id === activeId && Object.keys(deltas).length) {
-        departments = departments.map(item => (
+        departments = departments.map((item) => (
           item.id === dept.id ? { ...item, staff: applyBuDeltas(item.staff, deltas) } : item
         ));
       }
       return sheet;
     });
-    if (sheetChanged || activeId !== st.activeSheetId) {
+    if (sheetChanged || activeId !== st.activeSheetId || sheets !== st.sheets) {
       sheetsByDept[dept.id] = { ...st, activeSheetId: activeId, sheets };
     }
   });
-  return { ...store, departments, sheetsByDept };
+  const activeDeptId = departments.some((d) => d.id === base.activeDeptId)
+    ? base.activeDeptId
+    : departments[0].id;
+  return { ...base, departments, activeDeptId, sheetsByDept };
 }
 
 function applyThemeClass(next) {
@@ -221,8 +243,6 @@ const MENU_BY_VIEW = {
   STAFF: 'lich-khoa-staff',
   CALENDAR: 'lich-khoa-calendar',
 };
-
-const CARDIOLOGY_DEPT_ID = 'dept_tim_mach';
 
 export function DeptScheduleApp({
   currentStaff = null,
@@ -389,17 +409,26 @@ export function DeptScheduleApp({
     ? `Đồng bộ từ Sheet (lần cuối ${new Date(sheetSync.sheetSyncAt).toLocaleString('vi-VN')})`
     : 'Đồng bộ từ Google Sheet';
 
-  // Active Department Data
-  const activeDept = store.departments.find(d => d.id === store.activeDeptId) || store.departments[0];
+  // Active Department Data — never throw if store/import is incomplete
+  const departments = Array.isArray(store?.departments) ? store.departments : [];
+  const activeDept = departments.find((d) => d.id === store?.activeDeptId) || departments[0] || {
+    id: CARDIOLOGY_DEPT_ID,
+    name: 'Khoa Tim Mạch',
+    staff: [],
+    tasks: [],
+    customCategories: [],
+    leaveEntries: [],
+    studyEntries: [],
+  };
   const staffList = activeDept?.staff || [];
   const taskList = activeDept?.tasks || [];
   const roster = useMemo(
-    () => store.departments.flatMap(dept => (dept.staff || []).map(person => ({
+    () => departments.flatMap((dept) => (dept.staff || []).map((person) => ({
       ...person,
       deptId: dept.id,
       deptName: dept.name
     }))),
-    [store.departments]
+    [departments]
   );
   const actor = useMemo(() => resolveActor(lichUser, roster), [lichUser, roster]);
   const linkedStaff = useMemo(
@@ -428,9 +457,11 @@ export function DeptScheduleApp({
   const categories = useMemo(() => getCategoriesForDept(activeDept), [activeDept]);
 
   // Active Sheet Data
-  const sheetState = store.sheetsByDept[activeDept.id];
-  const sheets = sheetState.sheets;
-  const activeSheet = sheets.find(s => s.id === sheetState.activeSheetId) || sheets[0];
+  const sheetState = store?.sheetsByDept?.[activeDept.id] || emptySheetState(activeDept);
+  const sheets = Array.isArray(sheetState.sheets) && sheetState.sheets.length
+    ? sheetState.sheets
+    : emptySheetState(activeDept).sheets;
+  const activeSheet = sheets.find((s) => s.id === sheetState.activeSheetId) || sheets[0];
   const scheduleData = useMemo(
     () => ({ ...activeSheet, days: buildWeekDays(activeSheet.startDate) }),
     [activeSheet]
@@ -1099,7 +1130,28 @@ export function DeptScheduleApp({
 
   const handleImportStore = (imported) => {
     if (!allow('tasks')) return;
-    setStore(ensureSheets(imported));
+    try {
+      const next = ensureSheets(imported);
+      if (!next.departments?.length) {
+        throw new Error('File sao lưu không có khoa hợp lệ.');
+      }
+      // CHD: giữ đúng 1 khoa Tim mạch nếu backup có nhiều khoa.
+      if (embedInChd) {
+        const cardio = next.departments.find((d) => d.id === CARDIOLOGY_DEPT_ID)
+          || next.departments.find((d) => /tim\s*mạch/i.test(String(d.name || '')))
+          || next.departments[0];
+        setStore(ensureSheets({
+          ...next,
+          departments: [cardio],
+          activeDeptId: cardio.id,
+        }));
+        return;
+      }
+      setStore(next);
+    } catch (error) {
+      console.error('Import store failed:', error);
+      window.alert(String(error?.message || error || 'Không nhập được file sao lưu.'));
+    }
   };
 
   const viewportWidth = useViewportWidth();
