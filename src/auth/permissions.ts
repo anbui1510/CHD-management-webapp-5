@@ -31,7 +31,13 @@ export type AppModule =
   | 'staff-guide'
   | 'chd-daily-brief'
   | 'cathlab-report'
-  | 'heart-transplant';
+  | 'heart-transplant'
+  | 'lich-khoa-sheet'
+  | 'lich-khoa-dashboard'
+  | 'lich-khoa-tasks'
+  | 'lich-khoa-staff'
+  | 'lich-khoa-calendar'
+  | 'lich-khoa-sheets';
 
 export type AppModuleGroup =
   | 'Chung'
@@ -40,6 +46,7 @@ export type AppModuleGroup =
   | 'MRI tim'
   | 'Phẫu thuật'
   | 'Ghép tim'
+  | 'Lịch khoa'
   | 'Quản trị';
 
 export interface AppModuleDefinition {
@@ -70,6 +77,12 @@ export const APP_MODULE_DEFINITIONS: AppModuleDefinition[] = [
   { id: 'surgery-scheduler', label: 'Xếp lịch phẫu thuật', group: 'Phẫu thuật', description: 'Phân ca mổ tim' },
   { id: 'surgery-schedule-view', label: 'Lịch mổ dự kiến', group: 'Phẫu thuật', description: 'Xem lịch phòng mổ' },
   { id: 'heart-transplant', label: 'Quản lý ghép tim', group: 'Ghép tim', description: 'Danh sách chờ ghép tim, đăng ký và xuất Excel' },
+  { id: 'lich-khoa-sheet', label: 'Xếp lịch khoa', group: 'Lịch khoa', description: 'Bảng lịch tuần/tháng/nghỉ/học' },
+  { id: 'lich-khoa-dashboard', label: 'Dashboard lịch khoa', group: 'Lịch khoa', description: 'Tổng quan công bằng / định mức lịch' },
+  { id: 'lich-khoa-tasks', label: 'Quản lý task lịch', group: 'Lịch khoa', description: 'Danh mục ca việc xếp lịch' },
+  { id: 'lich-khoa-staff', label: 'Nhân sự xếp lịch', group: 'Lịch khoa', description: 'Thuộc tính lịch (quota, quyền tab)' },
+  { id: 'lich-khoa-calendar', label: 'Lịch google khoa', group: 'Lịch khoa', description: 'Agenda lịch cá nhân / Google' },
+  { id: 'lich-khoa-sheets', label: 'Virtual Sheets lịch khoa', group: 'Lịch khoa', description: 'Liên kết Google Sheet lịch riêng' },
   { id: 'excel-export', label: 'Bảng Filter_Consult', group: 'Quản trị', description: 'Xuất Excel / filter consult' },
   { id: 'google-sheets', label: 'Virtual Google Sheets', group: 'Quản trị', description: 'Sửa dữ liệu trực tiếp trên sheet ảo' },
   { id: 'staff-mgmt', label: 'Phân quyền nhân sự', group: 'Quản trị', description: 'Chỉnh sửa tài khoản, vai trò mẫu và module cho nhân viên' },
@@ -305,6 +318,7 @@ export const MODULE_GROUP_ORDER: AppModuleGroup[] = [
   'MRI tim',
   'Phẫu thuật',
   'Ghép tim',
+  'Lịch khoa',
   'Quản trị',
 ];
 

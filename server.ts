@@ -406,6 +406,7 @@ const PUSH_DELIVERY_LOG_FILE = getPushDeliveryLogFile(DB_DIR);
 const DOCTOR_MARKS_FILE = path.join(DB_DIR, 'doctor-performance-marks.json');
 const SHEETS_SYNC_FAILURES_FILE = path.join(DB_DIR, 'sheets-sync-failures.json');
 const SYNC_CONFIG_FILE = path.join(DB_DIR, 'sync_config.json');
+const LICHKHOA_SYNC_CONFIG_FILE = path.join(DB_DIR, 'lichkhoa_sync_config.json');
 
 // Ensure DB directory exists
 if (!fs.existsSync(DB_DIR)) {
@@ -418,6 +419,12 @@ initWebPushFromEnv();
 interface SyncConfig {
   scriptUrl: string;
   scriptSecret?: string;
+}
+
+interface LichKhoaSyncConfig {
+  scriptUrl: string;
+  scriptSecret?: string;
+  spreadsheetId?: string;
 }
 
 function getSyncConfig(): SyncConfig {
@@ -447,6 +454,37 @@ function saveSyncConfig(config: SyncConfig): void {
     fs.writeFileSync(SYNC_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error writing sync config:', err);
+  }
+}
+
+function getLichKhoaSyncConfig(): LichKhoaSyncConfig {
+  if (process.env.LICHKHOA_SCRIPT_URL) {
+    return {
+      scriptUrl: process.env.LICHKHOA_SCRIPT_URL,
+      scriptSecret: process.env.LICHKHOA_SCRIPT_SECRET || process.env.LICHKHOA_SCRIPT_API_KEY || '',
+      spreadsheetId: process.env.LICHKHOA_SPREADSHEET_ID || '',
+    };
+  }
+  try {
+    if (fs.existsSync(LICHKHOA_SYNC_CONFIG_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(LICHKHOA_SYNC_CONFIG_FILE, 'utf-8'));
+      return {
+        scriptUrl: parsed.scriptUrl || '',
+        scriptSecret: parsed.scriptSecret || '',
+        spreadsheetId: parsed.spreadsheetId || '',
+      };
+    }
+  } catch (err) {
+    console.error('Error reading lichkhoa sync config:', err);
+  }
+  return { scriptUrl: '', scriptSecret: '', spreadsheetId: '' };
+}
+
+function saveLichKhoaSyncConfig(config: LichKhoaSyncConfig): void {
+  try {
+    fs.writeFileSync(LICHKHOA_SYNC_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error writing lichkhoa sync config:', err);
   }
 }
 
@@ -1616,6 +1654,96 @@ app.post('/api/sync-config/sync', requireSheetsConfig, async (req, res) => {
     res.json({ success: true, message: "Đồng bộ thành công dữ liệu mới nhất từ Google Sheets!" });
   } else {
     res.status(500).json({ error: "Không thể kết nối tới Google Sheet. Đang hiển thị dữ liệu lưu tạm ngoại tuyến." });
+  }
+});
+
+// --- Lịch khoa Sheet bridge (separate from medical CHD sync) ---
+app.get('/api/lichkhoa/sync-config', requireAuth, (_req, res) => {
+  const config = getLichKhoaSyncConfig();
+  res.json({
+    scriptUrl: config.scriptUrl,
+    spreadsheetId: config.spreadsheetId || '',
+    hasSecret: !!config.scriptSecret,
+    isSynced: !!(config.scriptUrl && config.spreadsheetId),
+  });
+});
+
+app.post('/api/lichkhoa/sync-config', requireAuth, async (req, res) => {
+  const { scriptUrl, scriptSecret, spreadsheetId, disconnect } = req.body || {};
+  if (disconnect || !scriptUrl) {
+    saveLichKhoaSyncConfig({ scriptUrl: '', scriptSecret: '', spreadsheetId: '' });
+    return res.json({ success: true, message: 'Đã hủy liên kết Sheet lịch khoa.' });
+  }
+  if (!String(scriptUrl).startsWith('https://script.google.com/')) {
+    return res.status(400).json({ error: 'URL Apps Script lịch khoa không hợp lệ.' });
+  }
+  const sheetId = String(spreadsheetId || '').trim();
+  if (!sheetId) {
+    return res.status(400).json({ error: 'Thiếu Spreadsheet ID lịch khoa.' });
+  }
+  try {
+    const existing = getLichKhoaSyncConfig();
+    const secretToStore = String(scriptSecret || '').trim() || existing.scriptSecret || '';
+    let setupUrl = `${scriptUrl}?action=setup`;
+    if (secretToStore) setupUrl += `&apiKey=${encodeURIComponent(secretToStore)}`;
+    const setupRes = await fetchWithTimeout(setupUrl, { method: 'GET' }, 10000);
+    const setupText = (await setupRes.text()).trim();
+    if (setupText.startsWith('<!') || setupText.startsWith('<html')) {
+      return res.status(400).json({
+        error: 'Apps Script trả HTML — kiểm tra deploy Web app (Anyone) và URL.',
+      });
+    }
+    let testUrl = `${scriptUrl}?action=test`;
+    if (secretToStore) testUrl += `&apiKey=${encodeURIComponent(secretToStore)}`;
+    const testRes = await fetchWithTimeout(testUrl, { method: 'GET' }, 10000);
+    const testData = JSON.parse(await testRes.text());
+    if (testData.status !== 'success' && !testData.ok) {
+      return res.status(400).json({ error: testData.message || 'Không test được bridge lịch khoa.' });
+    }
+    saveLichKhoaSyncConfig({
+      scriptUrl: String(scriptUrl).trim(),
+      scriptSecret: secretToStore,
+      spreadsheetId: sheetId,
+    });
+    res.json({ success: true, message: 'Kết nối Sheet lịch khoa thành công.' });
+  } catch (err: any) {
+    console.error('lichkhoa sync-config failed:', err);
+    res.status(500).json({ error: err.message || 'Không kết nối được bridge lịch khoa.' });
+  }
+});
+
+app.post('/api/lichkhoa/proxy', requireAuth, async (req, res) => {
+  try {
+    const config = getLichKhoaSyncConfig();
+    if (!config.scriptUrl) {
+      return res.status(400).json({ error: 'Chưa cấu hình Apps Script lịch khoa.' });
+    }
+    const staffKey = String((req as any).staffKey || req.body?.staffKey || '');
+    if (!staffKey) {
+      return res.status(401).json({ error: 'Thiếu StaffKey phiên đăng nhập.' });
+    }
+    const spreadsheetId = String(req.body?.spreadsheetId || config.spreadsheetId || '').trim();
+    if (!spreadsheetId) {
+      return res.status(400).json({ error: 'Thiếu spreadsheetId lịch khoa.' });
+    }
+    const payload = {
+      ...(req.body || {}),
+      spreadsheetId,
+      staffKey,
+      apiKey: config.scriptSecret || '',
+    };
+    delete (payload as any).scriptSecret;
+    const upstream = await fetch(config.scriptUrl, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+    const text = await upstream.text();
+    res.status(upstream.ok ? 200 : upstream.status).type('application/json').send(text);
+  } catch (err) {
+    console.error('Error in POST /api/lichkhoa/proxy:', err);
+    res.status(500).json({ error: 'Không thể gọi bridge lịch khoa.' });
   }
 });
 

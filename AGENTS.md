@@ -225,4 +225,30 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 | `SortOrder` | Thứ tự hiển thị | Number | | | Số nhỏ hiển thị trước. |
 | `IsSystem` | Preset hệ thống | Boolean | true/false | | `admin-khoa`, `tuy-chinh` không được xóa qua UI. |
 
-* Sửa ma trận trên tab **Ma trận vai trò mẫu** (Module 6) hoặc sheet **RolePreset** — không cần deploy code.
+* Sửa ma trận trên tab **Ma trận vai trò mẫu** (Workspace mục 8 · Quản lý nhân sự) hoặc sheet **RolePreset** — không cần deploy code.
+
+---
+
+## Module 7 — Quản lý lịch làm việc (Lịch khoa)
+
+Tích hợp từ `lichkhoa-webapp`. **Không** dùng Google login; dùng phiên CHD `StaffKey` + Password.
+
+### Module IDs (Permissions)
+`lich-khoa-sheet`, `lich-khoa-dashboard`, `lich-khoa-tasks`, `lich-khoa-staff`, `lich-khoa-calendar`, `lich-khoa-sheets`
+
+### Google Sheet lịch — tách biệt Sheet y tế CHD
+- Config riêng: `data/lichkhoa_sync_config.json` / env `LICHKHOA_SCRIPT_URL`, `LICHKHOA_SCRIPT_SECRET`, `LICHKHOA_SPREADSHEET_ID`
+- API: `GET/POST /api/lichkhoa/sync-config`, `POST /api/lichkhoa/proxy`
+- Apps Script: `src/data/lichKhoaAppsScriptCode.ts` (auth bằng `apiKey` + `staffKey`, không Google ID token)
+- Tab Sheet: `_meta`, `NhanSu`, `Task`, `LichTuan`, `LichThang`, (`LichNghi`, `LichHoc`, `Dashboard`)
+- Liên kết UI: thẻ **Virtual Google Sheets** trong workspace mục 7 (`lich-khoa-sheets`)
+
+### Nhân sự xếp lịch
+- Nguồn danh sách: CHD bảng **Staff** (`NhanSu.id = StaffKey`)
+- Thẻ `lich-khoa-staff` chỉ sửa thuộc tính lịch trên Sheet lịch: `shortName`, `title`, `position`, `dutyQuota`, `buBalance`, `phepBalance`, `accessRole`, `access_*`
+- Không sửa Password / Role / Permissions CHD (thuộc mục 8)
+
+### Code port
+- `src/lichkhoa/` — logic + UI xếp lịch
+- Shell: `src/lichkhoa/DeptScheduleApp.jsx`
+- UI mới (dialog/settings): pattern [anbui1510/an_ui](https://github.com/anbui1510/an_ui) (shadcn base-nova)

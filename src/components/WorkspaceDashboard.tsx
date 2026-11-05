@@ -200,7 +200,54 @@ export default function WorkspaceDashboard({
         ],
       },
       {
-        title: '6. QUẢN LÝ NHÂN SỰ',
+        title: '7. QUẢN LÝ LỊCH LÀM VIỆC',
+        tiles: [
+          {
+            module: 'lich-khoa-sheet',
+            label: 'Xếp lịch',
+            description: 'Bảng lịch tuần / tháng / nghỉ / học',
+            icon: <Calendar className="w-6 h-6 text-emerald-600" />,
+            iconBg: 'bg-emerald-50',
+          },
+          {
+            module: 'lich-khoa-dashboard',
+            label: 'Dashboard',
+            description: 'Tổng quan công bằng & định mức',
+            icon: <LayoutDashboard className="w-6 h-6 text-teal-600" />,
+            iconBg: 'bg-teal-50',
+          },
+          {
+            module: 'lich-khoa-tasks',
+            label: 'Quản lý task',
+            description: 'Danh mục ca việc xếp lịch',
+            icon: <ClipboardList className="w-6 h-6 text-cyan-600" />,
+            iconBg: 'bg-cyan-50',
+          },
+          {
+            module: 'lich-khoa-staff',
+            label: 'Quản lý nhân sự',
+            description: 'Thuộc tính lịch · quota · quyền tab',
+            icon: <UserCog className="w-6 h-6 text-sky-600" />,
+            iconBg: 'bg-sky-50',
+          },
+          {
+            module: 'lich-khoa-calendar',
+            label: 'Lịch google',
+            description: 'Agenda lịch cá nhân',
+            icon: <Calendar className="w-6 h-6 text-blue-600" />,
+            iconBg: 'bg-blue-50',
+          },
+          {
+            module: 'lich-khoa-sheets',
+            label: 'Virtual Google Sheets',
+            description: 'Liên kết Sheet lịch khoa riêng',
+            icon: <FileText className="w-6 h-6 text-slate-600" />,
+            iconBg: 'bg-slate-50',
+          },
+        ],
+      },
+      {
+        title: '8. QUẢN LÝ NHÂN SỰ',
         tiles: [
           {
             module: 'staff-mgmt',

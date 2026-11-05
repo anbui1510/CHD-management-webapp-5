@@ -40,6 +40,12 @@ export const SIDEBAR_MENU_ITEMS: NavMenuItem[] = [
   { id: 'mri-scheduler', label: 'Xếp lịch MRI' },
   { id: 'mri-result', label: 'Điền KQ MRI' },
   { id: 'mri-calendar', label: 'Lịch chụp MRI' },
+  { id: 'lich-khoa-sheet', label: 'Xếp lịch khoa' },
+  { id: 'lich-khoa-dashboard', label: 'Dashboard lịch khoa' },
+  { id: 'lich-khoa-tasks', label: 'Quản lý task lịch' },
+  { id: 'lich-khoa-staff', label: 'Nhân sự xếp lịch' },
+  { id: 'lich-khoa-calendar', label: 'Lịch google khoa' },
+  { id: 'lich-khoa-sheets', label: 'Virtual Sheets lịch khoa' },
   { id: 'google-sheets', label: 'Virtual Google Sheets' },
   { id: 'excel-export', label: 'Bảng Filter_Consult' },
   { id: 'chd-daily-brief', label: 'CHD Daily Brief' },
@@ -70,6 +76,12 @@ const MOBILE_SHORT_LABELS: Partial<Record<ActiveMenuId, string>> = {
   'surgery-room': 'P.Mổ',
   'surgery-scheduler': 'XL Mổ',
   'surgery-schedule-view': 'Lịch Mổ',
+  'lich-khoa-sheet': 'XL khoa',
+  'lich-khoa-dashboard': 'DB lịch',
+  'lich-khoa-tasks': 'Task lịch',
+  'lich-khoa-staff': 'NS lịch',
+  'lich-khoa-calendar': 'Lịch GG',
+  'lich-khoa-sheets': 'Sheet lịch',
   'google-sheets': 'Sheets',
   'excel-export': 'Export',
   'chd-daily-brief': 'Brief',
@@ -93,6 +105,12 @@ export const MOBILE_MORE_MENU_IDS: ActiveMenuId[] = [
   'surgery-room',
   'surgery-scheduler',
   'surgery-schedule-view',
+  'lich-khoa-sheet',
+  'lich-khoa-dashboard',
+  'lich-khoa-tasks',
+  'lich-khoa-staff',
+  'lich-khoa-calendar',
+  'lich-khoa-sheets',
   'google-sheets',
   'excel-export',
   'chd-daily-brief',
@@ -116,6 +134,12 @@ const MOBILE_MORE_LABELS: Partial<Record<ActiveMenuId, string>> = {
   'surgery-room': 'Phòng mổ tim',
   'surgery-scheduler': 'Xếp lịch mổ',
   'surgery-schedule-view': 'Xem lịch mổ',
+  'lich-khoa-sheet': 'Xếp lịch khoa',
+  'lich-khoa-dashboard': 'Dashboard lịch khoa',
+  'lich-khoa-tasks': 'Quản lý task lịch',
+  'lich-khoa-staff': 'Nhân sự xếp lịch',
+  'lich-khoa-calendar': 'Lịch google khoa',
+  'lich-khoa-sheets': 'Virtual Sheets lịch khoa',
   'google-sheets': 'Virtual Google Sheets',
   'excel-export': 'Bảng Filter_Consult',
   'chd-daily-brief': 'CHD Daily Brief',
@@ -150,11 +174,20 @@ export function getNavIcon(id: ActiveMenuId, className = 'w-4 h-4'): ReactNode {
     case 'schedule-view':
     case 'mri-calendar':
     case 'surgery-schedule-view':
+    case 'lich-khoa-sheet':
+    case 'lich-khoa-calendar':
       return <CalendarDays className={className} />;
     case 'mri-register':
     case 'mri-scheduler':
     case 'mri-result':
       return <Activity className={className} />;
+    case 'lich-khoa-dashboard':
+      return <LayoutDashboard className={className} />;
+    case 'lich-khoa-tasks':
+      return <ClipboardList className={className} />;
+    case 'lich-khoa-staff':
+      return <UserCog className={className} />;
+    case 'lich-khoa-sheets':
     case 'google-sheets':
       return <Database className={className} />;
     case 'excel-export':

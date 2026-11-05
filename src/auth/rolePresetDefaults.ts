@@ -8,7 +8,7 @@ export interface RolePresetRecord {
 }
 
 const ALL_MODULES_CSV =
-  'home,workspace,chd-daily-brief,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,cathlab-report,mri-overview,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,heart-transplant,excel-export,google-sheets,staff-mgmt,staff-marks,staff-settings,staff-guide';
+  'home,workspace,chd-daily-brief,patients,consult-list,results-staff,schedule-tt,schedule-view,cathlab-room,archive,cathlab-report,mri-overview,mri-register,mri-scheduler,mri-result,mri-calendar,surgery-room,surgery-scheduler,surgery-schedule-view,heart-transplant,lich-khoa-sheet,lich-khoa-dashboard,lich-khoa-tasks,lich-khoa-staff,lich-khoa-calendar,lich-khoa-sheets,excel-export,google-sheets,staff-mgmt,staff-marks,staff-settings,staff-guide';
 
 export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
   {
@@ -65,7 +65,7 @@ export const DEFAULT_ROLE_PRESET_RECORDS: RolePresetRecord[] = [
     RolePresetID: 'chi-xem',
     RolePresetLabel: 'Chỉ xem (Read-only)',
     RolePresetDescription: 'Xem hồ sơ và các lịch, không sửa dữ liệu nghiệp vụ',
-    Permissions: 'home,workspace,patients,schedule-view,mri-calendar,surgery-schedule-view',
+    Permissions: 'home,workspace,patients,schedule-view,mri-calendar,surgery-schedule-view,lich-khoa-sheet,lich-khoa-calendar',
     SortOrder: 8,
   },
   {
