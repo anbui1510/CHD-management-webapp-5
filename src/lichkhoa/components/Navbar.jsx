@@ -60,8 +60,8 @@ function NavIconActions({
           type="button"
           className="nav-icon-btn"
           onClick={onSheetSync}
-          title={sheetSyncTitle || 'Đồng bộ từ Google Sheet'}
-          aria-label="Đồng bộ từ Google Sheet"
+          title={sheetSyncTitle || 'Ghi & kéo Sheet lịch khoa'}
+          aria-label="Ghi và kéo Sheet lịch khoa"
         >
           <RefreshCw size={18} />
         </button>
@@ -76,8 +76,8 @@ function NavIconActions({
           type="button"
           className="nav-icon-btn"
           onClick={onSheetSync}
-          title={sheetSyncTitle || 'Đồng bộ từ Google Sheet'}
-          aria-label="Đồng bộ từ Google Sheet"
+          title={sheetSyncTitle || 'Ghi & kéo Sheet lịch khoa'}
+          aria-label="Ghi và kéo Sheet lịch khoa"
         >
           <RefreshCw size={18} />
         </button>

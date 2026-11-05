@@ -10,7 +10,7 @@ import { MobileShell } from './components/mobile/MobileShell';
 import { useViewportWidth } from './hooks/useViewportWidth';
 import { toLichkhoaUser, isLichkhoaSessionReady } from './auth/chdAuth';
 import { mergeChdStaffIntoStore } from './auth/mergeChdStaff';
-import { isLocalScheduleStaff } from './logic/staffSource.js';
+import { isBackupImportedStaff, isLocalScheduleStaff, purgeBackupImportedStaff } from './logic/staffSource.js';
 
 import {
   getCloudMeta,
@@ -406,8 +406,8 @@ export function DeptScheduleApp({
   ) : null;
 
   const sheetSyncTitle = sheetSync.sheetSyncAt
-    ? `Đồng bộ từ Sheet (lần cuối ${new Date(sheetSync.sheetSyncAt).toLocaleString('vi-VN')})`
-    : 'Đồng bộ từ Google Sheet';
+    ? `Ghi & kéo Sheet lịch khoa (lần cuối ${new Date(sheetSync.sheetSyncAt).toLocaleString('vi-VN')})`
+    : 'Ghi store hiện tại lên Google Sheet lịch khoa rồi kéo lại';
 
   // Active Department Data — never throw if store/import is incomplete
   const departments = Array.isArray(store?.departments) ? store.departments : [];
@@ -1068,15 +1068,67 @@ export function DeptScheduleApp({
     });
   };
 
-  const handleDeleteStaff = (staffId) => {
+  const handleDeleteStaff = async (staffId) => {
     if (!allow('staff')) return;
-    updateActiveDept((d) => {
-      const target = (d.staff || []).find((s) => s.id === staffId);
-      if (!target) return d;
-      // CHD Staff rows: ẩn bằng ShowInLichKhoa = Off ở module nhân sự CHD, không xóa tại đây.
-      if (!isLocalScheduleStaff(target)) return d;
-      return { ...d, staff: d.staff.filter((s) => s.id !== staffId) };
+    const prev = storeRef.current;
+    const deptId = activeDept?.id;
+    const target = (prev.departments || [])
+      .find((d) => d.id === deptId)?.staff
+      ?.find((s) => s.id === staffId);
+    if (!target || !isLocalScheduleStaff(target)) return;
+
+    const nextStore = ensureSheets({
+      ...prev,
+      departments: (prev.departments || []).map((d) => (
+        d.id === deptId
+          ? { ...d, staff: (d.staff || []).filter((s) => s.id !== staffId) }
+          : d
+      )),
     });
+    setStore(nextStore);
+    saveStore(nextStore, { skipCloud: true });
+    storeRef.current = nextStore;
+    // Force push — tránh pull định kỳ kéo lại hàng local còn trên Sheet.
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: 'Đã xóa nhân sự lịch cục bộ và ghi lên Google Sheet.',
+        });
+      } catch (error) {
+        window.alert(String(error?.message || error || 'Xóa local nhưng chưa ghi được Sheet. Thử nút làm mới lịch khoa.'));
+      }
+    }
+  };
+
+  const handlePurgeBackupStaff = async () => {
+    if (!allow('staff')) return;
+    const before = (activeDept?.staff || []).filter(isBackupImportedStaff).length;
+    if (!before) {
+      window.alert('Không còn nhân sự «Lịch cục bộ» từ file sao lưu (doc_*).');
+      return;
+    }
+    const prev = storeRef.current;
+    const deptId = activeDept?.id;
+    const nextStore = ensureSheets({
+      ...prev,
+      departments: (prev.departments || []).map((d) => (
+        d.id === deptId
+          ? { ...d, staff: purgeBackupImportedStaff(d.staff) }
+          : d
+      )),
+    });
+    setStore(nextStore);
+    saveStore(nextStore, { skipCloud: true });
+    storeRef.current = nextStore;
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: `Đã gỡ ${before} nhân sự trùng từ file sao lưu và ghi lên Sheet.`,
+        });
+      } catch (error) {
+        window.alert(String(error?.message || error || 'Gỡ local nhưng chưa ghi được Sheet.'));
+      }
+    }
   };
 
   const handleBulkImportStaff = (newStaffList) => {
@@ -1212,6 +1264,7 @@ export function DeptScheduleApp({
       onAddStaff={handleAddStaff}
       onUpdateStaff={handleUpdateStaff}
       onDeleteStaff={handleDeleteStaff}
+      onPurgeBackupStaff={handlePurgeBackupStaff}
       onReorderStaff={handleReorderStaff}
       onBulkImport={undefined}
       readOnly={!allow('staff')}
@@ -1393,7 +1446,7 @@ export function DeptScheduleApp({
         onProfile={() => onNavigateToSheets?.()}
         onSettings={() => onNavigateToSheets?.()}
         onExit={handleExit}
-        onSheetSync={isSheetBackend() && syncAuthReady ? () => sheetSync.manualPull() : undefined}
+        onSheetSync={isSheetBackend() && syncAuthReady ? () => sheetSync.manualSync() : undefined}
         sheetSyncTitle={sheetSyncTitle}
         embedInChd={embedInChd}
       />

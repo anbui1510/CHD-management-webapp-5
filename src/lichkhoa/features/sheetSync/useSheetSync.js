@@ -326,6 +326,21 @@ export function useSheetSync({
     return pullFromSheet(true);
   }, [pullFromSheet]);
 
+  /** Ghi store hiện tại lên Sheet rồi kéo lại — dùng sau xóa / khi bấm Đồng bộ Module 7. */
+  const manualSync = useCallback(async () => {
+    if (!syncAuthReady || !getSpreadsheetId()) return;
+    setSheetSyncError('');
+    try {
+      await persistStoreToSheet(storeRef.current, {
+        notice: 'Đã ghi lịch khoa lên Google Sheet.',
+      });
+      forcePullRef.current = true;
+      await pullFromSheet(true);
+    } catch (error) {
+      setSheetSyncError(error?.message || 'Đồng bộ Sheet lịch khoa thất bại.');
+    }
+  }, [persistStoreToSheet, pullFromSheet, storeRef, syncAuthReady]);
+
   return {
     sheetSyncError,
     sheetSyncNotice,
@@ -335,6 +350,7 @@ export function useSheetSync({
     bootstrapBusy,
     runBootstrap,
     manualPull,
+    manualSync,
     markForcePull,
     persistStoreToSheet,
   };
