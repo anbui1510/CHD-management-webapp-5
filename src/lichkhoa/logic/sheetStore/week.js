@@ -1,6 +1,19 @@
 import { WEEK_HEADERS } from './constants.js';
 import { objectsToRows, rowsToObjects } from './tableUtils.js';
 
+/** In-memory grids use day maps `{ 0: {S,R,C,T}, … }`; Sheet import uses arrays. */
+function forEachStaffWeekDays(days, callback) {
+  if (Array.isArray(days)) {
+    days.forEach((day, dayIndex) => callback(day, dayIndex));
+    return;
+  }
+  if (!days || typeof days !== 'object') return;
+  for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+    const day = days[dayIndex];
+    if (day && typeof day === 'object') callback(day, dayIndex);
+  }
+}
+
 /** TC-F304-04 — week grid cells */
 export function importWeekRows(rows) {
   const objs = rowsToObjects(rows, WEEK_HEADERS);
@@ -85,8 +98,7 @@ export function exportWeekRows(deptSheets) {
     });
     const pushGrid = (grid, weekStart) => {
       Object.entries(grid || {}).forEach(([staffId, days]) => {
-        (days || []).forEach((day, dayIndex) => {
-          if (!day || typeof day !== 'object') return;
+        forEachStaffWeekDays(days, (day, dayIndex) => {
           ['S', 'R', 'C', 'T'].forEach((slot) => {
             const value = day[slot];
             if (value === undefined || value === null || String(value).trim() === '' || value === '0') return;
