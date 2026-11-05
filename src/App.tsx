@@ -967,6 +967,16 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [currentStaff?.StaffKey, refreshMedicalData]);
 
+  useEffect(() => {
+    const onLichKhoa = activeMenu.startsWith('lich-khoa-');
+    if (!currentStaff?.StaffKey || !onLichKhoa) {
+      document.body.removeAttribute('data-lich-khoa-module');
+      return undefined;
+    }
+    document.body.setAttribute('data-lich-khoa-module', '1');
+    return () => document.body.removeAttribute('data-lich-khoa-module');
+  }, [activeMenu, currentStaff?.StaffKey]);
+
   // Background Clinical Data Polling (Refresh every 60 seconds when logged in)
   useEffect(() => {
     if (!currentStaff?.StaffKey) return;
@@ -2481,6 +2491,8 @@ export default function App() {
     setIsSidebarExpanded(prev => !prev);
   };
 
+  const isLichKhoaModule = activeMenu.startsWith('lich-khoa-');
+
   return (
     <SheetsSyncFeedbackProvider
       onSuccessBanner={handleSheetsSuccessBanner}
@@ -2715,7 +2727,7 @@ export default function App() {
       )}
 
       {/* Dual Panel Workspace Block */}
-      <div className="app-main-workspace max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4">
+      <div className={`app-main-workspace max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 ${isLichKhoaModule ? 'pb-2 xl:pb-4' : 'pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4'}`}>
         
         {/* Primary View content frame */}
         <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'heart-transplant' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' || activeMenu.startsWith('lich-khoa-') ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
@@ -4815,7 +4827,7 @@ export default function App() {
         onOpenMore={() => setIsMobileMoreMenuOpen(true)}
         pendingStaffCount={pendingStaffConsultCount}
         quickTabIds={mobileBottomTabIds}
-        hidden={activeMenu.startsWith('lich-khoa-')}
+        hidden={isLichKhoaModule}
       />
 
       {currentStaff && (

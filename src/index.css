@@ -114,6 +114,27 @@
   --app-vh: 100dvh;
 }
 
+/* Module Lịch khoa: full-height sheet — no CHD mobile tab bar */
+body[data-lich-khoa-module="1"] {
+  --mobile-bottom-nav-offset: 0px;
+}
+
+body[data-lich-khoa-module="1"] .mobile-bottom-nav {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body[data-lich-khoa-module="1"] .app-main-workspace {
+  padding-bottom: 0.5rem !important;
+}
+
+@media (min-width: 768px) {
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+}
+
 html,
 body,
 #root {
