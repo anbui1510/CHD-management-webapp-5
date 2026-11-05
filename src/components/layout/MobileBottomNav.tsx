@@ -14,6 +14,7 @@ interface MobileBottomNavProps {
   onOpenMore: () => void;
   pendingStaffCount?: number;
   quickTabIds?: ActiveMenuId[];
+  hidden?: boolean;
 }
 
 export default function MobileBottomNav({
@@ -22,8 +23,11 @@ export default function MobileBottomNav({
   onOpenMore,
   pendingStaffCount = 0,
   quickTabIds = [],
+  hidden = false,
 }: MobileBottomNavProps) {
   const moreActive = isMoreMenuActive(activeMenu, quickTabIds);
+
+  if (hidden) return null;
 
   return (
     <nav

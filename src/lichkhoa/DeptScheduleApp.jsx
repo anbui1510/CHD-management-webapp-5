@@ -217,6 +217,7 @@ export function DeptScheduleApp({
   chdStaffList = [],
   activeMenu = 'lich-khoa-sheet',
   onNavigateToSheets = null,
+  embedInChd = true,
 }) {
   const lichUser = useMemo(() => toLichkhoaUser(currentStaff), [currentStaff]);
   const [store, setStore] = useState(() => ensureSheets(getInitialStore()));
@@ -1028,7 +1029,7 @@ export function DeptScheduleApp({
   const coarsePointer = typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
     && window.matchMedia('(pointer: coarse)').matches;
-  const isMobileUi = resolveUiMode({
+  const isMobileUi = !embedInChd && resolveUiMode({
     width: viewportWidth,
     coarsePointer
   }) === 'mobile';
@@ -1151,7 +1152,7 @@ export function DeptScheduleApp({
 
   if (!syncAuthReady) {
     return (
-      <div className="lichkhoa-root flex items-center justify-center p-8 text-sm text-slate-600">
+      <div className="lichkhoa-root chd-embed flex items-center justify-center p-8 text-sm text-slate-600">
         Cần đăng nhập CHD để mở Lịch khoa.
       </div>
     );
@@ -1159,7 +1160,7 @@ export function DeptScheduleApp({
 
   if (!getSpreadsheetId() && typeof onNavigateToSheets === 'function') {
     return (
-      <div className="lichkhoa-root flex flex-col items-center justify-center gap-3 p-8 text-center">
+      <div className="lichkhoa-root chd-embed flex flex-col items-center justify-center gap-3 p-8 text-center">
         <p className="text-sm text-slate-600">Chưa liên kết Google Sheet lịch khoa.</p>
         <button
           type="button"
@@ -1195,9 +1196,11 @@ export function DeptScheduleApp({
     </>
   ) : null;
 
+  const rootClass = embedInChd ? 'lichkhoa-root chd-embed app-container' : 'lichkhoa-root app-container';
+
   if (isMobileUi) {
     return (
-      <div className="lichkhoa-root app-container mobile-app">
+      <div className={`${rootClass} mobile-app`}>
         {sheetSyncBanner}
         {sheetDialogs}
         <MobileShell
@@ -1228,7 +1231,7 @@ export function DeptScheduleApp({
   }
 
   return (
-    <div className="lichkhoa-root app-container">
+    <div className={rootClass}>
       <Navbar
         activeDept={activeDept}
         departments={store.departments}
@@ -1246,6 +1249,7 @@ export function DeptScheduleApp({
         onExit={handleExit}
         onSheetSync={isSheetBackend() && syncAuthReady ? () => sheetSync.manualPull() : undefined}
         sheetSyncTitle={sheetSyncTitle}
+        embedInChd={embedInChd}
       />
       {sheetSyncBanner}
       {sheetDialogs}

@@ -4815,6 +4815,7 @@ export default function App() {
         onOpenMore={() => setIsMobileMoreMenuOpen(true)}
         pendingStaffCount={pendingStaffConsultCount}
         quickTabIds={mobileBottomTabIds}
+        hidden={activeMenu.startsWith('lich-khoa-')}
       />
 
       {currentStaff && (

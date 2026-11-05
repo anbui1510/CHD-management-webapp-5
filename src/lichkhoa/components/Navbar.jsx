@@ -39,7 +39,28 @@ export function Navbar({
   tenantLabel = '',
   onSheetSync,
   sheetSyncTitle = '',
+  embedInChd = false,
 }) {
+  if (embedInChd) {
+    if (hideDeptSelector) return null;
+    return (
+      <header className="navbar navbar-chd-compact">
+        <div className="dept-selector-wrapper">
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Khoa:</span>
+          <select
+            className="dept-select"
+            value={activeDept?.id}
+            onChange={(e) => onSelectDept(e.target.value)}
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="navbar">
       <div className="brand-logo">
