@@ -260,17 +260,21 @@ export function DeptScheduleApp({
     ensureSheets,
   });
 
-  // Hydrate spreadsheet id from CHD lichkhoa sync-config (server)
+  // Hydrate / sửa Spreadsheet ID từ cấu hình server (CHD lichkhoa sync-config)
   useEffect(() => {
-    if (!syncAuthReady || getSpreadsheetId()) return;
+    if (!syncAuthReady) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch('/api/lichkhoa/sync-config', { credentials: 'include' });
         const data = await res.json();
         if (cancelled || !data?.spreadsheetId) return;
-        setSpreadsheetConnection(data.spreadsheetId);
-        setSheetConnectionRevision((rev) => rev + 1);
+        const serverId = String(data.spreadsheetId).trim();
+        const localId = getSpreadsheetId();
+        if (localId !== serverId) {
+          setSpreadsheetConnection(serverId);
+          setSheetConnectionRevision((rev) => rev + 1);
+        }
       } catch {
         /* offline / not configured */
       }

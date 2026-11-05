@@ -1,4 +1,8 @@
 import { readRequestSession, type CloudflareGateEnv } from './cloudflareGate';
+import {
+  normalizeLichKhoaSpreadsheetId,
+  verifyLichKhoaSpreadsheetAccess,
+} from './lichKhoaSpreadsheetVerify';
 
 export interface LichKhoaSyncConfigRecord {
   scriptUrl: string;
@@ -106,11 +110,16 @@ export async function handleCloudflareLichKhoaSyncConfigRequest(
 
   if (method === 'GET') {
     const config = await readLichKhoaSyncConfig(env);
+    const normalized =
+      normalizeLichKhoaSpreadsheetId(config.spreadsheetId || '') || config.spreadsheetId || '';
+    if (normalized && normalized !== config.spreadsheetId) {
+      await writeLichKhoaSyncConfig(env, { ...config, spreadsheetId: normalized });
+    }
     return json({
       scriptUrl: config.scriptUrl,
-      spreadsheetId: config.spreadsheetId || '',
+      spreadsheetId: normalized,
       hasSecret: !!config.scriptSecret,
-      isSynced: !!(config.scriptUrl && config.spreadsheetId),
+      isSynced: !!(config.scriptUrl && normalized),
     });
   }
 
@@ -130,9 +139,15 @@ export async function handleCloudflareLichKhoaSyncConfigRequest(
     return json({ error: 'URL Apps Script lịch khoa không hợp lệ.' }, 400);
   }
 
-  const sheetId = String(spreadsheetId || '').trim();
-  if (!sheetId) {
+  const sheetIdRaw = String(spreadsheetId || '').trim();
+  if (!sheetIdRaw) {
     return json({ error: 'Thiếu Spreadsheet ID lịch khoa.' }, 400);
+  }
+  const sheetId = normalizeLichKhoaSpreadsheetId(sheetIdRaw);
+  if (!sheetId) {
+    return json({
+      error: 'Spreadsheet ID không hợp lệ. Copy đúng ID từ URL Google Sheet (docs.google.com/spreadsheets/d/…/edit, thường 44 ký tự).',
+    }, 400);
   }
 
   const existing = await readLichKhoaSyncConfig(env);
@@ -141,6 +156,15 @@ export async function handleCloudflareLichKhoaSyncConfigRequest(
   const validationError = await validateLichKhoaBridge(String(scriptUrl).trim(), secretToStore);
   if (validationError) {
     return json({ error: validationError }, 400);
+  }
+
+  const sheetVerifyError = await verifyLichKhoaSpreadsheetAccess(
+    String(scriptUrl).trim(),
+    secretToStore,
+    sheetId
+  );
+  if (sheetVerifyError) {
+    return json({ error: sheetVerifyError }, 400);
   }
 
   await writeLichKhoaSyncConfig(env, {
@@ -171,7 +195,9 @@ export async function handleCloudflareLichKhoaProxy(
   }
 
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-  const spreadsheetId = String(body.spreadsheetId || config.spreadsheetId || '').trim();
+  const spreadsheetIdRaw = String(body.spreadsheetId || config.spreadsheetId || '').trim();
+  const spreadsheetId =
+    normalizeLichKhoaSpreadsheetId(spreadsheetIdRaw) || spreadsheetIdRaw;
   if (!spreadsheetId) {
     return json({ error: 'Thiếu spreadsheetId lịch khoa.' }, 400);
   }

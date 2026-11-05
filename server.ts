@@ -16,6 +16,10 @@ import { canAccessModule, isAdminStaff, isSystemRolePresetId, resolveRolePresetR
 import { hashPassword, verifyPassword } from './src/auth/passwordCrypto';
 import { assertStaffMutation, denialForSheetsPayload } from './src/auth/staffUpdateGuard';
 import { forwardToAppsScript } from './src/sync/sheetsProxy';
+import {
+  normalizeLichKhoaSpreadsheetId,
+  verifyLichKhoaSpreadsheetAccess,
+} from './src/sync/lichKhoaSpreadsheetVerify';
 import { resolveStaffByNameOrKey, resolveStaffDisplayName } from './src/utils/staffNameMatch';
 import {
   buildMissingCathResultNotificationMessage,
@@ -1660,11 +1664,15 @@ app.post('/api/sync-config/sync', requireSheetsConfig, async (req, res) => {
 // --- Lịch khoa Sheet bridge (separate from medical CHD sync) ---
 app.get('/api/lichkhoa/sync-config', requireAuth, (_req, res) => {
   const config = getLichKhoaSyncConfig();
+  const normalized = normalizeLichKhoaSpreadsheetId(config.spreadsheetId || '') || config.spreadsheetId || '';
+  if (normalized && normalized !== config.spreadsheetId) {
+    saveLichKhoaSyncConfig({ ...config, spreadsheetId: normalized });
+  }
   res.json({
     scriptUrl: config.scriptUrl,
-    spreadsheetId: config.spreadsheetId || '',
+    spreadsheetId: normalized,
     hasSecret: !!config.scriptSecret,
-    isSynced: !!(config.scriptUrl && config.spreadsheetId),
+    isSynced: !!(config.scriptUrl && normalized),
   });
 });
 
@@ -1677,9 +1685,15 @@ app.post('/api/lichkhoa/sync-config', requireAuth, async (req, res) => {
   if (!String(scriptUrl).startsWith('https://script.google.com/')) {
     return res.status(400).json({ error: 'URL Apps Script lịch khoa không hợp lệ.' });
   }
-  const sheetId = String(spreadsheetId || '').trim();
-  if (!sheetId) {
+  const sheetIdRaw = String(spreadsheetId || '').trim();
+  if (!sheetIdRaw) {
     return res.status(400).json({ error: 'Thiếu Spreadsheet ID lịch khoa.' });
+  }
+  const sheetId = normalizeLichKhoaSpreadsheetId(sheetIdRaw);
+  if (!sheetId) {
+    return res.status(400).json({
+      error: 'Spreadsheet ID không hợp lệ. Copy đúng ID từ URL Google Sheet (docs.google.com/spreadsheets/d/…/edit, thường 44 ký tự).',
+    });
   }
   try {
     const existing = getLichKhoaSyncConfig();
@@ -1699,6 +1713,14 @@ app.post('/api/lichkhoa/sync-config', requireAuth, async (req, res) => {
     const testData = JSON.parse(await testRes.text());
     if (testData.status !== 'success' && !testData.ok) {
       return res.status(400).json({ error: testData.message || 'Không test được bridge lịch khoa.' });
+    }
+    const sheetVerifyError = await verifyLichKhoaSpreadsheetAccess(
+      String(scriptUrl).trim(),
+      secretToStore,
+      sheetId
+    );
+    if (sheetVerifyError) {
+      return res.status(400).json({ error: sheetVerifyError });
     }
     saveLichKhoaSyncConfig({
       scriptUrl: String(scriptUrl).trim(),
@@ -1722,7 +1744,9 @@ app.post('/api/lichkhoa/proxy', requireAuth, async (req, res) => {
     if (!staffKey) {
       return res.status(401).json({ error: 'Thiếu StaffKey phiên đăng nhập.' });
     }
-    const spreadsheetId = String(req.body?.spreadsheetId || config.spreadsheetId || '').trim();
+    const spreadsheetIdRaw = String(req.body?.spreadsheetId || config.spreadsheetId || '').trim();
+    const spreadsheetId =
+      normalizeLichKhoaSpreadsheetId(spreadsheetIdRaw) || spreadsheetIdRaw;
     if (!spreadsheetId) {
       return res.status(400).json({ error: 'Thiếu spreadsheetId lịch khoa.' });
     }
