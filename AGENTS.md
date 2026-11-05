@@ -134,6 +134,7 @@ Chào Agent, đây là file `AGENTS.md` - nơi quy định cấu trúc dữ li�
 *   `StaffRolePreset`: Mã vai trò mẫu phân quyền (ví dụ `bs-hoi-chan`, `dieu-phoi-tt`, `admin-khoa`). Dùng khi gán nhanh bộ quyền trong view Quản lý nhân sự.
 *   `Email`: Địa chỉ email
 *   `FireDate`: Ngày nghỉ việc (Trống nếu còn làm)
+*   `ShowInLichKhoa`: Hiển thị trong lịch | Enum | On / Off | | On = xuất hiện trong Module 7 Quản lý lịch làm việc; Off = không đưa vào module lịch khoa (vẫn có thể dùng các module CHD khác).
 
 ### 6. Bảng CMR (Cộng hưởng từ tim / MRI tim)
 
@@ -245,6 +246,8 @@ Tích hợp từ `lichkhoa-webapp`. **Không** dùng Google login; dùng phiên 
 
 ### Nhân sự xếp lịch
 - Nguồn danh sách: CHD bảng **Staff** (`NhanSu.id = StaffKey`)
+- `Staff.Department` → cột **Khoa / Phòng** trên tab Quản lý nhân sự module 7 (`NhanSu.deptLabel` trên Sheet lịch)
+- `Staff.ShowInLichKhoa` (`On` / `Off`): **On** = có trong module 7; **Off** = không merge vào lịch (mặc định **On** nếu cột trống)
 - Thẻ `lich-khoa-staff` chỉ sửa thuộc tính lịch trên Sheet lịch: `shortName`, `title`, `position`, `dutyQuota`, `buBalance`, `phepBalance`, `accessRole`, `access_*`
 - Không sửa Password / Role / Permissions CHD (thuộc mục 8)
 

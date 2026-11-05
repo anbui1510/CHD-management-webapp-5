@@ -21,6 +21,8 @@ export interface Staff {
   StaffRolePreset?: string;
   Email: string;
   FireDate: string; // Empty if still active, otherwise "YYYY-MM-DD"
+  /** On = hiển thị Module 7 Lịch khoa; Off = ẩn khỏi xếp lịch (cột Sheet Staff). */
+  ShowInLichKhoa?: 'On' | 'Off' | string;
 }
 
 export type OutcomeType = 'Tử vong' | 'Nặng xin về' | 'Đã mổ' | 'Đã thông' | '';
