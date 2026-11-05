@@ -2324,6 +2324,22 @@ body.mobile-ui .confirm-dialog {
   flex-direction: column;
 }
 
+.sheet-engine-loading {
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  background: var(--sheet-header);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sheet-engine-error {
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  color: #991b1b;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+}
+
 .sheet-scroll.is-open {
   overflow: scroll;
   background: var(--bg-card);

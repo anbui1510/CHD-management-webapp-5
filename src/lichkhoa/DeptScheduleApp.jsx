@@ -38,6 +38,7 @@ import {
   setSpreadsheetConnection
 } from './features/sheetSync/sheetStorage';
 import { resolveTenant, tenantDepartmentOptions } from './config/tenant';
+import { ensureLichKhoaSheetLibs, isLichKhoaSheetEngineReady } from './loadSheetLibs';
 
 const DEFAULT_START_DATE = '2026-09-14'; // Monday 14/09/2026
 
@@ -225,6 +226,8 @@ export function DeptScheduleApp({
   const [theme, setTheme] = useState('light');
   const [sheetConnectOpen, setSheetConnectOpen] = useState(false);
   const [sheetConnectionRevision, setSheetConnectionRevision] = useState(0);
+  const [sheetEngineReady, setSheetEngineReady] = useState(() => isLichKhoaSheetEngineReady());
+  const [sheetEngineError, setSheetEngineError] = useState(null);
 
   useEffect(() => {
     applyThemeClass('light');
@@ -249,6 +252,23 @@ export function DeptScheduleApp({
   storeRef.current = store;
 
   const syncAuthReady = isLichkhoaSessionReady(currentStaff);
+
+  useEffect(() => {
+    if (!syncAuthReady) return undefined;
+    let cancelled = false;
+    ensureLichKhoaSheetLibs()
+      .then(() => {
+        if (!cancelled) setSheetEngineReady(true);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSheetEngineError(err?.message || 'Không tải được Handsontable.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [syncAuthReady]);
 
   const sheetSync = useSheetSync({
     syncAuthReady,
@@ -320,6 +340,12 @@ export function DeptScheduleApp({
       }}
     >
       {sheetSync.sheetSyncError || sheetSync.sheetSyncNotice}
+    </div>
+  ) : null;
+
+  const sheetEngineBanner = sheetEngineError ? (
+    <div className="sheet-engine-error" role="alert">
+      {sheetEngineError} Kiểm tra mạng hoặc thử tải lại trang.
     </div>
   ) : null;
 
@@ -1147,6 +1173,7 @@ export function DeptScheduleApp({
       onDeleteMonthRole={handleDeleteMonthRole}
       onAutoSchedule={handleAutoSchedule}
       actor={actor}
+      sheetEngineReady={sheetEngineReady}
     />
   );
 
@@ -1202,6 +1229,7 @@ export function DeptScheduleApp({
     return (
       <div className={`${rootClass} mobile-app`}>
         {sheetSyncBanner}
+        {sheetEngineBanner}
         {sheetDialogs}
         <MobileShell
           activeDept={activeDept}
@@ -1252,6 +1280,7 @@ export function DeptScheduleApp({
         embedInChd={embedInChd}
       />
       {sheetSyncBanner}
+      {sheetEngineBanner}
       {sheetDialogs}
 
       <main className="main-content">

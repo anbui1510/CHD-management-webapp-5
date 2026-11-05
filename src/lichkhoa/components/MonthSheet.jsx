@@ -195,7 +195,8 @@ export function MonthSheet({
   freezeCols = null,
   zoom = 100,
   readOnly = false,
-  visible = true
+  visible = true,
+  sheetEngineReady = true
 }) {
   const containerRef = useRef(null);
   const hotRef = useRef(null);
@@ -325,7 +326,7 @@ export function MonthSheet({
   };
 
   useEffect(() => {
-    if (!containerRef.current || !window.Handsontable) return undefined;
+    if (!sheetEngineReady || !containerRef.current || !window.Handsontable) return undefined;
 
     if (hotRef.current) {
       const previous = hotRef.current;
@@ -882,7 +883,7 @@ export function MonthSheet({
     // Recreate when the month grid structure or values change.
     // MONTH_PANE_REV recreates the grid when the frozen-column alignment changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structureKey, monthKey, MONTH_PANE_REV]);
+  }, [structureKey, monthKey, MONTH_PANE_REV, sheetEngineReady]);
 
   useEffect(() => {
     if (!visibleRef.current) return;
