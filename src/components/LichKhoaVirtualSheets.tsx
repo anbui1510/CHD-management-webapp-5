@@ -13,6 +13,16 @@ import {
 } from 'lucide-react';
 import { LICH_KHOA_APPS_SCRIPT_CODE } from '../data/lichKhoaAppsScriptCode';
 import { setSpreadsheetConnection, clearSpreadsheetConnection } from '../lichkhoa/features/sheetSync/sheetStorage';
+import { parseSpreadsheetId } from '../lichkhoa/logic/sheetStore/parseSpreadsheetId';
+
+function extractWebAppDeploymentId(scriptUrl: string): string | null {
+  const m = String(scriptUrl || '').match(/\/macros\/s\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+function resolveSpreadsheetIdInput(raw: string): string {
+  return parseSpreadsheetId(raw) || String(raw || '').trim();
+}
 
 type SyncState = {
   scriptUrl: string;
@@ -76,19 +86,30 @@ export default function LichKhoaVirtualSheets() {
     setActionError('');
     setActionSuccess('');
     try {
+      const scriptUrl = inputUrl.trim();
+      const spreadsheetId = resolveSpreadsheetIdInput(inputSheetId);
+      const deployId = extractWebAppDeploymentId(scriptUrl);
+      if (!spreadsheetId) {
+        throw new Error('Thiếu Spreadsheet ID lịch khoa.');
+      }
+      if (deployId && spreadsheetId === deployId) {
+        throw new Error(
+          'Spreadsheet ID đang trùng mã deploy trong Web App URL. Hãy copy ID từ URL Google Sheet (docs.google.com/spreadsheets/d/…/edit), không phải đoạn trong script.google.com/macros/s/…'
+        );
+      }
       const res = await fetch('/api/lichkhoa/sync-config', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          scriptUrl: inputUrl.trim(),
+          scriptUrl,
           scriptSecret: inputSecret.trim(),
-          spreadsheetId: inputSheetId.trim(),
+          spreadsheetId,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Không kết nối được.');
-      setSpreadsheetConnection(inputSheetId.trim());
+      setSpreadsheetConnection(spreadsheetId);
       setActionSuccess(data.message || 'Kết nối thành công.');
       await loadConfig();
     } catch (err: any) {
@@ -248,6 +269,12 @@ export default function LichKhoaVirtualSheets() {
               <li>
                 Deploy → New deployment → Web app · Execute as Me · Who has access: Anyone → copy Web app URL.
               </li>
+              <li>
+                Copy <strong>Spreadsheet ID</strong> từ URL file Sheet (
+                <code className="font-mono text-[10px]">docs.google.com/spreadsheets/d/ID/…</code>
+                ), không dùng đoạn trong Web App URL (
+                <code className="font-mono text-[10px]">macros/s/…</code>).
+              </li>
               <li>Dán URL, API Key và Spreadsheet ID vào form dưới → Lưu &amp; kết nối.</li>
             </ol>
 
@@ -294,7 +321,7 @@ export default function LichKhoaVirtualSheets() {
                 <input
                   type="text"
                   required
-                  placeholder="ID trong URL docs.google.com/spreadsheets/d/...."
+                  placeholder="ID trong URL docs.google.com/spreadsheets/d/…/edit (khác mã macros/s/…)"
                   value={inputSheetId}
                   onChange={(e) => setInputSheetId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none"

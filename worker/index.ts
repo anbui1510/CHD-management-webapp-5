@@ -8,7 +8,11 @@ import {
   readRequestSession,
   type CloudflareGateEnv,
 } from '../src/sync/cloudflareGate';
-interface Env extends ChdBriefEnv, ConsultSlideEnv, CloudflarePushEnv, CloudflareSyncConfigEnv, CloudflareGateEnv {
+import {
+  handleCloudflareLichKhoaRequest,
+  type CloudflareLichKhoaSyncConfigEnv,
+} from '../src/sync/cloudflareLichKhoaSyncConfigApi';
+interface Env extends ChdBriefEnv, ConsultSlideEnv, CloudflarePushEnv, CloudflareSyncConfigEnv, CloudflareGateEnv, CloudflareLichKhoaSyncConfigEnv {
   ASSETS: Fetcher;
 }
 
@@ -66,6 +70,10 @@ export default {
         }
       }
       return handleCloudflareSyncConfigRequest(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/lichkhoa/')) {
+      return handleCloudflareLichKhoaRequest(request, env);
     }
 
     return env.ASSETS.fetch(request);
