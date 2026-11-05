@@ -1,5 +1,5 @@
 import { parseSpreadsheetId } from '../../logic/sheetStore/parseSpreadsheetId';
-import { tenantSpreadsheetId } from '../../config/tenant';
+import { TIM_MACH_SPREADSHEET_ID, tenantSpreadsheetId } from '../../config/tenant';
 
 const SHEET_ID_KEY = 'LICHKHOA_SHEET_ID';
 const SHEET_URL_KEY = 'LICHKHOA_SHEET_URL';
@@ -14,11 +14,17 @@ export function getSpreadsheetId() {
         return id;
       }
     }
+    const stored = localStorage.getItem(SHEET_ID_KEY) || '';
+    if (stored) return stored;
     const fromTenant = tenantSpreadsheetId();
-    if (fromTenant) return fromTenant;
-    return localStorage.getItem(SHEET_ID_KEY) || '';
+    if (fromTenant) {
+      localStorage.setItem(SHEET_ID_KEY, fromTenant);
+      return fromTenant;
+    }
+    localStorage.setItem(SHEET_ID_KEY, TIM_MACH_SPREADSHEET_ID);
+    return TIM_MACH_SPREADSHEET_ID;
   } catch {
-    return '';
+    return TIM_MACH_SPREADSHEET_ID;
   }
 }
 

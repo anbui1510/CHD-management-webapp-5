@@ -237,6 +237,18 @@ function findStaffByKey_(staffKey, staff) {
 }
 
 function resolveActorByKey_(staffKey, staff, chdRole) {
+  // CHD Admin luôn full quyền (kể cả khi dòng NhanSu đang gán access_tasks=none).
+  // Tránh push Task/NhanSu thất bại → mất dữ liệu sau mỗi lần deploy/xóa localStorage.
+  if (String(chdRole || '').trim().toLowerCase() === 'admin') {
+    var sAdmin = findStaffByKey_(staffKey, staff);
+    return {
+      allowed: true,
+      kind: 'admin',
+      staffId: (sAdmin && sAdmin.id) || String(staffKey || '').trim(),
+      access: fullAccess_(),
+      fromChdAdmin: true
+    };
+  }
   var s = findStaffByKey_(staffKey, staff);
   if (s) {
     var role = String(s.accessRole || '').trim().toLowerCase();
@@ -257,16 +269,6 @@ function resolveActorByKey_(staffKey, staff, chdRole) {
         staff: s.access_staff || 'none',
         tasks: s.access_tasks || 'none'
       }
-    };
-  }
-  // CHD Admin được phép đồng bộ dù chưa có dòng trên NhanSu (roster lấy từ CHD Staff).
-  if (String(chdRole || '').trim().toLowerCase() === 'admin') {
-    return {
-      allowed: true,
-      kind: 'admin',
-      staffId: String(staffKey || '').trim(),
-      access: fullAccess_(),
-      fromChdAdmin: true
     };
   }
   return { allowed: false, kind: 'guest' };

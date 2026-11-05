@@ -6,16 +6,22 @@ import {
   setCloudMeta,
   setCloudPushHandler,
   ensureBootstrapAdminStaff,
+  fillEmptyTasksFromSeed,
 } from '../../store/dbStore';
 import { getSpreadsheetId } from './sheetStorage';
 import {
   bootstrapScheduleStore,
   canSyncScheduleStore,
   fetchSheetProfile,
+  forcePushScheduleStore,
   pullScheduleStore,
   pushScheduleStore,
   pushScheduleStoreIfNotStale,
 } from '../scheduleSync/scheduleStoreClient';
+
+function deptTaskCount(store) {
+  return (store?.departments || []).reduce((sum, dept) => sum + (dept.tasks?.length || 0), 0);
+}
 
 const PULL_INTERVAL_MS = 45_000;
 
@@ -46,10 +52,12 @@ export function useSheetSync({
   const [bootstrapBusy, setBootstrapBusy] = useState(false);
   const forcePullRef = useRef(false);
   const bootstrapCheckedRef = useRef(false);
+  const taskHydratePushedRef = useRef(false);
 
   const markForcePull = useCallback(() => {
     forcePullRef.current = true;
     bootstrapCheckedRef.current = false;
+    taskHydratePushedRef.current = false;
   }, []);
 
   const applyRemotePayload = useCallback((remote, force) => {
@@ -58,14 +66,44 @@ export function useSheetSync({
     const remoteTs = new Date(remote.updatedAt).getTime() || 0;
     const localTs = localMeta.updatedAt ? new Date(localMeta.updatedAt).getTime() : 0;
     if (!force && localTs && remoteTs < localTs) return false;
-    const next = ensureSheets(remote.payload);
+    let next = ensureSheets(remote.payload);
+    // Sheet Task trống (trước lần push đầu) → giữ task local / seed, rồi hydrate lên Sheet.
+    if (!deptTaskCount(next) && deptTaskCount(storeRef.current)) {
+      next = ensureSheets({
+        ...next,
+        departments: next.departments.map((dept) => {
+          const local = storeRef.current.departments?.find((d) => d.id === dept.id)
+            || storeRef.current.departments?.[0];
+          return {
+            ...dept,
+            tasks: (local?.tasks || []).length ? local.tasks : dept.tasks,
+          };
+        }),
+      });
+    }
+    if (!deptTaskCount(next)) {
+      next = ensureSheets(fillEmptyTasksFromSeed(next));
+    }
     setStore(next);
     saveStore(next, { skipCloud: true });
     setCloudMeta({ updatedAt: remote.updatedAt });
     setSheetSyncAt(remote.updatedAt);
     setSheetSyncError('');
     return true;
-  }, [ensureSheets, setStore]);
+  }, [ensureSheets, setStore, storeRef]);
+
+  const persistStoreToSheet = useCallback(async (store, { notice } = {}) => {
+    if (!syncAuthReady || !getSpreadsheetId()) return null;
+    if (!(await canSyncScheduleStore())) return null;
+    const res = await forcePushScheduleStore(store);
+    if (res?.updatedAt) {
+      setCloudMeta({ updatedAt: res.updatedAt });
+      setSheetSyncAt(res.updatedAt);
+      setSheetSyncError('');
+      if (notice) setSheetSyncNotice(notice);
+    }
+    return res;
+  }, [syncAuthReady]);
 
   const ensureSelfThenPush = useCallback(async () => {
     const prepared = ensureBootstrapAdminStaff(storeRef.current, {
@@ -89,9 +127,16 @@ export function useSheetSync({
     if (!(await canSyncScheduleStore())) return;
     try {
       const remote = await pullScheduleStore(storeRef.current);
+      const remoteTasks = deptTaskCount(remote?.payload);
       const did = applyRemotePayload(remote, force || forcePullRef.current);
       if (forcePullRef.current) forcePullRef.current = false;
       if (did) setSheetSyncNotice('');
+      if (!remoteTasks && deptTaskCount(storeRef.current) && !taskHydratePushedRef.current) {
+        taskHydratePushedRef.current = true;
+        await persistStoreToSheet(storeRef.current, {
+          notice: 'Đã ghi danh mục Task Tim mạch lên Google Sheet.',
+        });
+      }
     } catch (error) {
       const message = error?.message || 'Không kéo được dữ liệu từ Sheet.';
       if (isChdAdmin && isMissingNhanSuStaffKeyError(message)) {
@@ -109,7 +154,7 @@ export function useSheetSync({
       }
       setSheetSyncError(message);
     }
-  }, [applyRemotePayload, ensureSelfThenPush, isChdAdmin, storeRef, syncAuthReady]);
+  }, [applyRemotePayload, ensureSelfThenPush, isChdAdmin, persistStoreToSheet, storeRef, syncAuthReady]);
 
   const runBootstrap = useCallback(async () => {
     if (!syncAuthReady || !getSpreadsheetId()) return;
@@ -177,11 +222,13 @@ export function useSheetSync({
           return;
         }
         bootstrapCheckedRef.current = true;
+        let remoteTaskCount = 0;
         if (forcePullRef.current || !getCloudMeta().updatedAt) {
           const remote = await pullScheduleStore(storeRef.current);
           if (cancelled) return;
+          remoteTaskCount = deptTaskCount(remote?.payload);
           if (!remote?.payload?.departments) {
-            const res = await pushScheduleStore(storeRef.current);
+            const res = await forcePushScheduleStore(storeRef.current);
             if (res?.updatedAt) {
               setCloudMeta({ updatedAt: res.updatedAt });
               setSheetSyncAt(res.updatedAt);
@@ -191,7 +238,18 @@ export function useSheetSync({
           applyRemotePayload(remote, forcePullRef.current || !getCloudMeta().updatedAt);
           if (forcePullRef.current) forcePullRef.current = false;
         } else {
-          await pullFromSheet(forcePullRef.current);
+          const remote = await pullScheduleStore(storeRef.current);
+          if (cancelled) return;
+          remoteTaskCount = deptTaskCount(remote?.payload);
+          applyRemotePayload(remote, forcePullRef.current);
+          if (forcePullRef.current) forcePullRef.current = false;
+        }
+        // Sheet Task trống: đẩy seed/task local lên Sheet (tránh mất sau deploy).
+        if (!cancelled && !remoteTaskCount && deptTaskCount(storeRef.current) && !taskHydratePushedRef.current) {
+          taskHydratePushedRef.current = true;
+          await persistStoreToSheet(storeRef.current, {
+            notice: 'Đã ghi danh mục Task Tim mạch lên Google Sheet.',
+          });
         }
         if (!cancelled) setSheetSyncError('');
       } catch (error) {
@@ -213,6 +271,7 @@ export function useSheetSync({
     sheetConnectionRevision,
     applyRemotePayload,
     ensureSelfThenPush,
+    persistStoreToSheet,
     pullFromSheet,
     storeRef,
   ]);
@@ -277,5 +336,6 @@ export function useSheetSync({
     runBootstrap,
     manualPull,
     markForcePull,
+    persistStoreToSheet,
   };
 }

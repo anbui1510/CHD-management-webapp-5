@@ -28,6 +28,23 @@ export async function pushScheduleStore(store) {
   return scheduleApi.put(store);
 }
 
+/** Ép ghi lên Sheet (sau import / hydrate Task) — bỏ qua so sánh stale. */
+export async function forcePushScheduleStore(store) {
+  if (!isSheetBackend()) {
+    const res = await scheduleApi.put(store);
+    return { outcome: 'pushed', updatedAt: res?.updatedAt };
+  }
+  const spreadsheetId = getSpreadsheetId();
+  if (!spreadsheetId) return null;
+  const profile = await sheetBridge.getProfile(spreadsheetId);
+  if (profile?.bootstrapEligible) {
+    const res = await bootstrapScheduleStore(store);
+    return { outcome: 'bootstrapped', updatedAt: res?.updatedAt };
+  }
+  const res = await pushScheduleStore(store);
+  return { outcome: 'pushed', updatedAt: res?.updatedAt };
+}
+
 export async function bootstrapScheduleStore(store) {
   const spreadsheetId = getSpreadsheetId();
   if (!spreadsheetId) return null;
