@@ -1714,20 +1714,23 @@ app.post('/api/lichkhoa/sync-config', requireAuth, async (req, res) => {
     if (testData.status !== 'success' && !testData.ok) {
       return res.status(400).json({ error: testData.message || 'Không test được bridge lịch khoa.' });
     }
-    const sheetVerifyError = await verifyLichKhoaSpreadsheetAccess(
+    const sheetVerify = await verifyLichKhoaSpreadsheetAccess(
       String(scriptUrl).trim(),
       secretToStore,
       sheetId
     );
-    if (sheetVerifyError) {
-      return res.status(400).json({ error: sheetVerifyError });
+    if (sheetVerify.error) {
+      return res.status(400).json({ error: sheetVerify.error });
     }
     saveLichKhoaSyncConfig({
       scriptUrl: String(scriptUrl).trim(),
       scriptSecret: secretToStore,
       spreadsheetId: sheetId,
     });
-    res.json({ success: true, message: 'Kết nối Sheet lịch khoa thành công.' });
+    const message = sheetVerify.warning
+      ? `Kết nối Sheet lịch khoa đã lưu. ${sheetVerify.warning}`
+      : 'Kết nối Sheet lịch khoa thành công.';
+    res.json({ success: true, message, legacyScript: !!sheetVerify.legacyScript });
   } catch (err: any) {
     console.error('lichkhoa sync-config failed:', err);
     res.status(500).json({ error: err.message || 'Không kết nối được bridge lịch khoa.' });

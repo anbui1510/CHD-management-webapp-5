@@ -126,6 +126,18 @@ function doGet(e) {
     }
     return jsonOut({ status: 'success', message: 'API Key đã lưu (nếu gửi kèm).' });
   }
+  if (p.action === 'verifySpreadsheet') {
+    var sid = String(p.spreadsheetId || '').trim();
+    var vKey = String(p.apiKey || '').trim();
+    if (!sid) {
+      return jsonOut({ error: 'Thiếu spreadsheetId.' }, 400);
+    }
+    if (!verifyApiKey_(vKey)) {
+      return jsonOut({ error: 'API Key không hợp lệ.' }, 401);
+    }
+    var ssGet = openSpreadsheetById_(sid);
+    return jsonOut({ status: 'success', title: ssGet.getName(), spreadsheetId: sid });
+  }
   return ContentService.createTextOutput(JSON.stringify({ ok: true, service: 'lichkhoa-sheet-bridge' }))
     .setMimeType(ContentService.MimeType.JSON);
 }
