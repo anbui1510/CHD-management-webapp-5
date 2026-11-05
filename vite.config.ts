@@ -57,6 +57,12 @@ export default defineConfig(() => {
     define: {
       __APP_BUILD_ID__: JSON.stringify(appBuildId),
     },
+    build: {
+      // Cloudflare Workers Builds hit EMFILE when Rollup opens many lucide-react icon files at once.
+      rollupOptions: {
+        maxParallelFileOps: 4,
+      },
+    },
     plugins: [
       stripBundledStaffSecrets(),
       react(),

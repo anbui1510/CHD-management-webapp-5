@@ -54,6 +54,7 @@ jobs:
           VITE_GOOGLE_SCRIPT_SECRET: ${{ secrets.GOOGLE_SCRIPT_SECRET }}
         run: |
           echo "Building with BUILD_ID=$BUILD_ID"
+          ulimit -n 65536 2>/dev/null || ulimit -n 8192 2>/dev/null || true
           npm run build
 
       - name: Deploy to Cloudflare Workers
