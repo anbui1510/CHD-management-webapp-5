@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { LICH_KHOA_APPS_SCRIPT_CODE } from '../data/lichKhoaAppsScriptCode';
 import { setSpreadsheetConnection, clearSpreadsheetConnection } from '../lichkhoa/features/sheetSync/sheetStorage';
-import { parseSpreadsheetId } from '../lichkhoa/logic/sheetStore/parseSpreadsheetId';
+import { parseSpreadsheetId, spreadsheetIdValidationMessage } from '../lichkhoa/logic/sheetStore/parseSpreadsheetId';
 
 function extractWebAppDeploymentId(scriptUrl: string): string | null {
   const m = String(scriptUrl || '').match(/\/macros\/s\/([a-zA-Z0-9_-]+)/);
@@ -96,6 +96,10 @@ export default function LichKhoaVirtualSheets() {
         throw new Error(
           'Spreadsheet ID đang trùng mã deploy trong Web App URL. Hãy copy ID từ URL Google Sheet (docs.google.com/spreadsheets/d/…/edit), không phải đoạn trong script.google.com/macros/s/…'
         );
+      }
+      const trimHint = spreadsheetIdValidationMessage(inputSheetId);
+      if (trimHint && trimHint.includes('cắt bớt')) {
+        setActionSuccess(trimHint);
       }
       const res = await fetch('/api/lichkhoa/sync-config', {
         method: 'POST',

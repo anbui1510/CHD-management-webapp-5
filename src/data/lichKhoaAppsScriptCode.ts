@@ -28,11 +28,17 @@ function doPost(e) {
     if (!verifyApiKey_(apiKey)) {
       return jsonOut({ error: 'API Key không hợp lệ.' }, 401);
     }
+
+    if (action === 'verifySpreadsheet') {
+      var ssVerify = openSpreadsheetById_(spreadsheetId);
+      return jsonOut({ status: 'success', title: ssVerify.getName(), spreadsheetId: spreadsheetId });
+    }
+
     if (!staffKey) {
       return jsonOut({ error: 'Thiếu staffKey.' }, 400);
     }
 
-    var ss = SpreadsheetApp.openById(spreadsheetId);
+    var ss = openSpreadsheetById_(spreadsheetId);
     ensureTabs_(ss);
 
     var staffRows = sheetValues_(ss, 'NhanSu');
@@ -136,6 +142,22 @@ function verifyApiKey_(apiKey) {
     || '';
   if (!expected) return true; // first deploy before setup
   return String(apiKey || '') === String(expected);
+}
+
+function openSpreadsheetById_(spreadsheetId) {
+  try {
+    return SpreadsheetApp.openById(spreadsheetId);
+  } catch (e) {
+    var msg = String(e && e.message ? e.message : e);
+    if (msg.indexOf('missing') !== -1) {
+      throw new Error(
+        'Không mở được Google Sheet (ID: ' + spreadsheetId + '). '
+        + 'Kiểm tra: (1) ID đúng 44 ký tự từ URL docs.google.com/spreadsheets/d/…/edit, '
+        + '(2) file chưa bị xóa, (3) tài khoản Google deploy Apps Script (Execute as Me) có quyền Editor trên file đó.'
+      );
+    }
+    throw e;
+  }
 }
 
 function ensureTabs_(ss) {

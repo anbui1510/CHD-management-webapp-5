@@ -27,7 +27,12 @@ async function postBridge(body) {
     data = { error: text || 'Phản hồi không hợp lệ.' };
   }
   if (!response.ok || data?.error) {
-    const err = new Error(data?.error || `Lỗi bridge (${response.status}).`);
+    let message = data?.error || `Lỗi bridge (${response.status}).`;
+    if (/Document .* is missing/i.test(message)) {
+      message =
+        'Không mở được Google Sheet. Kiểm tra Spreadsheet ID (44 ký tự từ URL Sheet), file chưa xóa, và tài khoản deploy Apps Script có quyền Editor trên file đó. Vào Virtual Google Sheets → Lưu & kết nối lại.';
+    }
+    const err = new Error(message);
     err.status = response.status;
     throw err;
   }
