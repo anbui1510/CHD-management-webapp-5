@@ -245,10 +245,11 @@ Tích hợp từ `lichkhoa-webapp`. **Không** dùng Google login; dùng phiên 
 - Liên kết UI: thẻ **Virtual Google Sheets** trong workspace mục 7 (`lich-khoa-sheets`)
 
 ### Nhân sự xếp lịch
-- Nguồn danh sách: CHD bảng **Staff** (`NhanSu.id = StaffKey`)
+- Nguồn danh sách: CHD bảng **Staff** (`NhanSu.id = StaffKey`) + nhân sự **thêm tay** trên Module 7
 - `Staff.Department` → cột **Khoa / Phòng** trên tab Quản lý nhân sự module 7 (`NhanSu.deptLabel` trên Sheet lịch)
 - `Staff.ShowInLichKhoa` (`On` / `Off`): **On** = có trong module 7; **Off** = không merge vào lịch (mặc định **On** nếu cột trống)
-- Thẻ `lich-khoa-staff` chỉ sửa thuộc tính lịch trên Sheet lịch: `shortName`, `title`, `position`, `dutyQuota`, `buBalance`, `phepBalance`, `accessRole`, `access_*`
+- **Thêm HV / hỗ trợ** trên tab Quản lý nhân sự Module 7: học viên, trực gác, hỗ trợ khoa phòng (`source=local`, `id` dạng `local_*`). Không tạo tài khoản CHD; được giữ khi merge Staff CHD; xóa được tại Module 7. Nhân sự CHD không xóa tại đây (dùng `ShowInLichKhoa=Off`).
+- Thẻ `lich-khoa-staff` sửa thuộc tính lịch trên Sheet lịch: `shortName`, `title`, `position`, `dutyQuota`, `buBalance`, `phepBalance`, `accessRole`, `access_*`, và toàn bộ trường cho hàng `local`
 - Không sửa Password / Role / Permissions CHD (thuộc mục 8)
 
 ### Code port

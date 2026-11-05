@@ -8,7 +8,8 @@ export const TITLE_OPTIONS = [
   { value: 'Phó Khoa', quota: 4 },
   { value: 'BS CK1', quota: 6 },
   { value: 'BS Trẻ', quota: 7 },
-  { value: 'Học Viên', quota: 9 }
+  { value: 'Học Viên', quota: 9 },
+  { value: 'Hỗ Trợ', quota: 0 },
 ];
 
 // Vị trí trực của bác sĩ trong khoa
@@ -18,7 +19,9 @@ export const POSITION_OPTIONS = [
   'BS Cột 1',
   'BS Cột 2',
   'BS Cột 3',
-  'BS Học viên'
+  'BS Học viên',
+  'Hỗ trợ khoa',
+  'Trực gác',
 ];
 
 // Gợi ý Vị trí mặc định dựa trên Chức danh (dùng khi dữ liệu cũ chưa có trường Vị trí)
@@ -29,6 +32,7 @@ export function derivePositionFromTitle(title) {
     case 'BS CK1': return 'BS Cột 2';
     case 'BS Trẻ': return 'BS Cột 1';
     case 'Học Viên': return 'BS Học viên';
+    case 'Hỗ Trợ': return 'Hỗ trợ khoa';
     default: return 'BS Cột 1';
   }
 }

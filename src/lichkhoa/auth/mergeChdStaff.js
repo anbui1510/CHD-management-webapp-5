@@ -1,5 +1,6 @@
 import { MEMBER_DEFAULT } from '../logic/access.js';
 import { formatShowInLichKhoa, parseShowInLichKhoa } from '../logic/showInLichKhoa.js';
+import { isLocalScheduleStaff, markChdScheduleStaff } from '../logic/staffSource.js';
 
 function isActiveChdStaff(staff) {
   return staff && !String(staff.FireDate || '').trim();
@@ -24,10 +25,12 @@ function chdDepartmentLabel(chd) {
 /**
  * Merge CHD Staff list into schedule department staff (NhanSu).
  * Identity + Department + ShowInLichKhoa from CHD; preserve schedule fields on the row.
+ * Local-only rows (học viên / hỗ trợ thêm tay) are kept after CHD rows.
  */
 export function mergeChdStaffIntoDept(dept, chdStaffList) {
   const existing = Array.isArray(dept?.staff) ? dept.staff : [];
   const byId = new Map(existing.map((s) => [String(s.id), s]));
+  const localStaff = existing.filter((s) => isLocalScheduleStaff(s));
   const usedShort = new Set();
   const next = [];
 
@@ -48,7 +51,7 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
     const isAdmin = chd.Role === 'Admin';
     const deptLabel = chdDepartmentLabel(chd) || String(prev.deptLabel || '').trim() || dept.name;
 
-    next.push({
+    next.push(markChdScheduleStaff({
       ...prev,
       id,
       name: String(chd.Name || chd.StaffName || prev.name || id),
@@ -67,6 +70,27 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
       deptId: dept.id,
       deptLabel,
       showInLichKhoa: formatShowInLichKhoa(true),
+    }));
+  }
+
+  const chdIds = new Set(next.map((s) => String(s.id)));
+  for (const local of localStaff) {
+    if (chdIds.has(String(local.id))) continue;
+    let shortName = String(local.shortName || '').trim().toUpperCase();
+    if (!shortName) continue;
+    if (usedShort.has(shortName)) {
+      let i = 2;
+      while (usedShort.has(`${shortName}${i}`)) i += 1;
+      shortName = `${shortName}${i}`;
+    }
+    usedShort.add(shortName);
+    next.push({
+      ...local,
+      source: 'local',
+      shortName,
+      deptId: local.deptId || dept.id,
+      deptLabel: local.deptLabel || dept.name,
+      showInLichKhoa: formatShowInLichKhoa(parseShowInLichKhoa(local.showInLichKhoa)),
     });
   }
 

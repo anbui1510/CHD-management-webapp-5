@@ -4,6 +4,7 @@ import { TITLE_OPTIONS, POSITION_OPTIONS, derivePositionFromTitle, getQuotaForTi
 import { ACCESS_LEVELS, ACCESS_TABS, accessRoleLabel, normalizeAccess } from '../logic/access';
 import { DUTY_WEEKDAYS, dutyScheduleTask, normalizeDuties } from '../logic/staffDuties';
 import { showInLichKhoaLabel } from '../logic/showInLichKhoa.js';
+import { isLocalScheduleStaff, markLocalScheduleStaff, newLocalStaffId } from '../logic/staffSource.js';
 import { useConfirm } from './ConfirmDialog';
 import { ModalPortal } from './ModalPortal';
 
@@ -23,6 +24,24 @@ const EMPTY_FORM = {
   deptLabel: ''
 };
 
+const LOCAL_ADD_FORM = {
+  ...EMPTY_FORM,
+  title: 'Học Viên',
+  position: 'BS Học viên',
+  dutyQuota: getQuotaForTitle('Học Viên'),
+  accessRole: 'member',
+  access: normalizeAccess({
+    week: 'view',
+    month: 'view',
+    leave: 'view',
+    study: 'view',
+    calendar: 'view',
+    dashboard: 'none',
+    staff: 'none',
+    tasks: 'none',
+  }),
+};
+
 export function StaffManager({
   staffList,
   taskList = [],
@@ -36,10 +55,14 @@ export function StaffManager({
   autoOpenAdd,
   onAutoOpenHandled,
   readOnly = false,
-  /** When true: roster comes from CHD Staff — no add/delete/bulk; identity fields read-only */
+  /**
+   * When true: base roster from CHD Staff.
+   * Still allow add/delete for local-only people (học viên / hỗ trợ trực gác).
+   */
   chdSynced = false,
 }) {
-  const canMutateRoster = !chdSynced && typeof onAddStaff === 'function';
+  const canAddLocal = !readOnly && typeof onAddStaff === 'function';
+  const canBulkImport = !chdSynced && !readOnly && typeof onBulkImport === 'function';
   // editing: null (đóng) | 'NEW' (thêm mới) | object nhân sự đang sửa
   const [editing, setEditing] = useState(null);
   const [dragId, setDragId] = useState(null);
@@ -55,14 +78,18 @@ export function StaffManager({
 
   const openAdd = () => {
     const fallbackDept = tenantDepartments.find((d) => d.id === defaultDeptId) || tenantDepartments[0];
+    const base = chdSynced ? LOCAL_ADD_FORM : EMPTY_FORM;
     setForm({
-      ...EMPTY_FORM,
+      ...base,
       deptId: fallbackDept?.id || defaultDeptId || '',
-      deptLabel: fallbackDept?.name || ''
+      deptLabel: fallbackDept?.name || (chdSynced ? 'Khoa Tim Mạch' : '')
     });
     setFormError('');
     setEditing('NEW');
   };
+
+  const editingIsLocal = isNew || isLocalScheduleStaff(editing);
+  const identityLocked = chdSynced && !editingIsLocal;
 
   const openEdit = (s) => {
     setForm({
@@ -175,18 +202,27 @@ export function StaffManager({
     };
 
     if (isNew) {
-      onAddStaff({ id: `doc_${Date.now()}`, ...payload });
+      const created = markLocalScheduleStaff({
+        id: chdSynced ? newLocalStaffId() : `doc_${Date.now()}`,
+        ...payload,
+      });
+      onAddStaff(created);
     } else {
-      onUpdateStaff({ ...editing, ...payload }, editing.shortName);
+      const next = editingIsLocal
+        ? markLocalScheduleStaff({ ...editing, ...payload })
+        : { ...editing, ...payload };
+      onUpdateStaff(next, editing.shortName);
     }
     closeModal();
   };
 
   const handleDelete = async (s) => {
+    if (chdSynced && !isLocalScheduleStaff(s)) return;
+    if (typeof onDeleteStaff !== 'function') return;
     const ok = await confirm({
       variant: 'danger',
       title: 'Xác nhận xóa nhân sự',
-      message: <>Bạn có chắc muốn xóa <strong>{s.name}</strong> ({s.shortName}) khỏi danh sách? Thao tác này không thể hoàn tác.</>,
+      message: <>Bạn có chắc muốn xóa <strong>{s.name}</strong> ({s.shortName}) khỏi danh sách lịch? Thao tác này không thể hoàn tác.</>,
       confirmText: 'Xóa'
     });
     if (ok) onDeleteStaff(s.id);
@@ -245,31 +281,38 @@ export function StaffManager({
           <div className="sub-header-info">{staffList.length} nhân sự trong khoa</div>
         </div>
 
-        {!readOnly && canMutateRoster && (
+        {!readOnly && (canAddLocal || canBulkImport) && (
           <div className="manager-toolbar">
-            <button
-              type="button"
-              className="action-btn primary icon-only"
-              onClick={openAdd}
-              title="Thêm bác sĩ mới"
-              aria-label="Thêm bác sĩ mới"
-            >
-              <UserPlus size={18} />
-            </button>
-            <button
-              type="button"
-              className="action-btn"
-              onClick={() => setIsBulkModalOpen(true)}
-              title="Nhập hàng loạt từ Excel"
-              aria-label="Nhập hàng loạt từ Excel"
-            >
-              <Upload size={16} /> Excel
-            </button>
+            {canAddLocal && (
+              <button
+                type="button"
+                className="action-btn primary"
+                onClick={openAdd}
+                title={chdSynced
+                  ? 'Thêm học viên / hỗ trợ trực gác vào lịch (không tạo tài khoản CHD)'
+                  : 'Thêm bác sĩ mới'}
+                aria-label="Thêm nhân sự lịch"
+              >
+                <UserPlus size={16} /> {chdSynced ? 'Thêm HV / hỗ trợ' : 'Thêm'}
+              </button>
+            )}
+            {canBulkImport && (
+              <button
+                type="button"
+                className="action-btn"
+                onClick={() => setIsBulkModalOpen(true)}
+                title="Nhập hàng loạt từ Excel"
+                aria-label="Nhập hàng loạt từ Excel"
+              >
+                <Upload size={16} /> Excel
+              </button>
+            )}
           </div>
         )}
         {chdSynced && (
           <div className="sub-header-info" style={{ marginTop: 4 }}>
-            Danh sách từ CHD Staff (ShowInLichKhoa = On). Khoa/Phòng = cột Department trên Sheet Staff; chỉ sửa thuộc tính lịch tại đây.
+            Nhân sự CHD (ShowInLichKhoa = On) + học viên/hỗ trợ thêm tay. Khoa/Phòng CHD = cột Department trên Sheet Staff.
+            Nhân sự thêm tay chỉ có trên lịch khoa, không tạo tài khoản CHD.
           </div>
         )}
       </div>
@@ -339,7 +382,12 @@ export function StaffManager({
                     <span className="row-grip-dots" aria-hidden="true" />
                   </button>
                 </td>
-                <td style={{ fontWeight: 600 }}>{s.name}</td>
+                <td style={{ fontWeight: 600 }}>
+                  {s.name}
+                  {isLocalScheduleStaff(s) && (
+                    <span className="position-pill" style={{ marginLeft: 6, fontSize: '0.7rem' }}>Lịch cục bộ</span>
+                  )}
+                </td>
                 <td><span className="code-pill">{s.shortName}</span></td>
                 <td>
                   {s.title}
@@ -369,8 +417,8 @@ export function StaffManager({
                     <button className="icon-btn edit" title="Sửa thuộc tính lịch" onClick={() => openEdit(s)}>
                       <Pencil size={15} />
                     </button>
-                    {canMutateRoster && (
-                      <button className="icon-btn danger" title="Xóa nhân sự" onClick={() => handleDelete(s)}>
+                    {typeof onDeleteStaff === 'function' && (!chdSynced || isLocalScheduleStaff(s)) && (
+                      <button className="icon-btn danger" title="Xóa nhân sự lịch" onClick={() => handleDelete(s)}>
                         <Trash2 size={15} />
                       </button>
                     )}
@@ -393,10 +441,20 @@ export function StaffManager({
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content staff-editor">
             <div className="modal-header">
-              <span>{isNew ? 'Thêm Bác Sĩ / Nhân Viên Mới' : `Sửa Thông Tin: ${editing.name}`}</span>
+              <span>
+                {isNew
+                  ? (chdSynced ? 'Thêm học viên / hỗ trợ vào lịch' : 'Thêm Bác Sĩ / Nhân Viên Mới')
+                  : `Sửa Thông Tin: ${editing.name}`}
+              </span>
               <button className="icon-btn" onClick={closeModal} title="Đóng"><X size={18} /></button>
             </div>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {isNew && chdSynced && (
+                <p className="form-hint">
+                  Dùng cho học viên hoặc nhân sự trực gác/hỗ trợ khoa phòng. Không tạo tài khoản đăng nhập CHD —
+                  chỉ xuất hiện trên Module 7 và tab NhanSu của Sheet lịch.
+                </p>
+              )}
               <div className="form-group">
                 <label className="form-label">Họ và Tên Đầy Đủ:</label>
                 <input
@@ -404,9 +462,9 @@ export function StaffManager({
                   required
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  placeholder="VD: Bùi Đạt Thịnh"
-                  readOnly={chdSynced}
-                  disabled={chdSynced}
+                  placeholder={chdSynced ? 'VD: Nguyễn Văn A (học viên)' : 'VD: Bùi Đạt Thịnh'}
+                  readOnly={identityLocked}
+                  disabled={identityLocked}
                 />
               </div>
 
