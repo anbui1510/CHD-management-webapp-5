@@ -109,6 +109,25 @@ body.dark-theme {
   flex-wrap: nowrap;
 }
 
+.navbar.navbar-chd-embed {
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.navbar.navbar-chd-embed .nav-views {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.navbar.navbar-chd-embed .nav-btn {
+  font-size: 0.82rem;
+  padding: 6px 10px;
+}
+
 .lichkhoa-root .app-container,
 .lichkhoa-root .main-content,
 .lichkhoa-root .view-container {

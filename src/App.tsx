@@ -4119,6 +4119,7 @@ export default function App() {
                 chdStaffList={staffList}
                 activeMenu={activeMenu}
                 onNavigateToSheets={() => navigateMenu('lich-khoa-sheets')}
+                onNavigateModule={navigateMenu}
               />
             </div>
           )}

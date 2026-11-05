@@ -213,11 +213,22 @@ const VIEW_BY_MENU = {
   'lich-khoa-calendar': 'CALENDAR',
 };
 
+const MENU_BY_VIEW = {
+  SHEET: 'lich-khoa-sheet',
+  DASHBOARD: 'lich-khoa-dashboard',
+  TASKS: 'lich-khoa-tasks',
+  STAFF: 'lich-khoa-staff',
+  CALENDAR: 'lich-khoa-calendar',
+};
+
+const CARDIOLOGY_DEPT_ID = 'dept_tim_mach';
+
 export function DeptScheduleApp({
   currentStaff = null,
   chdStaffList = [],
   activeMenu = 'lich-khoa-sheet',
   onNavigateToSheets = null,
+  onNavigateModule = null,
   embedInChd = true,
 }) {
   const lichUser = useMemo(() => toLichkhoaUser(currentStaff), [currentStaff]);
@@ -237,6 +248,28 @@ export function DeptScheduleApp({
     const next = VIEW_BY_MENU[activeMenu] || 'SHEET';
     setActiveView(next);
   }, [activeMenu]);
+
+  useEffect(() => {
+    if (!embedInChd) return;
+    setStore((prev) => {
+      const cardio = prev.departments.find((d) => d.id === CARDIOLOGY_DEPT_ID)
+        || prev.departments.find((d) => /tim\s*mạch/i.test(String(d.name || '')))
+        || prev.departments[0];
+      if (!cardio) return prev;
+      if (
+        prev.departments.length === 1
+        && prev.departments[0].id === cardio.id
+        && prev.activeDeptId === cardio.id
+      ) {
+        return prev;
+      }
+      return ensureSheets({
+        ...prev,
+        departments: [cardio],
+        activeDeptId: cardio.id,
+      });
+    });
+  }, [embedInChd]);
 
   useEffect(() => {
     if (isSheetBackend()) ensureSpreadsheetFromTenant();
@@ -370,7 +403,7 @@ export function DeptScheduleApp({
     () => findLinkedStaff(lichUser, roster),
     [lichUser, roster]
   );
-  const hideDeptSelector = actor.kind === 'member' && Boolean(linkedStaff?.deptId);
+  const hideDeptSelector = embedInChd || (actor.kind === 'member' && Boolean(linkedStaff?.deptId));
   const tenantMeta = useMemo(() => resolveTenant(), []);
 
   useEffect(() => {
@@ -1061,6 +1094,13 @@ export function DeptScheduleApp({
   }) === 'mobile';
   const navViews = visibleNav(actor);
 
+  const handleSelectView = useCallback((view) => {
+    setActiveView(view);
+    if (embedInChd && onNavigateModule && MENU_BY_VIEW[view]) {
+      onNavigateModule(MENU_BY_VIEW[view]);
+    }
+  }, [embedInChd, onNavigateModule]);
+
   const handleExit = () => {
     onNavigateToSheets?.();
   };
@@ -1238,7 +1278,7 @@ export function DeptScheduleApp({
           hideDeptSelector={hideDeptSelector}
           tenantLabel={tenantMeta.label}
           activeView={activeView}
-          onSelectView={setActiveView}
+          onSelectView={handleSelectView}
           views={navViews}
           theme={theme}
           onToggleTheme={handleToggleTheme}
@@ -1267,7 +1307,7 @@ export function DeptScheduleApp({
         hideDeptSelector={hideDeptSelector}
         tenantLabel={tenantMeta.label}
         activeView={activeView}
-        onSelectView={setActiveView}
+        onSelectView={handleSelectView}
         views={navViews}
         theme={theme}
         onToggleTheme={handleToggleTheme}
