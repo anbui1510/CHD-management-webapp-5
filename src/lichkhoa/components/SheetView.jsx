@@ -256,7 +256,8 @@ export function SheetView({
   onUpdateNote,
   onUpdateBalance,
   onAutoSchedule,
-  actor
+  actor,
+  sheetEngineReady = true
 }) {
   const containerRef = useRef(null);
   const hotInstanceRef = useRef(null);
@@ -494,7 +495,7 @@ export function SheetView({
   };
 
   useEffect(() => {
-    if (!containerRef.current || !window.Handsontable) return undefined;
+    if (!sheetEngineReady || !containerRef.current || !window.Handsontable) return undefined;
 
     if (hotInstanceRef.current) {
       hotInstanceRef.current.destroy();
@@ -808,7 +809,7 @@ export function SheetView({
     // Rebuild only when columns, row count, or the week itself change.
     // Cell text is patched in place by the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gridShape]);
+  }, [gridShape, sheetEngineReady]);
 
   useEffect(() => {
     patchHotCells(hotInstanceRef.current, weekData);
@@ -1067,6 +1068,11 @@ export function SheetView({
         />
       )}
       <div className={`sheet-scroll${activePlan === 'week' ? ' is-open' : ''}`}>
+      {!sheetEngineReady && (
+        <div className="sheet-engine-loading" role="status">
+          Đang tải engine bảng lịch (Handsontable)…
+        </div>
+      )}
       <div className="sheet-workbook" hidden={activePlan !== 'week' && activePlan !== 'month'}>
         <div className="sheet-zoom">
           <div ref={containerRef} className={`sheet-grid-host${activePlan === 'week' ? '' : ' is-parked'}`} />
@@ -1099,6 +1105,7 @@ export function SheetView({
               freezeRows={Number(scheduleData.freeze?.month?.rows) || 0}
               freezeCols={scheduleData.freeze?.month?.cols}
               zoom={zoom}
+              sheetEngineReady={sheetEngineReady}
             />
           )}
         </div>
@@ -1137,6 +1144,7 @@ export function SheetView({
           uiRef={uiRef}
           onChange={readOnlyRef.current ? undefined : onUpdateRooms}
           readOnly={!canEdit(actor, 'week')}
+          sheetEngineReady={sheetEngineReady}
         />
       </div>
       </div>

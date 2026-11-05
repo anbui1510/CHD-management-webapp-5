@@ -191,7 +191,7 @@ function hiddenDoctorColumns(matrix, labels, names) {
     .filter(col => col >= 0);
 }
 
-export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge, formatCtl, uiRef, onChange, readOnly = false, active = true, hiddenDoctors = [] }) {
+export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge, formatCtl, uiRef, onChange, readOnly = false, active = true, hiddenDoctors = [], sheetEngineReady = true }) {
   const containerRef = useRef(null);
   const hotRef = useRef(null);
   const stylesRef = useRef(cellStyles || {});
@@ -224,7 +224,7 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
   };
 
   useEffect(() => {
-    if (!containerRef.current || !window.Handsontable) return undefined;
+    if (!sheetEngineReady || !containerRef.current || !window.Handsontable) return undefined;
     if (hotRef.current) {
       hotRef.current.destroy();
       hotRef.current = null;
@@ -485,7 +485,7 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
       hotRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structureKey]);
+  }, [structureKey, sheetEngineReady]);
 
   useEffect(() => {
     patchHotCells(hotRef.current, JSON.parse(valueKey));
