@@ -10,6 +10,7 @@ import { MobileShell } from './components/mobile/MobileShell';
 import { useViewportWidth } from './hooks/useViewportWidth';
 import { toLichkhoaUser, isLichkhoaSessionReady } from './auth/chdAuth';
 import { mergeChdStaffIntoStore } from './auth/mergeChdStaff';
+import { isLocalScheduleStaff } from './logic/staffSource.js';
 
 import {
   getCloudMeta,
@@ -989,7 +990,16 @@ export function DeptScheduleApp({
   // ---------- Staff Management Actions ----------
   const handleAddStaff = (newStaffObj) => {
     if (!allow('staff')) return;
-    updateActiveDept(d => ({ ...d, staff: [...d.staff, newStaffObj] }));
+    updateActiveDept((d) => ({
+      ...d,
+      staff: [...(d.staff || []), {
+        ...newStaffObj,
+        source: newStaffObj.source || 'local',
+        showInLichKhoa: newStaffObj.showInLichKhoa || 'On',
+        deptId: newStaffObj.deptId || d.id,
+        deptLabel: newStaffObj.deptLabel || d.name,
+      }],
+    }));
   };
 
   const handleUpdateStaff = (updatedStaff, oldShortName) => {
@@ -1027,7 +1037,13 @@ export function DeptScheduleApp({
 
   const handleDeleteStaff = (staffId) => {
     if (!allow('staff')) return;
-    updateActiveDept(d => ({ ...d, staff: d.staff.filter(s => s.id !== staffId) }));
+    updateActiveDept((d) => {
+      const target = (d.staff || []).find((s) => s.id === staffId);
+      if (!target) return d;
+      // CHD Staff rows: ẩn bằng ShowInLichKhoa = Off ở module nhân sự CHD, không xóa tại đây.
+      if (!isLocalScheduleStaff(target)) return d;
+      return { ...d, staff: d.staff.filter((s) => s.id !== staffId) };
+    });
   };
 
   const handleBulkImportStaff = (newStaffList) => {
@@ -1131,9 +1147,9 @@ export function DeptScheduleApp({
       taskList={taskList}
       tenantDepartments={tenantDepartmentOptions()}
       defaultDeptId={activeDept?.id}
-      onAddStaff={undefined}
+      onAddStaff={handleAddStaff}
       onUpdateStaff={handleUpdateStaff}
-      onDeleteStaff={undefined}
+      onDeleteStaff={handleDeleteStaff}
       onReorderStaff={handleReorderStaff}
       onBulkImport={undefined}
       readOnly={!allow('staff')}

@@ -1,6 +1,7 @@
 import { NHAN_SU_HEADERS } from './constants.js';
 import { normalizeAccess } from '../access.js';
 import { parseShowInLichKhoa, formatShowInLichKhoa } from '../showInLichKhoa.js';
+import { isLocalScheduleStaff } from '../staffSource.js';
 import { objectsToRows, rowsToObjects } from './tableUtils.js';
 
 /** TC-F304-02 */
@@ -34,6 +35,14 @@ export function importNhanSuRows(rows) {
     if (row.showInLichKhoa !== undefined && row.showInLichKhoa !== '') {
       staff.showInLichKhoa = formatShowInLichKhoa(parseShowInLichKhoa(row.showInLichKhoa));
     }
+    const sourceRaw = String(row.source || '').trim().toLowerCase();
+    if (sourceRaw === 'local' || sourceRaw === 'chd') {
+      staff.source = sourceRaw;
+    } else if (isLocalScheduleStaff(staff)) {
+      staff.source = 'local';
+    } else {
+      staff.source = 'chd';
+    }
     if (row.accessRole) staff.accessRole = String(row.accessRole).trim();
     if (Object.values(access).some((v) => v !== undefined)) staff.access = access;
     return staff;
@@ -59,6 +68,7 @@ export function exportNhanSuRows(staffList) {
       deptId: s.deptId || '',
       deptLabel: s.deptLabel || '',
       showInLichKhoa: s.showInLichKhoa || formatShowInLichKhoa(true),
+      source: isLocalScheduleStaff(s) ? 'local' : 'chd',
       accessRole: s.accessRole || '',
       access_week: access.week ?? '',
       access_month: access.month ?? '',
