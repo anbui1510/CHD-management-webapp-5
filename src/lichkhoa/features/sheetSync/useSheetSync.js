@@ -22,16 +22,23 @@ const PULL_INTERVAL_MS = 45_000;
 /**
  * F-304 — bootstrap Sheet, pull/push, conflict hint.
  */
+function isMissingNhanSuStaffKeyError(message) {
+  return /StaffKey chưa có trong NhanSu/i.test(String(message || ''));
+}
+
 export function useSheetSync({
   syncAuthReady,
   accountLoading,
   accountEmail,
   accountFullName,
+  accountStaffKey = '',
+  accountRole = '',
   sheetConnectionRevision,
   setStore,
   storeRef,
   ensureSheets,
 }) {
+  const isChdAdmin = String(accountRole || '').trim().toLowerCase() === 'admin';
   const [sheetSyncError, setSheetSyncError] = useState('');
   const [sheetSyncNotice, setSheetSyncNotice] = useState('');
   const [sheetSyncAt, setSheetSyncAt] = useState(() => getCloudMeta().updatedAt || '');
@@ -60,6 +67,23 @@ export function useSheetSync({
     return true;
   }, [ensureSheets, setStore]);
 
+  const ensureSelfThenPush = useCallback(async () => {
+    const prepared = ensureBootstrapAdminStaff(storeRef.current, {
+      email: accountEmail,
+      fullName: accountFullName,
+      staffKey: accountStaffKey,
+    });
+    setStore(prepared);
+    saveStore(prepared, { skipCloud: true });
+    storeRef.current = prepared;
+    const res = await pushScheduleStore(prepared);
+    if (res?.updatedAt) {
+      setCloudMeta({ updatedAt: res.updatedAt });
+      setSheetSyncAt(res.updatedAt);
+    }
+    return prepared;
+  }, [accountEmail, accountFullName, accountStaffKey, setStore, storeRef]);
+
   const pullFromSheet = useCallback(async (force = false) => {
     if (!syncAuthReady || !getSpreadsheetId()) return;
     if (!(await canSyncScheduleStore())) return;
@@ -69,9 +93,23 @@ export function useSheetSync({
       if (forcePullRef.current) forcePullRef.current = false;
       if (did) setSheetSyncNotice('');
     } catch (error) {
-      setSheetSyncError(error?.message || 'Không kéo được dữ liệu từ Sheet.');
+      const message = error?.message || 'Không kéo được dữ liệu từ Sheet.';
+      if (isChdAdmin && isMissingNhanSuStaffKeyError(message)) {
+        try {
+          await ensureSelfThenPush();
+          const remote = await pullScheduleStore(storeRef.current);
+          applyRemotePayload(remote, true);
+          setSheetSyncError('');
+          setSheetSyncNotice('Đã ghi StaffKey hiện tại vào NhanSu và đồng bộ lại.');
+          return;
+        } catch (retryError) {
+          setSheetSyncError(retryError?.message || message);
+          return;
+        }
+      }
+      setSheetSyncError(message);
     }
-  }, [applyRemotePayload, storeRef, syncAuthReady]);
+  }, [applyRemotePayload, ensureSelfThenPush, isChdAdmin, storeRef, syncAuthReady]);
 
   const runBootstrap = useCallback(async () => {
     if (!syncAuthReady || !getSpreadsheetId()) return;
@@ -81,6 +119,7 @@ export function useSheetSync({
       let prepared = ensureBootstrapAdminStaff(storeRef.current, {
         email: accountEmail,
         fullName: accountFullName,
+        staffKey: accountStaffKey,
       });
       const res = await bootstrapScheduleStore(prepared);
       if (res?.updatedAt) {
@@ -100,6 +139,7 @@ export function useSheetSync({
   }, [
     accountEmail,
     accountFullName,
+    accountStaffKey,
     pullFromSheet,
     setStore,
     storeRef,
@@ -115,7 +155,21 @@ export function useSheetSync({
     (async () => {
       try {
         if (!(await canSyncScheduleStore())) return;
-        const profile = await fetchSheetProfile();
+        let profile;
+        try {
+          profile = await fetchSheetProfile();
+        } catch (profileError) {
+          if (cancelled) return;
+          const message = profileError?.message || 'Lỗi đồng bộ Sheet.';
+          if (isChdAdmin && isMissingNhanSuStaffKeyError(message)) {
+            await ensureSelfThenPush();
+            if (cancelled) return;
+            profile = await fetchSheetProfile();
+            setSheetSyncNotice('Đã ghi StaffKey Admin vào NhanSu Sheet lịch.');
+          } else {
+            throw profileError;
+          }
+        }
         if (cancelled) return;
         if (profile?.bootstrapEligible) {
           bootstrapCheckedRef.current = true;
@@ -139,6 +193,7 @@ export function useSheetSync({
         } else {
           await pullFromSheet(forcePullRef.current);
         }
+        if (!cancelled) setSheetSyncError('');
       } catch (error) {
         if (!cancelled) {
           setSheetSyncError(error?.message || 'Lỗi đồng bộ Sheet.');
@@ -153,8 +208,11 @@ export function useSheetSync({
     accountLoading,
     syncAuthReady,
     accountEmail,
+    accountStaffKey,
+    isChdAdmin,
     sheetConnectionRevision,
     applyRemotePayload,
+    ensureSelfThenPush,
     pullFromSheet,
     storeRef,
   ]);

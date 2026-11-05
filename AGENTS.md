@@ -240,7 +240,7 @@ Tích hợp từ `lichkhoa-webapp`. **Không** dùng Google login; dùng phiên 
 ### Google Sheet lịch — tách biệt Sheet y tế CHD
 - Config riêng: `data/lichkhoa_sync_config.json` / env `LICHKHOA_SCRIPT_URL`, `LICHKHOA_SCRIPT_SECRET`, `LICHKHOA_SPREADSHEET_ID`
 - API: `GET/POST /api/lichkhoa/sync-config`, `POST /api/lichkhoa/proxy`
-- Apps Script: `src/data/lichKhoaAppsScriptCode.ts` (auth bằng `apiKey` + `staffKey`, không Google ID token)
+- Apps Script: `src/data/lichKhoaAppsScriptCode.ts` (auth bằng `apiKey` + `staffKey` + `chdRole` từ phiên CHD; **Admin CHD** được đồng bộ dù chưa có dòng trên tab `NhanSu`; User phải có `id = StaffKey` trên `NhanSu`)
 - Tab Sheet: `_meta`, `NhanSu`, `Task`, `LichTuan`, `LichThang`, (`LichNghi`, `LichHoc`, `Dashboard`)
 - Liên kết UI: thẻ **Virtual Google Sheets** trong workspace mục 7 (`lich-khoa-sheets`)
 

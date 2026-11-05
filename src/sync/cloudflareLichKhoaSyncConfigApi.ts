@@ -209,6 +209,7 @@ export async function handleCloudflareLichKhoaProxy(
     ...body,
     spreadsheetId,
     staffKey: session.staffKey,
+    chdRole: String(session.role || '').trim(),
     apiKey: config.scriptSecret || '',
   };
   delete (payload as Record<string, unknown>).scriptSecret;
