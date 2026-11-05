@@ -309,6 +309,8 @@ export function DeptScheduleApp({
     accountLoading: false,
     accountEmail: lichUser?.email,
     accountFullName: lichUser?.fullName,
+    accountStaffKey: lichUser?.id || currentStaff?.StaffKey || '',
+    accountRole: lichUser?.role || currentStaff?.Role || '',
     sheetConnectionRevision,
     setStore,
     storeRef,

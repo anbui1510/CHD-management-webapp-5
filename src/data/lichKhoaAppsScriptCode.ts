@@ -22,6 +22,7 @@ function doPost(e) {
     var spreadsheetId = body.spreadsheetId;
     var apiKey = body.apiKey || body.scriptSecret || '';
     var staffKey = String(body.staffKey || '').trim();
+    var chdRole = String(body.chdRole || body.role || '').trim();
     if (!spreadsheetId) {
       return jsonOut({ error: 'Thiếu spreadsheetId.' }, 400);
     }
@@ -53,9 +54,11 @@ function doPost(e) {
           updatedAt: metaUpdatedAt_(ss)
         });
       }
-      var actorProfile = resolveActorByKey_(staffKey, staff);
+      var actorProfile = resolveActorByKey_(staffKey, staff, chdRole);
       if (!actorProfile.allowed) {
-        return jsonOut({ error: 'StaffKey chưa có trong NhanSu. Liên hệ trưởng khoa.' }, 403);
+        return jsonOut({
+          error: 'StaffKey chưa có trong NhanSu. Admin CHD: redeploy Code.gs lịch khoa bản mới, hoặc Đồng bộ để ghi NhanSu từ CHD. User: nhờ Admin bật ShowInLichKhoa và đẩy NhanSu.'
+        }, 403);
       }
       return jsonOut({
         staffKey: staffKey,
@@ -73,15 +76,19 @@ function doPost(e) {
       touchMetaUpdatedAt_(ss);
       staffRows = sheetValues_(ss, 'NhanSu');
       staff = rowsToStaff_(staffRows);
-      var actorBoot = resolveActorByKey_(staffKey, staff);
+      var actorBoot = resolveActorByKey_(staffKey, staff, chdRole);
       if (!actorBoot.allowed) {
-        return jsonOut({ error: 'Bootstrap xong nhưng StaffKey chưa có trong NhanSu. Kiểm tra tab NhanSu.' }, 500);
+        return jsonOut({ error: 'Bootstrap xong nhưng StaffKey chưa có trong NhanSu. Kiểm tra tab NhanSu (cột id = StaffKey).' }, 500);
       }
       return jsonOut({ updatedAt: metaUpdatedAt_(ss), actor: actorBoot, staffKey: staffKey });
     }
 
-    var actor = resolveActorByKey_(staffKey, staff);
-    if (!actor.allowed) return jsonOut({ error: 'StaffKey chưa có trong NhanSu. Liên hệ trưởng khoa.' }, 403);
+    var actor = resolveActorByKey_(staffKey, staff, chdRole);
+    if (!actor.allowed) {
+      return jsonOut({
+        error: 'StaffKey chưa có trong NhanSu. Admin CHD: redeploy Code.gs lịch khoa bản mới, hoặc Đồng bộ để ghi NhanSu từ CHD. User: nhờ Admin bật ShowInLichKhoa và đẩy NhanSu.'
+      }, 403);
+    }
 
     if (action === 'pull') {
       var tabs = {};
@@ -229,28 +236,40 @@ function findStaffByKey_(staffKey, staff) {
   return null;
 }
 
-function resolveActorByKey_(staffKey, staff) {
+function resolveActorByKey_(staffKey, staff, chdRole) {
   var s = findStaffByKey_(staffKey, staff);
-  if (!s) return { allowed: false, kind: 'guest' };
-  var role = String(s.accessRole || '').trim().toLowerCase();
-  if (role && role !== 'member') {
-    return { allowed: true, kind: 'admin', staffId: s.id, access: fullAccess_() };
-  }
-  return {
-    allowed: true,
-    kind: 'member',
-    staffId: s.id,
-    access: {
-      week: s.access_week || 'edit',
-      month: s.access_month || 'view',
-      leave: s.access_leave || 'edit',
-      study: s.access_study || 'view',
-      calendar: s.access_calendar || 'view',
-      dashboard: s.access_dashboard || 'none',
-      staff: s.access_staff || 'none',
-      tasks: s.access_tasks || 'none'
+  if (s) {
+    var role = String(s.accessRole || '').trim().toLowerCase();
+    if (role && role !== 'member') {
+      return { allowed: true, kind: 'admin', staffId: s.id, access: fullAccess_() };
     }
-  };
+    return {
+      allowed: true,
+      kind: 'member',
+      staffId: s.id,
+      access: {
+        week: s.access_week || 'edit',
+        month: s.access_month || 'view',
+        leave: s.access_leave || 'edit',
+        study: s.access_study || 'view',
+        calendar: s.access_calendar || 'view',
+        dashboard: s.access_dashboard || 'none',
+        staff: s.access_staff || 'none',
+        tasks: s.access_tasks || 'none'
+      }
+    };
+  }
+  // CHD Admin được phép đồng bộ dù chưa có dòng trên NhanSu (roster lấy từ CHD Staff).
+  if (String(chdRole || '').trim().toLowerCase() === 'admin') {
+    return {
+      allowed: true,
+      kind: 'admin',
+      staffId: String(staffKey || '').trim(),
+      access: fullAccess_(),
+      fromChdAdmin: true
+    };
+  }
+  return { allowed: false, kind: 'guest' };
 }
 
 function fullAccess_() {

@@ -26,15 +26,59 @@ export function createEmptyTenantStore(tenantMeta = {}) {
   };
 }
 
-/** Đảm bảo có admin với loginEmail Gmail trước khi bootstrap Sheet. */
-export function ensureBootstrapAdminStaff(store, { email, fullName = '' }) {
+/**
+ * Đảm bảo người bootstrap (CHD StaffKey hoặc email) có trong NhanSu trước khi ghi Sheet.
+ * Ưu tiên id = StaffKey CHD để Apps Script resolveActor khớp phiên đăng nhập.
+ */
+export function ensureBootstrapAdminStaff(store, { email, fullName = '', staffKey = '' } = {}) {
   const loginEmail = String(email || '').trim().toLowerCase();
-  if (!loginEmail) return store;
+  const key = String(staffKey || '').trim();
+  if (!loginEmail && !key) return store;
 
   const deptId = store.activeDeptId || store.departments?.[0]?.id;
   const departments = (store.departments || []).map((dept) => {
     if (dept.id !== deptId) return dept;
     let staff = [...(dept.staff || [])];
+
+    if (key) {
+      const byKey = staff.find((s) => String(s.id || '').trim() === key);
+      if (byKey) {
+        staff = staff.map((s) => (
+          s.id === byKey.id
+            ? {
+              ...s,
+              accessRole: s.accessRole === 'member' ? 'admin' : (s.accessRole || 'admin'),
+              email: s.email || loginEmail,
+              loginEmail: s.loginEmail || loginEmail,
+              source: s.source || 'chd',
+              showInLichKhoa: s.showInLichKhoa || 'On',
+            }
+            : s
+        ));
+        return { ...dept, staff };
+      }
+      const display = String(fullName || loginEmail.split('@')[0] || key).trim();
+      const shortName = display.split(/\s+/).pop()?.slice(0, 8).toUpperCase() || 'ADMIN';
+      staff.push({
+        id: key,
+        name: display,
+        shortName,
+        title: 'Trưởng Khoa',
+        dutyQuota: 0,
+        buBalance: 0,
+        phepBalance: 0,
+        email: loginEmail || `${shortName.toLowerCase()}@hospital.vn`,
+        loginEmail: loginEmail || '',
+        position: 'BS Trưởng Khoa',
+        accessRole: 'admin',
+        source: 'chd',
+        showInLichKhoa: 'On',
+        deptId: dept.id,
+        deptLabel: dept.name,
+      });
+      return { ...dept, staff };
+    }
+
     const byLogin = staff.find((s) => String(s.loginEmail || '').trim().toLowerCase() === loginEmail);
     if (byLogin) {
       if (!byLogin.accessRole || byLogin.accessRole === 'member') {

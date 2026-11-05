@@ -1753,10 +1753,13 @@ app.post('/api/lichkhoa/proxy', requireAuth, async (req, res) => {
     if (!spreadsheetId) {
       return res.status(400).json({ error: 'Thiếu spreadsheetId lịch khoa.' });
     }
+    const staffList = readDB<Staff>(STAFF_FILE, defaultStaff);
+    const actor = staffList.find((s) => String(s.StaffKey || '').trim() === staffKey);
     const payload = {
       ...(req.body || {}),
       spreadsheetId,
       staffKey,
+      chdRole: String(actor?.Role || '').trim(),
       apiKey: config.scriptSecret || '',
     };
     delete (payload as any).scriptSecret;
