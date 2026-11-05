@@ -56,6 +56,9 @@ import StaffManagementView from './components/StaffManagementView';
 import StaffAccountMenu from './components/StaffAccountMenu';
 import BellNotificationMenu from './components/BellNotificationMenu';
 import StaffProfileView from './components/StaffProfileView';
+import LichKhoaVirtualSheets from './components/LichKhoaVirtualSheets';
+import { DeptScheduleApp } from './lichkhoa/DeptScheduleApp';
+import './lichkhoa/index.css';
 import { useRefreshMedicalData, type MedicalDataLoadState } from './hooks/useRefreshMedicalData';
 import { useSheetsSyncStatus } from './hooks/useSheetsSyncStatus';
 import { formatSheetsSyncStatusLabel } from './utils/sheetsSyncFeedback';
@@ -340,7 +343,7 @@ export default function App() {
   };
 
   // Navigation State - Defaults to Home Bento Grid !
-  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'heart-transplant' | 'mri-overview' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt'>('home');
+  const [activeMenu, setActiveMenu] = useState<'home' | 'workspace' | 'profile' | 'patients' | 'consult-form' | 'consult-list' | 'results-staff' | 'schedule-tt' | 'schedule-view' | 'cathlab-room' | 'cathlab-report' | 'heart-transplant' | 'mri-overview' | 'mri-scheduler' | 'mri-register' | 'mri-result' | 'mri-calendar' | 'surgery-room' | 'surgery-scheduler' | 'surgery-schedule-view' | 'archive' | 'excel-export' | 'google-sheets' | 'chd-daily-brief' | 'staff-mgmt' | 'lich-khoa-sheet' | 'lich-khoa-dashboard' | 'lich-khoa-tasks' | 'lich-khoa-staff' | 'lich-khoa-calendar' | 'lich-khoa-sheets'>('home');
   const [profileReturnMenu, setProfileReturnMenu] = useState<typeof activeMenu>('home');
   const [isStaffAccountMenuOpen, setIsStaffAccountMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -2715,7 +2718,7 @@ export default function App() {
       <div className="app-main-workspace max-w-none px-2 sm:px-3 md:px-4 xl:px-6 mx-auto py-1 md:py-2 xl:py-4 flex-1 w-full flex flex-row gap-2 md:gap-3 xl:gap-4 overflow-hidden min-h-0 pb-[var(--mobile-bottom-nav-offset)] md:pb-2 xl:pb-4">
         
         {/* Primary View content frame */}
-        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'heart-transplant' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-w-0 h-full flex flex-col min-h-0 ${activeMenu === 'home' || activeMenu === 'profile' || activeMenu === 'cathlab-room' || activeMenu === 'cathlab-report' || activeMenu === 'heart-transplant' || activeMenu === 'surgery-room' || activeMenu === 'patients' || activeMenu === 'schedule-tt' || activeMenu === 'schedule-view' || activeMenu === 'archive' || activeMenu === 'mri-overview' || activeMenu === 'mri-scheduler' || activeMenu === 'mri-register' || activeMenu === 'mri-result' || activeMenu === 'mri-calendar' || activeMenu === 'surgery-scheduler' || activeMenu === 'surgery-schedule-view' || activeMenu === 'google-sheets' || activeMenu === 'chd-daily-brief' || activeMenu === 'results-staff' || activeMenu === 'consult-list' || activeMenu === 'staff-mgmt' || activeMenu.startsWith('lich-khoa-') ? (activeMenu === 'home' ? 'overflow-y-auto md:overflow-hidden' : 'overflow-hidden') : 'overflow-y-auto'}`}>
           
           {/* HOME PANEL */}
           {activeMenu === 'home' && (
@@ -4090,6 +4093,26 @@ export default function App() {
               </button>
 
             </div>
+          )}
+
+          {/* LỊCH KHOA — Module 7 */}
+          {(activeMenu === 'lich-khoa-sheet'
+            || activeMenu === 'lich-khoa-dashboard'
+            || activeMenu === 'lich-khoa-tasks'
+            || activeMenu === 'lich-khoa-staff'
+            || activeMenu === 'lich-khoa-calendar') && (
+            <div className="flex-1 min-h-0 h-full overflow-hidden">
+              <DeptScheduleApp
+                currentStaff={currentStaff}
+                chdStaffList={staffList}
+                activeMenu={activeMenu}
+                onNavigateToSheets={() => navigateMenu('lich-khoa-sheets')}
+              />
+            </div>
+          )}
+
+          {activeMenu === 'lich-khoa-sheets' && (
+            <LichKhoaVirtualSheets />
           )}
 
           {/* STAFF MANAGEMENT */}
