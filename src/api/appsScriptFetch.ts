@@ -1275,6 +1275,9 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     return null;
   }
 
+  // Lịch khoa: server-side only (Express / Cloudflare Worker), not medical bridge collections.
+  if (endpoint === 'lichkhoa') return null;
+
   if (endpoint === 'reset') {
     // Require Admin for reset in bridge mode
     if (!isLocalHost()) {
