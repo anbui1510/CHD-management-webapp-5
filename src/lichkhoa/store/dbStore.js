@@ -296,21 +296,22 @@ function storeFromTimMachSeed() {
 }
 
 /** Ghi đè nhân sự + task Tim Mạch từ repo; giữ lịch sheet và khoa khác. */
-export function applyTimMachSeedToStore(store) {
+export function applyTimMachSeedToStore(store, { overwriteTasks = true, overwriteStaff = true } = {}) {
   const seedDept = timMachDepartmentFromSeed();
-  let departments = (store?.departments || []).map(dept => (
-    dept.id === seedDept.id
-      ? {
-        ...dept,
-        staff: seedDept.staff,
-        tasks: seedDept.tasks,
-        rules: seedDept.rules,
-        customCategories: seedDept.customCategories,
-        leaveEntries: seedDept.leaveEntries
-      }
-      : dept
-  ));
-  if (!departments.some(dept => dept.id === seedDept.id)) {
+  let departments = (store?.departments || []).map((dept) => {
+    if (dept.id !== seedDept.id) return dept;
+    const next = { ...dept, rules: seedDept.rules ?? dept.rules };
+    if (overwriteStaff || !(dept.staff || []).length) next.staff = seedDept.staff;
+    if (overwriteTasks || !(dept.tasks || []).length) {
+      next.tasks = seedDept.tasks;
+      next.customCategories = seedDept.customCategories;
+    }
+    if (!(dept.leaveEntries || []).length && seedDept.leaveEntries) {
+      next.leaveEntries = seedDept.leaveEntries;
+    }
+    return next;
+  });
+  if (!departments.some((dept) => dept.id === seedDept.id)) {
     departments = [seedDept, ...departments];
   }
   return normalizeStore({
@@ -320,12 +321,32 @@ export function applyTimMachSeedToStore(store) {
   });
 }
 
+export function getTimMachSeedTasks() {
+  return timMachDepartmentFromSeed().tasks || [];
+}
+
+export function fillEmptyTasksFromSeed(store) {
+  const seedTasks = getTimMachSeedTasks();
+  if (!seedTasks.length) return store;
+  const deptId = timMachDepartmentFromSeed().id;
+  let changed = false;
+  const departments = (store?.departments || []).map((dept) => {
+    if ((dept.tasks || []).length) return dept;
+    if (dept.id !== deptId && store?.departments?.length > 1) return dept;
+    changed = true;
+    return { ...dept, tasks: seedTasks };
+  });
+  return changed ? normalizeStore({ ...store, departments }) : store;
+}
+
 /**
- * Khi seed repo lên version mới có kèm lịch demo: nạp lại staff/tasks
- * và chỉ gắn sheets seed nếu khoa chưa có sheet / sheet trống.
+ * Seed version mới: chỉ bổ sung task/sheet khi đang trống — không đè dữ liệu đang dùng.
  */
 export function upgradeStoreFromTimMachSeed(store) {
-  const base = applyTimMachSeedToStore(store);
+  const base = applyTimMachSeedToStore(store, {
+    overwriteTasks: false,
+    overwriteStaff: false,
+  });
   const seedSheets = timMachSheetsFromSeed();
   const deptId = timMachDepartmentFromSeed().id;
   const seeded = seedSheets[deptId];
@@ -357,9 +378,10 @@ export function getInitialStore() {
     try {
       let parsed = normalizeStore(JSON.parse(saved));
       if (seedVersion !== TIM_MACH_SEED_VERSION) {
+        // Không đè task/staff đã có — chỉ bổ sung khi trống.
         parsed = upgradeStoreFromTimMachSeed(parsed);
         localStorage.setItem(SEED_STORAGE_KEY, TIM_MACH_SEED_VERSION);
-        saveStore(parsed);
+        saveStore(parsed, { skipCloud: true });
       }
       return parsed;
     } catch (e) {
@@ -368,14 +390,9 @@ export function getInitialStore() {
   }
 
   if (isSheetBackend()) {
-    const tenant = resolveTenant();
-    const dept = tenant.departments?.[0];
-    const initial = normalizeStore(buildEmptyTenantStore({
-      slug: tenant.slug,
-      id: dept?.id,
-      name: tenant.label || dept?.name,
-      code: dept?.id?.replace(/^dept_/, '').toUpperCase(),
-    }));
+    // Boot với seed Tim mạch (task đầy đủ); pull Sheet sẽ ghi đè nếu đã có dữ liệu.
+    const initial = storeFromTimMachSeed();
+    localStorage.setItem(SEED_STORAGE_KEY, TIM_MACH_SEED_VERSION);
     saveStore(initial, { skipCloud: true });
     return initial;
   }

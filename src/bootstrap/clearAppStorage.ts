@@ -5,6 +5,12 @@ const PRESERVE_LOCAL_KEYS = [
   'chd_apps_script_url',
   'chd_apps_script_secret',
   'CHD_APP_BUILD_ID',
+  // Module 7 — giữ cache lịch/task qua deploy; Sheet vẫn là nguồn chính khi pull.
+  'LICHKHOA_DATA_STORE_V1',
+  'LICHKHOA_SEED_VERSION_V1',
+  'LICHKHOA_CLOUD_META_V1',
+  'LICHKHOA_SHEET_ID',
+  'LICHKHOA_SHEET_URL',
 ] as const;
 
 function preserveLocalStorageValues(): Record<string, string> {

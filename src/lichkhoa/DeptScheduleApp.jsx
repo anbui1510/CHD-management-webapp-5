@@ -1128,7 +1128,7 @@ export function DeptScheduleApp({
     }));
   };
 
-  const handleImportStore = (imported) => {
+  const handleImportStore = async (imported) => {
     if (!allow('tasks')) return;
     try {
       const next = ensureSheets(imported);
@@ -1136,18 +1136,26 @@ export function DeptScheduleApp({
         throw new Error('File sao lưu không có khoa hợp lệ.');
       }
       // CHD: giữ đúng 1 khoa Tim mạch nếu backup có nhiều khoa.
+      let toSave = next;
       if (embedInChd) {
         const cardio = next.departments.find((d) => d.id === CARDIOLOGY_DEPT_ID)
           || next.departments.find((d) => /tim\s*mạch/i.test(String(d.name || '')))
           || next.departments[0];
-        setStore(ensureSheets({
+        toSave = ensureSheets({
           ...next,
           departments: [cardio],
           activeDeptId: cardio.id,
-        }));
-        return;
+        });
       }
-      setStore(next);
+      setStore(toSave);
+      saveStore(toSave, { skipCloud: true });
+      storeRef.current = toSave;
+      // Ghi ngay lên Google Sheet — không phụ thuộc localStorage qua các lần deploy.
+      if (typeof sheetSync.persistStoreToSheet === 'function') {
+        await sheetSync.persistStoreToSheet(toSave, {
+          notice: 'Đã lưu Task/nhân sự lịch lên Google Sheet Tim mạch.',
+        });
+      }
     } catch (error) {
       console.error('Import store failed:', error);
       window.alert(String(error?.message || error || 'Không nhập được file sao lưu.'));

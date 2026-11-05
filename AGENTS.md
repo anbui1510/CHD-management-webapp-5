@@ -238,11 +238,14 @@ Tích hợp từ `lichkhoa-webapp`. **Không** dùng Google login; dùng phiên 
 `lich-khoa-sheet`, `lich-khoa-dashboard`, `lich-khoa-tasks`, `lich-khoa-staff`, `lich-khoa-calendar`, `lich-khoa-sheets`
 
 ### Google Sheet lịch — tách biệt Sheet y tế CHD
-- Config riêng: `data/lichkhoa_sync_config.json` / env `LICHKHOA_SCRIPT_URL`, `LICHKHOA_SCRIPT_SECRET`, `LICHKHOA_SPREADSHEET_ID`
+- Spreadsheet mặc định Khoa Tim mạch: `1auPmK3BcgDbHJcVut5SzEMLjQ_VH9wi8ZM6pS5LZ1Lc`
+- Config: `data/lichkhoa_sync_config.json` / env `LICHKHOA_SCRIPT_URL`, `LICHKHOA_SCRIPT_SECRET`, `LICHKHOA_SPREADSHEET_ID`
 - API: `GET/POST /api/lichkhoa/sync-config`, `POST /api/lichkhoa/proxy`
-- Apps Script: `src/data/lichKhoaAppsScriptCode.ts` (auth bằng `apiKey` + `staffKey` + `chdRole` từ phiên CHD; **Admin CHD** được đồng bộ dù chưa có dòng trên tab `NhanSu`; User phải có `id = StaffKey` trên `NhanSu`)
+- Apps Script: `src/data/lichKhoaAppsScriptCode.ts` (auth `apiKey` + `staffKey` + `chdRole`; **Admin CHD luôn full quyền** kể cả khi đã có dòng `NhanSu` với `access_tasks=none`; User cần `id = StaffKey` trên `NhanSu`)
 - Tab Sheet: `_meta`, `NhanSu`, `Task`, `LichTuan`, `LichThang`, (`LichNghi`, `LichHoc`, `Dashboard`)
+- **Task / thuộc tính lịch NhanSu** lưu trên Sheet; sửa trên UI → push Sheet. Sau deploy app kéo lại từ Sheet (không phụ thuộc nhập JSON).
 - Liên kết UI: thẻ **Virtual Google Sheets** trong workspace mục 7 (`lich-khoa-sheets`)
+
 
 ### Nhân sự xếp lịch
 - Nguồn danh sách: CHD bảng **Staff** (`NhanSu.id = StaffKey`) + nhân sự **thêm tay** trên Module 7

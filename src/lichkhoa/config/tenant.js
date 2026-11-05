@@ -2,6 +2,9 @@ import { parseSpreadsheetId } from '../logic/sheetStore/parseSpreadsheetId.js';
 
 const PAGES_DEV_SUFFIX = '-lichkhoa-webapp.pages.dev';
 
+/** Spreadsheet mặc định Khoa Tim mạch (CHD Module 7). */
+export const TIM_MACH_SPREADSHEET_ID = '1auPmK3BcgDbHJcVut5SzEMLjQ_VH9wi8ZM6pS5LZ1Lc';
+
 function env(key) {
   try {
     return import.meta.env?.[key];
@@ -56,16 +59,16 @@ function entryFromEnvSingle() {
   const sheetRaw = String(
     env('VITE_DEFAULT_SPREADSHEET_ID')
     || env('VITE_DEFAULT_SPREADSHEET_URL')
-    || ''
+    || TIM_MACH_SPREADSHEET_ID
   ).trim();
-  const spreadsheetId = parseSpreadsheetId(sheetRaw) || sheetRaw;
+  const spreadsheetId = parseSpreadsheetId(sheetRaw) || sheetRaw || TIM_MACH_SPREADSHEET_ID;
   const deptList = parseJsonEnv(env('VITE_TENANT_DEPARTMENTS'));
-  const deptId = slug ? `dept_${slug.replace(/-/g, '_')}` : 'dept_default';
+  const deptId = slug ? `dept_${slug.replace(/-/g, '_')}` : 'dept_tim_mach';
   return {
-    slug: slug || 'default',
-    label: label || 'Lịch khoa',
+    slug: slug || 'tim-mach',
+    label: label || 'Khoa Tim Mạch',
     spreadsheetId,
-    departments: normalizeDepartments(deptList, deptId, label || 'Khoa')
+    departments: normalizeDepartments(deptList, deptId, label || 'Khoa Tim Mạch')
   };
 }
 
