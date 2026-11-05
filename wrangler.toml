@@ -12,4 +12,5 @@ id = "00000000000000000000000000000000"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-not_found_handling = "single-page-application"
+# Missing static files return 404; worker/index.ts serves index.html for HTML navigations only.
+not_found_handling = "none"

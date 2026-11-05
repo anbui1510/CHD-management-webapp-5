@@ -23,6 +23,46 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+const STATIC_FILE_EXT = /\.(?:js|mjs|css|map|woff2?|ttf|otf|png|jpe?g|gif|webp|svg|ico|webmanifest|txt|pptx|pdf)$/i;
+
+function isStaticAssetPath(pathname: string): boolean {
+  if (pathname.startsWith('/assets/')) return true;
+  if (pathname.startsWith('/icons/')) return true;
+  if (pathname.startsWith('/consult-slide/')) return true;
+  if (pathname.startsWith('/lichkhoa/')) return true;
+  return STATIC_FILE_EXT.test(pathname);
+}
+
+function wantsHtmlDocument(request: Request): boolean {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return false;
+  const accept = request.headers.get('Accept') || '';
+  return accept.includes('text/html') || accept === '*/*';
+}
+
+/** Avoid SPA fallback HTML on missing JS/CSS (causes blank screen after deploy). */
+async function serveClientAsset(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  let response = await env.ASSETS.fetch(request);
+
+  if (isStaticAssetPath(url.pathname)) {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      return new Response('Not Found', {
+        status: 404,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+    return response;
+  }
+
+  if (response.status === 404 && wantsHtmlDocument(request)) {
+    const indexRequest = new Request(new URL('/index.html', url.origin), request);
+    response = await env.ASSETS.fetch(indexRequest);
+  }
+
+  return response;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -76,6 +116,6 @@ export default {
       return handleCloudflareLichKhoaRequest(request, env);
     }
 
-    return env.ASSETS.fetch(request);
+    return serveClientAsset(request, env);
   },
 };
