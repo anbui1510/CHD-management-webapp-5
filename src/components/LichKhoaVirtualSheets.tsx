@@ -271,7 +271,8 @@ export default function LichKhoaVirtualSheets() {
                 Extensions → Apps Script → dán toàn bộ Code.gs bên phải → Lưu.
               </li>
               <li>
-                Deploy → New deployment → Web app · Execute as Me · Who has access: Anyone → copy Web app URL.
+                Deploy → New deployment → Web app · Execute as Me · Anyone → copy URL. Sau khi sửa Code.gs phải{' '}
+                <strong>Manage deployments → New version</strong> (không chỉ Save trong editor).
               </li>
               <li>
                 Copy <strong>Spreadsheet ID</strong> từ URL file Sheet (

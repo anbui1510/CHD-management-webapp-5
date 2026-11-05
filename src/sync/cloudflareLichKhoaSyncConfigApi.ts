@@ -158,13 +158,13 @@ export async function handleCloudflareLichKhoaSyncConfigRequest(
     return json({ error: validationError }, 400);
   }
 
-  const sheetVerifyError = await verifyLichKhoaSpreadsheetAccess(
+  const sheetVerify = await verifyLichKhoaSpreadsheetAccess(
     String(scriptUrl).trim(),
     secretToStore,
     sheetId
   );
-  if (sheetVerifyError) {
-    return json({ error: sheetVerifyError }, 400);
+  if (sheetVerify.error) {
+    return json({ error: sheetVerify.error }, 400);
   }
 
   await writeLichKhoaSyncConfig(env, {
@@ -173,7 +173,10 @@ export async function handleCloudflareLichKhoaSyncConfigRequest(
     spreadsheetId: sheetId,
   });
 
-  return json({ success: true, message: 'Kết nối Sheet lịch khoa thành công.' });
+  const message = sheetVerify.warning
+    ? `Kết nối Sheet lịch khoa đã lưu. ${sheetVerify.warning}`
+    : 'Kết nối Sheet lịch khoa thành công.';
+  return json({ success: true, message, legacyScript: !!sheetVerify.legacyScript });
 }
 
 export async function handleCloudflareLichKhoaProxy(
