@@ -401,12 +401,62 @@ export function saveStore(store, { skipCloud = false } = {}) {
   }, 800);
 }
 
+/** Đưa sheetsByDept về map theo deptId (một số file seed lưu thẳng block sheet). */
+function coerceSheetsByDept(rawSheets, departments) {
+  const depts = Array.isArray(departments) ? departments : [];
+  if (!rawSheets || typeof rawSheets !== 'object') return {};
+  if (Array.isArray(rawSheets.sheets)) {
+    const deptId = depts[0]?.id;
+    return deptId ? { [deptId]: rawSheets } : {};
+  }
+  const next = {};
+  Object.entries(rawSheets).forEach(([key, value]) => {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value.sheets)) {
+      next[key] = value;
+      return;
+    }
+    if (Array.isArray(value)) {
+      next[key] = {
+        activeSheetId: value[0]?.id || `sheet_${key}_1`,
+        sheets: value,
+      };
+    }
+  });
+  return next;
+}
+
+/**
+ * Đọc file sao lưu Lịch Khoa.
+ * Chấp nhận: { departments: [...] } hoặc seed { department: {...} }.
+ */
 export function parseImportedStore(text) {
   const parsed = JSON.parse(text);
-  if (!parsed || !Array.isArray(parsed.departments)) {
-    throw new Error('File không đúng định dạng sao lưu Lịch Khoa (thiếu danh sách khoa).');
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('File không đúng định dạng sao lưu Lịch Khoa.');
   }
-  return normalizeStore(parsed);
+
+  let departments = Array.isArray(parsed.departments) ? parsed.departments : null;
+  if ((!departments || !departments.length) && parsed.department && typeof parsed.department === 'object') {
+    departments = [parsed.department];
+  }
+  if (!departments || !departments.length) {
+    throw new Error('File sao lưu không có khoa nào (thiếu departments/department).');
+  }
+  if (departments.some((dept) => !dept || typeof dept !== 'object' || !String(dept.id || '').trim())) {
+    throw new Error('File sao lưu có khoa thiếu mã id.');
+  }
+
+  const activeDeptId = parsed.activeDeptId
+    || departments.find((dept) => dept.id === 'dept_tim_mach')?.id
+    || departments[0].id;
+
+  return normalizeStore({
+    ...parsed,
+    departments,
+    activeDeptId,
+    sheetsByDept: coerceSheetsByDept(parsed.sheetsByDept, departments),
+  });
 }
 
 export function downloadStoreBackup(store, filenamePrefix = 'lichkhoa-backup') {

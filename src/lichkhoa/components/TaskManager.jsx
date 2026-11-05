@@ -160,15 +160,18 @@ export function TaskManager({
       const imported = parseImportedStore(text);
       const deptCount = imported.departments?.length || 0;
       const taskCount = imported.departments?.reduce((sum, dept) => sum + (dept.tasks?.length || 0), 0) || 0;
+      const staffCount = imported.departments?.reduce((sum, dept) => sum + (dept.staff?.length || 0), 0) || 0;
       const ok = await confirm({
         variant: 'danger',
         title: 'Nhập sao lưu',
-        message: <>Thay toàn bộ dữ liệu hiện tại bằng file này ({deptCount} khoa, {taskCount} task)?</>,
+        message: `Thay toàn bộ dữ liệu hiện tại bằng file này (${deptCount} khoa, ${staffCount} nhân sự, ${taskCount} task)?`,
         confirmText: 'Nhập'
       });
       if (ok) onImportStore?.(imported);
     } catch (error) {
       await confirm({
+        variant: 'danger',
+        alertOnly: true,
         title: 'Không đọc được file',
         message: String(error?.message || error),
         confirmText: 'Đóng'
