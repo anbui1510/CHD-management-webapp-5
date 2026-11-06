@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { UserPlus, Upload, Trash2, Pencil, X, Plus, ChevronRight } from 'lucide-react';
-import { TITLE_OPTIONS, POSITION_OPTIONS, derivePositionFromTitle, getQuotaForTitle } from '../store/constants';
+import {
+  POSITION_OPTIONS,
+  getQuotaForLegacyTitle,
+  getQuotaForPosition,
+  normalizeLegacyPosition,
+  positionShowsStudyRange,
+} from '../store/constants';
 import { ACCESS_LEVELS, ACCESS_TABS, accessRoleLabel, normalizeAccess } from '../logic/access';
 import { DUTY_WEEKDAYS, dutyScheduleTask, normalizeDuties } from '../logic/staffDuties';
 import { showInLichKhoaLabel } from '../logic/showInLichKhoa.js';
@@ -16,9 +22,8 @@ import { ModalPortal } from './ModalPortal';
 const EMPTY_FORM = {
   name: '',
   shortName: '',
-  title: 'BS CK1',
-  position: 'BS Cột 2',
-  dutyQuota: 6,
+  position: POSITION_OPTIONS[0],
+  dutyQuota: getQuotaForPosition(POSITION_OPTIONS[0]),
   buBalance: 0,
   phepBalance: 12,
   email: '',
@@ -31,9 +36,8 @@ const EMPTY_FORM = {
 
 const LOCAL_ADD_FORM = {
   ...EMPTY_FORM,
-  title: 'Học Viên',
-  position: 'BS Học viên',
-  dutyQuota: getQuotaForTitle('Học Viên'),
+  position: 'Học viên',
+  dutyQuota: getQuotaForPosition('Học viên'),
   accessRole: 'member',
   access: normalizeAccess({
     week: 'view',
@@ -106,12 +110,12 @@ export function StaffManager({
   const identityLocked = chdSynced && !editingIsLocal;
 
   const openEdit = (s) => {
+    const position = normalizeLegacyPosition(s.position || s.title || '');
     setForm({
       name: s.name || '',
       shortName: s.shortName || '',
-      title: s.title || 'BS CK1',
-      position: s.position || derivePositionFromTitle(s.title),
-      dutyQuota: s.dutyQuota ?? getQuotaForTitle(s.title),
+      position,
+      dutyQuota: s.dutyQuota ?? getQuotaForPosition(position, getQuotaForLegacyTitle(s.title, 6)),
       buBalance: s.buBalance ?? 0,
       phepBalance: s.phepBalance ?? 0,
       email: s.email || '',
@@ -164,8 +168,12 @@ export function StaffManager({
     }));
   };
 
-  const handleTitleChange = (title) => {
-    setForm(f => ({ ...f, title, dutyQuota: getQuotaForTitle(title, f.dutyQuota) }));
+  const handlePositionChange = (position) => {
+    setForm((f) => ({
+      ...f,
+      position,
+      dutyQuota: getQuotaForPosition(position, f.dutyQuota),
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -181,8 +189,8 @@ export function StaffManager({
       setFormError(`Tên viết tắt "${shortName}" đã được dùng cho ${duplicate.name}. Vui lòng chọn tên khác.`);
       return;
     }
-    if (form.title === 'Học Viên' && form.studyFrom && form.studyTo && form.studyTo < form.studyFrom) {
-      setFormError('Ngày kết thúc đi học phải sau ngày bắt đầu.');
+    if (positionShowsStudyRange(form.position) && form.studyFrom && form.studyTo && form.studyTo < form.studyFrom) {
+      setFormError('Ngày kết thúc phải sau ngày bắt đầu.');
       return;
     }
 
@@ -199,14 +207,14 @@ export function StaffManager({
     const payload = {
       name,
       shortName,
-      title: form.title,
+      title: '',
       position: form.position,
       dutyQuota: Number(form.dutyQuota) || 0,
       buBalance: Number(form.buBalance) || 0,
       phepBalance: Number(form.phepBalance) || 0,
       email: form.email.trim() || `${shortName.toLowerCase()}@hospital.vn`,
-      studyFrom: form.title === 'Học Viên' ? (form.studyFrom || '') : (form.studyFrom || ''),
-      studyTo: form.title === 'Học Viên' ? (form.studyTo || '') : (form.studyTo || ''),
+      studyFrom: positionShowsStudyRange(form.position) ? (form.studyFrom || '') : '',
+      studyTo: positionShowsStudyRange(form.position) ? (form.studyTo || '') : '',
       taskDuties: normalizeDuties(form.taskDuties).filter(row => row.taskId),
       accessRole: form.accessRole === 'member' ? 'member' : 'admin',
       access: normalizeAccess(form.access),
@@ -261,16 +269,16 @@ export function StaffManager({
       if (parts.length >= 2) {
         const name = parts[0].trim();
         const shortName = parts[1].trim().toUpperCase();
-        const title = parts[2]?.trim() || 'BS CK1';
-        const position = parts[3]?.trim() || derivePositionFromTitle(title);
+        const positionRaw = parts[2]?.trim() || parts[3]?.trim() || '';
+        const position = normalizeLegacyPosition(positionRaw);
         if (name && shortName) {
           newStaff.push({
             id: `doc_bulk_${Date.now()}_${idx}`,
             name,
             shortName,
-            title,
+            title: '',
             position,
-            dutyQuota: getQuotaForTitle(title),
+            dutyQuota: getQuotaForPosition(position),
             buBalance: 0,
             phepBalance: 12,
             email: `${shortName.toLowerCase()}@hospital.vn`
@@ -399,8 +407,7 @@ export function StaffManager({
               <th className="col-grip" aria-label="Thứ tự" />
               <th>Họ và Tên</th>
               <th>Tên Viết Tắt</th>
-              <th>Chức Danh</th>
-              <th>Vị Trí</th>
+              <th>Vị trí</th>
               <th>Định Mức Ca</th>
               <th>Quỹ Bù</th>
               <th>Quỹ Phép</th>
@@ -464,8 +471,8 @@ export function StaffManager({
                 </td>
                 <td><span className="code-pill">{s.shortName}</span></td>
                 <td>
-                  {s.title}
-                  {s.title === 'Học Viên' && (s.studyFrom || s.studyTo) && (
+                  <span className="position-pill">{normalizeLegacyPosition(s.position || s.title || '')}</span>
+                  {positionShowsStudyRange(s.position) && (s.studyFrom || s.studyTo) && (
                     <div className="text-muted-cell">
                       {s.studyFrom ? s.studyFrom.split('-').reverse().join('/') : '…'}
                       {' – '}
@@ -473,7 +480,6 @@ export function StaffManager({
                     </div>
                   )}
                 </td>
-                <td><span className="position-pill">{s.position || derivePositionFromTitle(s.title)}</span></td>
                 <td>{s.dutyQuota} ca/tháng</td>
                 <td className="num-positive">{s.buBalance}</td>
                 <td className="num-negative">{s.phepBalance}</td>
@@ -502,7 +508,7 @@ export function StaffManager({
             ))}
             {staffList.length === 0 && (
               <tr>
-                <td colSpan={readOnly ? 13 : 14} className="empty-cell">Chưa có nhân sự nào. Bấm “Thêm Bác Sĩ Mới” để bắt đầu.</td>
+                <td colSpan={readOnly ? 12 : 13} className="empty-cell">Chưa có nhân sự nào. Bấm “Thêm Bác Sĩ Mới” để bắt đầu.</td>
               </tr>
             )}
           </tbody>
@@ -529,42 +535,36 @@ export function StaffManager({
                   chỉ xuất hiện trên Module 7 và tab NhanSu của Sheet lịch.
                 </p>
               )}
-              <div className="form-group">
-                <label className="form-label">Họ và Tên Đầy Đủ:</label>
-                <input
-                  className="form-input"
-                  required
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
-                  placeholder={chdSynced ? 'VD: Nguyễn Văn A (học viên)' : 'VD: Bùi Đạt Thịnh'}
-                  readOnly={identityLocked}
-                  disabled={identityLocked}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Tên Viết Tắt (Ký hiệu ô Lịch):</label>
-                <input
-                  className="form-input"
-                  required
-                  value={form.shortName}
-                  onChange={e => { setForm({ ...form, shortName: e.target.value }); setFormError(''); }}
-                  placeholder="VD: THỊNH"
-                />
-              </div>
-
-              <div className="form-grid-2">
+              <div className="form-grid-3 staff-form-top">
                 <div className="form-group">
-                  <label className="form-label">Chức Danh:</label>
-                  <select className="form-select" value={form.title} onChange={e => handleTitleChange(e.target.value)}>
-                    {TITLE_OPTIONS.map(t => (
-                      <option key={t.value} value={t.value}>{t.value} ({t.quota} ca/tháng)</option>
-                    ))}
-                  </select>
+                  <label className="form-label">Họ và Tên Đầy Đủ:</label>
+                  <input
+                    className="form-input"
+                    required
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    placeholder={chdSynced ? 'VD: Nguyễn Văn A (học viên)' : 'VD: Bùi Đạt Thịnh'}
+                    readOnly={identityLocked}
+                    disabled={identityLocked}
+                  />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Vị Trí:</label>
-                  <select className="form-select" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })}>
+                  <label className="form-label">Tên Viết Tắt (Ký hiệu ô Lịch):</label>
+                  <input
+                    className="form-input"
+                    required
+                    value={form.shortName}
+                    onChange={e => { setForm({ ...form, shortName: e.target.value }); setFormError(''); }}
+                    placeholder="VD: THỊNH"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Vị trí:</label>
+                  <select
+                    className="form-select"
+                    value={form.position}
+                    onChange={e => handlePositionChange(e.target.value)}
+                  >
                     {POSITION_OPTIONS.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
@@ -572,20 +572,20 @@ export function StaffManager({
                 </div>
               </div>
 
-              {form.title === 'Học Viên' && (
+              {positionShowsStudyRange(form.position) && (
                 <div className="form-grid-2">
                   <div className="form-group">
-                    <label className="form-label">Bắt đầu đi học:</label>
+                    <label className="form-label">Bắt đầu học/hỗ trợ:</label>
                     <input type="date" className="form-input" value={form.studyFrom || ''} onChange={e => setForm(current => ({ ...current, studyFrom: e.target.value }))} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Kết thúc đi học:</label>
+                    <label className="form-label">Kết thúc học/hỗ trợ:</label>
                     <input type="date" className="form-input" value={form.studyTo || ''} onChange={e => setForm(current => ({ ...current, studyTo: e.target.value }))} />
                   </div>
                 </div>
               )}
-              {form.title === 'Học Viên' && (
-                <p className="form-hint">Lịch tuần và phân công bệnh phòng chỉ hiện tên trong khoảng này. Lịch tháng vẫn hiện tên. Để trống ngày bắt đầu thì lịch tuần hiện như hiện tại.</p>
+              {positionShowsStudyRange(form.position) && (
+                <p className="form-hint">Lịch tuần và phân công bệnh phòng chỉ hiện tên trong khoảng này khi đã điền ít nhất một ngày. Lịch tháng vẫn hiện tên. Để trống cả hai ngày thì hiển thị như cả tuần.</p>
               )}
 
               <div className="form-grid-3">
@@ -604,27 +604,44 @@ export function StaffManager({
               </div>
 
               {tenantDepartments.length > 0 && (
-                <div className="form-group">
-                  <label className="form-label">Khoa / phòng (F-305):</label>
-                  <select
-                    className="form-select"
-                    value={form.deptId || ''}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      const dept = tenantDepartments.find((d) => d.id === id);
-                      setForm((current) => ({
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Khoa / phòng (F-305):</label>
+                    <select
+                      className="form-select"
+                      value={form.deptId || ''}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        const dept = tenantDepartments.find((d) => d.id === id);
+                        setForm((current) => ({
+                          ...current,
+                          deptId: id,
+                          deptLabel: dept?.name || ''
+                        }));
+                      }}
+                    >
+                      <option value="">— Chọn —</option>
+                      {tenantDepartments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                    <div className="form-hint">Khớp cột Department trên Sheet Staff CHD. Nhân viên đăng nhập Google vào đúng khoa/phòng.</div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Phân quyền:</label>
+                    <select
+                      className="form-select"
+                      value={form.accessRole === 'member' ? 'member' : 'admin'}
+                      onChange={e => setForm(current => ({
                         ...current,
-                        deptId: id,
-                        deptLabel: dept?.name || ''
-                      }));
-                    }}
-                  >
-                    <option value="">— Chọn —</option>
-                    {tenantDepartments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
-                    ))}
-                  </select>
-                  <div className="form-hint">Nhân viên đăng nhập Google sẽ vào đúng khoa/phòng (ẩn bộ chọn khoa trên thanh tiêu đề).</div>
+                        accessRole: e.target.value,
+                        access: normalizeAccess(current.access)
+                      }))}
+                    >
+                      <option value="admin">Quản trị — thấy và sửa mọi tab</option>
+                      <option value="member">Nhân viên — theo từng tab</option>
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -657,49 +674,34 @@ export function StaffManager({
                 )}
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Phân quyền:</label>
-                <select
-                  className="form-select"
-                  value={form.accessRole === 'member' ? 'member' : 'admin'}
-                  onChange={e => setForm(current => ({
-                    ...current,
-                    accessRole: e.target.value,
-                    access: normalizeAccess(current.access)
-                  }))}
-                >
-                  <option value="admin">Quản trị — thấy và sửa mọi tab</option>
-                  <option value="member">Nhân viên — theo từng tab</option>
-                </select>
-                {form.accessRole === 'member' && (
-                  <div className="access-grid">
-                    {ACCESS_TABS.map(tab => {
-                      const current = normalizeAccess(form.access)[tab.id];
-                      return (
-                        <div key={tab.id} className="access-row">
-                          <span>{tab.label}</span>
-                          <div className="choice-row compact" role="group" aria-label={tab.label}>
-                            {ACCESS_LEVELS.map(level => (
-                              <button
-                                key={level.id}
-                                type="button"
-                                className={current === level.id ? 'active' : ''}
-                                aria-pressed={current === level.id}
-                                onClick={() => setForm(prev => ({
-                                  ...prev,
-                                  access: { ...normalizeAccess(prev.access), [tab.id]: level.id }
-                                }))}
-                              >
-                                {level.label}
-                              </button>
-                            ))}
-                          </div>
+              {form.accessRole === 'member' && (
+                <div className="access-grid">
+                  {ACCESS_TABS.map(tab => {
+                    const current = normalizeAccess(form.access)[tab.id];
+                    return (
+                      <div key={tab.id} className="access-row">
+                        <span>{tab.label}</span>
+                        <div className="choice-row compact" role="group" aria-label={tab.label}>
+                          {ACCESS_LEVELS.map(level => (
+                            <button
+                              key={level.id}
+                              type="button"
+                              className={current === level.id ? 'active' : ''}
+                              aria-pressed={current === level.id}
+                              onClick={() => setForm(prev => ({
+                                ...prev,
+                                access: { ...normalizeAccess(prev.access), [tab.id]: level.id }
+                              }))}
+                            >
+                              {level.label}
+                            </button>
+                          ))}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Task của nhân sự:</label>
@@ -857,15 +859,15 @@ export function StaffManager({
             </div>
             <div className="form-hint">
               Dán dữ liệu copy từ Excel/Google Sheets theo định dạng từng dòng:{' '}
-              <code>Họ và Tên [Tab] Tên Viết Tắt [Tab] Chức Danh [Tab] Vị Trí</code>
-              {' '}(Chức Danh và Vị Trí có thể bỏ trống).
+              <code>Họ và Tên [Tab] Tên Viết Tắt [Tab] Vị trí</code>
+              {' '}(Cột Vị trí có thể bỏ trống — mặc định Bác sĩ cột 1).
             </div>
             <textarea
               rows={8}
               className="form-input"
               value={bulkText}
               onChange={e => setBulkText(e.target.value)}
-              placeholder={`Bùi Đạt Thịnh\tTHỊNH\tBS CK1\tBS Cột 2\nPhan Tiến Lợi\tLỢI\tTrưởng Khoa\tBS Trưởng Khoa\nLương Hoài Ân\tÂN\tBS Trẻ\tBS Cột 1`}
+              placeholder={`Bùi Đạt Thịnh\tTHỊNH\tBác sĩ cột 2\nPhan Tiến Lợi\tLỢI\tBác sĩ cột 1\nNguyễn Văn A\tHV_A\tHọc viên`}
             />
             <div className="modal-actions">
               <button className="action-btn" onClick={() => setIsBulkModalOpen(false)}>Hủy</button>

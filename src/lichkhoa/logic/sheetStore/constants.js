@@ -35,6 +35,7 @@ export const NHAN_SU_HEADERS = [
   'email', 'loginEmail', 'position', 'deptId', 'deptLabel', 'showInLichKhoa', 'source', 'accessRole',
   'access_week', 'access_month', 'access_leave', 'access_study',
   'access_calendar', 'access_dashboard', 'access_staff', 'access_tasks',
+  'studyFrom', 'studyTo',
 ];
 
 export const TASK_HEADERS = [

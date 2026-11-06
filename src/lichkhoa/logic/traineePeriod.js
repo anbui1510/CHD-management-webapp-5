@@ -1,3 +1,5 @@
+import { positionShowsStudyRange } from '../store/constants.js';
+
 function fold(value) {
   return String(value || '')
     .normalize('NFD')
@@ -6,8 +8,9 @@ function fold(value) {
     .trim();
 }
 
+/** Khoảng thời gian (học viên / hỗ trợ) — không còn dựa vào Chức danh. */
 export function isTrainee(person) {
-  return fold(person?.title) === 'hoc vien';
+  return positionShowsStudyRange(person?.position) || fold(person?.title) === 'hoc vien';
 }
 
 function bounds(person) {

@@ -43,7 +43,7 @@ export function FairnessDashboard({ dept, staffList, scheduleData }) {
         <div>
           <h2 className="view-title">Dashboard Thống Kê Công Bằng Ca Trực</h2>
           <div className="sub-header-info">
-            <span>Theo dõi chỉ số trực & phân công so với Định Mức Chức Danh</span>
+            <span>Theo dõi chỉ số trực & phân công so với định mức theo vị trí</span>
           </div>
         </div>
       </div>
@@ -78,7 +78,7 @@ export function FairnessDashboard({ dept, staffList, scheduleData }) {
           <thead>
             <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
               <th style={{ padding: 12 }}>BÁC SĨ</th>
-              <th style={{ padding: 12 }}>CHỨC DANH</th>
+              <th style={{ padding: 12 }}>VỊ TRÍ</th>
               <th style={{ padding: 12 }}>ĐỊNH MỨC</th>
               <th style={{ padding: 12 }}>CA TRỰC TUẦN</th>
               <th style={{ padding: 12 }}>THỦ THUẬT</th>
@@ -91,7 +91,7 @@ export function FairnessDashboard({ dept, staffList, scheduleData }) {
             {stats.map(s => (
               <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <td style={{ padding: 12, fontWeight: 700 }}>{s.name} ({s.shortName})</td>
-                <td style={{ padding: 12, color: 'var(--text-secondary)' }}>{s.title}</td>
+                <td style={{ padding: 12, color: 'var(--text-secondary)' }}>{s.position || '—'}</td>
                 <td style={{ padding: 12, fontWeight: 600 }}>{s.dutyQuota} ca/tháng</td>
                 <td style={{ padding: 12, fontWeight: 700, color: 'var(--accent-amber)' }}>{s.totalDuties} ca</td>
                 <td style={{ padding: 12 }}>{s.totalProcedures} kíp</td>

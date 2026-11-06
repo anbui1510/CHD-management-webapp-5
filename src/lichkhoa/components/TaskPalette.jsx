@@ -73,7 +73,7 @@ export function TaskPalette({ tasks, categories = DEFAULT_CATEGORIES, staff = []
             className="task-chip staff-chip"
             draggable
             onDragStart={(event) => startDrag(event, 'staff', person.shortName, person)}
-            title={`${person.shortName} — ${person.name}${person.title ? ` · ${person.title}` : ''}`}
+            title={`${person.shortName} — ${person.name}${person.position ? ` · ${person.position}` : ''}`}
           >
             <span className="task-code">{person.shortName}</span>
           </div>

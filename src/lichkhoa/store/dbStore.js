@@ -2,7 +2,7 @@
 // DATABASE & LOCAL STORAGE PERSISTENCE ENGINE (INSTANT & OFFLINE READY)
 // ==========================================================================
 
-import { derivePositionFromTitle } from './constants.js';
+import { getQuotaForPosition, normalizeLegacyPosition } from './constants.js';
 import timMachSeed from '../data/tim-mach-seed.json';
 import { isSheetBackend } from '../config/dataBackend.js';
 import { resolveTenant } from '../config/tenant.js';
@@ -251,9 +251,9 @@ export function normalizeStore(store) {
     departments: (store.departments || []).map(dept => ({
       ...dept,
       customCategories: dept.customCategories || [],
-      staff: (dept.staff || []).map(s => ({
+      staff: (dept.staff || []).map((s) => ({
         ...s,
-        position: s.position || derivePositionFromTitle(s.title)
+        position: normalizeLegacyPosition(s.position || s.title || ''),
       })),
       tasks: withTeachTasks(withDutyFields(withWardTask((dept.tasks || []).map(t => ({
         ...t,

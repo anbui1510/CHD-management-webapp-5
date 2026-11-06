@@ -2945,6 +2945,10 @@ body.mobile-ui .manager-toolbar .action-btn {
 .form-grid-2 { grid-template-columns: 1fr 1fr; }
 .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
 
+.staff-form-top {
+  align-items: end;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
