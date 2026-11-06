@@ -7,6 +7,26 @@ import { metaObjectToRows, metaRowsToObject } from './tableUtils.js';
 import { exportWeekRows, importWeekRows } from './week.js';
 
 /**
+ * Các trường tuần chưa có trong tab LichTuan (exportWeekRows) — khi pull Sheet,
+ * merge từ store local theo cùng sheetId để không mất dữ liệu (vd. Phân công bệnh phòng).
+ */
+const SHEET_MERGE_PRESERVE_KEYS = ['roomTable', 'roomColumns', 'roomAssignments'];
+
+function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
+  if (!Array.isArray(remoteSheets) || !remoteSheets.length) return remoteSheets;
+  const byId = new Map((localSheets || []).filter(Boolean).map((sh) => [sh.id, sh]));
+  return remoteSheets.map((sh) => {
+    const prev = byId.get(sh.id);
+    if (!prev) return sh;
+    const patch = {};
+    for (const key of SHEET_MERGE_PRESERVE_KEYS) {
+      if (key in prev && !(key in sh)) patch[key] = prev[key];
+    }
+    return Object.keys(patch).length ? { ...sh, ...patch } : sh;
+  });
+}
+
+/**
  * @param {Record<string, string[][]>} tabs — tên tab → values (含 header)
  * @param {object} baseStore — store hiện tại (giữ dept id / sheets phụ nếu thiếu tab)
  */
@@ -25,6 +45,8 @@ export function importTabsToStore(tabs, baseStore = null) {
     || { id: deptId, name: meta.deptName || 'Khoa', code: meta.deptCode || 'DEPT', staff: [], tasks: [] };
 
   let sheets = weekBlock.sheets?.length ? weekBlock.sheets : (baseStore?.sheetsByDept?.[deptId]?.sheets || []);
+  const prevSheets = baseStore?.sheetsByDept?.[deptId]?.sheets;
+  sheets = mergeSheetsPreserveLocalFields(sheets, prevSheets);
   sheets = sheets.map((sh) => applyMonthToSheet(sh, monthBySheet.get(sh.id)));
 
   const department = {
