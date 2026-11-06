@@ -1,4 +1,5 @@
 import { COMMON_TASK_TEMPLATE, DEFAULT_KHOA_RULES } from './commonTaskTemplate.js';
+import { getQuotaForPosition } from './constants.js';
 
 /** Store ban đầu khoa mới (F-304): 0 nhân sự + task mẫu chung. */
 export function createEmptyTenantStore(tenantMeta = {}) {
@@ -63,13 +64,13 @@ export function ensureBootstrapAdminStaff(store, { email, fullName = '', staffKe
         id: key,
         name: display,
         shortName,
-        title: 'Trưởng Khoa',
-        dutyQuota: 0,
+        title: '',
+        dutyQuota: getQuotaForPosition('Bác sĩ cột 1', 0),
         buBalance: 0,
         phepBalance: 0,
         email: loginEmail || `${shortName.toLowerCase()}@hospital.vn`,
         loginEmail: loginEmail || '',
-        position: 'BS Trưởng Khoa',
+        position: 'Bác sĩ cột 1',
         accessRole: 'admin',
         source: 'chd',
         showInLichKhoa: 'On',
@@ -87,7 +88,7 @@ export function ensureBootstrapAdminStaff(store, { email, fullName = '', staffKe
       return { ...dept, staff };
     }
     if (staff.length > 0) {
-      const lead = staff.find((s) => /trưởng/i.test(String(s.title || ''))) || staff[0];
+      const lead = staff.find((s) => /cột\s*1|trưởng|truong/i.test(String(s.position || s.title || ''))) || staff[0];
       staff = staff.map((s) => (
         s.id === lead.id
           ? { ...s, loginEmail, accessRole: 'admin' }
@@ -102,13 +103,13 @@ export function ensureBootstrapAdminStaff(store, { email, fullName = '', staffKe
       id: adminId,
       name: display,
       shortName,
-      title: 'Trưởng Khoa',
-      dutyQuota: 0,
+      title: '',
+      dutyQuota: getQuotaForPosition('Bác sĩ cột 1', 0),
       buBalance: 0,
       phepBalance: 0,
       email: loginEmail,
       loginEmail,
-      position: 'BS Trưởng Khoa',
+      position: 'Bác sĩ cột 1',
       accessRole: 'admin',
     });
     return { ...dept, staff };

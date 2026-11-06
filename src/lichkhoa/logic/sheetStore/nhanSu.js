@@ -2,6 +2,7 @@ import { NHAN_SU_HEADERS } from './constants.js';
 import { normalizeAccess } from '../access.js';
 import { parseShowInLichKhoa, formatShowInLichKhoa } from '../showInLichKhoa.js';
 import { isLocalScheduleStaff } from '../staffSource.js';
+import { normalizeLegacyPosition } from '../../store/constants.js';
 import { objectsToRows, rowsToObjects } from './tableUtils.js';
 
 /** TC-F304-02 */
@@ -28,8 +29,12 @@ export function importNhanSuRows(rows) {
       phepBalance: Number(row.phepBalance) || 0,
       email: String(row.email || '').trim(),
       loginEmail: String(row.loginEmail || '').trim(),
-      position: String(row.position || '').trim(),
+      position: normalizeLegacyPosition(row.position || row.title || ''),
     };
+    const studyFrom = String(row.studyFrom || '').trim();
+    const studyTo = String(row.studyTo || '').trim();
+    if (studyFrom) staff.studyFrom = studyFrom;
+    if (studyTo) staff.studyTo = studyTo;
     if (row.deptId) staff.deptId = String(row.deptId).trim();
     if (row.deptLabel) staff.deptLabel = String(row.deptLabel).trim();
     if (row.showInLichKhoa !== undefined && row.showInLichKhoa !== '') {
@@ -64,7 +69,9 @@ export function exportNhanSuRows(staffList) {
       phepBalance: s.phepBalance,
       email: s.email,
       loginEmail: s.loginEmail || '',
-      position: s.position || '',
+      position: normalizeLegacyPosition(s.position || s.title || ''),
+      studyFrom: s.studyFrom || '',
+      studyTo: s.studyTo || '',
       deptId: s.deptId || '',
       deptLabel: s.deptLabel || '',
       showInLichKhoa: s.showInLichKhoa || formatShowInLichKhoa(true),

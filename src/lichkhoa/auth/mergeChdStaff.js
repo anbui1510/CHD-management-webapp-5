@@ -1,6 +1,11 @@
 import { MEMBER_DEFAULT } from '../logic/access.js';
 import { formatShowInLichKhoa, parseShowInLichKhoa } from '../logic/showInLichKhoa.js';
 import { isLocalScheduleStaff, markChdScheduleStaff } from '../logic/staffSource.js';
+import {
+  getQuotaForLegacyTitle,
+  getQuotaForPosition,
+  normalizeLegacyPosition,
+} from '../store/constants.js';
 
 function isActiveChdStaff(staff) {
   return staff && !String(staff.FireDate || '').trim();
@@ -50,6 +55,8 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
 
     const isAdmin = chd.Role === 'Admin';
     const deptLabel = chdDepartmentLabel(chd) || String(prev.deptLabel || '').trim() || dept.name;
+    const career = String(chd.Career || '').trim();
+    const position = normalizeLegacyPosition(prev.position || prev.title || career || '');
 
     next.push(markChdScheduleStaff({
       ...prev,
@@ -59,9 +66,9 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
       shortName,
       email: String(chd.Email || prev.email || ''),
       loginEmail: '',
-      title: prev.title || chd.Career || 'BS CK1',
-      position: prev.position || 'BS Cột 2',
-      dutyQuota: prev.dutyQuota ?? 6,
+      title: prev.title || career || '',
+      position,
+      dutyQuota: prev.dutyQuota ?? getQuotaForPosition(position, getQuotaForLegacyTitle(career, 6)),
       buBalance: prev.buBalance ?? 0,
       phepBalance: prev.phepBalance ?? 12,
       accessRole: prev.accessRole || (isAdmin ? 'admin' : 'member'),

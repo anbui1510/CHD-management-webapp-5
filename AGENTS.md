@@ -252,7 +252,7 @@ Tích hợp từ `lichkhoa-webapp`. **Không** dùng Google login; dùng phiên 
 - `Staff.Department` → cột **Khoa / Phòng** trên tab Quản lý nhân sự module 7 (`NhanSu.deptLabel` trên Sheet lịch)
 - `Staff.ShowInLichKhoa` (`On` / `Off`): **On** = có trong module 7; **Off** = không merge vào lịch (mặc định **On** nếu cột trống)
 - **Thêm HV / hỗ trợ** trên tab Quản lý nhân sự Module 7: học viên, trực gác, hỗ trợ khoa phòng (`source=local`, `id` dạng `local_*`). Không tạo tài khoản CHD; được giữ khi merge Staff CHD; xóa được tại Module 7. Nhân sự CHD không xóa tại đây (dùng `ShowInLichKhoa=Off`).
-- Thẻ `lich-khoa-staff` sửa thuộc tính lịch trên Sheet lịch: `shortName`, `title`, `position`, `dutyQuota`, `buBalance`, `phepBalance`, `accessRole`, `access_*`, và toàn bộ trường cho hàng `local`
+- Thẻ `lich-khoa-staff` sửa thuộc tính lịch trên Sheet lịch: `shortName`, `position` (Bác sĩ cột 1–3 / Giảng viên / Học viên / Hỗ trợ), `studyFrom` / `studyTo` (khi Học viên hoặc Hỗ trợ — giới hạn hiện trên lịch tuần), `dutyQuota`, `buBalance`, `phepBalance`, `accessRole`, `access_*`, cột `title` giữ tương thích Sheet cũ (có thể để trống), và toàn bộ trường cho hàng `local`
 - Không sửa Password / Role / Permissions CHD (thuộc mục 8)
 
 ### Code port
