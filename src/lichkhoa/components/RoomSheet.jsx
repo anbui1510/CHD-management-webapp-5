@@ -65,14 +65,11 @@ function doctorRowNeedsStaffSync(matrix, labels, staffList) {
   const names = staffShortNames(staffList);
   if (!names.length) return false;
   const row = matrix[doctorRowIndex(labels)] || [];
-  const width = Math.max(row.length, names.length);
+  if (names.length > row.length) return true;
   for (let col = 0; col < names.length; col += 1) {
     if (!sameStaffName(row[col], names[col])) return true;
   }
-  for (let col = names.length; col < width; col += 1) {
-    if (String(row[col] || '').trim()) return true;
-  }
-  return names.length > row.length;
+  return false;
 }
 
 function legacyColumns(sheet) {
@@ -91,26 +88,30 @@ function legacyColumns(sheet) {
   ];
 }
 
+/**
+ * Đồng bộ tên BS theo danh sách staff theo **thứ tự cột**, không hoán vị cột.
+ * Hoán vị cũ làm lệch map hàng «Tên bệnh phòng» → người dùng thấy ô phòng «tự biến mất».
+ */
 function alignRoomColumnsToStaff(matrix, labels, colWidths, staffList) {
   const names = staffShortNames(staffList);
   if (!names.length || !doctorRowNeedsStaffSync(matrix, labels, staffList)) return null;
   const doctorRow = doctorRowIndex(labels);
-  const doctors = (matrix[doctorRow] || []).map(cell => String(cell ?? ''));
-  const used = new Set();
-  const matched = names.map((name) => {
-    const index = doctors.findIndex((cell, col) => !used.has(col) && sameStaffName(cell, name));
-    if (index >= 0) used.add(index);
-    return index;
+  const rowLens = (matrix || []).map(r => (r || []).length);
+  const width = Math.max(names.length, ...rowLens, colWidths?.length || 0);
+  const nextWidths = Array.from({ length: width }, (_, col) => {
+    const w = Number(colWidths?.[col]) || 0;
+    return w > 0 ? w : DEFAULT_COL_WIDTH;
   });
-  const leftover = doctors.map((_, col) => col).filter(col => !used.has(col));
-  const sources = [...matched, ...leftover];
   return {
-    matrix: matrix.map((row, rowIndex) => sources.map((src, col) => {
-      if (rowIndex === doctorRow) return col < names.length ? names[col] : '';
-      if (src < 0) return '';
-      return String(row[src] ?? '');
-    })),
-    colWidths: sources.map(src => (src >= 0 ? Number(colWidths?.[src]) : 0) || DEFAULT_COL_WIDTH)
+    matrix: (matrix || []).map((row, rowIndex) => (
+      Array.from({ length: width }, (_, col) => {
+        if (rowIndex === doctorRow) {
+          return col < names.length ? names[col] : String(row?.[col] ?? '');
+        }
+        return String(row?.[col] ?? '');
+      })
+    )),
+    colWidths: nextWidths
   };
 }
 
@@ -329,8 +330,8 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
         columns: hiddenDoctorColumns(table.matrix, table.labels, hiddenDoctorsRef.current),
         indicators: false
       },
-      // Không stretch trên mobile — giữ colWidths để cuộn ngang xem đủ BS.
-      stretchH: narrowUi ? 'none' : 'all',
+      // Luôn stretchH: none — cột có độ rộng cố định; cuộn ngang (.sheet-scroll) xem đủ BS, không co cột cắt chữ.
+      stretchH: 'none',
       autoColumnSize: false,
       manualColumnResize: true,
       manualRowResize: true,
