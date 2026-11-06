@@ -1181,18 +1181,20 @@ body.dark-theme {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
-  min-width: 0;
-  padding: 0 4px;
-  overflow: hidden;
+  min-width: 148px;
+  padding: 0 6px;
+  box-sizing: border-box;
 }
 
 .month-task-head span {
+  flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  font-weight: 700;
 }
 
 .handsontable th .month-task-head .month-add-task {
@@ -1323,6 +1325,8 @@ body.mobile-ui .room-assignments-container {
 .handsontable thead th.ht-span-label .month-task-head {
   pointer-events: auto;
   justify-content: space-between;
+  min-width: 148px;
+  padding: 0 6px;
 }
 
 .handsontable thead th.ht-span-gap {
@@ -1436,6 +1440,11 @@ body.mobile-ui .room-assignments-container {
   gap: 16px;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+/* Popup Task — rộng ~1.5× để Khóa / lịch tuần hiện đủ, ít phải cuộn. */
+.modal-content.task-editor-modal {
+  max-width: 900px;
 }
 
 .modal-header {

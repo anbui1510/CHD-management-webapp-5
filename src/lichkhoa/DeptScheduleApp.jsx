@@ -929,7 +929,12 @@ export function DeptScheduleApp({
       ...sh,
       monthRoles: resolveMonthRoles(sh.monthRoles).map(role => (
         role.key === roleKey
-          ? { ...role, label: matched ? String(matched.code || '').trim() : text, taskId: matched?.id || null }
+          ? {
+            ...role,
+            // Giữ đúng chữ người dùng gõ; vẫn gắn taskId nếu khớp mã/tên task.
+            label: text,
+            taskId: matched?.id || null
+          }
           : role
       ))
     }));

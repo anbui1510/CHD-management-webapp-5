@@ -274,13 +274,15 @@ export function MonthSheet({
   const taskCol = columns.findIndex(column => column.kind === 'task');
   metaRef.current = model.meta;
   stylesRef.current = cellStyles || {};
+  // Ưu tiên label đã lưu để sửa ô Nhiệm vụ không bị ép lại mã task.
   const rowData = useMemo(() => model.rows.map((row, index) => {
     const info = model.meta[index];
     if (info?.type !== 'role' || taskCol < 0) return row;
-    const short = roleShortLabel(info.role, taskList || []);
-    if (short === row[taskCol]) return row;
+    const label = String(info.role.label || '').trim();
+    const display = label || roleShortLabel(info.role, taskList || []);
+    if (display === row[taskCol]) return row;
     const next = row.slice();
-    next[taskCol] = short;
+    next[taskCol] = display;
     return next;
   }), [model, taskCol, taskList]);
   const structureKey = useMemo(() => JSON.stringify({
@@ -348,11 +350,15 @@ export function MonthSheet({
     }
 
     const colWidths = columns.map((column) => {
-      const saved = widthByKeyRef.current[column.key];
-      if (saved) return saved;
-      if (column.kind === 'del') return 42;
-      if (column.kind === 'task') return 180;
-      return column.kind === 'custom' ? 120 : 72;
+      const saved = Number(widthByKeyRef.current[column.key]) || 0;
+      if (column.kind === 'del') return Math.max(saved || 0, 42);
+      if (column.kind === 'task') return Math.max(saved || 0, 168);
+      if (column.kind === 'custom') {
+        const isNotes = column.id === 'notes' || column.id === 'ghi_chu' || /ghi\s*ch[úu]/i.test(column.title || '');
+        return Math.max(saved || 0, isNotes ? 140 : 120);
+      }
+      // Buổi ngày — không để quá rộng (tránh CN Chiều bị stretchH kéo dài).
+      return saved > 0 ? Math.min(saved, 96) : 72;
     });
     const topHeaders = [];
     const subHeaders = [];
@@ -404,7 +410,8 @@ export function MonthSheet({
       height: 560,
       width: '100%',
       licenseKey: 'non-commercial-and-evaluation',
-      stretchH: 'last',
+      // Không stretch cột cuối (tránh Chủ nhật Chiều / Ghi chú bị kéo quá rộng).
+      stretchH: 'none',
       manualColumnResize: true,
       manualRowResize: true,
       contextMenu: {
