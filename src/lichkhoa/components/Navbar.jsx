@@ -11,7 +11,8 @@ import {
   Stethoscope,
   Sun,
   Table,
-  User
+  User,
+  UserPlus
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -22,20 +23,25 @@ const NAV_ITEMS = [
   { id: 'TASKS', icon: ClipboardList, label: 'Quản lý task' }
 ];
 
-function NavViewButtons({ activeView, onSelectView, views }) {
+function NavViewButtons({ activeView, onSelectView, views, staffAddShortcut }) {
+  const items = NAV_ITEMS.filter((item) => !views || views.includes(item.id));
   return (
     <div className="nav-views">
-      {NAV_ITEMS.filter((item) => !views || views.includes(item.id)).map((item) => {
+      {items.map((item) => {
         const Icon = item.icon;
         return (
-          <button
-            key={item.id}
-            type="button"
-            className={`nav-btn ${activeView === item.id ? 'active' : ''}`}
-            onClick={() => onSelectView(item.id)}
-          >
-            <Icon size={16} /> {item.label}
-          </button>
+          <React.Fragment key={item.id}>
+            <button
+              type="button"
+              className={`nav-btn ${activeView === item.id ? 'active' : ''}`}
+              onClick={() => onSelectView(item.id)}
+            >
+              <Icon size={16} /> {item.label}
+            </button>
+            {item.id === 'STAFF' && staffAddShortcut ? (
+              <span className="nav-tab-inline-action">{staffAddShortcut}</span>
+            ) : null}
+          </React.Fragment>
         );
       })}
     </div>
@@ -149,11 +155,33 @@ export function Navbar({
   onSheetSync,
   sheetSyncTitle = '',
   embedInChd = false,
+  showStaffTabAddShortcut = false,
+  onStaffTabAdd = undefined,
 }) {
+  const staffAddShortcut = showStaffTabAddShortcut && typeof onStaffTabAdd === 'function' ? (
+    <button
+      type="button"
+      className="nav-staff-add-btn"
+      onClick={(event) => {
+        event.stopPropagation();
+        onStaffTabAdd();
+      }}
+      title="Thêm học viên / hỗ trợ trực gác vào lịch (không tạo tài khoản CHD)"
+      aria-label="Thêm học viên hoặc hỗ trợ vào lịch khoa"
+    >
+      <UserPlus size={18} strokeWidth={2.25} />
+    </button>
+  ) : null;
+
   if (embedInChd) {
     return (
       <header className="navbar navbar-chd-compact navbar-chd-embed">
-        <NavViewButtons activeView={activeView} onSelectView={onSelectView} views={views} />
+        <NavViewButtons
+          activeView={activeView}
+          onSelectView={onSelectView}
+          views={views}
+          staffAddShortcut={staffAddShortcut}
+        />
         <NavIconActions
           compact
           onSheetSync={onSheetSync}
@@ -194,7 +222,12 @@ export function Navbar({
       )}
 
       {/* View Switcher */}
-      <NavViewButtons activeView={activeView} onSelectView={onSelectView} views={views} />
+      <NavViewButtons
+        activeView={activeView}
+        onSelectView={onSelectView}
+        views={views}
+        staffAddShortcut={staffAddShortcut}
+      />
 
       <NavIconActions
         theme={theme}

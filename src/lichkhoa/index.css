@@ -235,6 +235,41 @@ body.dark-theme {
   max-width: 100%;
 }
 
+.nav-tab-inline-action {
+  display: inline-flex;
+  align-items: center;
+  margin: 2px 4px 2px -4px;
+}
+
+.nav-staff-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.35);
+  transition: filter 0.12s ease, transform 0.08s ease;
+}
+
+.nav-staff-add-btn:hover {
+  filter: brightness(1.06);
+}
+
+.nav-staff-add-btn:active {
+  transform: scale(0.96);
+}
+
+.navbar.navbar-chd-embed .nav-staff-add-btn {
+  width: 32px;
+  height: 32px;
+}
+
 .nav-btn {
   display: flex;
   align-items: center;
@@ -2631,6 +2666,24 @@ body.dark-theme .sheet-scroll.is-open::-webkit-scrollbar-thumb:hover {
   flex-wrap: wrap;
 }
 
+.section-header-staff-embed {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.section-header-staff-embed .staff-embed-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.section-header-staff-embed .staff-chd-hint {
+  width: 100%;
+  flex-basis: 100%;
+}
+
 .manager-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -3507,14 +3560,49 @@ body.mobile-ui {
 }
 
 .mobile-bottom-nav {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 2px;
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
   background: var(--bg-card);
   border-top: 1px solid color-mix(in srgb, var(--text-muted) 25%, transparent);
   flex-shrink: 0;
+}
+
+.mobile-nav-cell {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+}
+
+.mobile-nav-cell.active .mobile-nav-item {
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+}
+
+.mobile-nav-staff-add {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(22, 163, 74, 0.4);
+  z-index: 2;
+}
+
+.mobile-nav-staff-add:active {
+  transform: scale(0.94);
 }
 
 .mobile-nav-item {
@@ -3530,11 +3618,7 @@ body.mobile-ui {
   font-size: 0.68rem;
   font-weight: 600;
   cursor: pointer;
-}
-
-.mobile-nav-item.active {
-  color: var(--accent-blue);
-  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  width: 100%;
 }
 
 .mobile-agenda {

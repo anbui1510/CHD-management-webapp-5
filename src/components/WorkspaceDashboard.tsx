@@ -204,7 +204,7 @@ export default function WorkspaceDashboard({
         tiles: [
           {
             module: 'lich-khoa-sheet',
-            label: 'Xếp lịch',
+            label: 'Xếp lịch làm việc',
             description: 'Bảng lịch tuần / tháng / nghỉ / học',
             icon: <Calendar className="w-6 h-6 text-emerald-600" />,
             iconBg: 'bg-emerald-50',

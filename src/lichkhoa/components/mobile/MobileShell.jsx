@@ -9,11 +9,12 @@ import {
   Stethoscope,
   Sun,
   Table,
-  User
+  User,
+  UserPlus
 } from 'lucide-react';
 
 const BOTTOM_TABS = [
-  { id: 'SHEET', icon: Table, label: 'Xếp lịch' },
+  { id: 'SHEET', icon: Table, label: 'Xếp lịch làm việc' },
   { id: 'STAFF', icon: Stethoscope, label: 'Nhân viên' },
   { id: 'TASKS', icon: ClipboardList, label: 'Task' },
   { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' }
@@ -34,7 +35,9 @@ export function MobileShell({
   onExit,
   hideDeptSelector = false,
   tenantLabel = '',
-  childrenByView
+  childrenByView,
+  showStaffTabAddShortcut = false,
+  onStaffTabAdd
 }) {
   const allowed = new Set(views || []);
   const tabs = BOTTOM_TABS.filter((tab) => allowed.has(tab.id));
@@ -122,16 +125,32 @@ export function MobileShell({
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = navActive === tab.id;
+          const staffShortcut = tab.id === 'STAFF' && showStaffTabAddShortcut && typeof onStaffTabAdd === 'function';
           return (
-            <button
-              key={tab.id}
-              type="button"
-              className={`mobile-nav-item${active ? ' active' : ''}`}
-              onClick={() => onSelectView(tab.id)}
-            >
-              <Icon size={20} />
-              <span>{tab.label}</span>
-            </button>
+            <div key={tab.id} className={`mobile-nav-cell${active ? ' active' : ''}`}>
+              <button
+                type="button"
+                className="mobile-nav-item"
+                onClick={() => onSelectView(tab.id)}
+              >
+                <Icon size={20} />
+                <span>{tab.label}</span>
+              </button>
+              {staffShortcut ? (
+                <button
+                  type="button"
+                  className="mobile-nav-staff-add"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStaffTabAdd();
+                  }}
+                  title="Thêm học viên / hỗ trợ (không tạo tài khoản CHD)"
+                  aria-label="Thêm học viên hoặc hỗ trợ vào lịch khoa"
+                >
+                  <UserPlus size={14} strokeWidth={2.25} />
+                </button>
+              ) : null}
+            </div>
           );
         })}
       </nav>

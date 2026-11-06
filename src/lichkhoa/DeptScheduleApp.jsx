@@ -260,6 +260,8 @@ export function DeptScheduleApp({
   const [sheetConnectionRevision, setSheetConnectionRevision] = useState(0);
   const [sheetEngineReady, setSheetEngineReady] = useState(() => isLichKhoaSheetEngineReady());
   const [sheetEngineError, setSheetEngineError] = useState(null);
+  const [staffAutoOpenAddSeq, setStaffAutoOpenAddSeq] = useState(0);
+  const staffAddSeqRef = useRef(0);
 
   useEffect(() => {
     applyThemeClass('light');
@@ -1231,6 +1233,19 @@ export function DeptScheduleApp({
     }
   }, [embedInChd, onNavigateModule]);
 
+  const requestStaffAddForm = useCallback(() => {
+    staffAddSeqRef.current += 1;
+    setStaffAutoOpenAddSeq(staffAddSeqRef.current);
+  }, []);
+
+  const handleStaffTabAddShortcut = useCallback(() => {
+    setActiveView('STAFF');
+    if (embedInChd && onNavigateModule) {
+      onNavigateModule('lich-khoa-staff');
+    }
+    requestStaffAddForm();
+  }, [embedInChd, onNavigateModule, requestStaffAddForm]);
+
   const handleExit = () => {
     onNavigateToSheets?.();
   };
@@ -1269,8 +1284,12 @@ export function DeptScheduleApp({
       onBulkImport={undefined}
       readOnly={!allow('staff')}
       chdSynced
+      headerLayout={embedInChd ? 'embedded' : 'full'}
+      autoOpenAdd={staffAutoOpenAddSeq || undefined}
     />
   );
+
+  const staffNavAddEnabled = embedInChd && allow('staff');
 
   const tasksView = (
     <TaskManager
@@ -1417,6 +1436,8 @@ export function DeptScheduleApp({
           onProfile={() => onNavigateToSheets?.()}
           onSettings={() => onNavigateToSheets?.()}
           onExit={handleExit}
+          showStaffTabAddShortcut={staffNavAddEnabled}
+          onStaffTabAdd={handleStaffTabAddShortcut}
           childrenByView={{
             SHEET: sheetView,
             STAFF: staffView,
@@ -1449,6 +1470,8 @@ export function DeptScheduleApp({
         onSheetSync={isSheetBackend() && syncAuthReady ? () => sheetSync.manualSync() : undefined}
         sheetSyncTitle={sheetSyncTitle}
         embedInChd={embedInChd}
+        showStaffTabAddShortcut={staffNavAddEnabled}
+        onStaffTabAdd={handleStaffTabAddShortcut}
       />
       {sheetSyncBanner}
       {sheetEngineBanner}

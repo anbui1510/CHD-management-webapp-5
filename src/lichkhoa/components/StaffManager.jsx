@@ -66,7 +66,13 @@ export function StaffManager({
    * Still allow add/delete for local-only people (học viên / hỗ trợ trực gác).
    */
   chdSynced = false,
+  /**
+   * full: tiêu đề + toolbar trong trang (standalone lịch khoa).
+   * embedded: tab CHD đã có nhãn «Quản lý nhân sự» — bỏ tiêu đề trùng; nút Thêm HV đưa lên thanh tab.
+   */
+  headerLayout = 'full',
 }) {
+  const embeddedHeader = headerLayout === 'embedded';
   const canAddLocal = !readOnly && typeof onAddStaff === 'function';
   const canBulkImport = !chdSynced && !readOnly && typeof onBulkImport === 'function';
   const backupLocalCount = staffList.filter(isBackupImportedStaff).length;
@@ -123,12 +129,11 @@ export function StaffManager({
 
   const closeModal = () => setEditing(null);
 
-  // Mở form Thêm khi bấm nút "+ BS Mới" trên thanh điều hướng
+  // Mở form Thêm khi bấm nút shortcut trên thanh tab (autoOpenAdd = số tăng mỗi lần bấm)
   useEffect(() => {
-    if (autoOpenAdd && !readOnly) {
-      openAdd();
-      onAutoOpenHandled?.();
-    }
+    if (!autoOpenAdd || readOnly) return;
+    openAdd();
+    onAutoOpenHandled?.();
   }, [autoOpenAdd]);
 
   const updateDuty = (id, patch) => {
@@ -294,53 +299,89 @@ export function StaffManager({
 
   return (
     <div className="view-container">
-      <div className="section-header">
-        <div>
-          <h2 className="view-title">Quản Lý Bác Sĩ &amp; Nhân Sự</h2>
-          <div className="sub-header-info">{staffList.length} nhân sự trong khoa</div>
-        </div>
+      <div className={`section-header${embeddedHeader ? ' section-header-staff-embed' : ''}`}>
+        {!embeddedHeader ? (
+          <>
+            <div>
+              <h2 className="view-title">Quản Lý Bác Sĩ &amp; Nhân Sự</h2>
+              <div className="sub-header-info">{staffList.length} nhân sự trong khoa</div>
+            </div>
 
-        {!readOnly && (canAddLocal || canBulkImport || canPurgeBackup) && (
-          <div className="manager-toolbar">
-            {canAddLocal && (
-              <button
-                type="button"
-                className="action-btn primary"
-                onClick={openAdd}
-                title={chdSynced
-                  ? 'Thêm học viên / hỗ trợ trực gác vào lịch (không tạo tài khoản CHD)'
-                  : 'Thêm bác sĩ mới'}
-                aria-label="Thêm nhân sự lịch"
-              >
-                <UserPlus size={16} /> {chdSynced ? 'Thêm HV / hỗ trợ' : 'Thêm'}
-              </button>
+            {!readOnly && (canAddLocal || canBulkImport || canPurgeBackup) && (
+              <div className="manager-toolbar">
+                {canAddLocal && (
+                  <button
+                    type="button"
+                    className="action-btn primary"
+                    onClick={openAdd}
+                    title={chdSynced
+                      ? 'Thêm học viên / hỗ trợ trực gác vào lịch (không tạo tài khoản CHD)'
+                      : 'Thêm bác sĩ mới'}
+                    aria-label="Thêm nhân sự lịch"
+                  >
+                    <UserPlus size={16} /> {chdSynced ? 'Thêm HV / hỗ trợ' : 'Thêm'}
+                  </button>
+                )}
+                {canPurgeBackup && (
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={handlePurgeBackup}
+                    title="Xóa các dòng Lịch cục bộ trùng bác sĩ CHD (từ file JSON sao lưu)"
+                    aria-label="Gỡ nhân sự trùng từ file sao lưu"
+                  >
+                    <Trash2 size={16} /> Gỡ trùng sao lưu ({backupLocalCount})
+                  </button>
+                )}
+                {canBulkImport && (
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => setIsBulkModalOpen(true)}
+                    title="Nhập hàng loạt từ Excel"
+                    aria-label="Nhập hàng loạt từ Excel"
+                  >
+                    <Upload size={16} /> Excel
+                  </button>
+                )}
+              </div>
             )}
-            {canPurgeBackup && (
-              <button
-                type="button"
-                className="action-btn"
-                onClick={handlePurgeBackup}
-                title="Xóa các dòng Lịch cục bộ trùng bác sĩ CHD (từ file JSON sao lưu)"
-                aria-label="Gỡ nhân sự trùng từ file sao lưu"
-              >
-                <Trash2 size={16} /> Gỡ trùng sao lưu ({backupLocalCount})
-              </button>
+          </>
+        ) : (
+          <>
+            <div className="staff-embed-summary">
+              <div className="sub-header-info">{staffList.length} nhân sự trong khoa</div>
+            </div>
+            {!readOnly && (canPurgeBackup || canBulkImport) && (
+              <div className="manager-toolbar">
+                {canPurgeBackup && (
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={handlePurgeBackup}
+                    title="Xóa các dòng Lịch cục bộ trùng bác sĩ CHD (từ file JSON sao lưu)"
+                    aria-label="Gỡ nhân sự trùng từ file sao lưu"
+                  >
+                    <Trash2 size={16} /> Gỡ trùng sao lưu ({backupLocalCount})
+                  </button>
+                )}
+                {canBulkImport && (
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => setIsBulkModalOpen(true)}
+                    title="Nhập hàng loạt từ Excel"
+                    aria-label="Nhập hàng loạt từ Excel"
+                  >
+                    <Upload size={16} /> Excel
+                  </button>
+                )}
+              </div>
             )}
-            {canBulkImport && (
-              <button
-                type="button"
-                className="action-btn"
-                onClick={() => setIsBulkModalOpen(true)}
-                title="Nhập hàng loạt từ Excel"
-                aria-label="Nhập hàng loạt từ Excel"
-              >
-                <Upload size={16} /> Excel
-              </button>
-            )}
-          </div>
+          </>
         )}
         {chdSynced && (
-          <div className="sub-header-info" style={{ marginTop: 4 }}>
+          <div className="sub-header-info staff-chd-hint" style={{ marginTop: 4 }}>
             Nhân sự CHD (ShowInLichKhoa = On) + học viên/hỗ trợ thêm tay. Khoa/Phòng CHD = cột Department trên Sheet Staff.
             Nhân sự thêm tay chỉ có trên lịch khoa, không tạo tài khoản CHD.
             {backupLocalCount > 0
