@@ -369,7 +369,7 @@ export function TaskEditorModal({
   return (
     <ModalPortal>
     <div className="modal-overlay" onMouseDown={(event) => event.stopPropagation()}>
-      <div className="modal-content" role="dialog" aria-modal="true">
+      <div className="modal-content task-editor-modal" role="dialog" aria-modal="true">
         <div className="modal-header">
           <span>{title}</span>
           <button type="button" className="icon-btn" onClick={onClose} title="Đóng"><X size={18} /></button>

@@ -10,7 +10,16 @@ import { exportWeekRows, importWeekRows } from './week.js';
  * Các trường tuần chưa có trong tab LichTuan (exportWeekRows) — khi pull Sheet,
  * merge từ store local theo cùng sheetId để không mất dữ liệu (vd. Phân công bệnh phòng).
  */
-const SHEET_MERGE_PRESERVE_KEYS = ['roomTable', 'roomColumns', 'roomAssignments'];
+/**
+ * Trường lịch tuần/tháng chưa (đủ) có trên Google Sheet — kéo Sheet sẽ mất nếu không merge lại.
+ * Thanh công cụ (cellStyles), merge ô, freeze, phân công phòng… thuộc nhóm này.
+ */
+const SHEET_MERGE_PRESERVE_KEYS = [
+  'roomTable', 'roomColumns', 'roomAssignments',
+  'cellStyles', 'weekMerges', 'monthMerges', 'freeze',
+  'warnings', 'roomWarnings', 'buGrants', 'buPosted', 'leaveCuts',
+  'cathGrid', 'cathRoles',
+];
 
 function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
   if (!Array.isArray(remoteSheets) || !remoteSheets.length) return remoteSheets;
@@ -23,6 +32,22 @@ function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
       if (key in prev && !(key in sh)) patch[key] = prev[key];
     }
     return Object.keys(patch).length ? { ...sh, ...patch } : sh;
+  });
+}
+
+/** Giữ studyFrom/studyTo/position lịch khi NhanSu Sheet chưa có cột hoặc để trống. */
+function mergeStaffPreserveLocalFields(remoteStaff, localStaff) {
+  if (!Array.isArray(remoteStaff) || !remoteStaff.length) return remoteStaff;
+  const byId = new Map((localStaff || []).filter(Boolean).map((s) => [String(s.id), s]));
+  return remoteStaff.map((s) => {
+    const prev = byId.get(String(s.id));
+    if (!prev) return s;
+    const next = { ...s };
+    if (!next.studyFrom && prev.studyFrom) next.studyFrom = prev.studyFrom;
+    if (!next.studyTo && prev.studyTo) next.studyTo = prev.studyTo;
+    if (!String(next.position || '').trim() && prev.position) next.position = prev.position;
+    if (next.dutyQuota == null && prev.dutyQuota != null) next.dutyQuota = prev.dutyQuota;
+    return next;
   });
 }
 
@@ -49,12 +74,16 @@ export function importTabsToStore(tabs, baseStore = null) {
   sheets = mergeSheetsPreserveLocalFields(sheets, prevSheets);
   sheets = sheets.map((sh) => applyMonthToSheet(sh, monthBySheet.get(sh.id)));
 
+  const mergedStaff = staff.length
+    ? mergeStaffPreserveLocalFields(staff, prevDept.staff)
+    : prevDept.staff;
+
   const department = {
     ...prevDept,
     id: deptId,
     name: meta.deptName || prevDept.name,
     code: meta.deptCode || prevDept.code,
-    staff: staff.length ? staff : prevDept.staff,
+    staff: mergedStaff,
     tasks: tasks.length ? tasks : prevDept.tasks,
     leaveEntries: leaveEntries.length ? leaveEntries : (prevDept.leaveEntries || []),
     studyEntries: studyEntries.length ? studyEntries : (prevDept.studyEntries || []),

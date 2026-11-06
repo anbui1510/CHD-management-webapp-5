@@ -16,6 +16,7 @@ import {
   markLocalScheduleStaff,
   newLocalStaffId,
 } from '../logic/staffSource.js';
+import { formatDateVN, toDateInputValue } from '../logic/dateDisplay.js';
 import { useConfirm } from './ConfirmDialog';
 import { ModalPortal } from './ModalPortal';
 
@@ -119,8 +120,8 @@ export function StaffManager({
       buBalance: s.buBalance ?? 0,
       phepBalance: s.phepBalance ?? 0,
       email: s.email || '',
-      studyFrom: s.studyFrom || '',
-      studyTo: s.studyTo || '',
+      studyFrom: toDateInputValue(s.studyFrom),
+      studyTo: toDateInputValue(s.studyTo),
       taskDuties: normalizeDuties(s.taskDuties),
       accessRole: s.accessRole === 'member' ? 'member' : 'admin',
       access: normalizeAccess(s.access),
@@ -189,7 +190,9 @@ export function StaffManager({
       setFormError(`Tên viết tắt "${shortName}" đã được dùng cho ${duplicate.name}. Vui lòng chọn tên khác.`);
       return;
     }
-    if (positionShowsStudyRange(form.position) && form.studyFrom && form.studyTo && form.studyTo < form.studyFrom) {
+    const studyFrom = positionShowsStudyRange(form.position) ? toDateInputValue(form.studyFrom) : '';
+    const studyTo = positionShowsStudyRange(form.position) ? toDateInputValue(form.studyTo) : '';
+    if (studyFrom && studyTo && studyTo < studyFrom) {
       setFormError('Ngày kết thúc phải sau ngày bắt đầu.');
       return;
     }
@@ -213,8 +216,8 @@ export function StaffManager({
       buBalance: Number(form.buBalance) || 0,
       phepBalance: Number(form.phepBalance) || 0,
       email: form.email.trim() || `${shortName.toLowerCase()}@hospital.vn`,
-      studyFrom: positionShowsStudyRange(form.position) ? (form.studyFrom || '') : '',
-      studyTo: positionShowsStudyRange(form.position) ? (form.studyTo || '') : '',
+      studyFrom,
+      studyTo,
       taskDuties: normalizeDuties(form.taskDuties).filter(row => row.taskId),
       accessRole: form.accessRole === 'member' ? 'member' : 'admin',
       access: normalizeAccess(form.access),
@@ -472,11 +475,11 @@ export function StaffManager({
                 <td><span className="code-pill">{s.shortName}</span></td>
                 <td>
                   <span className="position-pill">{normalizeLegacyPosition(s.position || s.title || '')}</span>
-                  {positionShowsStudyRange(s.position) && (s.studyFrom || s.studyTo) && (
+                  {positionShowsStudyRange(normalizeLegacyPosition(s.position || s.title || '')) && (s.studyFrom || s.studyTo) && (
                     <div className="text-muted-cell">
-                      {s.studyFrom ? s.studyFrom.split('-').reverse().join('/') : '…'}
+                      {formatDateVN(s.studyFrom) || '…'}
                       {' – '}
-                      {s.studyTo ? s.studyTo.split('-').reverse().join('/') : '…'}
+                      {formatDateVN(s.studyTo) || '…'}
                     </div>
                   )}
                 </td>
@@ -576,11 +579,11 @@ export function StaffManager({
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Bắt đầu học/hỗ trợ:</label>
-                    <input type="date" className="form-input" value={form.studyFrom || ''} onChange={e => setForm(current => ({ ...current, studyFrom: e.target.value }))} />
+                    <input type="date" className="form-input" value={toDateInputValue(form.studyFrom)} onChange={e => setForm(current => ({ ...current, studyFrom: e.target.value }))} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Kết thúc học/hỗ trợ:</label>
-                    <input type="date" className="form-input" value={form.studyTo || ''} onChange={e => setForm(current => ({ ...current, studyTo: e.target.value }))} />
+                    <input type="date" className="form-input" value={toDateInputValue(form.studyTo)} onChange={e => setForm(current => ({ ...current, studyTo: e.target.value }))} />
                   </div>
                 </div>
               )}

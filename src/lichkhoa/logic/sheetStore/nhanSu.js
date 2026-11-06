@@ -3,6 +3,7 @@ import { normalizeAccess } from '../access.js';
 import { parseShowInLichKhoa, formatShowInLichKhoa } from '../showInLichKhoa.js';
 import { isLocalScheduleStaff } from '../staffSource.js';
 import { normalizeLegacyPosition } from '../../store/constants.js';
+import { toDateInputValue } from '../dateDisplay.js';
 import { objectsToRows, rowsToObjects } from './tableUtils.js';
 
 /** TC-F304-02 */
@@ -31,8 +32,8 @@ export function importNhanSuRows(rows) {
       loginEmail: String(row.loginEmail || '').trim(),
       position: normalizeLegacyPosition(row.position || row.title || ''),
     };
-    const studyFrom = String(row.studyFrom || '').trim();
-    const studyTo = String(row.studyTo || '').trim();
+    const studyFrom = toDateInputValue(row.studyFrom);
+    const studyTo = toDateInputValue(row.studyTo);
     if (studyFrom) staff.studyFrom = studyFrom;
     if (studyTo) staff.studyTo = studyTo;
     if (row.deptId) staff.deptId = String(row.deptId).trim();
@@ -70,8 +71,8 @@ export function exportNhanSuRows(staffList) {
       email: s.email,
       loginEmail: s.loginEmail || '',
       position: normalizeLegacyPosition(s.position || s.title || ''),
-      studyFrom: s.studyFrom || '',
-      studyTo: s.studyTo || '',
+      studyFrom: toDateInputValue(s.studyFrom),
+      studyTo: toDateInputValue(s.studyTo),
       deptId: s.deptId || '',
       deptLabel: s.deptLabel || '',
       showInLichKhoa: s.showInLichKhoa || formatShowInLichKhoa(true),

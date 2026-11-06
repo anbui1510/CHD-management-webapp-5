@@ -1,4 +1,5 @@
 import { positionShowsStudyRange } from '../store/constants.js';
+import { toDateInputValue } from './dateDisplay.js';
 
 function fold(value) {
   return String(value || '')
@@ -15,8 +16,8 @@ export function isTrainee(person) {
 
 function bounds(person) {
   if (!isTrainee(person)) return null;
-  const from = String(person?.studyFrom || '').trim();
-  const to = String(person?.studyTo || '').trim();
+  const from = toDateInputValue(person?.studyFrom);
+  const to = toDateInputValue(person?.studyTo);
   if (!from && !to) return null;
   return { from, to };
 }
@@ -25,7 +26,7 @@ function bounds(person) {
 export function traineeCovers(person, iso) {
   const limit = bounds(person);
   if (!limit) return true;
-  const day = String(iso || '');
+  const day = toDateInputValue(iso) || String(iso || '');
   if (!day) return true;
   if (limit.from && day < limit.from) return false;
   if (limit.to && day > limit.to) return false;

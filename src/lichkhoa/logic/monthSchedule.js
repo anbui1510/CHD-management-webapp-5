@@ -118,6 +118,9 @@ export function sessionLabel(id) {
   return DAY_SESSIONS.find(item => item.id === id)?.label || id;
 }
 
+/** Cột ghi chú mặc định bên phải lịch tháng (custom id `notes`). */
+export const MONTH_NOTES_COLUMN_KEY = 'x:notes';
+
 export function defaultMonthColumnKeys(sessions) {
   const active = normalizeDaySessions(sessions);
   const keys = ['del', 'task'];
@@ -127,6 +130,7 @@ export function defaultMonthColumnKeys(sessions) {
       keys.push(`d${day}${spec.suffix}`);
     });
   }
+  keys.push(MONTH_NOTES_COLUMN_KEY);
   return keys;
 }
 
@@ -177,6 +181,7 @@ function columnKeys(order, sessions) {
   for (let day = lastDay + 1; day < 7; day += 1) result.push(...dayKeys(day));
   if (!result.includes('del')) result.unshift('del');
   if (!result.includes('task')) result.splice(Math.max(0, result.indexOf('del')) + 1, 0, 'task');
+  if (!result.includes(MONTH_NOTES_COLUMN_KEY)) result.push(MONTH_NOTES_COLUMN_KEY);
   return result.filter((key, index) => result.indexOf(key) === index);
 }
 
@@ -186,7 +191,8 @@ export function columnSpecs(order, titles = {}, sessions) {
     if (key === 'task') return { key, kind: 'task', title: 'Nhiệm vụ' };
     if (key.startsWith('x:')) {
       const id = key.slice(2);
-      return { key, kind: 'custom', id, title: titles[key] || 'Cột mới' };
+      const fallback = id === 'notes' || id === 'ghi_chu' ? 'Ghi chú' : 'Cột mới';
+      return { key, kind: 'custom', id, title: titles[key] || fallback };
     }
     const day = parseDayKey(key);
     if (!day) return null;
