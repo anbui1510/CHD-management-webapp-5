@@ -8,7 +8,7 @@ export function toLichkhoaUser(currentStaff) {
     id: String(currentStaff.StaffKey),
     email: String(currentStaff.Email || '').trim(),
     username: String(currentStaff.StaffName || currentStaff.Name || currentStaff.StaffKey),
-    fullName: String(currentStaff.Name || currentStaff.StaffName || ''),
+    fullName: String(currentStaff.StaffName || currentStaff.Name || ''),
     role: currentStaff.Role === 'Admin' ? 'Admin' : 'User',
   };
 }

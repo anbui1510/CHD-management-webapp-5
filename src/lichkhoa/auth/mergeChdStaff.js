@@ -54,7 +54,8 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
     next.push(markChdScheduleStaff({
       ...prev,
       id,
-      name: String(chd.Name || chd.StaffName || prev.name || id),
+      // Họ tên đầy đủ = StaffName (Sheet CHD); Name là tên ngắn có chức danh (BS. …).
+      name: String(chd.StaffName || chd.Name || prev.name || id),
       shortName,
       email: String(chd.Email || prev.email || ''),
       loginEmail: '',
