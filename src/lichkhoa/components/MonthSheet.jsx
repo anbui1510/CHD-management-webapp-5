@@ -10,20 +10,34 @@ import { attachPaletteDrop } from '../logic/paletteDrop';
 import { patchHotCells, revealSheet, watchSheetViewport } from '../logic/sheetViewport';
 import { useConfirm } from './ConfirmDialog';
 
-const MONTH_PANE_REV = 7;
+const MONTH_PANE_REV = 8;
+
+/** Chỉ ghim cột trước Nhiệm vụ (thường là cột ×). Không ghim cột task — clone ẩn + pin sticky làm header khuyết chữ và chặn click sửa. */
+function defaultFrozenCols(columns) {
+  const taskIndex = (columns || []).findIndex((column) => column.kind === 'task');
+  if (taskIndex > 0) return taskIndex;
+  return 1;
+}
 
 function pinMonthColumns(hot) {
   const root = hot?.rootElement;
   if (!root) return;
   const freeze = Number(hot.getSettings().fixedColumnsStart) || 0;
-  const pin = freeze + 1;
+  const pin = Math.max(0, freeze);
   const rows = root.querySelectorAll('.ht_master .htCore tr, .ht_clone_top .htCore tr');
-  if (!rows.length || pin <= 0) return;
+  if (!rows.length || pin <= 0) {
+    root.querySelectorAll('.month-pin').forEach((cell) => {
+      cell.classList.remove('month-pin');
+      cell.style.left = '';
+    });
+    root.__pinSig = '';
+    return;
+  }
   const sample = root.querySelector('.ht_master .htCore tbody tr');
-  const sig = sample ? [...sample.children].map(cell => cell.offsetWidth).join(',') : '';
+  const sig = `${pin}|${sample ? [...sample.children].map((cell) => cell.offsetWidth).join(',') : ''}`;
   let missing = false;
   rows.forEach((row) => {
-    const cell = row.children[1] || row.children[0];
+    const cell = row.children[0];
     if (cell && !cell.classList.contains('month-pin')) missing = true;
   });
   if (!missing && sig && root.__pinSig === sig) return;
@@ -352,7 +366,8 @@ export function MonthSheet({
     const colWidths = columns.map((column) => {
       const saved = Number(widthByKeyRef.current[column.key]) || 0;
       if (column.kind === 'del') return Math.max(saved || 0, 42);
-      if (column.kind === 'task') return Math.max(saved || 0, 168);
+      // Cột Nhiệm vụ luôn đủ rộng để hiện đủ chữ + nút +; không để width đã lưu làm hẹp.
+      if (column.kind === 'task') return Math.max(saved || 0, 180);
       if (column.kind === 'custom') {
         const isNotes = column.id === 'notes' || column.id === 'ghi_chu' || /ghi\s*ch[úu]/i.test(column.title || '');
         return Math.max(saved || 0, isNotes ? 140 : 120);
@@ -385,7 +400,8 @@ export function MonthSheet({
       }
     }
     const meta = metaRef.current;
-    const frozen = Math.max(1, columns.findIndex(column => column.kind === 'day'));
+    // Chỉ freeze cột × — cột Nhiệm vụ nằm vùng master để click/gõ được.
+    const frozen = defaultFrozenCols(columns);
 
     const askDelete = async (role) => {
       const ok = await confirmRef.current({
@@ -577,7 +593,10 @@ export function MonthSheet({
         return { row: 0, col: 0 };
       },
       fixedRowsTop: freezeRef.current.rows,
-      fixedColumnsStart: freezeRef.current.cols == null ? frozen : Number(freezeRef.current.cols) || 0,
+      fixedColumnsStart: (() => {
+        const raw = freezeRef.current.cols == null ? frozen : Number(freezeRef.current.cols) || 0;
+        return Math.min(Math.max(0, raw), frozen);
+      })(),
       wordWrap: false,
       autoRowSize: false,
       renderAllColumns: true,
@@ -900,9 +919,13 @@ export function MonthSheet({
   useEffect(() => {
     const hot = hotRef.current;
     if (!hot) return;
-    const structural = Math.max(1, columnsRef.current.findIndex(column => column.kind === 'day'));
+    const structural = defaultFrozenCols(columnsRef.current);
     const rows = Number(freezeRows) || 0;
-    const cols = freezeCols == null ? structural : Number(freezeCols) || 0;
+    // Không cho freeze kéo theo cột Nhiệm vụ (index task) — tối đa freeze tới trước task.
+    const taskIndex = columnsRef.current.findIndex((column) => column.kind === 'task');
+    const maxFreeze = taskIndex > 0 ? taskIndex : structural;
+    const rawCols = freezeCols == null ? structural : Number(freezeCols) || 0;
+    const cols = Math.min(Math.max(0, rawCols), maxFreeze);
     const settings = hot.getSettings();
     if ((Number(settings.fixedRowsTop) || 0) === rows && (Number(settings.fixedColumnsStart) || 0) === cols) return;
     hot.updateSettings({ fixedRowsTop: rows, fixedColumnsStart: cols });

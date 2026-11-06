@@ -1109,11 +1109,13 @@ body.dark-theme {
   overflow: hidden !important;
 }
 
+/* Clone trái ẩn + không nhận click (tránh lớp phủ chặn ô Nhiệm vụ). */
 .month-sheet .ht_clone_inline_start,
 .month-sheet .ht_clone_left,
 .month-sheet .ht_clone_top_inline_start_corner,
 .month-sheet .ht_clone_top_left_corner {
   display: none !important;
+  pointer-events: none !important;
 }
 
 .month-sheet .ht_master .htCore > tbody > tr > th {
@@ -1129,6 +1131,18 @@ body.dark-theme {
 .month-sheet .ht_clone_top .htCore .month-pin {
   z-index: 8;
   background-color: var(--sheet-header) !important;
+}
+
+/* Header Nhiệm vụ: không bị overflow:hidden của sheet-zoom cắt chữ. */
+.sheet-zoom .month-sheet .handsontable thead th.ht-span-label {
+  overflow: visible !important;
+  min-width: 180px;
+}
+
+.sheet-zoom .month-sheet .handsontable td.month-role {
+  overflow: visible !important;
+  pointer-events: auto !important;
+  cursor: cell;
 }
 
 .handsontable td.month-weekhead {
@@ -1183,14 +1197,15 @@ body.dark-theme {
   justify-content: space-between;
   gap: 6px;
   width: 100%;
-  min-width: 148px;
+  min-width: 168px;
   padding: 0 6px;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 .month-task-head span {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 1 auto;
+  min-width: max-content;
   white-space: nowrap;
   overflow: visible;
   text-overflow: clip;
@@ -1325,8 +1340,14 @@ body.mobile-ui .room-assignments-container {
 .handsontable thead th.ht-span-label .month-task-head {
   pointer-events: auto;
   justify-content: space-between;
-  min-width: 148px;
+  min-width: 168px;
   padding: 0 6px;
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  height: 100%;
 }
 
 .handsontable thead th.ht-span-gap {
