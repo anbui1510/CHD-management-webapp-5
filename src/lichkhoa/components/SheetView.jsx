@@ -1129,7 +1129,7 @@ export function SheetView({
       <div className="room-assignments-container" hidden={activePlan !== 'week'}>
         <div className="room-title">Phân công bệnh phòng</div>
         {(roomTable?.matrix?.[0]?.length || 0) > 3 && (
-          <div className="room-hint">Vuốt ngang bảng để xem đủ bác sĩ / phòng.</div>
+          <div className="room-hint">Cuộn trang để xem đủ bác sĩ / phòng.</div>
         )}
         <RoomSheet
           active={activePlan === 'week'}

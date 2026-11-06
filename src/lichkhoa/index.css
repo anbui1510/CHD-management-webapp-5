@@ -2399,14 +2399,10 @@ body.dark-theme .sheet-scroll.is-open::-webkit-scrollbar-thumb:hover {
   background-clip: padding-box;
 }
 
-/* Chỉ khóa scroll nội bộ của lưới tuần — bảng Phân công bệnh phòng phải cuộn ngang được. */
-.sheet-scroll.is-open .sheet-workbook .handsontable .wtHolder {
-  overflow: hidden !important;
-}
-
+/* Lưới tuần + Phân công bệnh phòng: không cuộn nội bộ — chỉ cuộn khung .sheet-scroll.is-open. */
+.sheet-scroll.is-open .sheet-workbook .handsontable .wtHolder,
 .sheet-scroll.is-open .room-assignments-container .handsontable .wtHolder {
-  overflow: auto !important;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden !important;
 }
 
 .sheet-scroll.is-open .handsontable.is-pin-x > .ht_clone_inline_start,

@@ -7,10 +7,32 @@ const DEFAULT_LABELS = ['BS Phụ trách', 'Tên bệnh phòng'];
 const DEFAULT_COL_WIDTH = 120;
 const DEFAULT_ROW_HEIGHT = 32;
 
-function roomGridPixelHeight(rowHeights) {
-  const rows = (rowHeights || []).reduce((sum, height) => sum + (Number(height) || DEFAULT_ROW_HEIGHT), 0);
-  // Handsontable keeps the horizontal scrollbar inside this height.
-  return rows + 18;
+/** Khớp kích thước lưới với nội dung — cuộn chỉ trên khung .sheet-scroll, không trong Handsontable. */
+function syncRoomFrame(hot) {
+  if (!hot?.rootElement) return;
+  let body = 0;
+  for (let index = 0; index < hot.countRows(); index += 1) {
+    body += hot.getRowHeight(index) || DEFAULT_ROW_HEIGHT;
+  }
+  let cols = 0;
+  for (let index = 0; index < hot.countCols(); index += 1) {
+    cols += hot.getColWidth(index) || DEFAULT_COL_WIDTH;
+  }
+  const zoom = parseFloat(hot.rootElement.style.zoom) || 1;
+  const leftClone = hot.rootElement.querySelector('.ht_clone_left, .ht_clone_inline_start');
+  const rowHeaderWidth = leftClone
+    ? Math.ceil(leftClone.getBoundingClientRect().width / zoom)
+    : Number(hot.getSettings().rowHeaderWidth) || 168;
+  const table = hot.rootElement.querySelector('.ht_master .htCore');
+  const tableWidth = table ? Math.ceil(table.getBoundingClientRect().width / zoom) : 0;
+  const height = body + 4;
+  const next = {};
+  if (hot.getSettings().height !== height) next.height = height;
+  if (hot.getSettings().stretchH === 'none') {
+    const width = Math.max(cols + rowHeaderWidth + 4, tableWidth);
+    if (hot.getSettings().width !== width) next.width = width;
+  }
+  if (Object.keys(next).length) hot.updateSettings(next);
 }
 
 function fold(value) {
@@ -252,6 +274,7 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
         colWidths,
         rowHeights
       });
+      requestAnimationFrame(() => syncRoomFrame(hot));
     };
 
     const fillCounts = (hot, row) => {
@@ -296,7 +319,10 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
       },
       rowHeaderWidth: headerWidth,
       colHeaders: false,
-      height: roomGridPixelHeight(table.rowHeights),
+      height: (table.rowHeights || []).reduce(
+        (sum, rowHeight) => sum + (Number(rowHeight) || DEFAULT_ROW_HEIGHT),
+        4
+      ),
       width: '100%',
       licenseKey: 'non-commercial-and-evaluation',
       hiddenColumns: {
@@ -454,9 +480,11 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
       },
       afterRowResize() {
         if (readOnlyRef.current) return;
-        const heights = Array.from({ length: this.countRows() }, (_, row) => this.getRowHeight(row) || DEFAULT_ROW_HEIGHT);
-        this.updateSettings({ height: roomGridPixelHeight(heights) });
+        syncRoomFrame(this);
         publish(this);
+      },
+      afterInit() {
+        requestAnimationFrame(() => syncRoomFrame(this));
       },
       afterSelectionEnd() {
         claim(this);
@@ -473,7 +501,19 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
 
     hotRef.current = hot;
     const detachDrop = attachPaletteDrop(hot);
+    let fitFrame = 0;
+    const refit = () => {
+      cancelAnimationFrame(fitFrame);
+      fitFrame = requestAnimationFrame(() => syncRoomFrame(hot));
+    };
+    const observer = typeof ResizeObserver !== 'undefined' && containerRef.current
+      ? new ResizeObserver(refit)
+      : null;
+    observer?.observe(containerRef.current);
+    requestAnimationFrame(() => syncRoomFrame(hot));
     return () => {
+      cancelAnimationFrame(fitFrame);
+      observer?.disconnect();
       detachDrop();
       if (bridge.current.hot === hot) {
         bridge.current.hot = null;
