@@ -215,6 +215,8 @@ function hiddenDoctorColumns(matrix, labels, names) {
 }
 
 export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge, formatCtl, uiRef, onChange, readOnly = false, active = true, hiddenDoctors = [], sheetEngineReady = true }) {
+  const activeRef = useRef(!!active);
+  activeRef.current = !!active;
   const containerRef = useRef(null);
   const hotRef = useRef(null);
   const stylesRef = useRef(cellStyles || {});
@@ -254,6 +256,8 @@ export function RoomSheet({ table, grid, staffList, taskList, cellStyles, bridge
     }
 
     const claim = (hot) => {
+      // Không cướp bridge khi tab tuần đang ở lưới tuần/tháng — tránh tô format rồi ~2s mất vì HOT phòng.
+      if (!activeRef.current) return;
       bridge.current.hot = hot;
       bridge.current.describe = describe;
       bridge.current.getSelectedEntries = () => selectedEntries(hot, describe);

@@ -7,11 +7,7 @@ import { metaObjectToRows, metaRowsToObject } from './tableUtils.js';
 import { exportWeekRows, importWeekRows } from './week.js';
 
 /**
- * Các trường tuần chưa có trong tab LichTuan (exportWeekRows) — khi pull Sheet,
- * merge từ store local theo cùng sheetId để không mất dữ liệu (vd. Phân công bệnh phòng).
- */
-/**
- * Trường lịch tuần/tháng chưa (đủ) có trên Google Sheet — kéo Sheet sẽ mất nếu không merge lại.
+ * Trường lịch tuần/tháng — round-trip qua sheet_meta.value hoặc merge từ local.
  * Thanh công cụ (cellStyles), merge ô, freeze, phân công phòng… thuộc nhóm này.
  */
 const SHEET_MERGE_PRESERVE_KEYS = [
@@ -21,6 +17,13 @@ const SHEET_MERGE_PRESERVE_KEYS = [
   'cathGrid', 'cathRoles',
 ];
 
+function isEmptyPreserveValue(value) {
+  if (value == null) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+}
+
 function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
   if (!Array.isArray(remoteSheets) || !remoteSheets.length) return remoteSheets;
   const byId = new Map((localSheets || []).filter(Boolean).map((sh) => [sh.id, sh]));
@@ -29,7 +32,18 @@ function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
     if (!prev) return sh;
     const patch = {};
     for (const key of SHEET_MERGE_PRESERVE_KEYS) {
-      if (key in prev && !(key in sh)) patch[key] = prev[key];
+      if (!(key in prev) || isEmptyPreserveValue(prev[key])) continue;
+      const remoteVal = sh[key];
+      if (isEmptyPreserveValue(remoteVal)) {
+        // Sheet chưa có / trống → giữ bản máy.
+        patch[key] = prev[key];
+        continue;
+      }
+      // cellStyles: luôn gộp, local thắng key trùng (tránh pull ~2s xóa format vừa tô).
+      if (key === 'cellStyles' && typeof remoteVal === 'object' && typeof prev[key] === 'object') {
+        patch[key] = { ...remoteVal, ...prev[key] };
+      }
+      // Khác (roomTable, merges…): Sheet đã có thì giữ remote (đã nằm trên sh).
     }
     return Object.keys(patch).length ? { ...sh, ...patch } : sh;
   });

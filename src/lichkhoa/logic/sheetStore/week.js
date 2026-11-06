@@ -1,6 +1,49 @@
 import { WEEK_HEADERS } from './constants.js';
 import { objectsToRows, rowsToObjects } from './tableUtils.js';
 
+/** Trường UI lưu trong sheet_meta.value (JSON) — thanh công cụ / merge / freeze / phòng. */
+export const WEEK_SHEET_UI_KEYS = [
+  'cellStyles', 'weekMerges', 'monthMerges', 'freeze',
+  'roomTable', 'roomColumns', 'roomAssignments',
+  'warnings', 'roomWarnings', 'buGrants', 'buPosted', 'leaveCuts',
+  'cathGrid', 'cathRoles',
+];
+
+function parseSheetUiPayload(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'object') return raw;
+  try {
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function applySheetUiPayload(sh, payload) {
+  if (!sh || !payload) return;
+  WEEK_SHEET_UI_KEYS.forEach((key) => {
+    if (!(key in payload)) return;
+    const value = payload[key];
+    if (value === undefined) return;
+    sh[key] = value;
+  });
+}
+
+function buildSheetUiPayload(sh) {
+  const out = {};
+  let has = false;
+  WEEK_SHEET_UI_KEYS.forEach((key) => {
+    const value = sh?.[key];
+    if (value == null) return;
+    if (typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length) return;
+    if (Array.isArray(value) && !value.length) return;
+    out[key] = value;
+    has = true;
+  });
+  return has ? out : null;
+}
+
 /** In-memory grids use day maps `{ 0: {S,R,C,T}, … }`; Sheet import uses arrays. */
 function forEachStaffWeekDays(days, callback) {
   if (Array.isArray(days)) {
@@ -37,6 +80,7 @@ export function importWeekRows(rows) {
       const sh = sheetMeta.get(sheetId);
       if (row.sheetName) sh.name = String(row.sheetName).trim();
       if (row.startDate) sh.startDate = String(row.startDate).trim();
+      applySheetUiPayload(sh, parseSheetUiPayload(row.value));
     } else if (type === 'week_cell') {
       weekCells.push(row);
     }
@@ -85,6 +129,7 @@ export function exportWeekRows(deptSheets) {
   const st = deptSheets || { sheets: [], activeSheetId: '' };
   const rows = [];
   (st.sheets || []).forEach((sh) => {
+    const ui = buildSheetUiPayload(sh);
     rows.push({
       recordType: 'sheet_meta',
       sheetId: sh.id,
@@ -94,7 +139,7 @@ export function exportWeekRows(deptSheets) {
       staffId: '',
       dayIndex: '',
       slot: '',
-      value: '',
+      value: ui ? JSON.stringify(ui) : '',
     });
     const pushGrid = (grid, weekStart) => {
       Object.entries(grid || {}).forEach(([staffId, days]) => {

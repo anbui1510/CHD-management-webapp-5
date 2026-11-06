@@ -65,7 +65,9 @@ export function useSheetSync({
     const localMeta = getCloudMeta();
     const remoteTs = new Date(remote.updatedAt).getTime() || 0;
     const localTs = localMeta.updatedAt ? new Date(localMeta.updatedAt).getTime() : 0;
-    if (!force && localTs && remoteTs < localTs) return false;
+    // remoteTs === localTs cũng bỏ qua — tránh pull ngay sau push xóa format vừa tô (~1–3s).
+    if (!force && localTs && remoteTs && remoteTs <= localTs) return false;
+    // importTabsToStore đã merge từ baseStore; truyền lại storeRef để chắc cellStyles local không mất.
     let next = ensureSheets(remote.payload);
     // Sheet Task trống (trước lần push đầu) → giữ task local / seed, rồi hydrate lên Sheet.
     if (!deptTaskCount(next) && deptTaskCount(storeRef.current)) {
@@ -286,8 +288,9 @@ export function useSheetSync({
       try {
         const result = await pushScheduleStoreIfNotStale(nextStore);
         if (result?.outcome === 'skipped_remote_newer') {
-          setSheetSyncNotice('Sheet Google mới hơn — đã bỏ qua ghi đè. Bấm «Đồng bộ từ Sheet».');
-          await pullFromSheet(true);
+          // Không force-pull ngay: pull đè sẽ làm mất format/ô vừa sửa trong ~2–3s sau khi tô.
+          // User bấm «Đồng bộ từ Sheet» khi muốn lấy bản Sheet.
+          setSheetSyncNotice('Sheet Google mới hơn — đã giữ bản máy này. Bấm «Đồng bộ từ Sheet» nếu muốn lấy bản Sheet.');
           return;
         }
         if (result?.outcome === 'pushed' && result.updatedAt) {
