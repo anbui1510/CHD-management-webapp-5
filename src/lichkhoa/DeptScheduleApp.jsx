@@ -27,6 +27,7 @@ import { mondayOf, columnSpecs, currentMonthKey, customCellKey, normalizeDaySess
 import { cathCellKey, localCathRoles } from './logic/cathSchedule';
 import { buBaseline, buCatchUp, buGrantDeltas } from './logic/buLedger';
 import { matchTask } from './logic/taskMatch';
+import { fold, splitTaskCodes } from './logic/cellOrder';
 import { canEdit, findLinkedStaff, firstNav, resolveActor, visibleNav } from './logic/access';
 import { resolveUiMode } from './logic/uiMode';
 import { isSheetBackend } from './config/dataBackend';
@@ -823,9 +824,10 @@ export function DeptScheduleApp({
   const handleUpdateCell = (shortName, dayIdx, session, newVal) => {
     if (!allow('week')) return;
     let value = newVal == null ? '' : String(newVal);
+    let previous = '';
 
     updateActiveSheet(sh => {
-      const previous = sh.grid?.[shortName]?.[dayIdx]?.[session] || '';
+      previous = sh.grid?.[shortName]?.[dayIdx]?.[session] || '';
       value = resolveLockedCell(previous, value, taskList);
       const grid = { ...sh.grid };
       const row = { ...(grid[shortName] || {}) };
@@ -836,15 +838,37 @@ export function DeptScheduleApp({
       return sheetWithPrunedAlerts({ ...sh, grid });
     });
 
-    // Real-time BÙ / PHÉP balance calculation
-    if (value.includes('BÙ') || value.includes('BU')) {
+    // Real-time BÙ / PHÉP balance differential calculation
+    const prevTokens = splitTaskCodes(previous, taskList);
+    const nextTokens = splitTaskCodes(value, taskList);
+
+    const prevHasBu = prevTokens.some(c => fold(c) === 'bu');
+    const nextHasBu = nextTokens.some(c => fold(c) === 'bu');
+
+    const prevHasPhep = prevTokens.some(c => fold(c) === 'p' || fold(c) === 'phep');
+    const nextHasPhep = nextTokens.some(c => fold(c) === 'p' || fold(c) === 'phep');
+
+    let buDelta = 0;
+    if (!prevHasBu && nextHasBu) buDelta = -0.5;
+    else if (prevHasBu && !nextHasBu) buDelta = 0.5;
+
+    let phepDelta = 0;
+    if (!prevHasPhep && nextHasPhep) phepDelta = -0.5;
+    else if (prevHasPhep && !nextHasPhep) phepDelta = 0.5;
+
+    if (buDelta !== 0 || phepDelta !== 0) {
       updateActiveDept(d => ({
         ...d,
-        staff: d.staff.map(s =>
-          s.shortName === shortName && s.buBalance >= 0.5
-            ? { ...s, buBalance: +(s.buBalance - 0.5).toFixed(1) }
-            : s
-        )
+        staff: d.staff.map(s => {
+          if (s.shortName !== shortName) return s;
+          const currentBu = Number(s.buBalance) || 0;
+          const currentPhep = Number(s.phepBalance) || 0;
+          return {
+            ...s,
+            buBalance: buDelta !== 0 ? Math.round((currentBu + buDelta) * 10) / 10 : s.buBalance,
+            phepBalance: phepDelta !== 0 ? Math.round((currentPhep + phepDelta) * 10) / 10 : s.phepBalance
+          };
+        })
       }));
     }
   };

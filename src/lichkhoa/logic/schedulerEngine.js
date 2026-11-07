@@ -805,29 +805,46 @@ export function generateWeeklySchedule({
   const ttWithRt = new Set(['tt', 'tt chinh', 'tt phu']);
   staffList.forEach((person) => {
     for (let day = 0; day < 7; day += 1) {
-      if (!sessions.some(session => tokens(read(person, day, session), taskList).some(item => isDutyToken(item, taskList, 'ra_truc', 'rt')))) continue;
-      let matched = null;
+      const hasRt = sessions.some(session => tokens(read(person, day, session), taskList).some(item => isDutyToken(item, taskList, 'ra_truc', 'rt')));
+      const hasVg = sessions.some(session => tokens(read(person, day, session), taskList).some(item => isDutyToken(item, taskList, 'vao_gac', 'vg')));
+      if (!hasRt && !hasVg) continue;
+
       sessions.forEach((session) => {
         tokens(read(person, day, session), taskList).forEach((code) => {
-          if (!ttWithRt.has(fold(code)) || matched) return;
-          matched = findTaskByCode(code, taskList) || { id: `code:${code}`, code };
+          const task = findTaskByCode(code, taskList) || (ttWithRt.has(fold(code)) ? { id: `code:${code}`, code } : null);
+          if (!task) return;
+          const bonus = bonusOf(task);
+
+          // RT bonus: doctor has RT on this day and task has buRt or is in ttWithRt
+          if (hasRt && (bonus.rt > 0 || ttWithRt.has(fold(code)))) {
+            const key = `${person.id}|${task.id}|${day}|rt`;
+            if (!granted.has(key)) {
+              granted.add(key);
+              const amount = bonus.rt > 0 ? bonus.rt : 0.5;
+              buGrants[person.shortName] = +((buGrants[person.shortName] || 0) + amount).toFixed(1);
+              addNote(person, `${days[day].dayName} ${days[day].dateStr}: có RT và ${task.code}, cộng ${String(amount).replace('.', ',')} bù.`);
+            }
+          }
+
+          // VG bonus: doctor has VG on this day and task has buVg
+          if (hasVg && bonus.vg > 0) {
+            const key = `${person.id}|${task.id}|${day}|vg`;
+            if (!granted.has(key)) {
+              granted.add(key);
+              const amount = bonus.vg;
+              buGrants[person.shortName] = +((buGrants[person.shortName] || 0) + amount).toFixed(1);
+              addNote(person, `${days[day].dayName} ${days[day].dateStr}: có VG và ${task.code}, cộng ${String(amount).replace('.', ',')} bù.`);
+            }
+          }
         });
       });
-      if (!matched) continue;
-      const key = `${person.id}|${matched.id}|${day}`;
-      if (granted.has(key)) continue;
-      granted.add(key);
-      const bonus = bonusOf(matched);
-      const amount = bonus.rt > 0 ? bonus.rt : 0.5;
-      buGrants[person.shortName] = +((buGrants[person.shortName] || 0) + amount).toFixed(1);
-      addNote(person, `${days[day].dayName} ${days[day].dateStr}: có RT và ${matched.code}, cộng ${String(amount).replace('.', ',')} bù.`);
     }
   });
   staffList.forEach((person) => {
     const row = grid[person.shortName];
     if (!row) return;
     const prev = String(existingNotes?.[person.shortName] || '');
-    const kept = prev.split('\n').map(line => line.trim()).filter(line => line && !/: có RT và .+ cộng [\d,]+ bù\.$/.test(line));
+    const kept = prev.split('\n').map(line => line.trim()).filter(line => line && !/: có (?:RT|VG) và .+ cộng [\d,]+ bù\.$/.test(line));
     const extra = (noteLines[person.shortName] || []).filter(line => !kept.includes(line));
     row.note = [...kept, ...extra].join('\n');
   });

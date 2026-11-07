@@ -189,14 +189,20 @@ export function mergeStaffPreserveLocalFields(remoteStaff, localStaff) {
     if (prev.position && (!next.position || !String(next.position).trim())) {
       next.position = prev.position;
     }
-    if (prev.dutyQuota != null && (next.dutyQuota == null || next.dutyQuota === 0)) {
+    if (prev.dutyQuota != null && (next.dutyQuota === undefined || isNaN(next.dutyQuota))) {
       next.dutyQuota = prev.dutyQuota;
+    } else if (next.dutyQuota === undefined) {
+      next.dutyQuota = 0;
     }
-    if (prev.buBalance != null && (next.buBalance == null || next.buBalance === 0)) {
+    if (prev.buBalance != null && (next.buBalance === undefined || isNaN(next.buBalance))) {
       next.buBalance = prev.buBalance;
+    } else if (next.buBalance === undefined) {
+      next.buBalance = 0;
     }
-    if (prev.phepBalance != null && (next.phepBalance == null || next.phepBalance === 0)) {
+    if (prev.phepBalance != null && (next.phepBalance === undefined || isNaN(next.phepBalance))) {
       next.phepBalance = prev.phepBalance;
+    } else if (next.phepBalance === undefined) {
+      next.phepBalance = 0;
     }
     if (Array.isArray(prev.taskDuties) && prev.taskDuties.length && (!next.taskDuties || !next.taskDuties.length)) {
       next.taskDuties = prev.taskDuties;

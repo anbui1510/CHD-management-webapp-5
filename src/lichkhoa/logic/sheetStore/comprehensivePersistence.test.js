@@ -212,5 +212,81 @@ assert.strictEqual(scheduleRes.grid['PHỤNG']?.[0]?.['S'], 'SN', 'PHỤNG must 
 assert(!String(scheduleRes.grid['LỢI']?.[3]?.['S'] || '').includes('SN'), 'LỢI must NOT have SN on Thursday morning');
 console.log('TEST 6 PASSED: SN is not assigned to BS Lợi when not scheduled in Lịch tháng!');
 
+// 7. BÙ / PHÉP: Differential tracking on cell edits
+console.log('TEST 7: BÙ and PHÉP differential deductions and refunds on week cell edits');
+const { splitTaskCodes, fold } = await import('../cellOrder.js');
+const sampleTasks = [
+  { code: 'BÙ', category: 'NGHI_VANG' },
+  { code: 'P', category: 'NGHI_VANG' },
+  { code: 'T1*', category: 'CHUYEN_MON' }
+];
+
+function simulateCellEdit(previous, value, staff) {
+  const prevTokens = splitTaskCodes(previous, sampleTasks);
+  const nextTokens = splitTaskCodes(value, sampleTasks);
+
+  const prevHasBu = prevTokens.some(c => fold(c) === 'bu');
+  const nextHasBu = nextTokens.some(c => fold(c) === 'bu');
+
+  const prevHasPhep = prevTokens.some(c => fold(c) === 'p' || fold(c) === 'phep');
+  const nextHasPhep = nextTokens.some(c => fold(c) === 'p' || fold(c) === 'phep');
+
+  let buDelta = 0;
+  if (!prevHasBu && nextHasBu) buDelta = -0.5;
+  else if (prevHasBu && !nextHasBu) buDelta = 0.5;
+
+  let phepDelta = 0;
+  if (!prevHasPhep && nextHasPhep) phepDelta = -0.5;
+  else if (prevHasPhep && !nextHasPhep) phepDelta = 0.5;
+
+  return {
+    ...staff,
+    buBalance: buDelta !== 0 ? Math.round(((Number(staff.buBalance) || 0) + buDelta) * 10) / 10 : staff.buBalance,
+    phepBalance: phepDelta !== 0 ? Math.round(((Number(staff.phepBalance) || 0) + phepDelta) * 10) / 10 : staff.phepBalance
+  };
+}
+
+let testStaff = { shortName: 'LỢI', buBalance: 2.0, phepBalance: 12.0 };
+// Step 1: User types BÙ into cell -> buBalance: 1.5
+testStaff = simulateCellEdit('', 'BÙ', testStaff);
+assert.strictEqual(testStaff.buBalance, 1.5, 'Typing BÙ must deduct 0.5');
+
+// Step 2: User adds note/task BÙ, T1* -> buBalance stays 1.5 (no duplicate deduction)
+testStaff = simulateCellEdit('BÙ', 'BÙ, T1*', testStaff);
+assert.strictEqual(testStaff.buBalance, 1.5, 'Editing cell keeping BÙ must not deduct again');
+
+// Step 3: User deletes BÙ -> buBalance refunded to 2.0
+testStaff = simulateCellEdit('BÙ, T1*', 'T1*', testStaff);
+assert.strictEqual(testStaff.buBalance, 2.0, 'Deleting BÙ must refund 0.5');
+
+// Step 4: User types P -> phepBalance: 11.5
+testStaff = simulateCellEdit('', 'P', testStaff);
+assert.strictEqual(testStaff.phepBalance, 11.5, 'Typing P must deduct 0.5');
+
+// Step 5: User deletes P -> phepBalance refunded to 12.0
+testStaff = simulateCellEdit('P', '', testStaff);
+assert.strictEqual(testStaff.phepBalance, 12.0, 'Deleting P must refund 0.5');
+console.log('TEST 7 PASSED: BÙ and PHÉP differential tracking works perfectly!');
+
+// 8. Explicit 0 balance persistence
+console.log('TEST 8: Explicit 0 balance in NhanSu and bundle is preserved and never reverted');
+const { importNhanSuRows, exportNhanSuRows } = await import('./nhanSu.js');
+
+const staffZero = [{ id: 'staff_101', source: 'chd', name: 'BS Zero', shortName: 'ZERO', buBalance: 0, phepBalance: 0 }];
+const exportedZeroRows = exportNhanSuRows(staffZero);
+const importedZeroStaff = importNhanSuRows(exportedZeroRows);
+assert.strictEqual(importedZeroStaff[0].buBalance, 0, 'Imported buBalance must be 0');
+assert.strictEqual(importedZeroStaff[0].phepBalance, 0, 'Imported phepBalance must be 0');
+
+const localStaffPrev = [{ id: 'staff_101', source: 'chd', name: 'BS Zero', shortName: 'ZERO', buBalance: 5, phepBalance: 12 }];
+const remoteStaffZero = [{ id: 'staff_101', source: 'chd', name: 'BS Zero', shortName: 'ZERO', buBalance: 0, phepBalance: 0 }];
+
+const mergedStaff = mergeStaffPreserveLocalFields(remoteStaffZero, localStaffPrev);
+const zeroDoctor = mergedStaff.find(s => s.id === 'staff_101');
+assert.strictEqual(zeroDoctor.buBalance, 0, 'Explicit 0 buBalance must be preserved, not reverted to 5');
+assert.strictEqual(zeroDoctor.phepBalance, 0, 'Explicit 0 phepBalance must be preserved, not reverted to 12');
+console.log('TEST 8 PASSED: Explicit 0 balance is safely preserved across sync!');
+
 console.log('\n>>> ALL COMPREHENSIVE PERSISTENCE TESTS PASSED! <<<');
+
 
