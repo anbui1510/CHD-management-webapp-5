@@ -1,7 +1,7 @@
 import { TASK_HEADERS } from './constants.js';
 import { boolCell, numCell, objectsToRows, parseJsonCell, rowsToObjects } from './tableUtils.js';
 
-/** TC-F304-03 */
+/** TC-F304-03 — hỗ trợ đầy đủ rotate, warn, display (Lịch tuần/Lịch chuyên môn) */
 export function importTaskRows(rows) {
   const objs = rowsToObjects(rows, TASK_HEADERS);
   return objs.map((row) => ({
@@ -28,6 +28,9 @@ export function importTaskRows(rows) {
     fixedDays: parseJsonCell(row.fixedDaysJson, []),
     fixedSlots: parseJsonCell(row.fixedSlotsJson, []),
     locks: parseJsonCell(row.locksJson, []),
+    rotate: boolCell(row.rotate),
+    warn: row.warn === undefined || row.warn === '' ? true : boolCell(row.warn),
+    display: String(row.display || 'both').trim() || 'both',
   })).filter((t) => t.id);
 }
 
@@ -56,6 +59,9 @@ export function exportTaskRows(tasks) {
     fixedDaysJson: JSON.stringify(t.fixedDays || []),
     fixedSlotsJson: JSON.stringify(t.fixedSlots || []),
     locksJson: JSON.stringify(t.locks || []),
+    rotate: t.rotate ? 'true' : 'false',
+    warn: t.warn !== false ? 'true' : 'false',
+    display: t.display || 'both',
   }));
   return objectsToRows(objects, TASK_HEADERS);
 }

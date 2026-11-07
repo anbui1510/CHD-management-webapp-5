@@ -52,7 +52,7 @@ function mergeWeekGridLocalWins(remoteGrid, localGrid) {
   return out;
 }
 
-function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
+export function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
   const localList = (localSheets || []).filter(Boolean);
   if (!Array.isArray(remoteSheets) || !remoteSheets.length) return localList;
   const byId = new Map(localList.map((sh) => [sh.id, sh]));
@@ -169,7 +169,7 @@ function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
 }
 
 /** Giữ studyFrom/studyTo/position/shortName lịch và bảo toàn nhân sự local (local_*). */
-function mergeStaffPreserveLocalFields(remoteStaff, localStaff) {
+export function mergeStaffPreserveLocalFields(remoteStaff, localStaff) {
   const localList = (localStaff || []).filter(Boolean);
   if (!Array.isArray(remoteStaff) || !remoteStaff.length) return localList;
   const byId = new Map(localList.map((s) => [String(s.id), s]));
@@ -225,7 +225,7 @@ function mergeStaffPreserveLocalFields(remoteStaff, localStaff) {
   return [...mergedRemote, ...extraLocal];
 }
 
-function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
+export function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
   const localList = (localTasks || []).filter(Boolean);
   if (!Array.isArray(remoteTasks) || !remoteTasks.length) return localList;
 
@@ -245,6 +245,16 @@ function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
       bgColor: prev.bgColor || t.bgColor,
       textColor: prev.textColor || t.textColor,
       category: prev.category || t.category,
+      display: prev.display || t.display || 'both',
+      rotate: prev.rotate !== undefined ? prev.rotate : t.rotate,
+      warn: prev.warn !== undefined ? prev.warn : t.warn,
+      dutyRole: prev.dutyRole || t.dutyRole,
+      encodeDuty: prev.encodeDuty !== undefined ? prev.encodeDuty : t.encodeDuty,
+      buRt: prev.buRt !== undefined ? prev.buRt : t.buRt,
+      buVg: prev.buVg !== undefined ? prev.buVg : t.buVg,
+      deltaRt: prev.deltaRt !== undefined ? prev.deltaRt : t.deltaRt,
+      deltaVg: prev.deltaVg !== undefined ? prev.deltaVg : t.deltaVg,
+      description: prev.description || t.description,
     };
   });
 
@@ -261,7 +271,7 @@ function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
   return [...mergedRemote, ...extraLocal];
 }
 
-function mergeEntriesPreserveLocal(remoteEntries, localEntries) {
+export function mergeEntriesPreserveLocal(remoteEntries, localEntries) {
   const localList = (localEntries || []).filter(Boolean);
   if (!Array.isArray(remoteEntries) || !remoteEntries.length) return localList;
 

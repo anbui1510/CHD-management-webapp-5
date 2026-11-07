@@ -211,8 +211,18 @@ function sheetValues_(ss, name) {
 function writeSheet_(ss, name, rows) {
   var sh = ss.getSheetByName(name) || ss.insertSheet(name);
   sh.clearContents();
-  if (!rows || !rows.length) return;
-  sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+  if (!rows || !rows.length || !rows[0].length) return;
+  var maxRows = sh.getMaxRows();
+  var maxCols = sh.getMaxColumns();
+  var reqRows = rows.length;
+  var reqCols = rows[0].length;
+  if (reqRows > maxRows) {
+    sh.insertRowsAfter(maxRows, reqRows - maxRows);
+  }
+  if (reqCols > maxCols) {
+    sh.insertColumnsAfter(maxCols, reqCols - maxCols);
+  }
+  sh.getRange(1, 1, reqRows, reqCols).setValues(rows);
 }
 
 function rowsToStaff_(rows) {

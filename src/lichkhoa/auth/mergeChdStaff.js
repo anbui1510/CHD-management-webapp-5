@@ -19,7 +19,17 @@ function foldName(value) {
     .trim();
 }
 
-function deriveShortName(staff, used, reservedByOther = null, selfId = '') {
+function isSamePerson(nameA, nameB) {
+  if (!nameA || !nameB) return false;
+  const fA = foldName(nameA);
+  const fB = foldName(nameB);
+  if (fA === fB) return true;
+  // Bỏ tiền tố BS., Bác sĩ...
+  const strip = (n) => n.replace(/^(bs\.?|bac\s*si|ths\.?|ts\.?|dd\.?)\s+/i, '').trim();
+  return strip(fA) === strip(fB);
+}
+
+function deriveShortName(staff, used, reservedByOther = null, selfId = '', staffName = '') {
   const fromName = String(staff.StaffName || staff.Name || staff.StaffKey || '')
     .trim()
     .split(/\s+/)
@@ -29,8 +39,10 @@ function deriveShortName(staff, used, reservedByOther = null, selfId = '') {
   const isTaken = (candidate) => {
     if (used.has(candidate)) return true;
     if (reservedByOther) {
-      const ownerId = reservedByOther.get(candidate);
-      if (ownerId && ownerId !== String(selfId)) return true;
+      const owner = reservedByOther.get(candidate);
+      if (owner && owner.id !== String(selfId) && !isSamePerson(owner.name, staffName)) {
+        return true;
+      }
     }
     return false;
   };
@@ -62,7 +74,7 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
   for (const s of existing) {
     const sn = String(s.shortName || '').trim().toUpperCase();
     if (sn) {
-      reservedByOther.set(sn, String(s.id));
+      reservedByOther.set(sn, { id: String(s.id), name: s.name });
     }
   }
 
@@ -80,9 +92,21 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
     const visible = parseShowInLichKhoa(chd.ShowInLichKhoa ?? prev.showInLichKhoa);
     if (!visible) continue;
 
+    const targetName = String(chd.StaffName || chd.Name || prev.name || id);
     let shortName = String(prev.shortName || '').trim().toUpperCase();
+
+    // Nếu tên viết tắt đang có đuôi số 2 (VD: THẢO2) nhưng tên gốc (THẢO) hoàn toàn chưa ai lấy -> phục hồi tên gốc
+    const fromParts = targetName.trim().split(/\s+/).filter(Boolean);
+    const baseCandidate = (fromParts[fromParts.length - 1] || '').toUpperCase().slice(0, 8);
+    if (baseCandidate && shortName === `${baseCandidate}2` && !usedShort.has(baseCandidate)) {
+      const owner = reservedByOther.get(baseCandidate);
+      if (!owner || owner.id === String(id) || isSamePerson(owner.name, targetName)) {
+        shortName = baseCandidate;
+      }
+    }
+
     if (!shortName || usedShort.has(shortName)) {
-      shortName = deriveShortName(chd, usedShort, reservedByOther, id);
+      shortName = deriveShortName(chd, usedShort, reservedByOther, id, targetName);
     }
     usedShort.add(shortName);
 

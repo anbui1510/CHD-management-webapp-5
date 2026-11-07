@@ -10,6 +10,11 @@ import {
 } from '../../store/dbStore';
 import { getSpreadsheetId } from './sheetStorage';
 import {
+  mergeTasksPreserveLocalFields,
+  mergeEntriesPreserveLocal,
+  mergeStaffPreserveLocalFields,
+} from '../../logic/sheetStore';
+import {
   bootstrapScheduleStore,
   canSyncScheduleStore,
   fetchSheetProfile,
@@ -72,6 +77,31 @@ export function useSheetSync({
     if (!force && localTs && remoteTs && remoteTs <= localTs) return false;
     // importTabsToStore đã merge từ baseStore; truyền lại storeRef để chắc cellStyles local không mất.
     let next = ensureSheets(remote.payload);
+
+    // Safeguard 1: Gộp departments (tasks, staff, leaveEntries, studyEntries) với storeRef.current
+    if (storeRef.current?.departments && next?.departments) {
+      next = {
+        ...next,
+        departments: next.departments.map((remoteDept) => {
+          const localDept = storeRef.current.departments.find((d) => d.id === remoteDept.id)
+            || storeRef.current.departments[0];
+          if (!localDept) return remoteDept;
+          return {
+            ...remoteDept,
+            tasks: mergeTasksPreserveLocalFields(remoteDept.tasks, localDept.tasks),
+            staff: mergeStaffPreserveLocalFields(remoteDept.staff, localDept.staff),
+            leaveEntries: mergeEntriesPreserveLocal(remoteDept.leaveEntries, localDept.leaveEntries),
+            studyEntries: mergeEntriesPreserveLocal(remoteDept.studyEntries, localDept.studyEntries),
+          };
+        }),
+      };
+      const remoteDeptIds = new Set((next.departments || []).map((d) => d.id));
+      const extraDepts = (storeRef.current.departments || []).filter((d) => !remoteDeptIds.has(d.id));
+      if (extraDepts.length) {
+        next.departments = [...next.departments, ...extraDepts];
+      }
+    }
+
     // Sheet Task trống (trước lần push đầu) → giữ task local / seed, rồi hydrate lên Sheet.
     if (!deptTaskCount(next) && deptTaskCount(storeRef.current)) {
       next = ensureSheets({
@@ -89,7 +119,7 @@ export function useSheetSync({
     if (!deptTaskCount(next)) {
       next = ensureSheets(fillEmptyTasksFromSeed(next));
     }
-    // Safeguard: Đảm bảo không bao giờ làm mất monthGrid/monthRoles local nếu remote bị trống
+    // Safeguard 2: Đảm bảo không bao giờ làm mất monthGrid/monthRoles/weeks/grid local nếu remote bị trống
     const prevSheetsByDept = storeRef.current?.sheetsByDept || {};
     if (next?.sheetsByDept) {
       Object.entries(next.sheetsByDept).forEach(([deptId, deptState]) => {
@@ -116,6 +146,14 @@ export function useSheetSync({
         });
 
         (deptState.sheets || []).forEach((sh) => {
+          const prevSh = prevSheets.find((p) => p.id === sh.id || p.name === sh.name) || prevSheets[0];
+          if (prevSh) {
+            sh.weeks = { ...(prevSh.weeks || {}), ...(sh.weeks || {}) };
+            if (prevSh.startDate && !sh.startDate) sh.startDate = prevSh.startDate;
+            if (prevSh.grid && (!sh.grid || !Object.keys(sh.grid).length)) {
+              sh.grid = prevSh.grid;
+            }
+          }
           sh.monthGrid = { ...(sh.monthGrid || {}), ...allPrevMonthCells };
           if (prevRoles && (!sh.monthRoles || !sh.monthRoles.length)) {
             sh.monthRoles = [...prevRoles];

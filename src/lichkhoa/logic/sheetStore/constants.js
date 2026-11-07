@@ -43,6 +43,7 @@ export const TASK_HEADERS = [
   'bgColor', 'textColor', 'blocker', 'delta', 'dutyRole', 'encodeDuty',
   'buRt', 'buVg', 'deltaRt', 'deltaVg', 'triggerRT',
   'ownersJson', 'ownerOrderJson', 'fixedDaysJson', 'fixedSlotsJson', 'locksJson',
+  'rotate', 'warn', 'display',
 ];
 
 // Các cột đầu giữ nguyên để tương thích sheet cũ; các cột sau lưu đủ field UI/scheduler dùng

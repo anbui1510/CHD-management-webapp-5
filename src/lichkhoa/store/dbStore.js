@@ -343,17 +343,9 @@ export function upgradeStoreFromTimMachSeed(store) {
   if (!deptId || !seeded?.sheets?.length) return base;
 
   const current = base.sheetsByDept?.[deptId];
-  const empty = !current?.sheets?.length || current.sheets.every((sh) => {
-    const grid = sh?.grid || {};
-    return Object.values(grid).every((row) => {
-      const days = Array.isArray(row) ? row : Object.values(row || {}).filter((d) => d && typeof d === 'object' && ('S' in d || 'C' in d));
-      return days.every((day) => ['S', 'R', 'C', 'T'].every((id) => {
-        const v = String(day?.[id] || '').trim();
-        return !v || v === '0';
-      }));
-    });
-  });
-  if (!empty) return base;
+  // Tuyệt đối không ghi đè sheets của người dùng bằng seed mẫu nếu khoa đã có sheet
+  // (tránh xóa sạch ô lịch tháng/tuần khi nâng cấp seed).
+  if (current?.sheets?.length) return base;
   return normalizeStore({
     ...base,
     sheetsByDept: { ...(base.sheetsByDept || {}), [deptId]: seeded }

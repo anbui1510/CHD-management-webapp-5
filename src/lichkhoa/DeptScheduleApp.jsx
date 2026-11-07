@@ -598,8 +598,10 @@ export function DeptScheduleApp({
     [activeSheet]
   );
   useEffect(() => {
-    const timer = window.setTimeout(() => saveStore(storeRef.current), 400);
-    return () => window.clearTimeout(timer);
+    saveStore(storeRef.current);
+    return () => {
+      saveStore(storeRef.current);
+    };
   }, [store]);
   useEffect(() => {
     const flush = () => saveStore(storeRef.current);
@@ -941,10 +943,13 @@ export function DeptScheduleApp({
     });
   };
 
-  const saveDeptList = (field, entry) => {
+  const saveDeptList = async (field, entry) => {
     const tab = field === 'studyEntries' ? 'study' : 'leave';
     if (!allow(tab)) return;
-    updateActiveDept(dept => {
+    const prev = storeRef.current;
+    const deptId = activeDept?.id || prev?.activeDeptId || 'dept_tim_mach';
+    const departments = (prev.departments || []).map(dept => {
+      if (dept.id !== deptId) return dept;
       const list = dept[field] || [];
       const exists = list.some(item => item.id === entry.id);
       return {
@@ -952,15 +957,46 @@ export function DeptScheduleApp({
         [field]: exists ? list.map(item => (item.id === entry.id ? entry : item)) : [...list, entry]
       };
     });
+    const nextStore = ensureSheets({ ...prev, departments });
+    setStore(nextStore);
+    saveStore(nextStore);
+    storeRef.current = nextStore;
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: tab === 'leave' ? 'Đã lưu lịch nghỉ và ghi lên Google Sheet.' : 'Đã lưu lịch học và ghi lên Google Sheet.',
+        });
+      } catch (err) {
+        console.warn('persistStoreToSheet saveDeptList failed:', err);
+      }
+    }
   };
 
-  const deleteDeptItem = (field, id) => {
+  const deleteDeptItem = async (field, id) => {
     const tab = field === 'studyEntries' ? 'study' : 'leave';
     if (!allow(tab)) return;
-    updateActiveDept(dept => ({
-      ...dept,
-      [field]: (dept[field] || []).filter(item => item.id !== id)
-    }));
+    const prev = storeRef.current;
+    const deptId = activeDept?.id || prev?.activeDeptId || 'dept_tim_mach';
+    const departments = (prev.departments || []).map(dept => {
+      if (dept.id !== deptId) return dept;
+      return {
+        ...dept,
+        [field]: (dept[field] || []).filter(item => item.id !== id)
+      };
+    });
+    const nextStore = ensureSheets({ ...prev, departments });
+    setStore(nextStore);
+    saveStore(nextStore);
+    storeRef.current = nextStore;
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: tab === 'leave' ? 'Đã xóa lịch nghỉ và ghi lên Google Sheet.' : 'Đã xóa lịch học và ghi lên Google Sheet.',
+        });
+      } catch (err) {
+        console.warn('persistStoreToSheet deleteDeptItem failed:', err);
+      }
+    }
   };
 
   const handleUpdateRooms = (roomTable) => {
@@ -1237,51 +1273,62 @@ export function DeptScheduleApp({
     }));
   };
 
-  const handleUpdateStaff = (updatedStaff, oldShortName) => {
+  const handleUpdateStaff = async (updatedStaff, oldShortName) => {
     if (!allow('staff')) return;
-    setStore(prev => {
-      const deptId = activeDept.id;
-      const departments = prev.departments.map(d =>
-        d.id === deptId
-          ? { ...d, staff: d.staff.map(s => (s.id === updatedStaff.id ? updatedStaff : s)) }
-          : d
-      );
+    const prev = storeRef.current;
+    const deptId = activeDept?.id || prev?.activeDeptId || 'dept_tim_mach';
+    const departments = (prev.departments || []).map(d =>
+      d.id === deptId
+        ? { ...d, staff: (d.staff || []).map(s => (s.id === updatedStaff.id ? updatedStaff : s)) }
+        : d
+    );
 
-      // Đổi tên viết tắt -> chuyển dữ liệu lịch của bác sĩ sang tên mới trong tất cả các sheet
-      let sheetsByDept = prev.sheetsByDept;
-      const newShortName = updatedStaff.shortName;
-      if (oldShortName && oldShortName !== newShortName && sheetsByDept[deptId]) {
-        const st = sheetsByDept[deptId];
-        sheetsByDept = {
-          ...sheetsByDept,
-          [deptId]: {
-            ...st,
-            sheets: st.sheets.map(sh => {
-              let grid = sh.grid;
-              if (grid && grid[oldShortName]) {
-                grid = { ...grid, [newShortName]: grid[oldShortName] };
-                delete grid[oldShortName];
-              }
-              let monthGrid = sh.monthGrid;
-              if (monthGrid && typeof monthGrid === 'object') {
-                monthGrid = { ...monthGrid };
-                let monthChanged = false;
-                Object.entries(monthGrid).forEach(([mk, mv]) => {
-                  if (mv === oldShortName) {
-                    monthGrid[mk] = newShortName;
-                    monthChanged = true;
-                  }
-                });
-                if (!monthChanged) monthGrid = sh.monthGrid;
-              }
-              return { ...sh, grid, monthGrid };
-            })
-          }
-        };
+    // Đổi tên viết tắt -> chuyển dữ liệu lịch của bác sĩ sang tên mới trong tất cả các sheet
+    let sheetsByDept = prev.sheetsByDept || {};
+    const newShortName = updatedStaff.shortName;
+    if (oldShortName && oldShortName !== newShortName && sheetsByDept[deptId]) {
+      const st = sheetsByDept[deptId];
+      sheetsByDept = {
+        ...sheetsByDept,
+        [deptId]: {
+          ...st,
+          sheets: (st.sheets || []).map(sh => {
+            let grid = sh.grid;
+            if (grid && grid[oldShortName]) {
+              grid = { ...grid, [newShortName]: grid[oldShortName] };
+              delete grid[oldShortName];
+            }
+            let monthGrid = sh.monthGrid;
+            if (monthGrid && typeof monthGrid === 'object') {
+              monthGrid = { ...monthGrid };
+              let monthChanged = false;
+              Object.entries(monthGrid).forEach(([mk, mv]) => {
+                if (mv === oldShortName) {
+                  monthGrid[mk] = newShortName;
+                  monthChanged = true;
+                }
+              });
+              if (!monthChanged) monthGrid = sh.monthGrid;
+            }
+            return { ...sh, grid, monthGrid };
+          })
+        }
+      };
+    }
+
+    const nextStore = ensureSheets({ ...prev, departments, sheetsByDept });
+    setStore(nextStore);
+    saveStore(nextStore);
+    storeRef.current = nextStore;
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: `Đã cập nhật nhân sự ${updatedStaff.name || updatedStaff.shortName} và ghi lên Google Sheet.`,
+        });
+      } catch (err) {
+        console.warn('persistStoreToSheet staff failed:', err);
       }
-
-      return { ...prev, departments, sheetsByDept };
-    });
+    }
   };
 
   const handleDeleteStaff = async (staffId) => {
@@ -1358,19 +1405,80 @@ export function DeptScheduleApp({
   };
 
   // ---------- Task Management Actions ----------
-  const handleAddTask = (newTaskObj) => {
+  const handleAddTask = async (newTaskObj) => {
     if (!allow('tasks') && !allow('month')) return;
-    updateActiveDept(d => ({ ...d, tasks: [...d.tasks, newTaskObj] }));
+    const prev = storeRef.current;
+    const deptId = activeDept?.id || prev?.activeDeptId || 'dept_tim_mach';
+    const nextStore = ensureSheets({
+      ...prev,
+      departments: (prev.departments || []).map(d =>
+        d.id === deptId ? { ...d, tasks: [...(d.tasks || []), newTaskObj] } : d
+      )
+    });
+    setStore(nextStore);
+    saveStore(nextStore);
+    storeRef.current = nextStore;
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: `Đã thêm task ${newTaskObj.code || ''} và ghi lên Google Sheet.`,
+        });
+      } catch (err) {
+        console.warn('persistStoreToSheet add task failed:', err);
+      }
+    }
   };
 
-  const handleUpdateTask = (updatedTask) => {
+  const handleUpdateTask = async (updatedTask) => {
     if (!allow('tasks') && !allow('month')) return;
-    updateActiveDept(d => ({ ...d, tasks: d.tasks.map(item => item.id === updatedTask.id ? updatedTask : item) }));
+    const prev = storeRef.current;
+    const deptId = activeDept?.id || prev?.activeDeptId || 'dept_tim_mach';
+    const nextStore = ensureSheets({
+      ...prev,
+      departments: (prev.departments || []).map(d =>
+        d.id === deptId
+          ? { ...d, tasks: (d.tasks || []).map(item => item.id === updatedTask.id ? updatedTask : item) }
+          : d
+      )
+    });
+    setStore(nextStore);
+    saveStore(nextStore);
+    storeRef.current = nextStore;
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: `Đã cập nhật task ${updatedTask.code || ''} và ghi lên Google Sheet.`,
+        });
+      } catch (err) {
+        console.warn('persistStoreToSheet update task failed:', err);
+      }
+    }
   };
 
-  const handleDeleteTask = (taskId) => {
+  const handleDeleteTask = async (taskId) => {
     if (!allow('tasks')) return;
-    updateActiveDept(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== taskId) }));
+    const prev = storeRef.current;
+    const deptId = activeDept?.id || prev?.activeDeptId || 'dept_tim_mach';
+    const nextStore = ensureSheets({
+      ...prev,
+      departments: (prev.departments || []).map(d =>
+        d.id === deptId
+          ? { ...d, tasks: (d.tasks || []).filter(t => t.id !== taskId) }
+          : d
+      )
+    });
+    setStore(nextStore);
+    saveStore(nextStore);
+    storeRef.current = nextStore;
+    if (typeof sheetSync.persistStoreToSheet === 'function') {
+      try {
+        await sheetSync.persistStoreToSheet(nextStore, {
+          notice: 'Đã xóa task và ghi lên Google Sheet.',
+        });
+      } catch (err) {
+        console.warn('persistStoreToSheet delete task failed:', err);
+      }
+    }
   };
 
   const handleReorderTasks = (tasks) => {
