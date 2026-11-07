@@ -240,7 +240,9 @@ export function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
 
   const mergedRemote = remoteTasks.map((t) => {
     const prev = localById.get(String(t.id)) || (t.code ? localByCode.get(String(t.code).trim().toLowerCase()) : null);
-    if (!prev) return t;
+    const code = String(t.code || prev?.code || '').trim().toLowerCase();
+    const isBaseDuty = code === 'vg' || code === 'rt' || code === 'tn';
+    if (!prev) return isBaseDuty ? { ...t, encodeDuty: false } : t;
     return {
       ...t,
       // Google Sheet (t) là nguồn lưu trữ vĩnh viễn: thuộc tính trên Sheet phải thắng giá trị seed cục bộ
@@ -251,7 +253,7 @@ export function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
       rotate: t.rotate !== undefined ? t.rotate : (prev.rotate !== undefined ? prev.rotate : false),
       warn: t.warn !== undefined ? t.warn : (prev.warn !== undefined ? prev.warn : true),
       dutyRole: t.dutyRole || prev.dutyRole || '',
-      encodeDuty: t.encodeDuty !== undefined ? t.encodeDuty : (prev.encodeDuty !== undefined ? prev.encodeDuty : false),
+      encodeDuty: isBaseDuty ? false : (t.encodeDuty !== undefined ? t.encodeDuty : (prev.encodeDuty !== undefined ? prev.encodeDuty : false)),
       buRt: t.buRt !== undefined ? t.buRt : (prev.buRt !== undefined ? prev.buRt : false),
       buVg: t.buVg !== undefined ? t.buVg : (prev.buVg !== undefined ? prev.buVg : false),
       deltaRt: t.deltaRt !== undefined && t.deltaRt !== 0 ? t.deltaRt : (prev.deltaRt ?? t.deltaRt ?? 0),
@@ -273,6 +275,10 @@ export function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
     if (remoteIds.has(String(t.id))) return false;
     if (t.code && remoteCodes.has(String(t.code).trim().toLowerCase())) return false;
     return true;
+  }).map((t) => {
+    const code = String(t.code || '').trim().toLowerCase();
+    const isBaseDuty = code === 'vg' || code === 'rt' || code === 'tn';
+    return isBaseDuty ? { ...t, encodeDuty: false } : t;
   });
 
   return [...mergedRemote, ...extraLocal];

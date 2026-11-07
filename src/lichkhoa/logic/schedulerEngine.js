@@ -127,8 +127,15 @@ function dutyHolders(taskList, role) {
 
 // The code written on the week. Prefer a role holder that is not itself a source;
 // if every holder encodes, use the one earlier in Quản lý Task.
+// Luôn ưu tiên đúng task đích tiêu chuẩn: vao_gac -> VG, ra_truc -> RT, truc_ngay -> TN
 function dutyTask(taskList, role) {
   const holders = dutyHolders(taskList, role);
+  const canonicalCode = role === 'vao_gac' ? 'vg' : (role === 'ra_truc' ? 'rt' : (role === 'truc_ngay' ? 'tn' : ''));
+  if (canonicalCode) {
+    const canonical = holders.find(task => fold(task?.code) === canonicalCode)
+      || (taskList || []).find(task => fold(task?.code) === canonicalCode);
+    if (canonical) return canonical;
+  }
   return holders.find(task => !task.encodeDuty) || holders[0] || null;
 }
 

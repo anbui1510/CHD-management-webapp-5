@@ -336,7 +336,7 @@ export function TaskEditorModal({
       category: form.category,
       scope: taskScope(form.scope),
       dutyRole: form.dutyRole || '',
-      encodeDuty: !!form.encodeDuty,
+      encodeDuty: ['vg', 'rt', 'tn'].includes(String(code || '').trim().toLowerCase()) ? false : !!form.encodeDuty,
       buRt: !!form.buRt,
       buVg: !!form.buVg,
       deltaRt: form.buRt ? buAmount(form.deltaRt) : 0,

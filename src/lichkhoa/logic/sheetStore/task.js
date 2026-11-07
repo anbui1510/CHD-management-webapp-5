@@ -4,51 +4,57 @@ import { boolCell, numCell, objectsToRows, parseJsonCell, rowsToObjects } from '
 /** TC-F304-03 — hỗ trợ đầy đủ rotate, warn, display (Lịch tuần/Lịch chuyên môn) */
 export function importTaskRows(rows) {
   const objs = rowsToObjects(rows, TASK_HEADERS);
-  return objs.map((row) => ({
-    id: String(row.id || '').trim(),
-    code: String(row.code || '').trim(),
-    name: String(row.name || '').trim(),
-    category: String(row.category || '').trim(),
-    session: String(row.session || '').trim(),
-    scope: String(row.scope || 'week').trim(),
-    description: String(row.description || '').trim(),
-    bgColor: String(row.bgColor || '').trim(),
-    textColor: String(row.textColor || '').trim(),
-    blocker: boolCell(row.blocker),
-    delta: numCell(row.delta, 0),
-    dutyRole: String(row.dutyRole || '').trim(),
-    encodeDuty: boolCell(row.encodeDuty),
-    buRt: boolCell(row.buRt),
-    buVg: boolCell(row.buVg),
-    deltaRt: numCell(row.deltaRt, 0),
-    deltaVg: numCell(row.deltaVg, 0),
-    triggerRT: boolCell(row.triggerRT),
-    owners: parseJsonCell(row.ownersJson, []),
-    ownerOrder: parseJsonCell(row.ownerOrderJson, []),
-    fixedDays: parseJsonCell(row.fixedDaysJson, []),
-    fixedSlots: parseJsonCell(row.fixedSlotsJson, []),
-    locks: parseJsonCell(row.locksJson, []),
-    rotate: boolCell(row.rotate),
-    warn: row.warn === undefined || row.warn === '' ? true : boolCell(row.warn),
-    display: String(row.display || 'both').trim() || 'both',
-  })).filter((t) => t.id);
+  return objs.map((row) => {
+    const code = String(row.code || '').trim();
+    const isBaseDuty = ['vg', 'rt', 'tn'].includes(code.toLowerCase());
+    return {
+      id: String(row.id || '').trim(),
+      code,
+      name: String(row.name || '').trim(),
+      category: String(row.category || '').trim(),
+      session: String(row.session || '').trim(),
+      scope: String(row.scope || 'week').trim(),
+      description: String(row.description || '').trim(),
+      bgColor: String(row.bgColor || '').trim(),
+      textColor: String(row.textColor || '').trim(),
+      blocker: boolCell(row.blocker),
+      delta: numCell(row.delta, 0),
+      dutyRole: String(row.dutyRole || '').trim(),
+      encodeDuty: isBaseDuty ? false : boolCell(row.encodeDuty),
+      buRt: boolCell(row.buRt),
+      buVg: boolCell(row.buVg),
+      deltaRt: numCell(row.deltaRt, 0),
+      deltaVg: numCell(row.deltaVg, 0),
+      triggerRT: boolCell(row.triggerRT),
+      owners: parseJsonCell(row.ownersJson, []),
+      ownerOrder: parseJsonCell(row.ownerOrderJson, []),
+      fixedDays: parseJsonCell(row.fixedDaysJson, []),
+      fixedSlots: parseJsonCell(row.fixedSlotsJson, []),
+      locks: parseJsonCell(row.locksJson, []),
+      rotate: boolCell(row.rotate),
+      warn: row.warn === undefined || row.warn === '' ? true : boolCell(row.warn),
+      display: String(row.display || 'both').trim() || 'both',
+    };
+  }).filter((t) => t.id);
 }
 
 export function exportTaskRows(tasks) {
-  const objects = (tasks || []).map((t) => ({
-    id: t.id,
-    code: t.code,
-    name: t.name,
-    category: t.category,
-    session: t.session,
-    scope: t.scope || 'week',
-    description: t.description || '',
-    bgColor: t.bgColor || '',
-    textColor: t.textColor || '',
-    blocker: t.blocker ? 'true' : 'false',
-    delta: t.delta ?? 0,
-    dutyRole: t.dutyRole || '',
-    encodeDuty: t.encodeDuty ? 'true' : 'false',
+  const objects = (tasks || []).map((t) => {
+    const isBaseDuty = ['vg', 'rt', 'tn'].includes(String(t.code || '').trim().toLowerCase());
+    return {
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      category: t.category,
+      session: t.session,
+      scope: t.scope || 'week',
+      description: t.description || '',
+      bgColor: t.bgColor || '',
+      textColor: t.textColor || '',
+      blocker: t.blocker ? 'true' : 'false',
+      delta: t.delta ?? 0,
+      dutyRole: t.dutyRole || '',
+      encodeDuty: (isBaseDuty ? false : !!t.encodeDuty) ? 'true' : 'false',
     buRt: t.buRt ? 'true' : 'false',
     buVg: t.buVg ? 'true' : 'false',
     deltaRt: t.deltaRt ?? 0,
@@ -62,6 +68,7 @@ export function exportTaskRows(tasks) {
     rotate: t.rotate ? 'true' : 'false',
     warn: t.warn !== false ? 'true' : 'false',
     display: t.display || 'both',
-  }));
+    };
+  });
   return objectsToRows(objects, TASK_HEADERS);
 }

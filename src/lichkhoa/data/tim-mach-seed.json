@@ -320,7 +320,7 @@
         "textColor": "#cc0000",
         "description": "",
         "dutyRole": "vao_gac",
-        "encodeDuty": true,
+        "encodeDuty": false,
         "scope": "week",
         "buRt": false,
         "buVg": false,

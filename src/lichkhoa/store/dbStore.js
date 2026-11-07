@@ -224,10 +224,13 @@ function withDutyFields(tasks) {
   claim('ra_truc', task => foldDuty(task.code) === 'rt');
   claim('truc_ngay', task => foldDuty(task.code) === 'tn');
   list.forEach((task) => {
+    const code = foldDuty(task.code);
+    if (code === 'vg' || code === 'rt' || code === 'tn') {
+      task.encodeDuty = false;
+    }
     if (task.dutyRole === undefined) task.dutyRole = '';
     if (task.encodeDuty !== undefined) return;
-    const code = foldDuty(task.code);
-    task.encodeDuty = code === 'tc' || code === 'tk1' || code === 'c1';
+    task.encodeDuty = code === 'tc' || code === 'c1';
   });
   return list;
 }
