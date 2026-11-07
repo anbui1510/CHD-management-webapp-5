@@ -45,7 +45,7 @@ const DEFAULT_START_DATE = '2026-09-14'; // Monday 14/09/2026
 const CARDIOLOGY_DEPT_ID = 'dept_tim_mach';
 
 // ---------- Sheet helpers ----------
-function blankSheetContent(dept, startDate) {
+function blankSheetContent(dept, startDate, templateSheet = null) {
   return {
     startDate,
     grid: emptyWeekGrid(dept.staff, ['S', 'C']),
@@ -54,7 +54,13 @@ function blankSheetContent(dept, startDate) {
     warnings: [],
     buGrants: {},
     buPosted: {},
-    leaveCuts: { bu: {}, phep: {} }
+    leaveCuts: { bu: {}, phep: {} },
+    monthKey: templateSheet?.monthKey || currentMonthKey(),
+    monthGrid: templateSheet?.monthGrid ? { ...templateSheet.monthGrid } : {},
+    monthRoles: templateSheet?.monthRoles ? [...templateSheet.monthRoles] : [],
+    monthColumnOrder: templateSheet?.monthColumnOrder ? [...templateSheet.monthColumnOrder] : null,
+    monthColumnTitles: templateSheet?.monthColumnTitles ? { ...templateSheet.monthColumnTitles } : {},
+    monthMerges: templateSheet?.monthMerges ? [...templateSheet.monthMerges] : [],
   };
 }
 
@@ -432,12 +438,72 @@ export function DeptScheduleApp({
       style={{
         padding: '8px 16px',
         fontSize: '0.85rem',
-        background: sheetSync.sheetSyncError ? 'var(--destructive, #fee2e2)' : 'var(--muted, #f1f5f9)',
-        color: sheetSync.sheetSyncError ? '#991b1b' : 'inherit',
+        background: sheetSync.sheetSyncError ? '#fee2e2' : '#fef3c7',
+        color: sheetSync.sheetSyncError ? '#991b1b' : '#92400e',
         borderBottom: '1px solid var(--border, #e2e8f0)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px',
       }}
     >
-      {sheetSync.sheetSyncError || sheetSync.sheetSyncNotice}
+      <div>
+        <strong>{sheetSync.sheetSyncError ? '⚠️ ' : 'ℹ️ '}</strong>
+        {sheetSync.sheetSyncError || sheetSync.sheetSyncNotice}
+      </div>
+      {sheetSync.sheetSyncNotice && !sheetSync.sheetSyncError && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="sheet-sync-btn btn-primary"
+            onClick={sheetSync.forcePushLocalToSheet}
+            style={{
+              padding: '4px 10px',
+              fontSize: '0.8rem',
+              borderRadius: '4px',
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Ghi đè lên Sheet
+          </button>
+          <button
+            type="button"
+            className="sheet-sync-btn btn-secondary"
+            onClick={sheetSync.manualPull}
+            style={{
+              padding: '4px 10px',
+              fontSize: '0.8rem',
+              borderRadius: '4px',
+              background: '#e2e8f0',
+              color: '#1e293b',
+              border: '1px solid #cbd5e1',
+              cursor: 'pointer',
+            }}
+          >
+            Đồng bộ từ Sheet
+          </button>
+          <button
+            type="button"
+            onClick={sheetSync.dismissNotice}
+            title="Đóng thông báo"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              color: '#78350f',
+              padding: '0 4px',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   ) : null;
 
@@ -544,6 +610,13 @@ export function DeptScheduleApp({
     updateSheetState(st => ({
       ...st,
       sheets: st.sheets.map(sh => (sh.id === activeSheet.id ? fn(sh) : sh))
+    }));
+  };
+
+  const updateDeptMonth = (fn) => {
+    updateSheetState(st => ({
+      ...st,
+      sheets: st.sheets.map(sh => fn(sh))
     }));
   };
 
@@ -797,7 +870,7 @@ export function DeptScheduleApp({
 
   const handleMonthKeyChange = (baseKey, delta) => {
     const next = delta === 0 ? currentMonthKey() : shiftMonthKey(baseKey, delta);
-    updateActiveSheet(sh => ({ ...sh, monthKey: next }));
+    updateDeptMonth(sh => ({ ...sh, monthKey: next }));
   };
 
   const handleWeekMerges = (weekMerges) => {
@@ -807,7 +880,7 @@ export function DeptScheduleApp({
 
   const handleMonthMerges = (monthMerges) => {
     if (!allow('month')) return;
-    updateActiveSheet(sh => ({ ...sh, monthMerges }));
+    updateDeptMonth(sh => ({ ...sh, monthMerges }));
   };
 
   const handleDaySessions = (daySessions) => {
@@ -897,7 +970,7 @@ export function DeptScheduleApp({
 
   const handleUpdateMonthCell = (iso, roleKey, session, value) => {
     if (!allow('month')) return;
-    updateActiveSheet(sh => ({
+    updateDeptMonth(sh => ({
       ...sh,
       monthGrid: { ...(sh.monthGrid || {}), [sessionCellKey(iso, roleKey, session)]: value ?? '' }
     }));
@@ -905,7 +978,7 @@ export function DeptScheduleApp({
 
   const handleUpdateMonthCustomCell = (id, weekStart, slot, value) => {
     if (!allow('month')) return;
-    updateActiveSheet(sh => ({
+    updateDeptMonth(sh => ({
       ...sh,
       monthGrid: { ...(sh.monthGrid || {}), [customCellKey(id, weekStart, slot)]: value ?? '' }
     }));
@@ -913,7 +986,7 @@ export function DeptScheduleApp({
 
   const handleInsertMonthColumn = (index, side) => {
     if (!allow('month')) return;
-    updateActiveSheet(sh => {
+    updateDeptMonth(sh => {
       const keys = columnSpecs(sh.monthColumnOrder, sh.monthColumnTitles, sh.daySessions).map(column => column.key);
       const key = `x:c${Date.now()}`;
       const at = Math.max(0, Math.min((Number(index) || 0) + (side === 'right' ? 1 : 0), keys.length));
@@ -928,7 +1001,7 @@ export function DeptScheduleApp({
 
   const handleRenameMonthColumn = (key, title) => {
     if (!allow('month')) return;
-    updateActiveSheet(sh => ({
+    updateDeptMonth(sh => ({
       ...sh,
       monthColumnTitles: { ...(sh.monthColumnTitles || {}), [key]: String(title || '').trim() || 'Cột mới' }
     }));
@@ -938,7 +1011,7 @@ export function DeptScheduleApp({
     if (!allow('month')) return;
     if (!String(key).startsWith('x:')) return;
     const id = String(key).slice(2);
-    updateActiveSheet(sh => {
+    updateDeptMonth(sh => {
       const monthGrid = { ...(sh.monthGrid || {}) };
       const cellStyles = { ...(sh.cellStyles || {}) };
       const prefix = `x|${id}|`;
@@ -978,7 +1051,7 @@ export function DeptScheduleApp({
     const task = taskOrLabel && typeof taskOrLabel === 'object' ? taskOrLabel : null;
     const label = task ? String(task.code || '').trim() : String(taskOrLabel || '').trim();
     if (!label) return;
-    updateActiveSheet(sh => ({
+    updateDeptMonth(sh => ({
       ...sh,
       monthRoles: [...resolveMonthRoles(sh.monthRoles), {
         key: `role_${Date.now()}`,
@@ -990,7 +1063,7 @@ export function DeptScheduleApp({
 
   const handleInsertMonthRole = (index) => {
     if (!allow('month')) return;
-    updateActiveSheet(sh => {
+    updateDeptMonth(sh => {
       const roles = resolveMonthRoles(sh.monthRoles);
       const next = [...roles];
       const at = Math.max(0, Math.min(Number(index) || 0, next.length));
@@ -1003,7 +1076,7 @@ export function DeptScheduleApp({
     if (!allow('month')) return;
     const text = String(raw || '').trim();
     const matched = matchTask(text, taskList);
-    updateActiveSheet(sh => ({
+    updateDeptMonth(sh => ({
       ...sh,
       monthRoles: resolveMonthRoles(sh.monthRoles).map(role => (
         role.key === roleKey
@@ -1020,7 +1093,7 @@ export function DeptScheduleApp({
 
   const handleDeleteMonthRole = (roleKey) => {
     if (!allow('month')) return;
-    updateActiveSheet(sh => {
+    updateDeptMonth(sh => {
       const monthGrid = { ...(sh.monthGrid || {}) };
       Object.keys(monthGrid).forEach((key) => {
         if (key.split('|')[1] === roleKey) delete monthGrid[key];
@@ -1043,7 +1116,7 @@ export function DeptScheduleApp({
     const id = `sheet_${Date.now()}`;
     updateSheetState(st => ({
       activeSheetId: id,
-      sheets: [...st.sheets, { id, name: nextSheetName(st.sheets), ...blankSheetContent(activeDept, activeSheet.startDate) }]
+      sheets: [...st.sheets, { id, name: nextSheetName(st.sheets), ...blankSheetContent(activeDept, activeSheet.startDate, activeSheet) }]
     }));
   };
 

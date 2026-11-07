@@ -16,6 +16,7 @@ const SHEET_MERGE_PRESERVE_KEYS = [
   'cellStyles', 'weekMerges', 'monthMerges', 'freeze',
   'warnings', 'roomWarnings', 'buGrants', 'buPosted', 'leaveCuts',
   'cathGrid', 'cathRoles',
+  'monthGrid', 'monthRoles', 'monthColumnOrder', 'monthColumnTitles', 'monthKey',
 ];
 
 function isEmptyPreserveValue(value) {
@@ -27,9 +28,13 @@ function isEmptyPreserveValue(value) {
 
 function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
   if (!Array.isArray(remoteSheets) || !remoteSheets.length) return remoteSheets;
-  const byId = new Map((localSheets || []).filter(Boolean).map((sh) => [sh.id, sh]));
-  return remoteSheets.map((sh) => {
-    const prev = byId.get(sh.id);
+  const localList = (localSheets || []).filter(Boolean);
+  const byId = new Map(localList.map((sh) => [sh.id, sh]));
+  const byName = new Map(localList.map((sh) => [sh.name, sh]));
+  return remoteSheets.map((sh, idx) => {
+    const prev = byId.get(sh.id)
+      || byName.get(sh.name)
+      || (localList.length === 1 && remoteSheets.length === 1 ? localList[0] : undefined);
     if (!prev) return sh;
     const patch = {};
     for (const key of SHEET_MERGE_PRESERVE_KEYS) {
@@ -43,6 +48,36 @@ function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
       // cellStyles: luôn gộp, local thắng key trùng (tránh pull ~2s xóa format vừa tô).
       if (key === 'cellStyles' && typeof remoteVal === 'object' && typeof prev[key] === 'object') {
         patch[key] = { ...remoteVal, ...prev[key] };
+        continue;
+      }
+      // monthGrid: luôn gộp ô, giữ các ô local đã điền
+      if (key === 'monthGrid' && typeof remoteVal === 'object' && typeof prev[key] === 'object') {
+        const merged = { ...remoteVal };
+        Object.entries(prev[key]).forEach(([cellKey, cellVal]) => {
+          if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
+            merged[cellKey] = cellVal;
+          }
+        });
+        patch[key] = merged;
+        continue;
+      }
+      // monthColumnTitles: luôn gộp tiêu đề cột
+      if (key === 'monthColumnTitles' && typeof remoteVal === 'object' && typeof prev[key] === 'object') {
+        patch[key] = { ...remoteVal, ...prev[key] };
+        continue;
+      }
+      // monthRoles: nếu remote rỗng hoặc có role tùy biến local chưa push
+      if (key === 'monthRoles' && Array.isArray(prev[key]) && prev[key].length) {
+        if (!Array.isArray(remoteVal) || !remoteVal.length) {
+          patch[key] = prev[key];
+          continue;
+        }
+        const existingKeys = new Set(remoteVal.map((r) => r.key));
+        const extraRoles = prev[key].filter((r) => !existingKeys.has(r.key));
+        if (extraRoles.length) {
+          patch[key] = [...remoteVal, ...extraRoles];
+          continue;
+        }
       }
       // Khác (roomTable, merges…): Sheet đã có thì giữ remote (đã nằm trên sh).
     }
@@ -87,7 +122,14 @@ export function importTabsToStore(tabs, baseStore = null) {
   let sheets = weekBlock.sheets?.length ? weekBlock.sheets : (baseStore?.sheetsByDept?.[deptId]?.sheets || []);
   const prevSheets = baseStore?.sheetsByDept?.[deptId]?.sheets;
   sheets = mergeSheetsPreserveLocalFields(sheets, prevSheets);
-  sheets = sheets.map((sh) => applyMonthToSheet(sh, monthBySheet.get(sh.id)));
+  const monthKeys = Array.from(monthBySheet.keys());
+  sheets = sheets.map((sh, idx) => {
+    const monthData = monthBySheet.get(sh.id)
+      || monthBySheet.get(prevSheets?.find((p) => p.name === sh.name)?.id)
+      || (monthKeys[idx] ? monthBySheet.get(monthKeys[idx]) : undefined)
+      || (monthBySheet.size === 1 ? Array.from(monthBySheet.values())[0] : undefined);
+    return applyMonthToSheet(sh, monthData);
+  });
 
   // Không fallback sang staff seed/doc_* khi NhanSu trống — CHD merge sẽ điền từ Sheet Staff.
   const mergedStaff = staff.length

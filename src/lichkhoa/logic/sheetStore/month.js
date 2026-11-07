@@ -36,10 +36,19 @@ export function importMonthRows(rows) {
 
 export function applyMonthToSheet(workbookSheet, monthData) {
   if (!monthData) return workbookSheet;
+  const mergedGrid = { ...(monthData.monthGrid || {}) };
+  if (workbookSheet.monthGrid && typeof workbookSheet.monthGrid === 'object') {
+    Object.entries(workbookSheet.monthGrid).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        // Local thắng khi có giá trị (tránh pull đè mất ô vừa gõ)
+        mergedGrid[key] = val;
+      }
+    });
+  }
   return {
     ...workbookSheet,
     monthKey: monthData.monthKey || workbookSheet.monthKey,
-    monthGrid: { ...(workbookSheet.monthGrid || {}), ...(monthData.monthGrid || {}) },
+    monthGrid: mergedGrid,
     monthColumnOrder: monthData.monthColumnOrder ?? workbookSheet.monthColumnOrder,
     monthColumnTitles: { ...(workbookSheet.monthColumnTitles || {}), ...(monthData.monthColumnTitles || {}) },
     monthRoles: monthData.monthRoles?.length ? monthData.monthRoles : workbookSheet.monthRoles,

@@ -86,6 +86,36 @@ export function useSheetSync({
     if (!deptTaskCount(next)) {
       next = ensureSheets(fillEmptyTasksFromSeed(next));
     }
+    // Safeguard: Đảm bảo không bao giờ làm mất monthGrid/monthRoles local nếu remote bị trống
+    const prevSheetsByDept = storeRef.current?.sheetsByDept || {};
+    if (next?.sheetsByDept) {
+      Object.entries(next.sheetsByDept).forEach(([deptId, deptState]) => {
+        const prevSheets = prevSheetsByDept[deptId]?.sheets || [];
+        (deptState.sheets || []).forEach((sh) => {
+          const prevSh = prevSheets.find((p) => p.id === sh.id) || prevSheets[0];
+          if (prevSh?.monthGrid && Object.keys(prevSh.monthGrid).length > 0) {
+            if (!sh.monthGrid || Object.keys(sh.monthGrid).length === 0) {
+              sh.monthGrid = { ...prevSh.monthGrid };
+            } else {
+              Object.entries(prevSh.monthGrid).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && String(v).trim() !== '') {
+                  const curVal = sh.monthGrid[k];
+                  if (curVal === undefined || curVal === null || String(curVal).trim() === '') {
+                    sh.monthGrid[k] = v;
+                  }
+                }
+              });
+            }
+          }
+          if (prevSh?.monthRoles?.length && (!sh.monthRoles || !sh.monthRoles.length)) {
+            sh.monthRoles = [...prevSh.monthRoles];
+          }
+          if (prevSh?.monthKey && !sh.monthKey) {
+            sh.monthKey = prevSh.monthKey;
+          }
+        });
+      });
+    }
     setStore(next);
     saveStore(next, { skipCloud: true });
     setCloudMeta({ updatedAt: remote.updatedAt });
@@ -344,6 +374,25 @@ export function useSheetSync({
     }
   }, [persistStoreToSheet, pullFromSheet, storeRef, syncAuthReady]);
 
+  const dismissNotice = useCallback(() => {
+    setSheetSyncNotice('');
+  }, []);
+
+  const forcePushLocalToSheet = useCallback(async () => {
+    if (!syncAuthReady || !getSpreadsheetId()) return;
+    setSheetSyncError('');
+    try {
+      const res = await persistStoreToSheet(storeRef.current, {
+        notice: 'Đã ghi đè toàn bộ dữ liệu máy này lên Google Sheet thành công.',
+      });
+      if (res?.updatedAt) {
+        setSheetSyncNotice('');
+      }
+    } catch (error) {
+      setSheetSyncError(error?.message || 'Không ghi đè được lên Sheet.');
+    }
+  }, [persistStoreToSheet, storeRef, syncAuthReady]);
+
   return {
     sheetSyncError,
     sheetSyncNotice,
@@ -356,5 +405,7 @@ export function useSheetSync({
     manualSync,
     markForcePull,
     persistStoreToSheet,
+    forcePushLocalToSheet,
+    dismissNotice,
   };
 }
