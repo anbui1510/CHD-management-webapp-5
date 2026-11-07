@@ -57,58 +57,78 @@ export function applyMonthToSheet(workbookSheet, monthData) {
 
 export function exportMonthRows(deptSheets) {
   const rows = [];
-  (deptSheets?.sheets || []).forEach((sh) => {
-    if (sh.monthKey) {
-      rows.push({
-        recordType: 'meta',
-        sheetId: sh.id,
-        monthKey: sh.monthKey,
-        field: 'meta',
-        key: 'monthKey',
-        value: sh.monthKey,
-      });
-    }
-    if (sh.monthColumnOrder) {
-      rows.push({
-        recordType: 'meta',
-        sheetId: sh.id,
-        monthKey: sh.monthKey || '',
-        field: 'meta',
-        key: 'monthColumnOrder',
-        value: JSON.stringify(sh.monthColumnOrder),
-      });
-    }
-    if (sh.monthColumnTitles && Object.keys(sh.monthColumnTitles).length) {
-      rows.push({
-        recordType: 'meta',
-        sheetId: sh.id,
-        monthKey: sh.monthKey || '',
-        field: 'meta',
-        key: 'monthColumnTitles',
-        value: JSON.stringify(sh.monthColumnTitles),
-      });
-    }
-    if (sh.monthRoles?.length) {
-      rows.push({
-        recordType: 'meta',
-        sheetId: sh.id,
-        monthKey: sh.monthKey || '',
-        field: 'meta',
-        key: 'monthRoles',
-        value: JSON.stringify(sh.monthRoles),
-      });
-    }
+  const sheets = deptSheets?.sheets || [];
+  const activeSheetId = deptSheets?.activeSheetId || sheets[0]?.id || 'sheet_dept_tim_mach_1';
+  const primarySheet = sheets.find((s) => s.id === activeSheetId) || sheets[0] || {};
+
+  const monthKey = primarySheet.monthKey || '2026-11';
+  rows.push({
+    recordType: 'meta',
+    sheetId: activeSheetId,
+    monthKey,
+    field: 'meta',
+    key: 'monthKey',
+    value: monthKey,
+  });
+
+  const columnOrder = primarySheet.monthColumnOrder || sheets.find((s) => s.monthColumnOrder)?.monthColumnOrder;
+  if (columnOrder) {
+    rows.push({
+      recordType: 'meta',
+      sheetId: activeSheetId,
+      monthKey,
+      field: 'meta',
+      key: 'monthColumnOrder',
+      value: JSON.stringify(columnOrder),
+    });
+  }
+
+  const columnTitles = primarySheet.monthColumnTitles || sheets.find((s) => s.monthColumnTitles && Object.keys(s.monthColumnTitles).length)?.monthColumnTitles;
+  if (columnTitles && Object.keys(columnTitles).length) {
+    rows.push({
+      recordType: 'meta',
+      sheetId: activeSheetId,
+      monthKey,
+      field: 'meta',
+      key: 'monthColumnTitles',
+      value: JSON.stringify(columnTitles),
+    });
+  }
+
+  const roles = (primarySheet.monthRoles && primarySheet.monthRoles.length)
+    ? primarySheet.monthRoles
+    : sheets.find((s) => Array.isArray(s.monthRoles) && s.monthRoles.length)?.monthRoles;
+  if (roles && roles.length) {
+    rows.push({
+      recordType: 'meta',
+      sheetId: activeSheetId,
+      monthKey,
+      field: 'meta',
+      key: 'monthRoles',
+      value: JSON.stringify(roles),
+    });
+  }
+
+  // Thu thập mọi ô lịch tháng trên tất cả các sheet trong khoa
+  const uniqueCells = {};
+  sheets.forEach((sh) => {
     Object.entries(sh.monthGrid || {}).forEach(([key, value]) => {
-      if (value === undefined || value === null || String(value).trim() === '') return;
-      rows.push({
-        recordType: 'cell',
-        sheetId: sh.id,
-        monthKey: sh.monthKey || '',
-        field: 'month_cell',
-        key,
-        value,
-      });
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        uniqueCells[key] = value;
+      }
     });
   });
+
+  Object.entries(uniqueCells).forEach(([key, value]) => {
+    rows.push({
+      recordType: 'cell',
+      sheetId: activeSheetId,
+      monthKey,
+      field: 'month_cell',
+      key,
+      value,
+    });
+  });
+
   return objectsToRows(rows, MONTH_HEADERS);
 }

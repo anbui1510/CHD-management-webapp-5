@@ -167,24 +167,45 @@ function codeForRole(role, session, taskList) {
   return roleShortLabel(role, taskList);
 }
 
+const TITLE_PREFIX_REGEX = /^(bs\.|bs|bác\s+sĩ|bac\s+si|ths\.|ths|ts\.|ts|pgs\.|pgs|gs\.|gs|bscki\.|bscki|bsckii\.|bsckii|bsck1\.|bsck1|bsck2\.|bsck2)\s+/i;
+
+function stripTitlePrefixes(str) {
+  let cur = String(str || '').trim();
+  let prev = '';
+  while (cur !== prev) {
+    prev = cur;
+    cur = cur.replace(TITLE_PREFIX_REGEX, '').trim();
+  }
+  return cur;
+}
+
 function staffNameKey(value) {
   return String(value || '').normalize('NFC').trim().toLocaleLowerCase('vi');
 }
 
-function matchOne(part, staffList) {
+function matchOne(rawPart, staffList) {
   const people = staffList || [];
+  const part = stripTitlePrefixes(rawPart);
   const exactKey = staffNameKey(part);
   const exact = people.filter(person => staffNameKey(person.shortName) === exactKey || staffNameKey(person.name) === exactKey);
   if (exact.length) return exact[0];
   const key = fold(part);
   if (!key) return null;
   const folded = people.filter(person => fold(person.shortName) === key || fold(person.name) === key);
-  return folded.length === 1 ? folded[0] : null;
+  if (folded.length === 1) return folded[0];
+  // Match given name (last word of person full name, e.g. "Hưng" in "Nguyễn Thái Hưng") if unique
+  const byGiven = people.filter(person => {
+    const nameTokens = String(person.name || '').trim().split(/\s+/);
+    const given = nameTokens[nameTokens.length - 1];
+    return fold(given) === key;
+  });
+  if (byGiven.length === 1) return byGiven[0];
+  return null;
 }
 
 function matchStaff(text, staffList) {
   const found = [];
-  String(text || '').split(/[,;/|\n]+/).map(item => item.trim()).filter(Boolean).forEach((part) => {
+  String(text || '').split(/[,;/|\n+&]+/).map(item => item.trim()).filter(Boolean).forEach((part) => {
     const hit = matchOne(part.replace(/\([^)]*\)/g, ''), staffList);
     if (hit && !found.some(person => person.id === hit.id)) found.push(hit);
   });

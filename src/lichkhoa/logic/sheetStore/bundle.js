@@ -34,6 +34,7 @@ function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
   const mergedRemote = remoteSheets.map((sh, idx) => {
     const prev = byId.get(sh.id)
       || byName.get(sh.name)
+      || localList[idx]
       || (localList.length === 1 && remoteSheets.length === 1 ? localList[0] : undefined);
     if (!prev) return sh;
     const patch = {};
@@ -260,13 +261,83 @@ export function importTabsToStore(tabs, baseStore = null) {
   let sheets = weekBlock.sheets?.length ? weekBlock.sheets : (baseStore?.sheetsByDept?.[deptId]?.sheets || []);
   const prevSheets = baseStore?.sheetsByDept?.[deptId]?.sheets;
   sheets = mergeSheetsPreserveLocalFields(sheets, prevSheets);
-  const monthKeys = Array.from(monthBySheet.keys());
-  sheets = sheets.map((sh, idx) => {
-    const monthData = monthBySheet.get(sh.id)
-      || monthBySheet.get(prevSheets?.find((p) => p.name === sh.name)?.id)
-      || (monthKeys[idx] ? monthBySheet.get(monthKeys[idx]) : undefined)
-      || (monthBySheet.size === 1 ? Array.from(monthBySheet.values())[0] : undefined);
-    return applyMonthToSheet(sh, monthData);
+
+  // Thu thập TOÀN BỘ dữ liệu lịch tháng local trên mọi sheet của khoa để bảo vệ vĩnh viễn
+  const allLocalMonthGrid = {};
+  let localMonthRoles = null;
+  let localMonthKey = null;
+  let localMonthColumnOrder = null;
+  let localMonthColumnTitles = null;
+  let localMonthMerges = null;
+  (prevSheets || []).forEach((ps) => {
+    if (ps?.monthGrid && typeof ps.monthGrid === 'object') {
+      Object.entries(ps.monthGrid).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          allLocalMonthGrid[k] = v;
+        }
+      });
+    }
+    if (Array.isArray(ps?.monthRoles) && ps.monthRoles.length && !localMonthRoles) {
+      localMonthRoles = ps.monthRoles;
+    }
+    if (ps?.monthKey && !localMonthKey) localMonthKey = ps.monthKey;
+    if (ps?.monthColumnOrder && !localMonthColumnOrder) localMonthColumnOrder = ps.monthColumnOrder;
+    if (ps?.monthColumnTitles && Object.keys(ps.monthColumnTitles).length && !localMonthColumnTitles) {
+      localMonthColumnTitles = ps.monthColumnTitles;
+    }
+    if (Array.isArray(ps?.monthMerges) && ps.monthMerges.length && !localMonthMerges) {
+      localMonthMerges = ps.monthMerges;
+    }
+  });
+
+  // Thu thập dữ liệu lịch tháng từ remote (tab LichThang trên Google Sheet)
+  const allRemoteMonthGrid = {};
+  let remoteMonthRoles = null;
+  let remoteMonthKey = null;
+  let remoteMonthColumnOrder = null;
+  let remoteMonthColumnTitles = null;
+  monthBySheet.forEach((mb) => {
+    if (mb?.monthGrid && typeof mb.monthGrid === 'object') {
+      Object.entries(mb.monthGrid).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          allRemoteMonthGrid[k] = v;
+        }
+      });
+    }
+    if (Array.isArray(mb?.monthRoles) && mb.monthRoles.length && !remoteMonthRoles) {
+      remoteMonthRoles = mb.monthRoles;
+    }
+    if (mb?.monthKey && !remoteMonthKey) remoteMonthKey = mb.monthKey;
+    if (mb?.monthColumnOrder && !remoteMonthColumnOrder) remoteMonthColumnOrder = mb.monthColumnOrder;
+    if (mb?.monthColumnTitles && Object.keys(mb.monthColumnTitles).length && !remoteMonthColumnTitles) {
+      remoteMonthColumnTitles = mb.monthColumnTitles;
+    }
+  });
+
+  // Hợp nhất Month Grid: Local thắng ô trùng (bảo vệ ô vừa gõ khỏi bị pull đè)
+  const unifiedMonthGrid = { ...allRemoteMonthGrid, ...allLocalMonthGrid };
+
+  // Month Roles: Giữ role tùy biến của local (ví dụ TC, TK1, C1...) nếu local có
+  const unifiedMonthRoles = (localMonthRoles && localMonthRoles.length)
+    ? localMonthRoles
+    : (remoteMonthRoles && remoteMonthRoles.length ? remoteMonthRoles : null);
+
+  const unifiedMonthKey = localMonthKey || remoteMonthKey || null;
+  const unifiedMonthColumnOrder = localMonthColumnOrder || remoteMonthColumnOrder || null;
+  const unifiedMonthColumnTitles = { ...(remoteMonthColumnTitles || {}), ...(localMonthColumnTitles || {}) };
+
+  // Áp dụng bộ lịch tháng đồng nhất cho TẤT CẢ các sheet trong khoa
+  sheets = sheets.map((sh) => {
+    const nextSh = { ...sh };
+    nextSh.monthGrid = { ...(nextSh.monthGrid || {}), ...unifiedMonthGrid };
+    if (unifiedMonthRoles) nextSh.monthRoles = unifiedMonthRoles;
+    if (unifiedMonthKey) nextSh.monthKey = unifiedMonthKey;
+    if (unifiedMonthColumnOrder) nextSh.monthColumnOrder = unifiedMonthColumnOrder;
+    if (Object.keys(unifiedMonthColumnTitles).length) {
+      nextSh.monthColumnTitles = { ...(nextSh.monthColumnTitles || {}), ...unifiedMonthColumnTitles };
+    }
+    if (localMonthMerges) nextSh.monthMerges = localMonthMerges;
+    return nextSh;
   });
 
   // Khi staff.length === 0 (Sheet NhanSu chưa có dữ liệu): giữ prevDept.staff
@@ -285,10 +356,18 @@ export function importTabsToStore(tabs, baseStore = null) {
     studyEntries: mergeEntriesPreserveLocal(studyEntries, prevDept.studyEntries || []),
   };
 
+  const localActiveId = baseStore?.sheetsByDept?.[deptId]?.activeSheetId;
+  const hasLocalActive = sheets.some((s) => s.id === localActiveId);
+  const activeSheetId = hasLocalActive
+    ? localActiveId
+    : (weekBlock.activeSheetId && sheets.some((s) => s.id === weekBlock.activeSheetId))
+      ? weekBlock.activeSheetId
+      : sheets[0]?.id;
+
   const sheetsByDept = {
     ...(baseStore?.sheetsByDept || {}),
     [deptId]: {
-      activeSheetId: weekBlock.activeSheetId || baseStore?.sheetsByDept?.[deptId]?.activeSheetId || sheets[0]?.id,
+      activeSheetId,
       sheets,
     },
   };

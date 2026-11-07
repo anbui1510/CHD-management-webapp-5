@@ -91,29 +91,47 @@ export function useSheetSync({
     if (next?.sheetsByDept) {
       Object.entries(next.sheetsByDept).forEach(([deptId, deptState]) => {
         const prevSheets = prevSheetsByDept[deptId]?.sheets || [];
-        (deptState.sheets || []).forEach((sh) => {
-          const prevSh = prevSheets.find((p) => p.id === sh.id) || prevSheets[0];
-          if (prevSh?.monthGrid && Object.keys(prevSh.monthGrid).length > 0) {
-            if (!sh.monthGrid || Object.keys(sh.monthGrid).length === 0) {
-              sh.monthGrid = { ...prevSh.monthGrid };
-            } else {
-              Object.entries(prevSh.monthGrid).forEach(([k, v]) => {
-                if (v !== undefined && v !== null && String(v).trim() !== '') {
-                  const curVal = sh.monthGrid[k];
-                  if (curVal === undefined || curVal === null || String(curVal).trim() === '') {
-                    sh.monthGrid[k] = v;
-                  }
-                }
-              });
-            }
+        const allPrevMonthCells = {};
+        let prevRoles = null;
+        let prevMonthKey = null;
+        let prevColumnOrder = null;
+        let prevColumnTitles = null;
+        prevSheets.forEach((p) => {
+          if (p?.monthGrid && typeof p.monthGrid === 'object') {
+            Object.entries(p.monthGrid).forEach(([k, v]) => {
+              if (v !== undefined && v !== null && String(v).trim() !== '') {
+                allPrevMonthCells[k] = v;
+              }
+            });
           }
-          if (prevSh?.monthRoles?.length && (!sh.monthRoles || !sh.monthRoles.length)) {
-            sh.monthRoles = [...prevSh.monthRoles];
-          }
-          if (prevSh?.monthKey && !sh.monthKey) {
-            sh.monthKey = prevSh.monthKey;
+          if (Array.isArray(p?.monthRoles) && p.monthRoles.length && !prevRoles) prevRoles = p.monthRoles;
+          if (p?.monthKey && !prevMonthKey) prevMonthKey = p.monthKey;
+          if (p?.monthColumnOrder && !prevColumnOrder) prevColumnOrder = p.monthColumnOrder;
+          if (p?.monthColumnTitles && Object.keys(p.monthColumnTitles).length && !prevColumnTitles) {
+            prevColumnTitles = p.monthColumnTitles;
           }
         });
+
+        (deptState.sheets || []).forEach((sh) => {
+          sh.monthGrid = { ...(sh.monthGrid || {}), ...allPrevMonthCells };
+          if (prevRoles && (!sh.monthRoles || !sh.monthRoles.length)) {
+            sh.monthRoles = [...prevRoles];
+          }
+          if (prevMonthKey && !sh.monthKey) {
+            sh.monthKey = prevMonthKey;
+          }
+          if (prevColumnOrder && !sh.monthColumnOrder) {
+            sh.monthColumnOrder = prevColumnOrder;
+          }
+          if (prevColumnTitles) {
+            sh.monthColumnTitles = { ...(sh.monthColumnTitles || {}), ...prevColumnTitles };
+          }
+        });
+
+        const localActiveId = prevSheetsByDept[deptId]?.activeSheetId;
+        if (localActiveId && (deptState.sheets || []).some((s) => s.id === localActiveId)) {
+          deptState.activeSheetId = localActiveId;
+        }
       });
     }
     setStore(next);

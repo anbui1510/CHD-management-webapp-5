@@ -654,11 +654,22 @@ export function DeptScheduleApp({
       staffList.forEach((person) => {
         existingNotes[person.shortName] = activeSheet.grid?.[person.shortName]?.note || '';
       });
+      // Thu thập toàn bộ ô lịch tháng trên các sheet của khoa để chắc chắn không bị thiếu
+      const allDeptMonthCells = {};
+      sheets.forEach(s => {
+        if (s.monthGrid && typeof s.monthGrid === 'object') {
+          Object.assign(allDeptMonthCells, s.monthGrid);
+        }
+      });
+      const monthGridForRun = Object.keys(activeSheet.monthGrid || {}).length > 0
+        ? { ...allDeptMonthCells, ...(activeSheet.monthGrid || {}) }
+        : allDeptMonthCells;
+
       const result = generateWeeklySchedule({
         startDate: activeSheet.startDate,
         staffList: staffForRun,
         taskList,
-        monthGrid: activeSheet.monthGrid || {},
+        monthGrid: monthGridForRun,
         monthRoles: resolveMonthRoles(activeSheet.monthRoles),
         daySessions: sessions,
         leaveEntries: activeDept.leaveEntries || [],
@@ -691,6 +702,11 @@ export function DeptScheduleApp({
           buGrants: after,
           buPosted: after,
           leaveCuts: afterCuts,
+          monthGrid: sh.monthGrid || monthGridForRun,
+          monthRoles: sh.monthRoles || activeSheet.monthRoles,
+          monthKey: sh.monthKey || activeSheet.monthKey,
+          monthColumnOrder: sh.monthColumnOrder || activeSheet.monthColumnOrder,
+          monthColumnTitles: sh.monthColumnTitles || activeSheet.monthColumnTitles,
           weeks: {
             ...(sh.weeks || {}),
             [weekKey]: {
@@ -723,7 +739,12 @@ export function DeptScheduleApp({
           }),
           sheetsByDept: {
             ...sheetsByDept,
-            [deptId]: { ...st, sheets: sheetList.map(item => item.id === sh.id ? nextSheet : item) }
+            [deptId]: {
+              ...st,
+              sheets: sheetList.map(item => item.id === sh.id
+                ? nextSheet
+                : { ...item, monthGrid: { ...(item.monthGrid || {}), ...monthGridForRun } })
+            }
           }
         };
       });
