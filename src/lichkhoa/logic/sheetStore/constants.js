@@ -45,8 +45,14 @@ export const TASK_HEADERS = [
   'ownersJson', 'ownerOrderJson', 'fixedDaysJson', 'fixedSlotsJson', 'locksJson',
 ];
 
-export const LEAVE_HEADERS = ['id', 'staffId', 'fromDate', 'toDate', 'note', 'type'];
-export const STUDY_HEADERS = ['id', 'staffId', 'fromDate', 'toDate', 'note'];
+// Các cột đầu giữ nguyên để tương thích sheet cũ; các cột sau lưu đủ field UI/scheduler dùng
+// (shortName, from/to, sessions, repeat...) để không mất dữ liệu khi export → import.
+const ENTRY_EXTRA_HEADERS = [
+  'shortName', 'from', 'to', 'iso', 'session', 'sessions',
+  'plannedLong', 'repeat', 'exdates', 'createdAt',
+];
+export const LEAVE_HEADERS = ['id', 'staffId', 'fromDate', 'toDate', 'note', 'type', ...ENTRY_EXTRA_HEADERS];
+export const STUDY_HEADERS = ['id', 'staffId', 'fromDate', 'toDate', 'note', 'type', 'taskId', 'topic', ...ENTRY_EXTRA_HEADERS];
 
 export const WEEK_HEADERS = [
   'recordType', 'sheetId', 'sheetName', 'startDate', 'weekStart', 'staffId', 'dayIndex', 'slot', 'value',

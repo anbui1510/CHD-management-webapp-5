@@ -227,17 +227,30 @@ function mergeEntriesPreserveLocal(remoteEntries, localEntries) {
   const localList = (localEntries || []).filter(Boolean);
   if (!Array.isArray(remoteEntries) || !remoteEntries.length) return localList;
 
+  const localById = new Map(localList.filter((e) => e.id).map((e) => [String(e.id), e]));
+  // Trùng id: local thắng từng field (có giá trị), remote chỉ bù field còn thiếu
+  const mergedRemote = remoteEntries.map((r) => {
+    const l = localById.get(String(r.id));
+    if (!l) return r;
+    const out = { ...r };
+    Object.entries(l).forEach(([k, v]) => {
+      const empty = v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
+      if (!empty) out[k] = v;
+    });
+    return out;
+  });
+
+  const entryKey = (e) => `${e.shortName || e.staffId}_${e.from || e.fromDate}_${e.to || e.toDate}_${e.type || ''}`;
   const remoteIds = new Set(remoteEntries.map((e) => String(e.id)));
-  const remoteKeys = new Set(remoteEntries.map((e) => `${e.staffId}_${e.fromDate}_${e.toDate}_${e.type || ''}`));
+  const remoteKeys = new Set(remoteEntries.map(entryKey));
 
   const extraLocal = localList.filter((e) => {
     if (!e || !e.id) return false;
     if (remoteIds.has(String(e.id))) return false;
-    const key = `${e.staffId}_${e.fromDate}_${e.toDate}_${e.type || ''}`;
-    return !remoteKeys.has(key);
+    return !remoteKeys.has(entryKey(e));
   });
 
-  return [...remoteEntries, ...extraLocal];
+  return [...mergedRemote, ...extraLocal];
 }
 
 /**
