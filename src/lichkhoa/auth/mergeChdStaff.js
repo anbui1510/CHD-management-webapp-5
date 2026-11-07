@@ -11,15 +11,33 @@ function isActiveChdStaff(staff) {
   return staff && !String(staff.FireDate || '').trim();
 }
 
-function deriveShortName(staff, used) {
+function foldName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function deriveShortName(staff, used, reservedByOther = null, selfId = '') {
   const fromName = String(staff.StaffName || staff.Name || staff.StaffKey || '')
     .trim()
     .split(/\s+/)
     .filter(Boolean);
   let base = (fromName[fromName.length - 1] || staff.StaffKey || 'NV').toUpperCase().slice(0, 8);
-  if (!used.has(base)) return base;
+
+  const isTaken = (candidate) => {
+    if (used.has(candidate)) return true;
+    if (reservedByOther) {
+      const ownerId = reservedByOther.get(candidate);
+      if (ownerId && ownerId !== String(selfId)) return true;
+    }
+    return false;
+  };
+
+  if (!isTaken(base)) return base;
   let i = 2;
-  while (used.has(`${base}${i}`)) i += 1;
+  while (isTaken(`${base}${i}`)) i += 1;
   return `${base}${i}`;
 }
 
@@ -35,7 +53,19 @@ function chdDepartmentLabel(chd) {
 export function mergeChdStaffIntoDept(dept, chdStaffList) {
   const existing = Array.isArray(dept?.staff) ? dept.staff : [];
   const byId = new Map(existing.map((s) => [String(s.id), s]));
+  const byName = new Map(existing.map((s) => [foldName(s.name), s]));
+  const byShort = new Map(existing.map((s) => [String(s.shortName || '').trim().toUpperCase(), s]));
   const localStaff = existing.filter((s) => isHandAddedLocalStaff(s));
+
+  // Giữ ưu tiên shortName đã có cho chính chủ — tránh thành viên duyệt trước chiếm mất
+  const reservedByOther = new Map();
+  for (const s of existing) {
+    const sn = String(s.shortName || '').trim().toUpperCase();
+    if (sn) {
+      reservedByOther.set(sn, String(s.id));
+    }
+  }
+
   const usedShort = new Set();
   const next = [];
 
@@ -43,13 +73,16 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
     if (!isActiveChdStaff(chd)) continue;
     const id = String(chd.StaffKey || '').trim();
     if (!id) continue;
-    const prev = byId.get(id) || {};
+    const prev = byId.get(id)
+      || byName.get(foldName(chd.StaffName || chd.Name))
+      || (chd.Name ? byShort.get(String(chd.Name).trim().toUpperCase()) : null)
+      || {};
     const visible = parseShowInLichKhoa(chd.ShowInLichKhoa ?? prev.showInLichKhoa);
     if (!visible) continue;
 
     let shortName = String(prev.shortName || '').trim().toUpperCase();
     if (!shortName || usedShort.has(shortName)) {
-      shortName = deriveShortName(chd, usedShort);
+      shortName = deriveShortName(chd, usedShort, reservedByOther, id);
     }
     usedShort.add(shortName);
 

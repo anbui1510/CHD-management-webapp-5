@@ -1213,10 +1213,24 @@ export function DeptScheduleApp({
           [deptId]: {
             ...st,
             sheets: st.sheets.map(sh => {
-              if (!sh.grid || !sh.grid[oldShortName]) return sh;
-              const grid = { ...sh.grid, [newShortName]: sh.grid[oldShortName] };
-              delete grid[oldShortName];
-              return { ...sh, grid };
+              let grid = sh.grid;
+              if (grid && grid[oldShortName]) {
+                grid = { ...grid, [newShortName]: grid[oldShortName] };
+                delete grid[oldShortName];
+              }
+              let monthGrid = sh.monthGrid;
+              if (monthGrid && typeof monthGrid === 'object') {
+                monthGrid = { ...monthGrid };
+                let monthChanged = false;
+                Object.entries(monthGrid).forEach(([mk, mv]) => {
+                  if (mv === oldShortName) {
+                    monthGrid[mk] = newShortName;
+                    monthChanged = true;
+                  }
+                });
+                if (!monthChanged) monthGrid = sh.monthGrid;
+              }
+              return { ...sh, grid, monthGrid };
             })
           }
         };

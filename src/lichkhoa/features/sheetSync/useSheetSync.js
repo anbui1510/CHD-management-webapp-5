@@ -323,11 +323,18 @@ export function useSheetSync({
           setSheetSyncNotice('Sheet Google mới hơn — đã giữ bản máy này. Bấm «Đồng bộ từ Sheet» nếu muốn lấy bản Sheet.');
           return;
         }
-        if (result?.outcome === 'pushed' && result.updatedAt) {
-          setCloudMeta({ updatedAt: result.updatedAt });
-          setSheetSyncAt(result.updatedAt);
-          setSheetSyncNotice('');
-          setSheetSyncError('');
+        if (result?.outcome === 'pushed') {
+          if (result.mergedStore) {
+            setStore(result.mergedStore);
+            saveStore(result.mergedStore, { skipCloud: true });
+          }
+          if (result.updatedAt) {
+            setCloudMeta({ updatedAt: result.updatedAt });
+            setSheetSyncAt(result.updatedAt);
+            setSheetSyncNotice('');
+            setSheetSyncError('');
+          }
+          return;
         }
       } catch (error) {
         setSheetSyncError(error?.message || 'Không ghi được lên Sheet.');

@@ -27,11 +27,11 @@ function isEmptyPreserveValue(value) {
 }
 
 function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
-  if (!Array.isArray(remoteSheets) || !remoteSheets.length) return remoteSheets;
   const localList = (localSheets || []).filter(Boolean);
+  if (!Array.isArray(remoteSheets) || !remoteSheets.length) return localList;
   const byId = new Map(localList.map((sh) => [sh.id, sh]));
   const byName = new Map(localList.map((sh) => [sh.name, sh]));
-  return remoteSheets.map((sh, idx) => {
+  const mergedRemote = remoteSheets.map((sh, idx) => {
     const prev = byId.get(sh.id)
       || byName.get(sh.name)
       || (localList.length === 1 && remoteSheets.length === 1 ? localList[0] : undefined);
@@ -79,26 +79,164 @@ function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
           continue;
         }
       }
-      // Khác (roomTable, merges…): Sheet đã có thì giữ remote (đã nằm trên sh).
+      // roomAssignments: gộp phân công phòng
+      if (key === 'roomAssignments' && typeof remoteVal === 'object' && typeof prev[key] === 'object') {
+        patch[key] = { ...remoteVal, ...prev[key] };
+        continue;
+      }
+      // cathGrid: gộp phân công cathlab
+      if (key === 'cathGrid' && typeof remoteVal === 'object' && typeof prev[key] === 'object') {
+        patch[key] = { ...remoteVal, ...prev[key] };
+        continue;
+      }
     }
+
+    // Gộp grid lịch tuần (sh.grid): giữ lại các ca local đã gán / xếp lịch
+    if (prev.grid && typeof prev.grid === 'object') {
+      const mergedGrid = { ...(sh.grid || {}) };
+      for (const [staffKey, prevDays] of Object.entries(prev.grid)) {
+        if (!prevDays) continue;
+        if (!mergedGrid[staffKey]) {
+          mergedGrid[staffKey] = Array.isArray(prevDays) ? [...prevDays] : { ...prevDays };
+        } else if (Array.isArray(prevDays) && Array.isArray(mergedGrid[staffKey])) {
+          const curArr = [...mergedGrid[staffKey]];
+          prevDays.forEach((prevDay, dayIdx) => {
+            if (!prevDay || typeof prevDay !== 'object') return;
+            while (curArr.length <= dayIdx) curArr.push({ S: '', R: '', C: '', T: '' });
+            const curDay = curArr[dayIdx] ? { ...curArr[dayIdx] } : { S: '', R: '', C: '', T: '' };
+            ['S', 'R', 'C', 'T'].forEach((slot) => {
+              const val = prevDay[slot];
+              if (val !== undefined && val !== null && String(val).trim() !== '' && (!curDay[slot] || !String(curDay[slot]).trim())) {
+                curDay[slot] = val;
+              }
+            });
+            curArr[dayIdx] = curDay;
+          });
+          mergedGrid[staffKey] = curArr;
+        }
+      }
+      patch.grid = mergedGrid;
+    }
+
     return Object.keys(patch).length ? { ...sh, ...patch } : sh;
   });
+
+  // Giữ lại các sheet local chưa có trên remote (ví dụ user thêm Tuần 2, Tuần 3)
+  const remoteIds = new Set(mergedRemote.map((s) => s.id));
+  const remoteNames = new Set(mergedRemote.map((s) => s.name));
+  const extraSheets = localList.filter((s) => !remoteIds.has(s.id) && !remoteNames.has(s.name));
+
+  return [...mergedRemote, ...extraSheets];
 }
 
-/** Giữ studyFrom/studyTo/position lịch khi NhanSu Sheet chưa có cột hoặc để trống. */
+/** Giữ studyFrom/studyTo/position/shortName lịch và bảo toàn nhân sự local (local_*). */
 function mergeStaffPreserveLocalFields(remoteStaff, localStaff) {
-  if (!Array.isArray(remoteStaff) || !remoteStaff.length) return remoteStaff;
-  const byId = new Map((localStaff || []).filter(Boolean).map((s) => [String(s.id), s]));
-  return remoteStaff.map((s) => {
-    const prev = byId.get(String(s.id));
+  const localList = (localStaff || []).filter(Boolean);
+  if (!Array.isArray(remoteStaff) || !remoteStaff.length) return localList;
+  const byId = new Map(localList.map((s) => [String(s.id), s]));
+  const byName = new Map(localList.map((s) => [String(s.name || '').trim().toLowerCase(), s]));
+
+  const mergedRemote = remoteStaff.map((s) => {
+    const prev = byId.get(String(s.id)) || byName.get(String(s.name || '').trim().toLowerCase());
     if (!prev) return s;
     const next = { ...s };
+
+    // shortName: User sửa ngắn (VD: THẢO2 -> THẢO), ưu tiên giữ bản máy nếu hợp lệ
+    if (prev.shortName && String(prev.shortName).trim()) {
+      next.shortName = String(prev.shortName).trim().toUpperCase();
+    }
     if (!next.studyFrom && prev.studyFrom) next.studyFrom = prev.studyFrom;
     if (!next.studyTo && prev.studyTo) next.studyTo = prev.studyTo;
-    if (!String(next.position || '').trim() && prev.position) next.position = prev.position;
-    if (next.dutyQuota == null && prev.dutyQuota != null) next.dutyQuota = prev.dutyQuota;
+    if (prev.position && (!next.position || !String(next.position).trim())) {
+      next.position = prev.position;
+    }
+    if (prev.dutyQuota != null && (next.dutyQuota == null || next.dutyQuota === 0)) {
+      next.dutyQuota = prev.dutyQuota;
+    }
+    if (prev.buBalance != null && (next.buBalance == null || next.buBalance === 0)) {
+      next.buBalance = prev.buBalance;
+    }
+    if (prev.phepBalance != null && (next.phepBalance == null || next.phepBalance === 0)) {
+      next.phepBalance = prev.phepBalance;
+    }
+    if (Array.isArray(prev.taskDuties) && prev.taskDuties.length && (!next.taskDuties || !next.taskDuties.length)) {
+      next.taskDuties = prev.taskDuties;
+    }
+    if (prev.access && !next.access) next.access = prev.access;
+    if (prev.accessRole && !next.accessRole) next.accessRole = prev.accessRole;
+    if (prev.source) next.source = prev.source;
+    if (prev.showInLichKhoa) next.showInLichKhoa = prev.showInLichKhoa;
+    if (prev.deptId && !next.deptId) next.deptId = prev.deptId;
+    if (prev.deptLabel && !next.deptLabel) next.deptLabel = prev.deptLabel;
+
     return next;
   });
+
+  // BẢO TOÀN NHÂN SỰ LOCAL: Thêm nhân sự local chưa có trên remoteStaff (VD: "Nguyễn Thái Hưng" local_*)
+  const remoteIds = new Set(mergedRemote.map((s) => String(s.id)));
+  const remoteNames = new Set(mergedRemote.map((s) => String(s.name || '').trim().toLowerCase()));
+
+  const extraLocal = localList.filter((s) => {
+    if (!s || !s.id) return false;
+    if (remoteIds.has(String(s.id))) return false;
+    if (s.name && remoteNames.has(String(s.name).trim().toLowerCase())) return false;
+    return true;
+  });
+
+  return [...mergedRemote, ...extraLocal];
+}
+
+function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
+  const localList = (localTasks || []).filter(Boolean);
+  if (!Array.isArray(remoteTasks) || !remoteTasks.length) return localList;
+
+  const localById = new Map(localList.map((t) => [String(t.id), t]));
+  const localByCode = new Map(localList.filter((t) => t.code).map((t) => [String(t.code).trim(), t]));
+
+  const mergedRemote = remoteTasks.map((t) => {
+    const prev = localById.get(String(t.id)) || (t.code ? localByCode.get(String(t.code).trim()) : null);
+    if (!prev) return t;
+    return {
+      ...t,
+      owners: (Array.isArray(prev.owners) && prev.owners.length) ? prev.owners : (t.owners || []),
+      ownerOrder: (Array.isArray(prev.ownerOrder) && prev.ownerOrder.length) ? prev.ownerOrder : (t.ownerOrder || []),
+      fixedDays: (Array.isArray(prev.fixedDays) && prev.fixedDays.length) ? prev.fixedDays : (t.fixedDays || []),
+      fixedSlots: (Array.isArray(prev.fixedSlots) && prev.fixedSlots.length) ? prev.fixedSlots : (t.fixedSlots || []),
+      locks: (Array.isArray(prev.locks) && prev.locks.length) ? prev.locks : (t.locks || []),
+      bgColor: prev.bgColor || t.bgColor,
+      textColor: prev.textColor || t.textColor,
+      category: prev.category || t.category,
+    };
+  });
+
+  const remoteIds = new Set(mergedRemote.map((t) => String(t.id)));
+  const remoteCodes = new Set(mergedRemote.map((t) => String(t.code || '').trim()).filter(Boolean));
+
+  const extraLocal = localList.filter((t) => {
+    if (!t || !t.id) return false;
+    if (remoteIds.has(String(t.id))) return false;
+    if (t.code && remoteCodes.has(String(t.code).trim())) return false;
+    return true;
+  });
+
+  return [...mergedRemote, ...extraLocal];
+}
+
+function mergeEntriesPreserveLocal(remoteEntries, localEntries) {
+  const localList = (localEntries || []).filter(Boolean);
+  if (!Array.isArray(remoteEntries) || !remoteEntries.length) return localList;
+
+  const remoteIds = new Set(remoteEntries.map((e) => String(e.id)));
+  const remoteKeys = new Set(remoteEntries.map((e) => `${e.staffId}_${e.fromDate}_${e.toDate}_${e.type || ''}`));
+
+  const extraLocal = localList.filter((e) => {
+    if (!e || !e.id) return false;
+    if (remoteIds.has(String(e.id))) return false;
+    const key = `${e.staffId}_${e.fromDate}_${e.toDate}_${e.type || ''}`;
+    return !remoteKeys.has(key);
+  });
+
+  return [...remoteEntries, ...extraLocal];
 }
 
 /**
@@ -131,10 +269,10 @@ export function importTabsToStore(tabs, baseStore = null) {
     return applyMonthToSheet(sh, monthData);
   });
 
-  // Không fallback sang staff seed/doc_* khi NhanSu trống — CHD merge sẽ điền từ Sheet Staff.
+  // Khi staff.length === 0 (Sheet NhanSu chưa có dữ liệu): giữ prevDept.staff
   const mergedStaff = staff.length
     ? mergeStaffPreserveLocalFields(staff, purgeBackupImportedStaff(prevDept.staff))
-    : purgeBackupImportedStaff(prevDept.staff).filter((s) => String(s.id || '').startsWith('local_'));
+    : purgeBackupImportedStaff(prevDept.staff);
 
   const department = {
     ...prevDept,
@@ -142,9 +280,9 @@ export function importTabsToStore(tabs, baseStore = null) {
     name: meta.deptName || prevDept.name,
     code: meta.deptCode || prevDept.code,
     staff: purgeBackupImportedStaff(mergedStaff),
-    tasks: tasks.length ? tasks : prevDept.tasks,
-    leaveEntries: leaveEntries.length ? leaveEntries : (prevDept.leaveEntries || []),
-    studyEntries: studyEntries.length ? studyEntries : (prevDept.studyEntries || []),
+    tasks: mergeTasksPreserveLocalFields(tasks, prevDept.tasks),
+    leaveEntries: mergeEntriesPreserveLocal(leaveEntries, prevDept.leaveEntries || []),
+    studyEntries: mergeEntriesPreserveLocal(studyEntries, prevDept.studyEntries || []),
   };
 
   const sheetsByDept = {

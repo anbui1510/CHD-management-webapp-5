@@ -67,7 +67,15 @@ export async function pushScheduleStoreIfNotStale(store) {
   const remoteTs = profile?.updatedAt ? new Date(profile.updatedAt).getTime() : 0;
   const localTs = localMeta.updatedAt ? new Date(localMeta.updatedAt).getTime() : 0;
   if (remoteTs && localTs && remoteTs > localTs) {
-    return { outcome: 'skipped_remote_newer' };
+    try {
+      const remote = await sheetBridge.pull(spreadsheetId);
+      const mergedStore = importTabsToStore(remote.tabs || {}, store);
+      const res = await pushScheduleStore(mergedStore);
+      return { outcome: 'pushed', updatedAt: res?.updatedAt, mergedStore };
+    } catch (err) {
+      console.warn('Auto-merge on stale remote failed:', err);
+      return { outcome: 'skipped_remote_newer' };
+    }
   }
   const res = await pushScheduleStore(store);
   return { outcome: 'pushed', updatedAt: res?.updatedAt };

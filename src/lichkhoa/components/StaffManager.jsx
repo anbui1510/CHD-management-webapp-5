@@ -227,7 +227,7 @@ export function StaffManager({
 
     if (isNew) {
       const created = markLocalScheduleStaff({
-        id: chdSynced ? newLocalStaffId() : `doc_${Date.now()}`,
+        id: newLocalStaffId(),
         ...payload,
       });
       onAddStaff(created);
