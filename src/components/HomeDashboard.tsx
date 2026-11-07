@@ -744,13 +744,13 @@ export default function HomeDashboard({
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
-          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-3">
+          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3 items-start content-start">
             {visibleStats.map((stat, idx) => (
-              <Card key={idx} className="gap-1 py-3 shadow-sm min-h-[85px]">
-                <CardContent className="px-3">
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-semibold mt-1 font-mono text-foreground leading-none">{stat.value}</p>
+              <Card key={idx} className="gap-0 py-2 shadow-sm self-start w-full">
+                <CardContent className="px-3 py-0">
+                  <p className="text-xs text-muted-foreground leading-tight">{stat.label}</p>
+                  <p className="text-xl font-semibold mt-0.5 font-mono text-foreground leading-none">{stat.value}</p>
                 </CardContent>
               </Card>
             ))}
@@ -975,7 +975,7 @@ export default function HomeDashboard({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     {selectedShortcutIds.map(sid => {
                       const sh = allowedShortcuts.find(x => x.id === sid);
                       if (!sh) return null;
@@ -984,12 +984,12 @@ export default function HomeDashboard({
                         <button 
                           key={sh.id}
                           onClick={() => onNavigate(sh.id)}
-                          className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 hover:bg-accent border border-slate-100 hover:border-border transition group text-center h-24 shadow-sm"
+                          className="flex flex-row items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 hover:bg-accent border border-slate-100 hover:border-border transition group text-left h-12 shadow-sm"
                         >
-                          <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
+                          <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                             {renderIcon(sh.iconName, `w-4 h-4 text-slate-600 group-hover:${colDef.text}`)}
                           </div>
-                          <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-foreground">{sh.label}</span>
+                          <span className="text-[11px] font-black text-slate-700 tracking-tight group-hover:text-foreground truncate">{sh.label}</span>
                         </button>
                       );
                     })}
@@ -1157,81 +1157,11 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1.5 -mt-1 shrink-0">
-                <div className="flex flex-wrap bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm gap-0.5">
-                  {([
-                    ['all', 'Tất cả'],
-                    ['month', 'Tháng'],
-                    ['quarter', 'Quý'],
-                    ['year', 'Năm']
-                  ] as Array<[PiePeriodMode, string]>).map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setPiePeriodMode(id)}
-                      className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition cursor-pointer ${
-                        piePeriodMode === id
-                          ? 'bg-slate-800 text-white shadow-sm'
-                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  {piePeriodMode === 'month' && (
-                    <select
-                      value={pieFilterMonth}
-                      onChange={(e) => setPieFilterMonth(Number(e.target.value))}
-                      className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[9px] font-black text-slate-700 focus:outline-none"
-                    >
-                      {Array.from({ length: 12 }, (_, idx) => idx + 1).map(month => (
-                        <option key={month} value={month}>Tháng {month}</option>
-                      ))}
-                    </select>
-                  )}
-                  {piePeriodMode === 'quarter' && (
-                    <select
-                      value={pieFilterQuarter}
-                      onChange={(e) => setPieFilterQuarter(Number(e.target.value))}
-                      className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[9px] font-black text-slate-700 focus:outline-none"
-                    >
-                      {[1, 2, 3, 4].map(quarter => (
-                        <option key={quarter} value={quarter}>Quý {quarter}</option>
-                      ))}
-                    </select>
-                  )}
-                  <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                    <button
-                      type="button"
-                      onClick={() => setPieFilterYear(prev => prev - 1)}
-                      className="p-0.5 text-slate-500 hover:text-foreground hover:bg-slate-50 cursor-pointer"
-                      title="Năm trước"
-                    >
-                      <ChevronLeft className="w-3 h-3" />
-                    </button>
-                    <span className="px-2 text-[9px] font-black font-mono text-foreground min-w-[36px] text-center">
-                      {pieFilterYear}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPieFilterYear(prev => prev + 1)}
-                      className="p-0.5 text-slate-500 hover:text-foreground hover:bg-slate-50 cursor-pointer"
-                      title="Năm sau"
-                    >
-                      <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <span className="hidden 2xl:inline-flex text-[9px] font-black text-slate-500 bg-white border border-slate-200 rounded-lg px-2 py-0.5 truncate">
-                    {piePeriodRange.label}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[minmax(140px,200px)_1fr] gap-3 items-center overflow-hidden">
-                <div className="relative w-full max-w-[176px] aspect-square mx-auto shrink-0 sm:-translate-y-2" onMouseLeave={() => setHoveredPieSegment(null)}>
+              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[minmax(120px,180px)_1fr] gap-3 items-stretch overflow-hidden">
+                <div
+                  className="relative mx-auto shrink-0 self-center w-full max-w-[160px] aspect-square max-h-full"
+                  onMouseLeave={() => setHoveredPieSegment(null)}
+                >
                   {(() => {
                     const radius = 38;
                     const circumference = 2 * Math.PI * radius;
@@ -1285,39 +1215,112 @@ export default function HomeDashboard({
                   </div>
                 </div>
 
-                <div className="h-full max-h-full min-h-0 self-stretch overflow-y-scroll custom-scrollbar pr-1.5 space-y-1.5">
-                  {pieConfig.segments.length === 0 ? (
-                    <div className="h-full min-h-[100px] flex items-center justify-center text-center">
-                      <span className="text-[10px] text-slate-400 font-semibold italic">
-                        Chưa có dữ liệu để thống kê
-                      </span>
+                <div className="h-full max-h-full min-h-0 self-stretch flex flex-col overflow-hidden">
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2 shrink-0">
+                    <div className="flex flex-wrap bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm gap-0.5">
+                      {([
+                        ['all', 'Tất cả'],
+                        ['month', 'Tháng'],
+                        ['quarter', 'Quý'],
+                        ['year', 'Năm']
+                      ] as Array<[PiePeriodMode, string]>).map(([id, label]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setPiePeriodMode(id)}
+                          className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition cursor-pointer ${
+                            piePeriodMode === id
+                              ? 'bg-slate-800 text-white shadow-sm'
+                              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
-                  ) : (
-                    pieConfig.segments.map(segment => (
-                      <div key={segment.label} className="bg-white border border-slate-100 rounded-xl px-2.5 py-1.5 shadow-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: segment.color }} />
-                            <span className="text-[10.5px] font-black text-slate-700 truncate" title={segment.label}>
-                              {segment.label}
-                            </span>
-                          </div>
-                          <div className="flex items-baseline gap-1 shrink-0">
-                            <span className="text-[10px] font-black font-mono text-slate-800">{segment.value}</span>
-                            <span className="text-[9px] font-black font-mono text-foreground">
-                              {segment.percent.toFixed(segment.percent >= 10 ? 0 : 1)}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${segment.percent}%`, backgroundColor: segment.color }}
-                          />
-                        </div>
+
+                    {piePeriodMode === 'month' && (
+                      <select
+                        value={pieFilterMonth}
+                        onChange={(e) => setPieFilterMonth(Number(e.target.value))}
+                        className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[9px] font-black text-slate-700 focus:outline-none"
+                      >
+                        {Array.from({ length: 12 }, (_, idx) => idx + 1).map(month => (
+                          <option key={month} value={month}>Tháng {month}</option>
+                        ))}
+                      </select>
+                    )}
+                    {piePeriodMode === 'quarter' && (
+                      <select
+                        value={pieFilterQuarter}
+                        onChange={(e) => setPieFilterQuarter(Number(e.target.value))}
+                        className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-[9px] font-black text-slate-700 focus:outline-none"
+                      >
+                        {[1, 2, 3, 4].map(quarter => (
+                          <option key={quarter} value={quarter}>Quý {quarter}</option>
+                        ))}
+                      </select>
+                    )}
+                    <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setPieFilterYear(prev => prev - 1)}
+                        className="p-0.5 text-slate-500 hover:text-foreground hover:bg-slate-50 cursor-pointer"
+                        title="Năm trước"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                      <span className="px-2 text-[9px] font-black font-mono text-foreground min-w-[36px] text-center">
+                        {pieFilterYear}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPieFilterYear(prev => prev + 1)}
+                        className="p-0.5 text-slate-500 hover:text-foreground hover:bg-slate-50 cursor-pointer"
+                        title="Năm sau"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <span className="hidden 2xl:inline-flex text-[9px] font-black text-slate-500 bg-white border border-slate-200 rounded-lg px-2 py-0.5 truncate">
+                      {piePeriodRange.label}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 min-h-0 overflow-y-scroll custom-scrollbar pr-1.5 space-y-1.5">
+                    {pieConfig.segments.length === 0 ? (
+                      <div className="h-full min-h-[100px] flex items-center justify-center text-center">
+                        <span className="text-[10px] text-slate-400 font-semibold italic">
+                          Chưa có dữ liệu để thống kê
+                        </span>
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      pieConfig.segments.map(segment => (
+                        <div key={segment.label} className="bg-white border border-slate-100 rounded-xl px-2.5 py-1.5 shadow-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: segment.color }} />
+                              <span className="text-[10.5px] font-black text-slate-700 truncate" title={segment.label}>
+                                {segment.label}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline gap-1 shrink-0">
+                              <span className="text-[10px] font-black font-mono text-slate-800">{segment.value}</span>
+                              <span className="text-[9px] font-black font-mono text-foreground">
+                                {segment.percent.toFixed(segment.percent >= 10 ? 0 : 1)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${segment.percent}%`, backgroundColor: segment.color }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
