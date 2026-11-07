@@ -393,10 +393,9 @@ export function StaffManager({
         )}
         {chdSynced && (
           <div className="sub-header-info staff-chd-hint" style={{ marginTop: 4 }}>
-            Nhân sự CHD (ShowInLichKhoa = On) + học viên/hỗ trợ thêm tay. Khoa/Phòng CHD = cột Department trên Sheet Staff.
-            Nhân sự thêm tay chỉ có trên lịch khoa, không tạo tài khoản CHD.
+            Danh sách bác sĩ đồng bộ từ Sheet Staff CHD (ShowInLichKhoa = On). Có thể thêm HV/hỗ trợ tay (`local_*`) — không tạo tài khoản CHD.
             {backupLocalCount > 0
-              ? ` Đang có ${backupLocalCount} dòng trùng từ file sao lưu — dùng «Gỡ trùng sao lưu» hoặc nút thùng rác (sẽ ghi Sheet).`
+              ? ` Đang còn ${backupLocalCount} dòng doc_* cũ — app sẽ tự gỡ và ghi Sheet, hoặc bấm «Gỡ trùng sao lưu».`
               : ''}
           </div>
         )}

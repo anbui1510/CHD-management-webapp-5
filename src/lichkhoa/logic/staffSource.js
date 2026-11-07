@@ -8,6 +8,15 @@ export function isLocalScheduleStaff(person) {
   return id.startsWith('local_') || id.startsWith('doc_');
 }
 
+/**
+ * HV / hỗ trợ thêm tay trên Module 7 (`local_*`) — giữ khi merge CHD.
+ * Không gồm bác sĩ seed/sao lưu `doc_*`.
+ */
+export function isHandAddedLocalStaff(person) {
+  if (!person) return false;
+  return String(person.id || '').startsWith('local_');
+}
+
 /** Bác sĩ từ file sao lưu JSON cũ (`doc_*`), trùng CHD Staff — khác HV thêm tay `local_*`. */
 export function isBackupImportedStaff(person) {
   if (!person || person.source === 'chd') return false;
@@ -19,6 +28,11 @@ export function isBackupImportedStaff(person) {
 
 export function purgeBackupImportedStaff(staffList) {
   return (staffList || []).filter((person) => !isBackupImportedStaff(person));
+}
+
+/** Lọc nhân sự lịch: CHD + HV/hỗ trợ `local_*` — bỏ hết `doc_*` / local giả. */
+export function rosterStaffOnly(staffList) {
+  return purgeBackupImportedStaff(staffList || []);
 }
 
 export function markChdScheduleStaff(person) {

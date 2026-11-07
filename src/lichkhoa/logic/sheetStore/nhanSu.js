@@ -1,12 +1,12 @@
 import { NHAN_SU_HEADERS } from './constants.js';
 import { normalizeAccess } from '../access.js';
 import { parseShowInLichKhoa, formatShowInLichKhoa } from '../showInLichKhoa.js';
-import { isLocalScheduleStaff } from '../staffSource.js';
+import { isBackupImportedStaff, isLocalScheduleStaff } from '../staffSource.js';
 import { normalizeLegacyPosition } from '../../store/constants.js';
 import { toDateInputValue } from '../dateDisplay.js';
 import { objectsToRows, rowsToObjects } from './tableUtils.js';
 
-/** TC-F304-02 */
+/** TC-F304-02 — bỏ doc_* / local giả (roster = CHD Staff + local_*). */
 export function importNhanSuRows(rows) {
   const objs = rowsToObjects(rows, NHAN_SU_HEADERS);
   return objs.map((row) => {
@@ -54,6 +54,7 @@ export function importNhanSuRows(rows) {
     return staff;
   })
     .filter((s) => s.id)
+    .filter((s) => !isBackupImportedStaff(s))
     .filter((s) => parseShowInLichKhoa(s.showInLichKhoa));
 }
 

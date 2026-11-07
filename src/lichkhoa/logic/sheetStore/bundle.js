@@ -5,6 +5,7 @@ import { exportNhanSuRows, importNhanSuRows } from './nhanSu.js';
 import { exportTaskRows, importTaskRows } from './task.js';
 import { metaObjectToRows, metaRowsToObject } from './tableUtils.js';
 import { exportWeekRows, importWeekRows } from './week.js';
+import { purgeBackupImportedStaff } from '../staffSource.js';
 
 /**
  * Trường lịch tuần/tháng — round-trip qua sheet_meta.value hoặc merge từ local.
@@ -88,16 +89,17 @@ export function importTabsToStore(tabs, baseStore = null) {
   sheets = mergeSheetsPreserveLocalFields(sheets, prevSheets);
   sheets = sheets.map((sh) => applyMonthToSheet(sh, monthBySheet.get(sh.id)));
 
+  // Không fallback sang staff seed/doc_* khi NhanSu trống — CHD merge sẽ điền từ Sheet Staff.
   const mergedStaff = staff.length
-    ? mergeStaffPreserveLocalFields(staff, prevDept.staff)
-    : prevDept.staff;
+    ? mergeStaffPreserveLocalFields(staff, purgeBackupImportedStaff(prevDept.staff))
+    : purgeBackupImportedStaff(prevDept.staff).filter((s) => String(s.id || '').startsWith('local_'));
 
   const department = {
     ...prevDept,
     id: deptId,
     name: meta.deptName || prevDept.name,
     code: meta.deptCode || prevDept.code,
-    staff: mergedStaff,
+    staff: purgeBackupImportedStaff(mergedStaff),
     tasks: tasks.length ? tasks : prevDept.tasks,
     leaveEntries: leaveEntries.length ? leaveEntries : (prevDept.leaveEntries || []),
     studyEntries: studyEntries.length ? studyEntries : (prevDept.studyEntries || []),
