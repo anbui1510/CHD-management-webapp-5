@@ -3,12 +3,46 @@ import { objectsToRows, parseJsonCell, rowsToObjects } from './tableUtils.js';
 
 const str = (v) => String(v ?? '').trim();
 
+/**
+ * Chuẩn hóa ngày thành định dạng YYYY-MM-DD
+ * Tránh lỗi Google Sheets trả về Date object bị JSON.stringify thành ISO UTC (lùi 1 ngày)
+ */
+export function normalizeDateIso(val) {
+  if (!val) return '';
+  const s = String(val).trim();
+  if (!s) return '';
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      // Bù giờ Việt Nam UTC+7
+      const vnTime = new Date(d.getTime() + 7 * 3600 * 1000);
+      const y = vnTime.getUTCFullYear();
+      const m = String(vnTime.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(vnTime.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+    return s.slice(0, 10);
+  }
+  const dmMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmMatch) {
+    const [, d, m, y] = dmMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  const ymdMatch = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymdMatch) {
+    const [, y, m, d] = ymdMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return s.slice(0, 10);
+}
+
 function importEntryRow(row, withStudy) {
-  const from = str(row.from) || str(row.fromDate);
-  const to = str(row.to) || str(row.toDate) || from;
+  const from = normalizeDateIso(str(row.from) || str(row.fromDate));
+  const to = normalizeDateIso(str(row.to) || str(row.toDate)) || from;
   const sessions = parseJsonCell(row.sessions, null);
   const repeat = parseJsonCell(row.repeat, null);
-  const exdates = parseJsonCell(row.exdates, null);
+  const rawExdates = parseJsonCell(row.exdates, null);
+  const exdates = Array.isArray(rawExdates) ? rawExdates.map(normalizeDateIso).filter(Boolean) : null;
   const createdAt = Number(row.createdAt);
   const entry = {
     id: str(row.id),
@@ -17,7 +51,7 @@ function importEntryRow(row, withStudy) {
     toDate: to,
     from,
     to,
-    iso: str(row.iso) || from,
+    iso: normalizeDateIso(str(row.iso)) || from,
     shortName: str(row.shortName),
     note: str(row.note),
     type: str(row.type),
@@ -36,16 +70,18 @@ function importEntryRow(row, withStudy) {
 }
 
 function toExportShape(entry) {
-  const from = entry.from || entry.fromDate || entry.iso || '';
-  const to = entry.to || entry.toDate || from;
+  const from = normalizeDateIso(entry.from || entry.fromDate || entry.iso || '');
+  const to = normalizeDateIso(entry.to || entry.toDate) || from;
+  const rawExdates = Array.isArray(entry.exdates) ? entry.exdates : [];
+  const exdates = rawExdates.map(normalizeDateIso).filter(Boolean);
   return {
     ...entry,
-    fromDate: entry.fromDate || from,
-    toDate: entry.toDate || to,
+    fromDate: from,
+    toDate: to,
     from,
     to,
-    iso: entry.iso || from,
-    exdates: Array.isArray(entry.exdates) && entry.exdates.length ? entry.exdates : '',
+    iso: normalizeDateIso(entry.iso) || from,
+    exdates: exdates.length ? exdates : '',
     sessions: Array.isArray(entry.sessions) ? entry.sessions : '',
     plannedLong: entry.plannedLong ? 'true' : '',
   };

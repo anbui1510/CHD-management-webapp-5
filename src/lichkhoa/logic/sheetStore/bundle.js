@@ -1,5 +1,5 @@
 import { SCHEMA_VERSION, SHEET_TABS } from './constants.js';
-import { exportLeaveRows, exportStudyRows, importLeaveRows, importStudyRows } from './entries.js';
+import { exportLeaveRows, exportStudyRows, importLeaveRows, importStudyRows, normalizeDateIso } from './entries.js';
 import { applyMonthToSheet, exportMonthRows, importMonthRows } from './month.js';
 import { exportNhanSuRows, importNhanSuRows } from './nhanSu.js';
 import { exportTaskRows, importTaskRows } from './task.js';
@@ -236,41 +236,42 @@ export function mergeTasksPreserveLocalFields(remoteTasks, localTasks) {
   if (!Array.isArray(remoteTasks) || !remoteTasks.length) return localList;
 
   const localById = new Map(localList.map((t) => [String(t.id), t]));
-  const localByCode = new Map(localList.filter((t) => t.code).map((t) => [String(t.code).trim(), t]));
+  const localByCode = new Map(localList.filter((t) => t.code).map((t) => [String(t.code).trim().toLowerCase(), t]));
 
   const mergedRemote = remoteTasks.map((t) => {
-    const prev = localById.get(String(t.id)) || (t.code ? localByCode.get(String(t.code).trim()) : null);
+    const prev = localById.get(String(t.id)) || (t.code ? localByCode.get(String(t.code).trim().toLowerCase()) : null);
     if (!prev) return t;
     return {
       ...t,
-      owners: (Array.isArray(prev.owners) && prev.owners.length) ? prev.owners : (t.owners || []),
-      ownerOrder: (Array.isArray(prev.ownerOrder) && prev.ownerOrder.length) ? prev.ownerOrder : (t.ownerOrder || []),
-      fixedDays: (Array.isArray(prev.fixedDays) && prev.fixedDays.length) ? prev.fixedDays : (t.fixedDays || []),
-      fixedSlots: (Array.isArray(prev.fixedSlots) && prev.fixedSlots.length) ? prev.fixedSlots : (t.fixedSlots || []),
-      locks: (Array.isArray(prev.locks) && prev.locks.length) ? prev.locks : (t.locks || []),
-      bgColor: prev.bgColor || t.bgColor,
-      textColor: prev.textColor || t.textColor,
-      category: prev.category || t.category,
-      display: prev.display || t.display || 'both',
-      rotate: prev.rotate !== undefined ? prev.rotate : t.rotate,
-      warn: prev.warn !== undefined ? prev.warn : t.warn,
-      dutyRole: prev.dutyRole || t.dutyRole,
-      encodeDuty: prev.encodeDuty !== undefined ? prev.encodeDuty : t.encodeDuty,
-      buRt: prev.buRt !== undefined ? prev.buRt : t.buRt,
-      buVg: prev.buVg !== undefined ? prev.buVg : t.buVg,
-      deltaRt: prev.deltaRt !== undefined ? prev.deltaRt : t.deltaRt,
-      deltaVg: prev.deltaVg !== undefined ? prev.deltaVg : t.deltaVg,
-      description: prev.description || t.description,
+      // Google Sheet (t) là nguồn lưu trữ vĩnh viễn: thuộc tính trên Sheet phải thắng giá trị seed cục bộ
+      bgColor: t.bgColor || prev.bgColor || '',
+      textColor: t.textColor || prev.textColor || '',
+      category: t.category || prev.category || '',
+      display: t.display || prev.display || 'both',
+      rotate: t.rotate !== undefined ? t.rotate : (prev.rotate !== undefined ? prev.rotate : false),
+      warn: t.warn !== undefined ? t.warn : (prev.warn !== undefined ? prev.warn : true),
+      dutyRole: t.dutyRole || prev.dutyRole || '',
+      encodeDuty: t.encodeDuty !== undefined ? t.encodeDuty : (prev.encodeDuty !== undefined ? prev.encodeDuty : false),
+      buRt: t.buRt !== undefined ? t.buRt : (prev.buRt !== undefined ? prev.buRt : false),
+      buVg: t.buVg !== undefined ? t.buVg : (prev.buVg !== undefined ? prev.buVg : false),
+      deltaRt: t.deltaRt !== undefined && t.deltaRt !== 0 ? t.deltaRt : (prev.deltaRt ?? t.deltaRt ?? 0),
+      deltaVg: t.deltaVg !== undefined && t.deltaVg !== 0 ? t.deltaVg : (prev.deltaVg ?? t.deltaVg ?? 0),
+      description: t.description || prev.description || '',
+      owners: (Array.isArray(t.owners) && t.owners.length) ? t.owners : (Array.isArray(prev.owners) ? prev.owners : []),
+      ownerOrder: (Array.isArray(t.ownerOrder) && t.ownerOrder.length) ? t.ownerOrder : (Array.isArray(prev.ownerOrder) ? prev.ownerOrder : []),
+      fixedDays: (Array.isArray(t.fixedDays) && t.fixedDays.length) ? t.fixedDays : (Array.isArray(prev.fixedDays) ? prev.fixedDays : []),
+      fixedSlots: (Array.isArray(t.fixedSlots) && t.fixedSlots.length) ? t.fixedSlots : (Array.isArray(prev.fixedSlots) ? prev.fixedSlots : []),
+      locks: (Array.isArray(t.locks) && t.locks.length) ? t.locks : (Array.isArray(prev.locks) ? prev.locks : []),
     };
   });
 
   const remoteIds = new Set(mergedRemote.map((t) => String(t.id)));
-  const remoteCodes = new Set(mergedRemote.map((t) => String(t.code || '').trim()).filter(Boolean));
+  const remoteCodes = new Set(mergedRemote.map((t) => String(t.code || '').trim().toLowerCase()).filter(Boolean));
 
   const extraLocal = localList.filter((t) => {
     if (!t || !t.id) return false;
     if (remoteIds.has(String(t.id))) return false;
-    if (t.code && remoteCodes.has(String(t.code).trim())) return false;
+    if (t.code && remoteCodes.has(String(t.code).trim().toLowerCase())) return false;
     return true;
   });
 
@@ -282,19 +283,24 @@ export function mergeEntriesPreserveLocal(remoteEntries, localEntries) {
   if (!Array.isArray(remoteEntries) || !remoteEntries.length) return localList;
 
   const localById = new Map(localList.filter((e) => e.id).map((e) => [String(e.id), e]));
-  // Trùng id: local thắng từng field (có giá trị), remote chỉ bù field còn thiếu
+  // Trùng id: remote thắng nếu có giá trị (nguồn chính từ Sheet), local bù field còn thiếu
   const mergedRemote = remoteEntries.map((r) => {
     const l = localById.get(String(r.id));
     if (!l) return r;
     const out = { ...r };
     Object.entries(l).forEach(([k, v]) => {
       const empty = v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
-      if (!empty) out[k] = v;
+      const remoteEmpty = out[k] === undefined || out[k] === null || out[k] === '' || (Array.isArray(out[k]) && !out[k].length);
+      if (remoteEmpty && !empty) out[k] = v;
     });
     return out;
   });
 
-  const entryKey = (e) => `${e.shortName || e.staffId}_${e.from || e.fromDate}_${e.to || e.toDate}_${e.type || ''}`;
+  const entryKey = (e) => {
+    const from = normalizeDateIso(e.from || e.fromDate || e.iso);
+    const to = normalizeDateIso(e.to || e.toDate || from);
+    return `${e.shortName || e.staffId}_${from}_${to}_${e.type || ''}`;
+  };
   const remoteIds = new Set(remoteEntries.map((e) => String(e.id)));
   const remoteKeys = new Set(remoteEntries.map(entryKey));
 

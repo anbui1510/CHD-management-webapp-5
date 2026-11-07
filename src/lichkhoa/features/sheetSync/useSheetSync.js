@@ -28,6 +28,14 @@ function deptTaskCount(store) {
   return (store?.departments || []).reduce((sum, dept) => sum + (dept.tasks?.length || 0), 0);
 }
 
+function deptLeaveCount(store) {
+  return (store?.departments || []).reduce((sum, dept) => sum + (dept.leaveEntries?.length || 0), 0);
+}
+
+function deptStudyCount(store) {
+  return (store?.departments || []).reduce((sum, dept) => sum + (dept.studyEntries?.length || 0), 0);
+}
+
 const PULL_INTERVAL_MS = 45_000;
 
 /**
@@ -58,11 +66,13 @@ export function useSheetSync({
   const forcePullRef = useRef(false);
   const bootstrapCheckedRef = useRef(false);
   const taskHydratePushedRef = useRef(false);
+  const leaveHydratePushedRef = useRef(false);
 
   const markForcePull = useCallback(() => {
     forcePullRef.current = true;
     bootstrapCheckedRef.current = false;
     taskHydratePushedRef.current = false;
+    leaveHydratePushedRef.current = false;
   }, []);
 
   const applyRemotePayload = useCallback((remote, force, baseline = null) => {
@@ -118,6 +128,34 @@ export function useSheetSync({
     }
     if (!deptTaskCount(next)) {
       next = ensureSheets(fillEmptyTasksFromSeed(next));
+    }
+    // Sheet LichNghi trống trên remote (hoặc chưa kịp load): bảo toàn lịch nghỉ local
+    if (!deptLeaveCount(next) && deptLeaveCount(storeRef.current)) {
+      next = ensureSheets({
+        ...next,
+        departments: next.departments.map((dept) => {
+          const local = storeRef.current.departments?.find((d) => d.id === dept.id)
+            || storeRef.current.departments?.[0];
+          return {
+            ...dept,
+            leaveEntries: (local?.leaveEntries || []).length ? local.leaveEntries : dept.leaveEntries,
+          };
+        }),
+      });
+    }
+    // Sheet LichHoc trống trên remote: bảo toàn lịch dạy local
+    if (!deptStudyCount(next) && deptStudyCount(storeRef.current)) {
+      next = ensureSheets({
+        ...next,
+        departments: next.departments.map((dept) => {
+          const local = storeRef.current.departments?.find((d) => d.id === dept.id)
+            || storeRef.current.departments?.[0];
+          return {
+            ...dept,
+            studyEntries: (local?.studyEntries || []).length ? local.studyEntries : dept.studyEntries,
+          };
+        }),
+      });
     }
     // Safeguard 2: Đảm bảo không bao giờ làm mất monthGrid/monthRoles/weeks/grid local nếu remote bị trống
     const prevSheetsByDept = storeRef.current?.sheetsByDept || {};
@@ -220,6 +258,7 @@ export function useSheetSync({
       const baseline = storeRef.current;
       const remote = await pullScheduleStore(baseline);
       const remoteTasks = deptTaskCount(remote?.payload);
+      const remoteLeaves = deptLeaveCount(remote?.payload);
       const did = applyRemotePayload(remote, force || forcePullRef.current, baseline);
       if (forcePullRef.current) forcePullRef.current = false;
       if (did) setSheetSyncNotice('');
@@ -227,6 +266,11 @@ export function useSheetSync({
         taskHydratePushedRef.current = true;
         await persistStoreToSheet(storeRef.current, {
           notice: 'Đã ghi danh mục Task Tim mạch lên Google Sheet.',
+        });
+      } else if (!remoteLeaves && deptLeaveCount(storeRef.current) && !leaveHydratePushedRef.current) {
+        leaveHydratePushedRef.current = true;
+        await persistStoreToSheet(storeRef.current, {
+          notice: 'Đã ghi Lịch nghỉ lên Google Sheet.',
         });
       }
     } catch (error) {
@@ -341,6 +385,14 @@ export function useSheetSync({
           taskHydratePushedRef.current = true;
           await persistStoreToSheet(storeRef.current, {
             notice: 'Đã ghi danh mục Task Tim mạch lên Google Sheet.',
+          });
+        }
+        // Sheet LichNghi trống trên remote: đẩy lịch nghỉ local lên Sheet
+        const remoteLeaveCount = deptLeaveCount(remote?.payload);
+        if (!cancelled && !remoteLeaveCount && deptLeaveCount(storeRef.current) && !leaveHydratePushedRef.current) {
+          leaveHydratePushedRef.current = true;
+          await persistStoreToSheet(storeRef.current, {
+            notice: 'Đã ghi Lịch nghỉ lên Google Sheet.',
           });
         }
         if (!cancelled) setSheetSyncError('');

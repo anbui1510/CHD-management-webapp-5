@@ -8,3 +8,4 @@ export {
   mergeEntriesPreserveLocal,
   mergeSheetsPreserveLocalFields
 } from './bundle.js';
+export { normalizeDateIso } from './entries.js';

@@ -34,6 +34,7 @@ import { isSheetBackend } from './config/dataBackend';
 import { ConnectSheetDialog } from './features/sheetSync/ConnectSheetDialog';
 import { BootstrapKhoaDialog } from './features/sheetSync/BootstrapKhoaDialog';
 import { useSheetSync } from './features/sheetSync/useSheetSync';
+import { normalizeDateIso } from './logic/sheetStore';
 import {
   ensureSpreadsheetFromTenant,
   getSpreadsheetId,
@@ -970,15 +971,25 @@ export function DeptScheduleApp({
   const saveDeptList = async (field, entry) => {
     const tab = field === 'studyEntries' ? 'study' : 'leave';
     if (!allow(tab)) return;
+    const from = normalizeDateIso(entry.from || entry.fromDate || entry.iso);
+    const to = normalizeDateIso(entry.to || entry.toDate) || from;
+    const cleanEntry = {
+      ...entry,
+      from,
+      to,
+      fromDate: from,
+      toDate: to,
+      iso: normalizeDateIso(entry.iso) || from,
+    };
     const prev = storeRef.current;
     const deptId = activeDept?.id || prev?.activeDeptId || 'dept_tim_mach';
     const departments = (prev.departments || []).map(dept => {
       if (dept.id !== deptId) return dept;
       const list = dept[field] || [];
-      const exists = list.some(item => item.id === entry.id);
+      const exists = list.some(item => item.id === cleanEntry.id);
       return {
         ...dept,
-        [field]: exists ? list.map(item => (item.id === entry.id ? entry : item)) : [...list, entry]
+        [field]: exists ? list.map(item => (item.id === cleanEntry.id ? cleanEntry : item)) : [...list, cleanEntry]
       };
     });
     const nextStore = ensureSheets({ ...prev, departments });

@@ -102,17 +102,22 @@ function doPost(e) {
 
     if (action === 'push') {
       var incoming = body.tabs || {};
+      var writtenCount = 0;
       Object.keys(incoming).forEach(function (tabName) {
         if (tabName === '_meta') return;
         var accessId = TAB_ACCESS[tabName];
         if (!accessId) return;
         if (!canEdit_(actor, accessId)) {
-          throw new Error('Không có quyền sửa tab ' + tabName);
+          // Bỏ qua tab này nếu actor không có quyền sửa (tránh quăng lỗi làm hỏng toàn bộ các tab khác)
+          return;
         }
         writeSheet_(ss, tabName, incoming[tabName]);
+        writtenCount++;
       });
-      touchMetaUpdatedAt_(ss);
-      return jsonOut({ updatedAt: metaUpdatedAt_(ss) });
+      if (writtenCount > 0) {
+        touchMetaUpdatedAt_(ss);
+      }
+      return jsonOut({ updatedAt: metaUpdatedAt_(ss), writtenCount: writtenCount });
     }
 
     return jsonOut({ error: 'action không hợp lệ.' }, 400);
@@ -205,7 +210,17 @@ function sheetValues_(ss, name) {
   if (!sh) return [];
   var range = sh.getDataRange();
   if (!range) return [];
-  return range.getValues();
+  var values = range.getValues();
+  // Chuẩn hóa Date object thành chuỗi yyyy-MM-dd để tránh bị lệch múi giờ UTC khi JSON.stringify
+  for (var r = 0; r < values.length; r++) {
+    for (var c = 0; c < values[r].length; c++) {
+      var cell = values[r][c];
+      if (Object.prototype.toString.call(cell) === '[object Date]' || cell instanceof Date) {
+        values[r][c] = Utilities.formatDate(cell, "GMT+7", "yyyy-MM-dd");
+      }
+    }
+  }
+  return values;
 }
 
 function writeSheet_(ss, name, rows) {
