@@ -168,4 +168,49 @@ assert(mergedLeaves.some((l) => l.id === 'leave_nov_1'));
 assert(mergedLeaves.some((l) => l.id === 'leave_nov_2'));
 console.log('TEST 4 PASSED: Leave entries safely preserved!');
 
+// 5. leadingTask: Whichever task is in front in the cell determines the cell's color
+console.log('TEST 5: leadingTask colors by the first task in cell, ignoring duty rank or taskList order');
+const { leadingTask } = await import('../cellOrder.js');
+const testTasks = [
+  { code: 'T1*', bgColor: '#fff2cc', textColor: '#000000' },
+  { code: 'sapk', bgColor: '#d9d9d9', textColor: '#000000' },
+  { code: 'SN', bgColor: '#d9ead3', textColor: '#1e400d' },
+  { code: 'VG', bgColor: '#ffe599', textColor: '#cc0000', category: 'THUONG_TRUC' },
+  { code: 'RT', bgColor: '#e6ecef', textColor: '#555555', category: 'THUONG_TRUC' },
+  { code: 'sahc', bgColor: '#c9daf8', textColor: '#1c4587' },
+  { code: 'round', bgColor: '#d9ead3', textColor: '#274e13' }
+];
+
+assert.strictEqual(leadingTask('T1*, sapk', testTasks).code, 'T1*', 'T1* must lead when first');
+assert.strictEqual(leadingTask('sapk, T1*', testTasks).code, 'sapk', 'sapk must lead when first');
+assert.strictEqual(leadingTask('VG, SN', testTasks).code, 'VG', 'Duty task VG must lead when first');
+assert.strictEqual(leadingTask('SN, VG', testTasks).code, 'SN', 'SN must lead when first');
+assert.strictEqual(leadingTask('b6, sahc, round', testTasks).code, 'sahc', 'Non-task room name ignored; sahc leads');
+assert.strictEqual(leadingTask('b6, round, sahc', testTasks).code, 'round', 'Non-task room name ignored; round leads');
+console.log('TEST 5 PASSED: leadingTask strictly adheres to the first task written in the cell!');
+
+// 6. schedulerEngine: Layer 5 does not auto-assign monthRole tasks (e.g. SN) to owners
+console.log('TEST 6: Layer 5 skips monthRoles tasks (e.g. SN) so unscheduled month slots do not invent assignments');
+const { generateWeeklySchedule } = await import('../schedulerEngine.js');
+const seedData = (await import('../../data/tim-mach-seed.json', { with: { type: 'json' } })).default;
+const testSheet = seedData.sheetsByDept.sheets[0];
+const scheduleRes = generateWeeklySchedule({
+  startDate: '2026-11-09',
+  staffList: seedData.department.staff,
+  taskList: seedData.department.tasks,
+  monthGrid: {
+    '2026-11-09|sn|S': 'PHỤNG',
+    '2026-11-11|truc_chinh|C': 'THỊNH'
+  },
+  monthRoles: testSheet.monthRoles,
+  daySessions: testSheet.daySessions,
+  leaveEntries: [],
+  roomTable: { labels: ['BS', 'Room'], matrix: [] }
+});
+
+assert.strictEqual(scheduleRes.grid['PHỤNG']?.[0]?.['S'], 'SN', 'PHỤNG must have SN on Monday from Lịch tháng');
+assert(!String(scheduleRes.grid['LỢI']?.[3]?.['S'] || '').includes('SN'), 'LỢI must NOT have SN on Thursday morning');
+console.log('TEST 6 PASSED: SN is not assigned to BS Lợi when not scheduled in Lịch tháng!');
+
 console.log('\n>>> ALL COMPREHENSIVE PERSISTENCE TESTS PASSED! <<<');
+

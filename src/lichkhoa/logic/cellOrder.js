@@ -111,9 +111,13 @@ export function orderCellText(value, taskList, roomNames) {
   return text;
 }
 
-export function leadingTask(value, taskList, roomNames) {
-  const text = orderCellText(value, taskList, roomNames);
-  const parts = splitTaskCodes(text, taskList);
-  const tasks = parts.map(code => taskOf(code, taskList)).filter(Boolean);
-  return tasks.find(task => !isDuty(task)) || tasks[0] || null;
+export function leadingTask(value, taskList, _roomNames) {
+  if (!value) return null;
+  const parts = splitTaskCodes(value, taskList);
+  for (const code of parts) {
+    const task = taskOf(code, taskList);
+    if (task) return task;
+  }
+  return null;
 }
+

@@ -666,9 +666,24 @@ export function generateWeeklySchedule({
     blocked: (person, day, session) => monthCells.has(`${person.shortName}|${day}|${session}`)
   }));
 
+  // Month-role tasks are poured exclusively from Lịch tháng (monthGrid) in Layer 2.
+  // Weekly auto-assignment (Layer 5 fixedDays) must not auto-assign tasks that belong to monthRoles.
+  const monthRoleTaskIds = new Set();
+  (monthRoles || []).forEach((role) => {
+    const t = taskForRole(role, taskList);
+    if (t?.id) monthRoleTaskIds.add(t.id);
+    if (role.taskId) monthRoleTaskIds.add(role.taskId);
+    const direct = (taskList || []).find(task =>
+      fold(task.code) === fold(role.key) ||
+      fold(task.code) === fold(role.label) ||
+      fold(task.name) === fold(role.label)
+    );
+    if (direct?.id) monthRoleTaskIds.add(direct.id);
+  });
+
   // Weekly tasks follow Quản lý Task order. Month scope and leave codes are poured earlier.
   (taskList || []).forEach((task) => {
-    if (task.scope === 'month' || isLeaveTask(task)) return;
+    if (task.scope === 'month' || monthRoleTaskIds.has(task.id) || isLeaveTask(task)) return;
     if (task.dutyRole === 'vao_gac' || task.dutyRole === 'ra_truc') return;
     if (isWardTask(task)) {
       placeWards(task);
