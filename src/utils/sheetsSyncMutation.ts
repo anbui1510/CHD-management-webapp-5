@@ -1,6 +1,13 @@
 import type { SheetsSyncContext } from '../types';
 import { getModuleLabel, type AppModule } from '../auth/permissions';
-import { evaluateSheetsSync, extractSheetsSync, SHEETS_SUCCESS_MESSAGE } from './sheetsSyncFeedback';
+import {
+  evaluateSheetsSync,
+  extractSheetsSync,
+  SHEETS_FAILURE_DEFAULT,
+  SHEETS_NOT_UPLOADED_TITLE,
+  SHEETS_SUCCESS_MESSAGE,
+  SHEETS_UNCONFIRMED_MESSAGE
+} from './sheetsSyncFeedback';
 
 export function withSyncContext<T extends Record<string, unknown>>(
   body: T,
@@ -29,10 +36,12 @@ export function buildSyncContext(
 }
 
 export type SheetsMutationFeedback = {
-  kind: 'success' | 'failure' | 'local_only' | 'none';
+  kind: 'success' | 'failure' | 'pending' | 'local_only' | 'none';
   bannerMessage: string;
+  overlayTitle: string;
   overlayMessage: string;
-  isFailure: boolean;
+  isWarning: boolean;
+  showOverlay: boolean;
 };
 
 export function buildMutationFeedback(
@@ -41,6 +50,7 @@ export function buildMutationFeedback(
 ): SheetsMutationFeedback {
   const evaluation = evaluateSheetsSync(data);
   const sync = extractSheetsSync(data);
+  const detail = sync?.message || evaluation.message;
 
   if (evaluation.kind === 'success') {
     return {
@@ -48,35 +58,59 @@ export function buildMutationFeedback(
       bannerMessage: baseMessage
         ? `${baseMessage} — ${SHEETS_SUCCESS_MESSAGE}`
         : SHEETS_SUCCESS_MESSAGE,
+      overlayTitle: '',
       overlayMessage: '',
-      isFailure: false
+      isWarning: false,
+      showOverlay: false
     };
   }
 
   if (evaluation.kind === 'failure') {
-    const detail = sync?.message || evaluation.message;
     return {
       kind: 'failure',
-      bannerMessage: baseMessage ? `${baseMessage} — ${detail}` : detail,
-      overlayMessage: detail,
-      isFailure: true
+      bannerMessage: baseMessage
+        ? `${baseMessage} — ${SHEETS_NOT_UPLOADED_TITLE}`
+        : SHEETS_NOT_UPLOADED_TITLE,
+      overlayTitle: SHEETS_NOT_UPLOADED_TITLE,
+      overlayMessage: detail || SHEETS_FAILURE_DEFAULT,
+      isWarning: true,
+      showOverlay: true
+    };
+  }
+
+  if (evaluation.kind === 'pending') {
+    return {
+      kind: 'pending',
+      bannerMessage: baseMessage
+        ? `${baseMessage} — đang ghi dữ liệu vào Google Sheets…`
+        : 'Đang ghi dữ liệu vào Google Sheets…',
+      overlayTitle: '',
+      overlayMessage: '',
+      isWarning: true,
+      showOverlay: false
     };
   }
 
   if (evaluation.kind === 'local_only') {
     return {
       kind: 'local_only',
-      bannerMessage: baseMessage ? `${baseMessage}. ${evaluation.message}` : evaluation.message,
-      overlayMessage: '',
-      isFailure: false
+      bannerMessage: baseMessage ? `${baseMessage} — ${detail}` : detail,
+      overlayTitle: SHEETS_NOT_UPLOADED_TITLE,
+      overlayMessage: detail,
+      isWarning: true,
+      showOverlay: true
     };
   }
 
   return {
     kind: 'none',
-    bannerMessage: baseMessage || 'Đã lưu trên máy chủ app',
-    overlayMessage: '',
-    isFailure: false
+    bannerMessage: baseMessage
+      ? `${baseMessage} — ${SHEETS_UNCONFIRMED_MESSAGE}`
+      : SHEETS_UNCONFIRMED_MESSAGE,
+    overlayTitle: SHEETS_NOT_UPLOADED_TITLE,
+    overlayMessage: SHEETS_UNCONFIRMED_MESSAGE,
+    isWarning: true,
+    showOverlay: false
   };
 }
 

@@ -3,14 +3,122 @@ import { buildWebPushPayload } from '../push/pushPayload';
 import { getAppVersionPayload } from '../appVersion';
 import { BUNDLED_STAFF, mergeStaffWithBundledPasswords } from '../data/bundledStaff';
 import type { Staff, Source, Consult, Patient, Notification } from '../types';
+import { AuthRequiredError } from '../auth/authErrors';
+import type { SheetsSyncContext } from '../types';
 import {
   fetchAppsScriptWithRetry,
   formatAppsScriptFetchError,
-  formatAppsScriptHttpError,
   normalizeAppsScriptUrl
 } from '../utils/appsScriptRetry';
+import { assertAppsScriptJsonOk, readSheetsProxyText } from '../utils/sheetsProxyErrors';
+import {
+  SHEETS_FAILURE_DEFAULT,
+  SHEETS_LOCAL_ONLY_MESSAGE,
+  SHEETS_PENDING_MESSAGE,
+  SHEETS_PUSH_WAIT_SECONDS,
+  SHEETS_SUCCESS_MESSAGE,
+  type SheetsSyncMeta
+} from '../utils/sheetsSyncFeedback';
+import {
+  acknowledgeAllLocalSheetsSyncFailures,
+  acknowledgeLocalSheetsSyncFailure,
+  clearLocalSheetsSyncFailure,
+  listSheetsSyncFailures,
+  recordLocalSheetsSyncFailure
+} from '../utils/sheetsSyncFailuresStore';
 import { sanitizeNotificationFields } from '../utils/workflowMessages';
 import { hasOsPushBeenDelivered, markOsPushDelivered } from '../utils/notificationPushDelivery';
+
+const SHEETS_PUSH_WAIT_MS = SHEETS_PUSH_WAIT_SECONDS * 1000;
+const CHD_SHEETS_PUSH_RESULT_EVENT = 'chd-sheets-push-result';
+/** Keep local edits over stale Sheets pulls until write is visible / TTL expires. */
+const RECENT_LOCAL_EDIT_TTL_MS = 3 * 60 * 1000;
+
+type RecentLocalEdit = {
+  type: SheetType;
+  key: string;
+  collection: keyof SheetData;
+  record: any;
+  at: number;
+};
+
+const recentLocalEdits = new Map<string, RecentLocalEdit>();
+
+const recentEditId = (type: string, key: string) =>
+  `${type}:${String(key).trim().toLowerCase()}`;
+
+const noteRecentLocalEdit = (
+  type: SheetType,
+  key: string,
+  collection: keyof SheetData,
+  record: any
+) => {
+  recentLocalEdits.set(recentEditId(type, key), {
+    type,
+    key: String(key),
+    collection,
+    record,
+    at: Date.now()
+  });
+};
+
+const clearRecentLocalEdit = (type: string, key: string) => {
+  recentLocalEdits.delete(recentEditId(type, key));
+};
+
+const recordKeyForCollection = (collection: keyof SheetData, item: any): string => {
+  switch (collection) {
+    case 'patients':
+      return String(item?.PatientKey || '').trim().toLowerCase();
+    case 'consults':
+      return String(item?.ConsultKey || '').trim().toLowerCase();
+    case 'staff':
+      return String(item?.StaffKey || '').trim().toLowerCase();
+    case 'cathlabs':
+      return String(item?.CathKey || '').trim().toLowerCase();
+    case 'operations':
+      return String(item?.SurgKey || '').trim().toLowerCase();
+    case 'cmrs':
+      return String(item?.CMRKey || item?.CMRkey || '').trim().toLowerCase();
+    case 'transplants':
+      return String(item?.TransKey || '').trim().toLowerCase();
+    case 'sources':
+      return String(item?.DiagnosisID || '').trim().toLowerCase();
+    case 'deviceTemplates':
+      return String(item?.DeviceName || '').trim().toLowerCase();
+    case 'rolePresets':
+      return String(item?.RolePresetID || '').trim().toLowerCase();
+    case 'notifications':
+      return String(item?.NotificationKey || '').trim().toLowerCase();
+    case 'doctorPerformanceMarks':
+      return String(item?.MarkKey || '').trim().toLowerCase();
+    default:
+      return '';
+  }
+};
+
+const overlayRecentLocalEdits = (data: SheetData): SheetData => {
+  const now = Date.now();
+  let next: SheetData = data;
+  for (const [id, edit] of [...recentLocalEdits.entries()]) {
+    if (now - edit.at > RECENT_LOCAL_EDIT_TTL_MS) {
+      recentLocalEdits.delete(id);
+      continue;
+    }
+    const collection = [...((next[edit.collection] as any[]) || [])];
+    const target = String(edit.key).trim().toLowerCase();
+    const index = collection.findIndex(
+      item => recordKeyForCollection(edit.collection, item) === target
+    );
+    if (index >= 0) {
+      collection[index] = { ...collection[index], ...edit.record };
+    } else {
+      collection.push(edit.record);
+    }
+    next = { ...next, [edit.collection]: collection };
+  }
+  return next;
+};
 
 type SheetData = {
   patients: any[];
@@ -382,7 +490,8 @@ let clientSheetsPullState = {
   lastPullMessage: '',
   lastPushAt: 0,
   lastPushOk: true,
-  lastPushMessage: ''
+  lastPushMessage: '',
+  lastPushPending: false
 };
 
 const markClientPullOk = (message = 'Đã kéo dữ liệu mới từ Google Sheets.') => {
@@ -404,6 +513,329 @@ const markClientPullFailed = (error: unknown) => {
   };
 };
 
+const markClientPushOk = (message = SHEETS_SUCCESS_MESSAGE) => {
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPushAt: Date.now(),
+    lastPushOk: true,
+    lastPushPending: false,
+    lastPushMessage: message
+  };
+};
+
+const markClientPushPending = (message: string) => {
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPushAt: Date.now(),
+    lastPushOk: true,
+    lastPushPending: true,
+    lastPushMessage: message
+  };
+};
+
+const markClientPushFailed = (message: string) => {
+  clientSheetsPullState = {
+    ...clientSheetsPullState,
+    lastPushAt: Date.now(),
+    lastPushOk: false,
+    lastPushPending: false,
+    lastPushMessage: message
+  };
+};
+
+const resolveBridgeStaffKey = (init?: RequestInit): string => {
+  const token = extractBridgeToken(init);
+  if (token) {
+    const fromSession = bridgeResolveSession(token);
+    if (fromSession) return fromSession;
+  }
+  try {
+    return String(localStorage.getItem(CHD_AUTH_STAFF_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+const extractBridgeSyncContext = (body: Record<string, unknown>): {
+  payload: Record<string, unknown>;
+  syncContext?: SheetsSyncContext;
+} => {
+  if (!('_syncContext' in body)) return { payload: body };
+  const { _syncContext, ...payload } = body;
+  const syncContext =
+    _syncContext && typeof _syncContext === 'object'
+      ? (_syncContext as SheetsSyncContext)
+      : undefined;
+  return { payload, syncContext };
+};
+
+const emitSheetsPushResult = (data: unknown, baseMessage?: string) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(
+    new CustomEvent(CHD_SHEETS_PUSH_RESULT_EVENT, {
+      detail: { data, baseMessage }
+    })
+  );
+};
+
+const pushPayloadToScript = async (payload: {
+  type: SheetType;
+  action: 'insert' | 'update' | 'delete';
+  key: string;
+  data?: any;
+}): Promise<void> => {
+  const response = await proxySheets({ kind: 'post', payload });
+  const text = await readSheetsProxyText(response);
+  const result = JSON.parse(text) as { status?: string; message?: string };
+  if (result.status === 'error') {
+    throw new Error(result.message || 'Apps Script không thể ghi dữ liệu');
+  }
+};
+
+/** Fire-and-forget push used after a local save already returned pending to the UI. */
+const runBackgroundSheetsPush = (
+  pushPromise: Promise<void>,
+  options: {
+    staffKey: string;
+    entityType: string;
+    entityKey: string;
+    action: 'insert' | 'update' | 'delete';
+    syncContext?: SheetsSyncContext;
+    baseMessage?: string;
+  }
+): void => {
+  markClientPushPending(SHEETS_PENDING_MESSAGE);
+  void pushPromise
+    .then(() => {
+      const okResult: SheetsSyncMeta = {
+        configured: true,
+        ok: true,
+        at: Date.now(),
+        message: SHEETS_SUCCESS_MESSAGE
+      };
+      markClientPushOk(okResult.message);
+      if (options.staffKey) {
+        clearLocalSheetsSyncFailure(options.staffKey, options.entityType, options.entityKey);
+      }
+      // Keep local overlay briefly so an immediate pull cannot wipe before Sheets is readable.
+      setTimeout(() => clearRecentLocalEdit(options.entityType, options.entityKey), 15000);
+      emitSheetsPushResult({ _sheetsSync: okResult }, options.baseMessage);
+    })
+    .catch((err: unknown) => {
+      if (err instanceof AuthRequiredError) {
+        const fail: SheetsSyncMeta = {
+          configured: true,
+          ok: false,
+          at: Date.now(),
+          message: err.message
+        };
+        markClientPushFailed(fail.message);
+        if (options.staffKey) {
+          recordLocalSheetsSyncFailure(
+            options.staffKey,
+            options.entityType,
+            options.entityKey,
+            options.action,
+            options.syncContext,
+            `${SHEETS_FAILURE_DEFAULT} (${err.message})`
+          );
+        }
+        emitSheetsPushResult({ _sheetsSync: fail }, options.baseMessage);
+        return;
+      }
+      const detail = err instanceof Error ? err.message : String(err || '');
+      const fail: SheetsSyncMeta = {
+        configured: true,
+        ok: false,
+        at: Date.now(),
+        message: detail ? `${SHEETS_FAILURE_DEFAULT} (${detail})` : SHEETS_FAILURE_DEFAULT
+      };
+      markClientPushFailed(fail.message);
+      if (options.staffKey) {
+        recordLocalSheetsSyncFailure(
+          options.staffKey,
+          options.entityType,
+          options.entityKey,
+          options.action,
+          options.syncContext,
+          fail.message
+        );
+      }
+      emitSheetsPushResult({ _sheetsSync: fail }, options.baseMessage);
+    });
+};
+
+const awaitSheetsPushWithTimeout = async (
+  pushPromise: Promise<void>,
+  options: {
+    staffKey: string;
+    entityType: string;
+    entityKey: string;
+    action: 'insert' | 'update' | 'delete';
+    syncContext?: SheetsSyncContext;
+    baseMessage?: string;
+    timeoutMs?: number;
+  }
+): Promise<SheetsSyncMeta> => {
+  const at = Date.now();
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) {
+    const result: SheetsSyncMeta = {
+      configured: false,
+      ok: true,
+      at,
+      message: SHEETS_LOCAL_ONLY_MESSAGE
+    };
+    markClientPushOk(result.message);
+    return result;
+  }
+
+  const timeoutMs = options.timeoutMs ?? SHEETS_PUSH_WAIT_MS;
+  let timedOut = false;
+  const timeoutPromise = new Promise<'timeout'>(resolve => {
+    setTimeout(() => resolve('timeout'), timeoutMs);
+  });
+
+  try {
+    const winner = await Promise.race([
+      pushPromise.then(() => 'ok' as const),
+      timeoutPromise
+    ]);
+
+    if (winner === 'timeout') {
+      timedOut = true;
+      const pending: SheetsSyncMeta = {
+        configured: true,
+        ok: false,
+        pending: true,
+        at,
+        message: SHEETS_PENDING_MESSAGE
+      };
+      markClientPushPending(pending.message);
+      void pushPromise
+        .then(() => {
+          const okResult: SheetsSyncMeta = {
+            configured: true,
+            ok: true,
+            at: Date.now(),
+            message: SHEETS_SUCCESS_MESSAGE
+          };
+          markClientPushOk(okResult.message);
+          if (options.staffKey) {
+            clearLocalSheetsSyncFailure(options.staffKey, options.entityType, options.entityKey);
+          }
+          emitSheetsPushResult({ _sheetsSync: okResult }, options.baseMessage);
+        })
+        .catch((err: unknown) => {
+          if (err instanceof AuthRequiredError) {
+            const fail: SheetsSyncMeta = {
+              configured: true,
+              ok: false,
+              at: Date.now(),
+              message: err.message
+            };
+            markClientPushFailed(fail.message);
+            if (options.staffKey) {
+              recordLocalSheetsSyncFailure(
+                options.staffKey,
+                options.entityType,
+                options.entityKey,
+                options.action,
+                options.syncContext,
+                `${SHEETS_FAILURE_DEFAULT} (${err.message})`
+              );
+            }
+            emitSheetsPushResult({ _sheetsSync: fail }, options.baseMessage);
+            return;
+          }
+          const detail = err instanceof Error ? err.message : String(err || '');
+          const fail: SheetsSyncMeta = {
+            configured: true,
+            ok: false,
+            at: Date.now(),
+            message: detail
+              ? `${SHEETS_FAILURE_DEFAULT} (${detail})`
+              : SHEETS_FAILURE_DEFAULT
+          };
+          markClientPushFailed(fail.message);
+          if (options.staffKey) {
+            recordLocalSheetsSyncFailure(
+              options.staffKey,
+              options.entityType,
+              options.entityKey,
+              options.action,
+              options.syncContext,
+              fail.message
+            );
+          }
+          emitSheetsPushResult({ _sheetsSync: fail }, options.baseMessage);
+        });
+      return pending;
+    }
+
+    const okResult: SheetsSyncMeta = {
+      configured: true,
+      ok: true,
+      at,
+      message: SHEETS_SUCCESS_MESSAGE
+    };
+    markClientPushOk(okResult.message);
+    if (options.staffKey) {
+      clearLocalSheetsSyncFailure(options.staffKey, options.entityType, options.entityKey);
+    }
+    return okResult;
+  } catch (err) {
+    if (timedOut) {
+      return {
+        configured: true,
+        ok: false,
+        pending: true,
+        at,
+        message: SHEETS_PENDING_MESSAGE
+      };
+    }
+    if (err instanceof AuthRequiredError) {
+      const fail: SheetsSyncMeta = {
+        configured: true,
+        ok: false,
+        at,
+        message: err.message
+      };
+      markClientPushFailed(fail.message);
+      if (options.staffKey) {
+        recordLocalSheetsSyncFailure(
+          options.staffKey,
+          options.entityType,
+          options.entityKey,
+          options.action,
+          options.syncContext,
+          `${SHEETS_FAILURE_DEFAULT} (${err.message})`
+        );
+      }
+      return fail;
+    }
+    const detail = err instanceof Error ? err.message : String(err || '');
+    const fail: SheetsSyncMeta = {
+      configured: true,
+      ok: false,
+      at,
+      message: detail ? `${SHEETS_FAILURE_DEFAULT} (${detail})` : SHEETS_FAILURE_DEFAULT
+    };
+    markClientPushFailed(fail.message);
+    if (options.staffKey) {
+      recordLocalSheetsSyncFailure(
+        options.staffKey,
+        options.entityType,
+        options.entityKey,
+        options.action,
+        options.syncContext,
+        fail.message
+      );
+    }
+    return fail;
+  }
+};
+
 let backgroundPullRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let backgroundPullRetryAttempt = 0;
 
@@ -414,7 +846,8 @@ export const getClientSheetsSyncStatus = () => ({
   lastPullMessage: clientSheetsPullState.lastPullMessage,
   lastPushAt: clientSheetsPullState.lastPushAt,
   lastPushOk: clientSheetsPullState.lastPushOk,
-  lastPushMessage: clientSheetsPullState.lastPushMessage
+  lastPushMessage: clientSheetsPullState.lastPushMessage,
+  lastPushPending: clientSheetsPullState.lastPushPending
 });
 
 const setScriptUrl = (scriptUrl: string): boolean => {
@@ -528,12 +961,12 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
   pendingStaffLoad = proxySheets({ kind: 'get', action: 'getStaff' }, force)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
-      const text = await res.text();
-      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
+      const text = await readSheetsProxyText(res);
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         throw new Error('Apps Script đang trả về HTML.');
       }
       const parsed = JSON.parse(text);
+      assertAppsScriptJsonOk(parsed);
       const staffList = Array.isArray(parsed.staff) && parsed.staff.length > 0
         ? parsed.staff
         : BUNDLED_STAFF;
@@ -545,6 +978,7 @@ const loadStaffOnly = async (force = false): Promise<Staff[]> => {
       return staffCache!;
     })
     .catch(err => {
+      if (err instanceof AuthRequiredError) throw err;
       if (staffCache?.length) return staffCache;
       console.warn('Staff sync failed, using bundled roster:', err);
       return resolveOfflineStaffList();
@@ -605,8 +1039,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
   pendingLoad = proxySheets({ kind: 'get', action: 'getAll' }, force)
     .then(async res => {
       const contentType = res.headers.get('Content-Type') || '';
-      const text = await res.text();
-      if (!res.ok) throw new Error(formatAppsScriptHttpError(res.status));
+      const text = await readSheetsProxyText(res);
       if (contentType.includes('text/html') || text.trim().startsWith('<')) {
         const scriptError = text.match(/<div[^>]*>([^<]+)<\/div>\s*<\/body>/i)?.[1]?.trim();
         throw new Error(
@@ -616,15 +1049,14 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
         );
       }
       const parsed = JSON.parse(text);
-      cache = normalizeData(parsed);
+      assertAppsScriptJsonOk(parsed);
+      // Overlay in-flight local saves so a soft refresh cannot wipe edits still traveling to Sheets.
+      cache = overlayRecentLocalEdits(normalizeData(parsed));
       if (Array.isArray(cache.staff)) {
         staffCache = mergeStaffWithBundledPasswords(cache.staff);
         cache.staff = staffCache;
       }
-      void setPersistedData('all_data', {
-        ...parsed,
-        staff: Array.isArray(cache.staff) ? cache.staff.map(stripBridgePassword) : []
-      });
+      void setPersistedData('all_data', sanitizeDataBundle(cache));
       if (Array.isArray(cache.staff)) {
         void setPersistedData('staff_data', cache.staff.map(stripBridgePassword));
       }
@@ -632,6 +1064,7 @@ const fetchAllDataFromNetwork = async (force = false): Promise<SheetData> => {
       return cache;
     })
     .catch(async err => {
+      if (err instanceof AuthRequiredError) throw err;
       markClientPullFailed(err);
 
       const cachedAll = cache || await hydrateCacheFromPersisted();
@@ -809,6 +1242,12 @@ const upsertCachedRecord = (config: (typeof endpointMap)[string], record: any, i
     ...cache,
     [config.collection]: collection
   };
+  // Persist immediately so reopen/drawer refresh still sees the local save
+  // while the Sheets push is in flight.
+  void setPersistedData('all_data', sanitizeDataBundle(cache));
+  if (recordKey) {
+    noteRecentLocalEdit(config.type, recordKey, config.collection, record);
+  }
 };
 
 const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): boolean => {
@@ -828,26 +1267,6 @@ const deleteCachedRecord = (config: (typeof endpointMap)[string], key: string): 
   return true;
 };
 
-const syncRecordToScript = (payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any }) => {
-  void proxySheets({ kind: 'post', payload }).then(async (response) => {
-    const text = await response.text();
-    if (!response.ok) {
-      console.error(`Background upsert sync HTTP ${response.status}:`, text);
-      return;
-    }
-    try {
-      const result = JSON.parse(text);
-      if (result.status === 'error') {
-        console.error('Background upsert sync error:', result.message);
-      }
-    } catch {
-      console.error('Background upsert sync returned invalid JSON:', text);
-    }
-  }).catch((err) => {
-    console.error('Background upsert sync failed:', err);
-  });
-};
-
 const postToScript = async (
   payload: { type: SheetType; action: 'insert' | 'update'; key: string; data: any },
   config: (typeof endpointMap)[string],
@@ -856,8 +1275,7 @@ const postToScript = async (
 ) => {
   const response = await proxySheets({ kind: 'post', payload });
 
-  const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  const text = await readSheetsProxyText(response);
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu');
@@ -872,8 +1290,7 @@ const postBatchToScript = async (operations: Array<{ type: SheetType; action: 'i
     payload: { action: 'batch', operations }
   });
 
-  const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  const text = await readSheetsProxyText(response);
   const result = JSON.parse(text);
   if (result.status === 'error') {
     throw new Error(result.message || 'Apps Script không thể ghi dữ liệu theo lô');
@@ -887,8 +1304,7 @@ const deleteFromScript = async (payload: { type: SheetType; key: string }) => {
     payload: { action: 'delete', ...payload }
   });
 
-  const text = await response.text();
-  if (!response.ok) throw new Error(formatAppsScriptHttpError(response.status));
+  const text = await readSheetsProxyText(response);
   let result: { status?: string; message?: string };
   try {
     result = JSON.parse(text);
@@ -1071,7 +1487,10 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   const config = endpointMap[endpoint];
   if (!config) return jsonResponse({ error: `Unsupported endpoint: ${endpoint}` }, { status: 404 });
 
-  const incoming = await parseBody(init);
+  const rawIncoming = await parseBody(init);
+  const { payload: incoming, syncContext } = extractBridgeSyncContext(
+    rawIncoming && typeof rawIncoming === 'object' ? rawIncoming as Record<string, unknown> : {}
+  );
   const isUpdate = method === 'PUT' || method === 'PATCH';
   const key = keyFromPath ? decodeURIComponent(keyFromPath) : getRecordKey(incoming, config);
 
@@ -1098,13 +1517,8 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
   record[config.keyField] = finalKey;
 
   const isInsert = !(existing || isUpdate);
+  const action: 'insert' | 'update' = existing || isUpdate ? 'update' : 'insert';
   upsertCachedRecord(config, record, isInsert);
-  syncRecordToScript({
-    type: config.type,
-    action: existing || isUpdate ? 'update' : 'insert',
-    key: String(finalKey),
-    data: record
-  });
 
   if (endpoint === 'notifications' && isInsert && record?.StaffKey) {
     deliverWebPushForNotification(record);
@@ -1115,7 +1529,60 @@ const upsertRecord = async (endpoint: string, keyFromPath: string | undefined, m
     void maybeNotifySchedulerAboutConsultMutation(previousConsult, record as Consult);
   }
 
-  return jsonResponse(record, { status: existing || isUpdate ? 200 : 201 });
+  const staffKey = resolveBridgeStaffKey(init);
+  const scriptUrl = getScriptUrl();
+  const at = Date.now();
+
+  // Honest UX: local save is instant; Sheets confirmation arrives later via event.
+  // Never return ok:true here — that caused a green banner while data was still in flight.
+  if (!scriptUrl) {
+    return jsonResponse(
+      {
+        ...record,
+        _sheetsSync: {
+          configured: false,
+          ok: true,
+          at,
+          message: SHEETS_LOCAL_ONLY_MESSAGE
+        } satisfies SheetsSyncMeta
+      },
+      { status: existing || isUpdate ? 200 : 201 }
+    );
+  }
+
+  const pendingSync: SheetsSyncMeta = {
+    configured: true,
+    ok: false,
+    pending: true,
+    at,
+    message: SHEETS_PENDING_MESSAGE
+  };
+
+  const baseMessage = syncContext?.viewLabel
+    ? `Đã lưu (${syncContext.viewLabel})`
+    : undefined;
+
+  runBackgroundSheetsPush(
+    pushPayloadToScript({
+      type: config.type,
+      action,
+      key: String(finalKey),
+      data: record
+    }),
+    {
+      staffKey,
+      entityType: config.type,
+      entityKey: String(finalKey),
+      action,
+      syncContext,
+      baseMessage
+    }
+  );
+
+  return jsonResponse(
+    { ...record, _sheetsSync: pendingSync },
+    { status: existing || isUpdate ? 200 : 201 }
+  );
 };
 
 const deleteRecord = async (endpoint: string, keyFromPath: string | undefined) => {
@@ -1225,12 +1692,16 @@ const batchWriteRecords = async (init?: RequestInit) => {
     responseRecords.push(prepared);
   }
 
-  await postBatchToScript(scriptOperations);
-
+  // Persist locally first so UI stays fast even if Sheets is slow.
   scriptOperations.forEach((operation, index) => {
     const config = Object.values(endpointMap).find(item => item.type === operation.type);
     if (config) upsertCachedRecord(config, responseRecords[index], operation.action === 'insert');
   });
+
+  const staffKey = resolveBridgeStaffKey(init);
+  const { syncContext } = extractBridgeSyncContext(
+    body && typeof body === 'object' ? body as Record<string, unknown> : {}
+  );
 
   for (let i = 0; i < incomingOperations.length; i += 1) {
     const endpoint = String(incomingOperations[i]?.endpoint || '').trim();
@@ -1240,7 +1711,48 @@ const batchWriteRecords = async (init?: RequestInit) => {
     }
   }
 
-  return jsonResponse({ success: true, count: responseRecords.length, records: responseRecords });
+  const scriptUrl = getScriptUrl();
+  const at = Date.now();
+  if (!scriptUrl) {
+    return jsonResponse({
+      success: true,
+      count: responseRecords.length,
+      records: responseRecords,
+      _sheetsSync: {
+        configured: false,
+        ok: true,
+        at,
+        message: SHEETS_LOCAL_ONLY_MESSAGE
+      } satisfies SheetsSyncMeta
+    });
+  }
+
+  const pendingSync: SheetsSyncMeta = {
+    configured: true,
+    ok: false,
+    pending: true,
+    at,
+    message: SHEETS_PENDING_MESSAGE
+  };
+  const batchKey = `batch_${at}`;
+  runBackgroundSheetsPush(
+    postBatchToScript(scriptOperations).then(() => undefined),
+    {
+      staffKey,
+      entityType: 'Batch',
+      entityKey: batchKey,
+      action: 'insert',
+      syncContext,
+      baseMessage: 'Đã lưu theo lô'
+    }
+  );
+
+  return jsonResponse({
+    success: true,
+    count: responseRecords.length,
+    records: responseRecords,
+    _sheetsSync: pendingSync
+  });
 };
 
 const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response | null> => {
@@ -1264,6 +1776,27 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
     const authErr = requireAuthBridge(init);
     if (authErr) return authErr;
     return jsonResponse(getClientSheetsSyncStatus());
+  }
+
+  if (endpoint === 'sheets-sync') {
+    if (isLocalHost()) return null;
+    const authErr = requireAuthBridge(init);
+    if (authErr) return authErr;
+    const staffKey = resolveBridgeStaffKey(init);
+
+    if (parts[1] === 'failures' && method === 'GET') {
+      return jsonResponse(listSheetsSyncFailures(staffKey));
+    }
+
+    if (parts[1] === 'failures' && parts[2] === 'acknowledge-all' && method === 'PUT') {
+      acknowledgeAllLocalSheetsSyncFailures(staffKey);
+      return jsonResponse({ success: true });
+    }
+
+    if (parts[1] === 'failures' && parts[2] && parts[3] === 'acknowledge' && method === 'PUT') {
+      acknowledgeLocalSheetsSyncFailure(decodeURIComponent(parts[2]));
+      return jsonResponse({ success: true });
+    }
   }
 
   if (endpoint === 'sync-config') {
@@ -1334,16 +1867,57 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
       return jsonResponse({ success: true });
     }
 
-    // GET /api/auth/me
+    // GET /api/auth/me — worker cookie is required for /api/sheets/proxy on Cloudflare.
     if (subAction === 'me' && method === 'GET') {
       const token = extractBridgeToken(init);
       if (!token) return jsonResponse({ error: 'Yêu cầu đăng nhập.' }, { status: 401 });
+
+      if (!isLocalHost()) {
+        const nativeFetch = (window as any).__CHD_NATIVE_FETCH__ as typeof fetch | undefined;
+        const upstream = await (nativeFetch || fetch)(parsed.pathname, {
+          method: 'GET',
+          credentials: 'include',
+        });
+        if (!upstream.ok) {
+          if (token) bridgeRevokeToken(token);
+          const errBody = await upstream.json().catch(() => ({})) as { error?: string };
+          return jsonResponse(
+            { error: errBody.error || 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.' },
+            { status: upstream.status }
+          );
+        }
+        const me = await upstream.json() as { StaffKey?: string };
+        const staffKey = String(me.StaffKey || '').trim();
+        if (!staffKey) {
+          if (token) bridgeRevokeToken(token);
+          return jsonResponse({ error: 'Phiên đăng nhập không hợp lệ.' }, { status: 401 });
+        }
+        bridgeResolveSession(token);
+        let staffList: Staff[];
+        try {
+          staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
+        } catch (err) {
+          if (err instanceof AuthRequiredError) {
+            if (token) bridgeRevokeToken(token);
+            return jsonResponse({ error: err.message }, { status: 401 });
+          }
+          staffList = BUNDLED_STAFF;
+        }
+        const staff = staffList.find((s: any) => String(s.StaffKey) === staffKey);
+        if (!staff) return jsonResponse({ error: 'Tài khoản không còn tồn tại.' }, { status: 401 });
+        return jsonResponse(staff);
+      }
+
       const staffKey = bridgeResolveSession(token);
       if (!staffKey) return jsonResponse({ error: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 });
       let staffList: Staff[];
       try {
         staffList = cache?.staff ?? (scriptUrl ? await loadStaffOnly(false) : BUNDLED_STAFF);
-      } catch {
+      } catch (err) {
+        if (err instanceof AuthRequiredError) {
+          if (token) bridgeRevokeToken(token);
+          return jsonResponse({ error: err.message }, { status: 401 });
+        }
         staffList = BUNDLED_STAFF;
       }
       const staff = staffList.find((s: any) => String(s.StaffKey) === staffKey);
@@ -1415,6 +1989,9 @@ const handleApiRequest = async (input: RequestInfo | URL, init?: RequestInit): P
           : {})
       });
     } catch (err) {
+      if (err instanceof AuthRequiredError) {
+        return jsonResponse({ error: err.message }, { status: 401 });
+      }
       const cached = await hydrateCacheFromPersisted();
       if (cached) {
         markClientPullFailed(err);

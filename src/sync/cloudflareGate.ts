@@ -6,6 +6,8 @@ import { readCookieToken, readSession, sessionCookie, signSession, type SessionC
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const LOGIN_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const LOGIN_CACHE_PREFIX = 'staff_login_v1:';
+/** Stable signing key — must not change when Google Sheets API key rotates. */
+const SESSION_SECRET_KV_KEY = 'chd_session_secret_v1';
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
 type CachedStaff = {
@@ -37,8 +39,15 @@ function json(body: unknown, status = 200, extraHeaders?: HeadersInit): Response
 
 async function signingSecret(env: CloudflareGateEnv): Promise<string> {
   if (env.SESSION_SECRET && env.SESSION_SECRET.trim()) return env.SESSION_SECRET.trim();
-  const config = await readSyncConfig(env);
-  return String(config.scriptSecret || '').trim();
+
+  const stored = await env.PUSH_KV.get(SESSION_SECRET_KV_KEY);
+  if (stored && stored.trim()) return stored.trim();
+
+  const generated = [...crypto.getRandomValues(new Uint8Array(32))]
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+  await env.PUSH_KV.put(SESSION_SECRET_KV_KEY, generated);
+  return generated;
 }
 
 export async function readRequestSession(request: Request, env: CloudflareGateEnv): Promise<SessionClaims | null> {

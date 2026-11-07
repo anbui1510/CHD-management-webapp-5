@@ -1037,8 +1037,8 @@ async function pushToGoogleSheetsAwaited(
       ok,
       at,
       message: ok
-        ? 'Đã ghi lên Google Sheets.'
-        : 'Google Sheets không xác nhận ghi dữ liệu — kiểm tra Apps Script hoặc thử Đồng bộ lại.'
+        ? 'Dữ liệu đã đẩy lên Google Sheets'
+        : 'Dữ liệu chưa lên Google Sheets — Google Sheets không xác nhận ghi. Đã lưu tạm trên app; máy khác có thể chưa thấy. Kiểm tra Apps Script hoặc thử Đồng bộ lại.'
     };
     sheetsSyncState.lastPushAt = at;
     sheetsSyncState.lastPushOk = ok;
@@ -1060,8 +1060,8 @@ async function pushToGoogleSheetsAwaited(
       ok: false,
       at,
       message: message.includes('20 giây')
-        ? 'Ghi Google Sheets quá 20 giây — dữ liệu đã lưu trên app, chưa chắc đã lên Sheet.'
-        : `Lỗi ghi Google Sheets: ${message}`
+        ? 'Dữ liệu chưa lên Google Sheets — ghi quá 20 giây. Đã lưu tạm trên app; máy khác có thể chưa thấy.'
+        : `Dữ liệu chưa lên Google Sheets — ${message}`
     };
     sheetsSyncState.lastPushAt = at;
     sheetsSyncState.lastPushOk = false;
@@ -1208,7 +1208,7 @@ function mergeSheetsSyncResults(results: SheetsSyncResult[]): SheetsSyncResult {
       configured: true,
       ok: true,
       at,
-      message: 'Đã ghi lên Google Sheets.'
+      message: 'Dữ liệu đã đẩy lên Google Sheets'
     };
   }
   return {
@@ -3408,8 +3408,8 @@ app.post('/api/sources/update-all', requireAuth, async (req, res) => {
           ok,
           at,
           message: ok
-            ? 'Đã ghi lên Google Sheets.'
-            : 'Google Sheets không xác nhận ghi dữ liệu — kiểm tra Apps Script hoặc thử Đồng bộ lại.'
+            ? 'Dữ liệu đã đẩy lên Google Sheets'
+            : 'Dữ liệu chưa lên Google Sheets — Google Sheets không xác nhận ghi. Đã lưu tạm trên app; máy khác có thể chưa thấy. Kiểm tra Apps Script hoặc thử Đồng bộ lại.'
         };
         sheetsSyncState.lastPushAt = at;
         sheetsSyncState.lastPushOk = ok;
@@ -3431,8 +3431,8 @@ app.post('/api/sources/update-all', requireAuth, async (req, res) => {
           ok: false,
           at,
           message: message.includes('20 giây')
-            ? 'Ghi Google Sheets quá 20 giây — dữ liệu đã lưu trên app, chưa chắc đã lên Sheet.'
-            : `Lỗi ghi Google Sheets: ${message}`
+            ? 'Dữ liệu chưa lên Google Sheets — ghi quá 20 giây. Đã lưu tạm trên app; máy khác có thể chưa thấy.'
+            : `Dữ liệu chưa lên Google Sheets — ${message}`
         };
         sheetsSyncState.lastPushAt = at;
         sheetsSyncState.lastPushOk = false;

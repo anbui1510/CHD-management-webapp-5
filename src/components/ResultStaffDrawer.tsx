@@ -314,6 +314,8 @@ export default function ResultStaffDrawer({
           reportMutationResponse(await patientRes.json(), { baseMessage: 'Đã cập nhật trạng thái bệnh nhi' });
         }
       }
+      // Soft refresh keeps local cache; do not claim Sheets success here —
+      // reportMutationResponse shows yellow while push is pending, then green when confirmed.
       onRefreshData();
       reportMutationResponse(savedData, {
         baseMessage: 'Đã cập nhật chỉ định kết quả hội chẩn'
@@ -321,7 +323,6 @@ export default function ResultStaffDrawer({
       if (options?.closeOnSuccess !== false) {
         forceClose();
       }
-      onSaveSuccess?.('Đã ghi lên Google Sheets');
       return true;
     } catch (err) {
       console.error(err);

@@ -31,6 +31,9 @@ export default function GlobalSheetsSyncAlert({
           <p className="text-xs text-slate-600 font-semibold leading-relaxed whitespace-pre-wrap">
             {message}
           </p>
+          <p className="text-[11px] text-amber-800/90 font-bold leading-relaxed">
+            Dữ liệu vẫn còn trên máy này — người khác có thể chưa thấy cho đến khi đồng bộ Sheets thành công.
+          </p>
           <button
             type="button"
             onClick={onDismiss}

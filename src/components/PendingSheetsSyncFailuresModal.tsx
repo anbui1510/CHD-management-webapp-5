@@ -29,10 +29,10 @@ export default function PendingSheetsSyncFailuresModal({
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                Cảnh báo đồng bộ Google Sheets
+                Dữ liệu chưa lên Google Sheets
               </h3>
               <p className="text-xs text-slate-600 font-semibold mt-1 leading-relaxed">
-                Có thay đổi từ phiên trước chưa ghi lên Google Sheets thành công. Vui lòng kiểm tra và thử Đồng bộ lại.
+                Có thay đổi đã lưu tạm trên app nhưng chưa ghi lên Google Sheets thành công. Máy khác / danh sách chung có thể chưa thấy — kiểm tra và bấm Đồng bộ lại.
               </p>
             </div>
           </div>

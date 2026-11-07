@@ -4,6 +4,9 @@ export function formatAppsScriptHttpError(status: number): string {
   if (status === 404) {
     return 'Không kết nối được Google Sheets (HTTP 404) — URL Web app có thể sai, chưa deploy, hoặc Google đang lỗi tạm. App vẫn dùng dữ liệu đã lưu; bấm Đồng bộ lại để thử.';
   }
+  if (status === 401) {
+    return 'Google từ chối truy cập Web app Apps Script (HTTP 401). Kiểm tra deploy Web app: quyền truy cập phải là Anyone (Bất kỳ ai), không phải “Anyone with Google account”. Nếu vừa deploy lại, copy URL Web app mới vào mục Google Sheets.';
+  }
   return `Apps Script trả về HTTP ${status}`;
 }
 
