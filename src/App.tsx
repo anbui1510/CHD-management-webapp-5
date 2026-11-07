@@ -1286,7 +1286,9 @@ export default function App() {
     const staffKey = currentStaff.StaffKey;
     
     const getTimeoutMs = () => {
-      const setting = localStorage.getItem(`SessionTimeout_${staffKey}`) || '30';
+      const setting = localStorage.getItem(`SessionTimeout_${staffKey}`)
+        || localStorage.getItem('SessionTimeout_GLOBAL')
+        || '30';
       if (setting === '1') return 60 * 1000;
       if (setting === '30') return 30 * 60 * 1000;
       if (setting === '60') return 60 * 60 * 1000;

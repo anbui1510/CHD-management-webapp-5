@@ -215,12 +215,11 @@ export default function HomeDashboard({
   });
 
   useEffect(() => {
+    if (!allowedShortcutIds.length) return;
     setSelectedShortcutIds(prev => {
-      const next = prev.filter(id => allowedShortcutIds.includes(id));
-      const fallback = DEFAULT_SHORTCUT_IDS.filter(id => allowedShortcutIds.includes(id)).slice(0, 4);
-      const resolved = (next.length > 0 ? next : fallback).slice(0, 4);
-      localStorage.setItem('home_quick_shortcuts', JSON.stringify(resolved));
-      return resolved;
+      const valid = prev.filter(id => allowedShortcutIds.includes(id));
+      if (valid.length > 0) return valid;
+      return DEFAULT_SHORTCUT_IDS.filter(id => allowedShortcutIds.includes(id)).slice(0, 4);
     });
   }, [allowedShortcutIds.join(',')]);
 

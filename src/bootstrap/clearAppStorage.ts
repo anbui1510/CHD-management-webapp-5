@@ -13,11 +13,37 @@ const PRESERVE_LOCAL_KEYS = [
   'LICHKHOA_SHEET_URL',
 ] as const;
 
+export function isPreservedLocalStorageKey(key: string, preserveAuth = true): boolean {
+  if (!key) return false;
+  // Cấu hình hạ tầng & Module 7
+  if ((PRESERVE_LOCAL_KEYS as readonly string[]).includes(key)) return true;
+  // Thông tin đăng nhập
+  if (preserveAuth && (key === 'CHD_AUTH_TOKEN' || key === 'CHD_AUTH_STAFF_KEY' || key === 'CurrentStaffKey')) return true;
+  // Cài đặt người dùng: Thời gian tự động đăng xuất & hoạt động
+  if (key.startsWith('SessionTimeout_') || key.startsWith('LastActivity_')) return true;
+  // Cài đặt người dùng: Tùy chọn thẻ Home & Truy cập nhanh
+  if (key === 'home_selected_stats' || key === 'home_quick_shortcuts') return true;
+  // Cài đặt người dùng: Mobile quick tabs
+  if (key.startsWith('mobile_quick_tabs_')) return true;
+  // Cài đặt người dùng: Trạng thái đóng nhắc nhở push/pwa
+  if (key === 'push_prompt_dismissed' || key === 'pwa_install_dismissed' || key === 'notification_push_delivery_keys') return true;
+  // Khóa lịch khoa
+  if (key.startsWith('LICHKHOA_') || key.startsWith('TIM_MACH_')) return true;
+  // Cache bản tin giao ban
+  if (key.startsWith('chd_daily_brief_')) return true;
+  return false;
+}
+
 function preserveLocalStorageValues(): Record<string, string> {
   const preserved: Record<string, string> = {};
-  for (const key of PRESERVE_LOCAL_KEYS) {
-    const value = localStorage.getItem(key);
-    if (value) preserved[key] = value;
+  if (typeof localStorage === 'undefined') return preserved;
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    if (isPreservedLocalStorageKey(key, true)) {
+      const value = localStorage.getItem(key);
+      if (value !== null) preserved[key] = value;
+    }
   }
   return preserved;
 }
@@ -56,13 +82,15 @@ export async function clearAppStorage(options?: {
   preserveScriptConfig?: boolean;
   preserveAuth?: boolean;
   preserveMedicalCache?: boolean;
+  preserveUserSettings?: boolean;
 }): Promise<void> {
   if (typeof window === 'undefined') return;
 
   const preserveScriptConfig = options?.preserveScriptConfig !== false;
   const preserveAuth = options?.preserveAuth === true;
   const preserveMedicalCache = options?.preserveMedicalCache === true;
-  const preserved = preserveScriptConfig ? preserveLocalStorageValues() : {};
+  const preserveUserSettings = options?.preserveUserSettings !== false;
+  const preserved = (preserveScriptConfig || preserveUserSettings) ? preserveLocalStorageValues() : {};
 
   const authToken = preserveAuth ? localStorage.getItem('CHD_AUTH_TOKEN') : null;
   const authStaffKey = preserveAuth ? localStorage.getItem('CHD_AUTH_STAFF_KEY') : null;
@@ -70,24 +98,23 @@ export async function clearAppStorage(options?: {
   if (!preserveAuth) {
     localStorage.removeItem('CHD_AUTH_TOKEN');
     localStorage.removeItem('CHD_AUTH_STAFF_KEY');
+    localStorage.removeItem('CurrentStaffKey');
   }
 
-  if (!preserveScriptConfig) {
+  if (!preserveScriptConfig && !preserveUserSettings) {
     localStorage.clear();
   } else {
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
       if (!key) continue;
-      if (PRESERVE_LOCAL_KEYS.includes(key as (typeof PRESERVE_LOCAL_KEYS)[number])) continue;
-      // preserveAuth must win over the generic key sweep (token is not in PRESERVE_LOCAL_KEYS)
-      if (preserveAuth && (key === 'CHD_AUTH_TOKEN' || key === 'CHD_AUTH_STAFF_KEY')) continue;
+      if (isPreservedLocalStorageKey(key, preserveAuth)) continue;
       keysToRemove.push(key);
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
   }
 
-  if (preserveScriptConfig) {
+  if (preserveScriptConfig || preserveUserSettings) {
     restoreLocalStorageValues(preserved);
   }
   if (preserveAuth) {

@@ -248,7 +248,9 @@ export default function StaffProfileView({
   const [showPassword, setShowPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [sessionTimeout, setSessionTimeout] = useState<string>(() => {
-    return localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || '30';
+    return localStorage.getItem(`SessionTimeout_${staff.StaffKey}`)
+      || localStorage.getItem('SessionTimeout_GLOBAL')
+      || '30';
   });
 
   useEffect(() => {
@@ -257,7 +259,11 @@ export default function StaffProfileView({
     setIsEditingAdmin(false);
     setShowPassword(false);
     setShowEditPassword(false);
-    setSessionTimeout(localStorage.getItem(`SessionTimeout_${staff.StaffKey}`) || '30');
+    setSessionTimeout(
+      localStorage.getItem(`SessionTimeout_${staff.StaffKey}`)
+      || localStorage.getItem('SessionTimeout_GLOBAL')
+      || '30'
+    );
   }, [staff]);
 
   const activeFilter = useMemo<ActivityDateFilter>(
@@ -368,6 +374,7 @@ export default function StaffProfileView({
       );
 
       localStorage.setItem(`SessionTimeout_${profileStaff.StaffKey}`, sessionTimeout);
+      localStorage.setItem('SessionTimeout_GLOBAL', sessionTimeout);
       window.dispatchEvent(new Event('storage'));
 
       setProfileStaff(updated);
@@ -905,7 +912,16 @@ export default function StaffProfileView({
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Thời gian tự động đăng xuất</span>
                     <select
                       value={sessionTimeout}
-                      onChange={e => setSessionTimeout(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setSessionTimeout(val);
+                        const key = profileStaff?.StaffKey || staff?.StaffKey;
+                        if (key) {
+                          localStorage.setItem(`SessionTimeout_${key}`, val);
+                          localStorage.setItem('SessionTimeout_GLOBAL', val);
+                          window.dispatchEvent(new Event('storage'));
+                        }
+                      }}
                       className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white"
                     >
                       <option value="1">1 phút</option>
