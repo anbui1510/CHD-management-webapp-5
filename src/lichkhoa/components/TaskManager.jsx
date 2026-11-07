@@ -180,12 +180,11 @@ export function TaskManager({
   };
 
   const handleLoadBundledTimMach = async () => {
-    const staffCount = timMachSeed?.department?.staff?.length || 0;
     const taskCount = timMachSeed?.department?.tasks?.length || 0;
     const ok = await confirm({
       variant: 'danger',
-      title: 'Nạp nhân sự & task Tim Mạch',
-      message: <>Thay danh sách nhân sự và task Khoa Tim Mạch bằng bản trong repo ({staffCount} nhân sự, {taskCount} task). Lịch tuần/tháng hiện tại giữ nguyên.</>,
+      title: 'Nạp task Tim Mạch',
+      message: <>Chỉ nạp danh mục task từ repo ({taskCount} task). Nhân sự giữ nguyên — bác sĩ lấy từ Sheet Staff CHD, không seed lại doc_*.</>,
       confirmText: 'Nạp'
     });
     if (ok) onImportStore?.(loadTimMachSeedStore(store));
@@ -254,7 +253,7 @@ export function TaskManager({
                       handleLoadBundledTimMach();
                     }}
                   >
-                    NS &amp; task Tim Mạch (repo)
+                    Task Tim Mạch (repo)
                   </button>
                 </div>
               )}

@@ -7,6 +7,7 @@ import timMachSeed from '../data/tim-mach-seed.json';
 import { isSheetBackend } from '../config/dataBackend.js';
 import { resolveTenant } from '../config/tenant.js';
 import { createEmptyTenantStore as buildEmptyTenantStore } from './sheetBootstrapStore.js';
+import { purgeBackupImportedStaff } from '../logic/staffSource.js';
 
 export { createEmptyTenantStore, ensureBootstrapAdminStaff } from './sheetBootstrapStore.js';
 
@@ -41,20 +42,8 @@ export const DEPARTMENT_TEMPLATES = {
     id: 'dept_tim_mach',
     name: 'Khoa Tim Mạch',
     code: 'TIM_MACH',
-    staff: [
-      { id: 'doc_1', name: 'Phan Tiến Lợi', shortName: 'LỢI', title: 'Trưởng Khoa', dutyQuota: 2, buBalance: 0.5, phepBalance: 11.0, email: 'loi.pt@hospital.vn' },
-      { id: 'doc_2', name: 'Trần Công Bảo Phụng', shortName: 'PHỤNG', title: 'Phó Khoa', dutyQuota: 4, buBalance: 14.0, phepBalance: 14.0, email: 'phung.tcb@hospital.vn' },
-      { id: 'doc_3', name: 'Bùi Đạt Thịnh', shortName: 'THỊNH', title: 'BS CK1', dutyQuota: 6, buBalance: 1.5, phepBalance: 11.5, email: 'thinh.bd@hospital.vn' },
-      { id: 'doc_4', name: 'Phạm Đức Nghị', shortName: 'NGHỊ', title: 'BS CK1', dutyQuota: 6, buBalance: 1.0, phepBalance: 12.0, email: 'nghi.pd@hospital.vn' },
-      { id: 'doc_5', name: 'Đỗ Hữu Tài', shortName: 'TÀI', title: 'BS CK1', dutyQuota: 6, buBalance: 1.5, phepBalance: 4.0, email: 'tai.dh@hospital.vn' },
-      { id: 'doc_6', name: 'Lương Hoài Ân', shortName: 'ÂN', title: 'BS Trẻ', dutyQuota: 7, buBalance: 2.0, phepBalance: 5.0, email: 'an.lh@hospital.vn' },
-      { id: 'doc_7', name: 'Nguyễn Văn Hiếu', shortName: 'HIẾU', title: 'BS Trẻ', dutyQuota: 7, buBalance: 1.5, phepBalance: 3.5, email: 'hieu.nv@hospital.vn' },
-      { id: 'doc_8', name: 'Hồ Thị Trang', shortName: 'TRANG', title: 'BS Trẻ', dutyQuota: 7, buBalance: 1.0, phepBalance: 8.0, email: 'trang.ht@hospital.vn' },
-      { id: 'doc_9', name: 'Lê Thị Thảo', shortName: 'THẢO', title: 'BS Trẻ', dutyQuota: 7, buBalance: 0.0, phepBalance: 0.0, email: 'thao.lt@hospital.vn' },
-      { id: 'doc_10', name: 'Nguyễn Văn Huy', shortName: 'HUY', title: 'BS CK1', dutyQuota: 6, buBalance: 0.0, phepBalance: 0.0, email: 'huy.nv@hospital.vn' },
-      { id: 'hv_1', name: 'Học viên 1', shortName: 'HV_A', title: 'Học Viên', dutyQuota: 9, buBalance: 0, phepBalance: 0, email: 'hv1@hospital.vn' },
-      { id: 'hv_2', name: 'Học viên 2', shortName: 'HV_B', title: 'Học Viên', dutyQuota: 9, buBalance: 0, phepBalance: 0, email: 'hv2@hospital.vn' }
-    ],
+    // Roster bác sĩ = Sheet Staff CHD (merge khi mở Module 7). Không seed doc_* nữa.
+    staff: [],
     tasks: [
       // 1. Thường trực
       { id: 'task_tn', code: 'TN', name: 'Trực Ngày', category: 'THUONG_TRUC', session: 'SANG', triggerRT: false, delta: 0, blocker: true, bgColor: '#fff2cc', textColor: '#cc0000', dutyRole: 'truc_ngay' },
@@ -269,7 +258,8 @@ function timMachDepartmentFromSeed() {
   return {
     ...DEPARTMENT_TEMPLATES.TIM_MACH,
     ...seed,
-    staff: seed.staff || [],
+    // Bỏ doc_* trong seed JSON — danh sách BS lấy từ Sheet Staff CHD.
+    staff: purgeBackupImportedStaff(seed.staff || []),
     tasks: seed.tasks || [],
     rules: seed.rules ?? DEPARTMENT_TEMPLATES.TIM_MACH.rules,
     customCategories: seed.customCategories || [],
@@ -390,8 +380,11 @@ export function getInitialStore() {
   }
 
   if (isSheetBackend()) {
-    // Boot với seed Tim mạch (task đầy đủ); pull Sheet sẽ ghi đè nếu đã có dữ liệu.
+    // Boot task từ seed; nhân sự trống — CHD Staff merge + pull NhanSu sẽ điền.
     const initial = storeFromTimMachSeed();
+    initial.departments = (initial.departments || []).map((dept) => (
+      dept.id === 'dept_tim_mach' ? { ...dept, staff: [] } : dept
+    ));
     localStorage.setItem(SEED_STORAGE_KEY, TIM_MACH_SEED_VERSION);
     saveStore(initial, { skipCloud: true });
     return initial;
@@ -487,9 +480,11 @@ export function downloadStoreBackup(store, filenamePrefix = 'lichkhoa-backup') {
   URL.revokeObjectURL(url);
 }
 
-/** Nạp nhân sự + task Tim Mạch từ repo (không đè lịch sheet). */
+/** Nạp task Tim Mạch từ repo — không đè nhân sự (roster = CHD Staff). */
 export function loadTimMachSeedStore(currentStore) {
-  const next = currentStore ? applyTimMachSeedToStore(currentStore) : storeFromTimMachSeed();
+  const next = currentStore
+    ? applyTimMachSeedToStore(currentStore, { overwriteTasks: true, overwriteStaff: false })
+    : storeFromTimMachSeed();
   localStorage.setItem(SEED_STORAGE_KEY, TIM_MACH_SEED_VERSION);
   saveStore(next);
   return next;

@@ -1,6 +1,6 @@
 import { MEMBER_DEFAULT } from '../logic/access.js';
 import { formatShowInLichKhoa, parseShowInLichKhoa } from '../logic/showInLichKhoa.js';
-import { isLocalScheduleStaff, markChdScheduleStaff } from '../logic/staffSource.js';
+import { isHandAddedLocalStaff, markChdScheduleStaff } from '../logic/staffSource.js';
 import {
   getQuotaForLegacyTitle,
   getQuotaForPosition,
@@ -30,12 +30,12 @@ function chdDepartmentLabel(chd) {
 /**
  * Merge CHD Staff list into schedule department staff (NhanSu).
  * Identity + Department + ShowInLichKhoa from CHD; preserve schedule fields on the row.
- * Local-only rows (học viên / hỗ trợ thêm tay) are kept after CHD rows.
+ * Chỉ giữ HV/hỗ trợ thêm tay (`local_*`). Bác sĩ seed/sao lưu `doc_*` bị bỏ — roster = Sheet Staff CHD.
  */
 export function mergeChdStaffIntoDept(dept, chdStaffList) {
   const existing = Array.isArray(dept?.staff) ? dept.staff : [];
   const byId = new Map(existing.map((s) => [String(s.id), s]));
-  const localStaff = existing.filter((s) => isLocalScheduleStaff(s));
+  const localStaff = existing.filter((s) => isHandAddedLocalStaff(s));
   const usedShort = new Set();
   const next = [];
 

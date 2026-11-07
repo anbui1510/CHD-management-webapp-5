@@ -306,6 +306,7 @@ export function DeptScheduleApp({
 
   const storeRef = useRef(store);
   storeRef.current = store;
+  const purgedBackupDocsRef = useRef(false);
 
   const syncAuthReady = isLichkhoaSessionReady(currentStaff);
 
@@ -338,6 +339,45 @@ export function DeptScheduleApp({
     storeRef,
     ensureSheets,
   });
+
+  // Một lần: gỡ doc_* «Lịch cục bộ» (seed/sao lưu) khỏi store + ghi NhanSu — roster = CHD Staff.
+  useEffect(() => {
+    if (!syncAuthReady || !chdStaffList?.length || purgedBackupDocsRef.current) return undefined;
+    const prev = storeRef.current;
+    const hasBackup = (prev?.departments || []).some((d) => (d.staff || []).some(isBackupImportedStaff));
+    if (!hasBackup) {
+      purgedBackupDocsRef.current = true;
+      return undefined;
+    }
+    purgedBackupDocsRef.current = true;
+    let cancelled = false;
+    (async () => {
+      const cleaned = ensureSheets({
+        ...prev,
+        departments: (prev.departments || []).map((d) => ({
+          ...d,
+          staff: purgeBackupImportedStaff(d.staff),
+        })),
+      });
+      const merged = mergeChdStaffIntoStore(cleaned, chdStaffList);
+      if (cancelled) return;
+      setStore(merged);
+      saveStore(merged, { skipCloud: true });
+      storeRef.current = merged;
+      if (typeof sheetSync.persistStoreToSheet === 'function') {
+        try {
+          await sheetSync.persistStoreToSheet(merged, {
+            notice: 'Đã gỡ bác sĩ lịch cục bộ (doc_*) — danh sách lấy từ Sheet Staff CHD.',
+          });
+        } catch {
+          /* user có thể bấm Đồng bộ / Gỡ trùng */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [syncAuthReady, chdStaffList, sheetSync.persistStoreToSheet]);
 
   // Hydrate / sửa Spreadsheet ID từ cấu hình server (CHD lichkhoa sync-config)
   useEffect(() => {
@@ -1194,17 +1234,24 @@ export function DeptScheduleApp({
       if (!next.departments?.length) {
         throw new Error('File sao lưu không có khoa hợp lệ.');
       }
-      // CHD: giữ đúng 1 khoa Tim mạch nếu backup có nhiều khoa.
+      // CHD: giữ đúng 1 khoa Tim mạch nếu backup có nhiều khoa; bỏ doc_* seed.
       let toSave = next;
       if (embedInChd) {
         const cardio = next.departments.find((d) => d.id === CARDIOLOGY_DEPT_ID)
           || next.departments.find((d) => /tim\s*mạch/i.test(String(d.name || '')))
           || next.departments[0];
+        const cardioClean = {
+          ...cardio,
+          staff: purgeBackupImportedStaff(cardio.staff),
+        };
         toSave = ensureSheets({
           ...next,
-          departments: [cardio],
-          activeDeptId: cardio.id,
+          departments: [cardioClean],
+          activeDeptId: cardioClean.id,
         });
+        if (chdStaffList?.length) {
+          toSave = mergeChdStaffIntoStore(toSave, chdStaffList);
+        }
       }
       setStore(toSave);
       saveStore(toSave, { skipCloud: true });
