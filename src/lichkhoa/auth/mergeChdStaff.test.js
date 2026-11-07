@@ -17,6 +17,9 @@ const dept = {
     { id: 'doc_2', name: 'Trần Công Bảo Phụng', shortName: 'PHUNG2', source: 'local', dutyQuota: 4 },
     { id: 'local_hv1', name: 'HV Test', shortName: 'HV1', source: 'local', dutyQuota: 9, position: 'Học viên' },
   ],
+  tasks: [
+    { id: 't1', code: 'C1', owners: ['doc_1', 'doc_2'], ownerOrder: ['doc_1', 'doc_2'] },
+  ],
 };
 
 const chd = [
@@ -34,5 +37,11 @@ assert(!ids.includes('doc_1'), 'drops doc_1 backup');
 assert(!ids.includes('doc_2'), 'drops doc_2 backup');
 assert(next.staff.every((s) => !isBackupImportedStaff(s)), 'no backup rows left');
 assert(isHandAddedLocalStaff(next.staff.find((s) => s.id === 'local_hv1')), 'HV still hand-added');
+
+const t1 = next.tasks.find((t) => t.id === 't1');
+assert(t1.owners.includes('00017'), 'migrated doc_1 to 00017');
+assert(t1.owners.includes('00776'), 'migrated doc_2 to 00776');
+assert(!t1.owners.includes('doc_1'), 'removed legacy doc_1 from owners');
+assert(!t1.owners.includes('doc_2'), 'removed legacy doc_2 from owners');
 
 console.log('mergeChdStaff.test.js: ok');

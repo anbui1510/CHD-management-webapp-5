@@ -958,6 +958,7 @@ body.dark-theme {
 
 .sheet-workbook[hidden],
 .room-assignments-container[hidden],
+.sheet-scroll[hidden],
 .day-cal[hidden] {
   display: none !important;
 }
@@ -1690,17 +1691,46 @@ body.mobile-ui .room-assignments-container {
 }
 
 .day-cal {
+  flex: 1;
+  min-height: 0;
   border: 1px solid var(--sheet-line);
   border-radius: 10px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--sheet-bg);
-  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg-secondary);
+}
+
+.day-cal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.day-cal::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.day-cal::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+}
+
+.day-cal::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .day-cal-week,
 .day-cal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.day-cal-week {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-secondary);
 }
 
 .day-cal-week div {

@@ -1,8 +1,15 @@
 /** Write only the cells that changed. Reading the source array avoids a lookup per cell. */
 export function patchHotCells(hot, rows) {
-  if (!hot || !Array.isArray(rows) || hot.countRows() !== rows.length) return;
+  if (!hot || !Array.isArray(rows) || !rows.length) return;
+  const rowCount = typeof hot.countRows === 'function' ? hot.countRows() : 0;
+  const colCount = typeof hot.countCols === 'function' ? hot.countCols() : 0;
   const width = rows[0]?.length || 0;
-  if (hot.countCols() !== width) return;
+  if (rowCount !== rows.length || colCount !== width) {
+    if (typeof hot.loadData === 'function') {
+      hot.loadData(rows);
+    }
+    return;
+  }
   const source = hot.getSourceData?.() || [];
   const updates = [];
   rows.forEach((row, rowIndex) => {

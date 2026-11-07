@@ -15,6 +15,7 @@ import { traineeCovers } from './traineePeriod';
 import { taskAlerts } from './taskAlert';
 import { pourCathNames, readCathCell } from './cathSchedule';
 import { showsBelow, showsOnWeek } from './taskDisplay';
+import { findStaffForOwner } from './staffSource';
 
 export const HOLIDAY_DICTIONARY = {
   '1/1': 'Tết Dương lịch',
@@ -196,9 +197,18 @@ function taskByTopic(topic, taskList) {
   return (taskList || []).find(task => fold(task.code) === needle || fold(task.name) === needle) || null;
 }
 
-function ownersOf(task, staffList) {
+export function ownersOf(task, staffList) {
   const ids = Array.isArray(task?.owners) ? task.owners : [];
-  return ids.map(id => (staffList || []).find(person => person.id === id)).filter(Boolean);
+  const found = [];
+  const seen = new Set();
+  ids.forEach((id) => {
+    const person = findStaffForOwner(id, staffList);
+    if (person && !seen.has(person.id)) {
+      seen.add(person.id);
+      found.push(person);
+    }
+  });
+  return found;
 }
 
 function collectStaffPinWarnings({ staffList, taskList, days, sessions, read, place, blocked, held }) {
@@ -216,8 +226,9 @@ function collectStaffPinWarnings({ staffList, taskList, days, sessions, read, pl
         if (!quiet) warnings.push(pinOwnerWarning(task.code, owners.map(owner => owner.shortName).join(', '), person.shortName, when));
         return;
       }
-      const substitute = (staffList || []).find(item => item.id === pin.substituteId && item.id !== person.id) || null;
-      const allowedSub = substitute && (!owners.length || owners.some(owner => owner.id === substitute.id)) ? substitute : null;
+      const substitute = (staffList || []).find(item => item.id === pin.substituteId && item.id !== person.id)
+        || findStaffForOwner(pin.substituteId, staffList);
+      const allowedSub = substitute && substitute.id !== person.id && (!owners.length || owners.some(owner => owner.id === substitute.id)) ? substitute : null;
       const holds = (who) => Boolean(who) && (
         hasToken(read(who, pin.day, pin.session), task.code, taskList)
         || held?.(who, pin.day, pin.session, task)
@@ -637,6 +648,7 @@ export function generateWeeklySchedule({
   // Weekly tasks follow Quản lý Task order. Month scope and leave codes are poured earlier.
   (taskList || []).forEach((task) => {
     if (task.scope === 'month' || isLeaveTask(task)) return;
+    if (task.dutyRole === 'vao_gac' || task.dutyRole === 'ra_truc') return;
     if (isWardTask(task)) {
       placeWards(task);
       return;
@@ -655,6 +667,7 @@ export function generateWeeklySchedule({
     }
     const people = ownersOf(task, staffList);
     if (!people.length) {
+      if (task.dutyRole) return;
       const open = plan.some(slot => !(staffList || []).some(person => hasToken(read(person, slot.day, slot.session), task.code, taskList)));
       if (open && !quiet) warnings.push(`Task ${task.code} có ngày cố định nhưng chưa chọn Trách nhiệm.`);
       return;
@@ -730,8 +743,9 @@ export function generateWeeklySchedule({
       if (!dutyScheduleTask(task) || !days[pin.day]) return;
       const owners = ownersOf(task, staffList);
       if (owners.length && !owners.some(owner => owner.id === person.id)) return;
-      const substitute = (staffList || []).find(item => item.id === pin.substituteId && item.id !== person.id) || null;
-      const allowedSub = substitute && (!owners.length || owners.some(owner => owner.id === substitute.id)) ? substitute : null;
+      const substitute = (staffList || []).find(item => item.id === pin.substituteId && item.id !== person.id)
+        || findStaffForOwner(pin.substituteId, staffList);
+      const allowedSub = substitute && substitute.id !== person.id && (!owners.length || owners.some(owner => owner.id === substitute.id)) ? substitute : null;
       const holder = [person, allowedSub].find(who => who && (
         hasToken(read(who, pin.day, pin.session), task.code, taskList)
         || lowerNames[`${task.id}|${pin.day}|${pin.session}`] === who.shortName

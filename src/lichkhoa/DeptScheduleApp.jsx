@@ -562,86 +562,124 @@ export function DeptScheduleApp({
   // Run Auto-Scheduler Engine on the active sheet
   const handleAutoSchedule = () => {
     if (!allow('week')) return;
-    const sessions = normalizeDaySessions(activeSheet.daySessions);
-    const previousCuts = activeSheet.leaveCuts || { bu: {}, phep: {} };
-    const staffForRun = staffList.map(person => ({
-      ...person,
-      buBalance: +((Number(person.buBalance) || 0) + (Number(previousCuts.bu?.[person.shortName]) || 0)).toFixed(1),
-      phepBalance: +((Number(person.phepBalance) || 0) + (Number(previousCuts.phep?.[person.shortName]) || 0)).toFixed(1)
-    }));
-    const existingNotes = {};
-    staffList.forEach((person) => {
-      existingNotes[person.shortName] = activeSheet.grid?.[person.shortName]?.note || '';
-    });
-    const result = generateWeeklySchedule({
-      startDate: activeSheet.startDate,
-      staffList: staffForRun,
-      taskList,
-      monthGrid: activeSheet.monthGrid || {},
-      monthRoles: resolveMonthRoles(activeSheet.monthRoles),
-      daySessions: sessions,
-      leaveEntries: activeDept.leaveEntries || [],
-      studyEntries: activeDept.studyEntries || [],
-      roomTable: roomTableOf(activeSheet, staffList),
-      sheets: weekSources(sheets),
-      existingNotes,
-      cathRoles: localCathRoles(activeSheet.cathRoles),
-      cathGrid: activeSheet.cathGrid || {}
-    });
-    const after = result.buGrants || {};
-    const afterCuts = result.leaveCuts || { bu: {}, phep: {} };
-    const sheetId = activeSheet.id;
-    const deptId = activeDept.id;
-    setStore(prev => {
-      const st = prev.sheetsByDept[deptId];
-      const sh = st.sheets.find(item => item.id === sheetId) || st.sheets[0];
-      const posted = sh.buPosted || buBaseline(sh);
-      const grantDeltas = buGrantDeltas(after, posted);
-      const cuts = sh.leaveCuts || { bu: {}, phep: {} };
-      const nextSheet = {
-        ...sh,
-        grid: result.grid,
-        warnings: result.warnings,
-        roomWarnings: result.roomWarnings,
-        cathGrid: result.cathGrid,
-        buGrants: after,
-        buPosted: after,
-        leaveCuts: afterCuts,
-        weeks: {
-          ...(sh.weeks || {}),
-          [sh.startDate]: {
-            grid: result.grid,
-            warnings: result.warnings,
-            roomWarnings: result.roomWarnings,
-            buGrants: after,
-            buPosted: after,
-            leaveCuts: afterCuts
+    try {
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+        const ok = window.confirm(
+          `Tự động xếp lịch tuần (từ ngày ${activeSheet.startDate || 'hiện tại'})?\n` +
+          'Hệ thống sẽ tổng hợp lịch tháng, phòng khám, lịch nghỉ/dạy và phân công nhiệm vụ vào bảng tuần.'
+        );
+        if (!ok) return;
+      }
+      const sessions = normalizeDaySessions(activeSheet.daySessions);
+      const previousCuts = activeSheet.leaveCuts || { bu: {}, phep: {} };
+      const staffForRun = staffList.map(person => ({
+        ...person,
+        buBalance: +((Number(person.buBalance) || 0) + (Number(previousCuts.bu?.[person.shortName]) || 0)).toFixed(1),
+        phepBalance: +((Number(person.phepBalance) || 0) + (Number(previousCuts.phep?.[person.shortName]) || 0)).toFixed(1)
+      }));
+      const existingNotes = {};
+      staffList.forEach((person) => {
+        existingNotes[person.shortName] = activeSheet.grid?.[person.shortName]?.note || '';
+      });
+      const result = generateWeeklySchedule({
+        startDate: activeSheet.startDate,
+        staffList: staffForRun,
+        taskList,
+        monthGrid: activeSheet.monthGrid || {},
+        monthRoles: resolveMonthRoles(activeSheet.monthRoles),
+        daySessions: sessions,
+        leaveEntries: activeDept.leaveEntries || [],
+        studyEntries: activeDept.studyEntries || [],
+        roomTable: roomTableOf(activeSheet, staffList),
+        sheets: weekSources(sheets),
+        existingNotes,
+        cathRoles: localCathRoles(activeSheet.cathRoles),
+        cathGrid: activeSheet.cathGrid || {}
+      });
+      const after = result.buGrants || {};
+      const afterCuts = result.leaveCuts || { bu: {}, phep: {} };
+      const sheetId = activeSheet.id;
+      const deptId = activeDept.id;
+      setStore(prev => {
+        const sheetsByDept = prev?.sheetsByDept || {};
+        const st = sheetsByDept[deptId] || emptySheetState(activeDept);
+        const sheetList = Array.isArray(st.sheets) && st.sheets.length ? st.sheets : [activeSheet];
+        const sh = sheetList.find(item => item.id === sheetId) || sheetList[0];
+        const posted = sh.buPosted || buBaseline(sh);
+        const grantDeltas = buGrantDeltas(after, posted);
+        const cuts = sh.leaveCuts || { bu: {}, phep: {} };
+        const weekKey = sh.startDate || activeSheet.startDate;
+        const nextSheet = {
+          ...sh,
+          grid: result.grid,
+          warnings: result.warnings,
+          roomWarnings: result.roomWarnings,
+          cathGrid: result.cathGrid,
+          buGrants: after,
+          buPosted: after,
+          leaveCuts: afterCuts,
+          weeks: {
+            ...(sh.weeks || {}),
+            [weekKey]: {
+              grid: result.grid,
+              warnings: result.warnings,
+              roomWarnings: result.roomWarnings,
+              buGrants: after,
+              buPosted: after,
+              leaveCuts: afterCuts
+            }
           }
-        }
-      };
-      return {
-        ...prev,
-        departments: prev.departments.map(dept => dept.id !== deptId ? dept : {
-          ...dept,
-          staff: dept.staff.map(person => {
-            const name = person.shortName;
-            const grantDelta = grantDeltas[name] || 0;
-            const buCutDelta = (Number(afterCuts.bu?.[name]) || 0) - (Number(cuts.bu?.[name]) || 0);
-            const phepCutDelta = (Number(afterCuts.phep?.[name]) || 0) - (Number(cuts.phep?.[name]) || 0);
-            if (!grantDelta && !buCutDelta && !phepCutDelta) return person;
-            return {
-              ...person,
-              buBalance: +((Number(person.buBalance) || 0) + grantDelta - buCutDelta).toFixed(1),
-              phepBalance: +((Number(person.phepBalance) || 0) - phepCutDelta).toFixed(1)
-            };
-          })
-        }),
-        sheetsByDept: {
-          ...prev.sheetsByDept,
-          [deptId]: { ...st, sheets: st.sheets.map(item => item.id === sh.id ? nextSheet : item) }
-        }
-      };
-    });
+        };
+        const prevDepts = Array.isArray(prev?.departments) ? prev.departments : [];
+        return {
+          ...prev,
+          departments: prevDepts.map(dept => dept.id !== deptId ? dept : {
+            ...dept,
+            staff: (dept.staff || []).map(person => {
+              const name = person.shortName;
+              const grantDelta = grantDeltas[name] || 0;
+              const buCutDelta = (Number(afterCuts.bu?.[name]) || 0) - (Number(cuts.bu?.[name]) || 0);
+              const phepCutDelta = (Number(afterCuts.phep?.[name]) || 0) - (Number(cuts.phep?.[name]) || 0);
+              if (!grantDelta && !buCutDelta && !phepCutDelta) return person;
+              return {
+                ...person,
+                buBalance: +((Number(person.buBalance) || 0) + grantDelta - buCutDelta).toFixed(1),
+                phepBalance: +((Number(person.phepBalance) || 0) - phepCutDelta).toFixed(1)
+              };
+            })
+          }),
+          sheetsByDept: {
+            ...sheetsByDept,
+            [deptId]: { ...st, sheets: sheetList.map(item => item.id === sh.id ? nextSheet : item) }
+          }
+        };
+      });
+
+      let totalAssigned = 0;
+      Object.values(result.grid || {}).forEach((doctorDays) => {
+        Object.values(doctorDays || {}).forEach((slot) => {
+          if (slot && typeof slot === 'object') {
+            if (slot.S) totalAssigned += 1;
+            if (slot.C) totalAssigned += 1;
+            if (slot.R) totalAssigned += 1;
+            if (slot.T) totalAssigned += 1;
+          }
+        });
+      });
+      const warnCount = (result.warnings?.length || 0) + (result.roomWarnings?.length || 0);
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(
+          `Đã tự động xếp lịch tuần xong!\n` +
+          `• Phân công: ${totalAssigned} lượt nhiệm vụ/ca trực.\n` +
+          (warnCount > 0 ? `• Cảnh báo: ${warnCount} lưu ý (xem dòng cảnh báo phía dưới bảng).` : '• Không có cảnh báo.')
+        );
+      }
+    } catch (err) {
+      console.error('Auto schedule failed:', err);
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(`Không thể tự động xếp lịch: ${err?.message || err}`);
+      }
+    }
   };
 
   const sheetWithPrunedAlerts = (sh, people = staffList, tasks = taskList) => {

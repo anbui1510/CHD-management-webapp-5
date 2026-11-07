@@ -1,6 +1,6 @@
 import { MEMBER_DEFAULT } from '../logic/access.js';
 import { formatShowInLichKhoa, parseShowInLichKhoa } from '../logic/showInLichKhoa.js';
-import { isHandAddedLocalStaff, markChdScheduleStaff } from '../logic/staffSource.js';
+import { isHandAddedLocalStaff, markChdScheduleStaff, migrateTaskOwnerIds } from '../logic/staffSource.js';
 import {
   getQuotaForLegacyTitle,
   getQuotaForPosition,
@@ -102,7 +102,11 @@ export function mergeChdStaffIntoDept(dept, chdStaffList) {
     });
   }
 
-  return { ...dept, staff: next };
+  return {
+    ...dept,
+    staff: next,
+    ...(dept?.tasks ? { tasks: migrateTaskOwnerIds(dept.tasks, next) } : {})
+  };
 }
 
 export function mergeChdStaffIntoStore(store, chdStaffList) {

@@ -1067,7 +1067,10 @@ export function SheetView({
           readOnly={planLocked || activePlan !== 'study'}
         />
       )}
-      <div className={`sheet-scroll${activePlan === 'week' ? ' is-open' : ''}`}>
+      <div
+        className={`sheet-scroll${activePlan === 'week' ? ' is-open' : ''}`}
+        hidden={activePlan !== 'week' && activePlan !== 'month'}
+      >
       {!sheetEngineReady && (
         <div className="sheet-engine-loading" role="status">
           Đang tải engine bảng lịch (Handsontable)…
