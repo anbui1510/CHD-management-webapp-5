@@ -26,6 +26,32 @@ function isEmptyPreserveValue(value) {
   return false;
 }
 
+const isFilled = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+
+/** Gộp lưới tuần theo ô: ô local có giá trị thắng; ô local trống lấy remote. */
+function mergeWeekGridLocalWins(remoteGrid, localGrid) {
+  const out = {};
+  const keys = new Set([...Object.keys(remoteGrid || {}), ...Object.keys(localGrid || {})]);
+  keys.forEach((staffKey) => {
+    const r = remoteGrid?.[staffKey];
+    const l = localGrid?.[staffKey];
+    if (!Array.isArray(r) || !Array.isArray(l)) { out[staffKey] = l || r; return; }
+    const len = Math.max(r.length, l.length);
+    const days = [];
+    for (let i = 0; i < len; i += 1) {
+      const rd = r[i] || {};
+      const ld = l[i] || {};
+      const day = { S: '', R: '', C: '', T: '', ...rd, ...ld };
+      ['S', 'R', 'C', 'T'].forEach((slot) => {
+        if (!isFilled(ld[slot]) && isFilled(rd[slot])) day[slot] = rd[slot];
+      });
+      days.push(day);
+    }
+    out[staffKey] = days;
+  });
+  return out;
+}
+
 function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
   const localList = (localSheets || []).filter(Boolean);
   if (!Array.isArray(remoteSheets) || !remoteSheets.length) return localList;
@@ -92,31 +118,43 @@ function mergeSheetsPreserveLocalFields(remoteSheets, localSheets) {
       }
     }
 
-    // Gộp grid lịch tuần (sh.grid): giữ lại các ca local đã gán / xếp lịch
-    if (prev.grid && typeof prev.grid === 'object') {
-      const mergedGrid = { ...(sh.grid || {}) };
-      for (const [staffKey, prevDays] of Object.entries(prev.grid)) {
-        if (!prevDays) continue;
-        if (!mergedGrid[staffKey]) {
-          mergedGrid[staffKey] = Array.isArray(prevDays) ? [...prevDays] : { ...prevDays };
-        } else if (Array.isArray(prevDays) && Array.isArray(mergedGrid[staffKey])) {
-          const curArr = [...mergedGrid[staffKey]];
-          prevDays.forEach((prevDay, dayIdx) => {
-            if (!prevDay || typeof prevDay !== 'object') return;
-            while (curArr.length <= dayIdx) curArr.push({ S: '', R: '', C: '', T: '' });
-            const curDay = curArr[dayIdx] ? { ...curArr[dayIdx] } : { S: '', R: '', C: '', T: '' };
-            ['S', 'R', 'C', 'T'].forEach((slot) => {
-              const val = prevDay[slot];
-              if (val !== undefined && val !== null && String(val).trim() !== '' && (!curDay[slot] || !String(curDay[slot]).trim())) {
-                curDay[slot] = val;
-              }
-            });
-            curArr[dayIdx] = curDay;
+    // Gộp lịch tuần theo TỪNG TUẦN: giữ tuần local đang mở (startDate) + mọi tuần đã lưu,
+    // ô local (có giá trị) thắng; remote chỉ bù ô local còn trống.
+    const weekFields = (src) => Object.fromEntries(
+      ['grid', 'warnings', 'roomWarnings', 'buGrants', 'buPosted', 'leaveCuts']
+        .filter((k) => src[k] !== undefined)
+        .map((k) => [k, src[k]])
+    );
+    const remoteWeeks = { ...(sh.weeks || {}) };
+    if (sh.startDate) {
+      remoteWeeks[sh.startDate] = { ...(remoteWeeks[sh.startDate] || {}), ...weekFields(sh) };
+    }
+    const localWeeks = { ...(prev.weeks || {}) };
+    if (prev.startDate) {
+      localWeeks[prev.startDate] = { ...(localWeeks[prev.startDate] || {}), ...weekFields(prev) };
+    }
+    const allWeeks = {};
+    new Set([...Object.keys(remoteWeeks), ...Object.keys(localWeeks)]).forEach((wk) => {
+      const r = remoteWeeks[wk];
+      const l = localWeeks[wk];
+      if (!l) { allWeeks[wk] = r; return; }
+      if (!r) { allWeeks[wk] = l; return; }
+      allWeeks[wk] = { ...r, ...l, grid: mergeWeekGridLocalWins(r.grid, l.grid) };
+    });
+    patch.weeks = allWeeks;
+    // Giữ tuần local đang xem (không để pull nhảy về tuần khác)
+    const keepStart = prev.startDate || sh.startDate;
+    if (keepStart) {
+      patch.startDate = keepStart;
+      const cur = allWeeks[keepStart];
+      if (cur) {
+        patch.grid = cur.grid || {};
+        if (keepStart !== sh.startDate) {
+          ['warnings', 'roomWarnings', 'buGrants', 'buPosted', 'leaveCuts'].forEach((k) => {
+            if (cur[k] !== undefined) patch[k] = cur[k];
           });
-          mergedGrid[staffKey] = curArr;
         }
       }
-      patch.grid = mergedGrid;
     }
 
     return Object.keys(patch).length ? { ...sh, ...patch } : sh;

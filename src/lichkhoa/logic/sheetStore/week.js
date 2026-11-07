@@ -104,7 +104,9 @@ export function importWeekRows(rows) {
       });
     }
     const sh = sheetMeta.get(sheetId);
-    const gridKey = weekStart && sh.weeks?.[weekStart] ? weekStart : 'active';
+    // Ô thuộc tuần đang mở (startDate của sheet) → sh.grid; tuần khác → sh.weeks[weekStart].
+    // (Trước đây mọi tuần bị dồn hết vào grid đang mở → lẫn dữ liệu giữa các tuần.)
+    const gridKey = (!weekStart || weekStart === sh.startDate) ? 'active' : weekStart;
     if (gridKey === 'active') {
       if (!sh.grid[staffId]) sh.grid[staffId] = [];
       while (sh.grid[staffId].length <= dayIndex) sh.grid[staffId].push({ S: '', R: '', C: '', T: '' });
@@ -117,6 +119,9 @@ export function importWeekRows(rows) {
       if (!sh.weeks[weekStart].grid[staffId]) sh.weeks[weekStart].grid[staffId] = [];
       while (sh.weeks[weekStart].grid[staffId].length <= dayIndex) {
         sh.weeks[weekStart].grid[staffId].push({ S: '', R: '', C: '', T: '' });
+      }
+      if (!sh.weeks[weekStart].grid[staffId][dayIndex] || typeof sh.weeks[weekStart].grid[staffId][dayIndex] !== 'object') {
+        sh.weeks[weekStart].grid[staffId][dayIndex] = { S: '', R: '', C: '', T: '' };
       }
       sh.weeks[weekStart].grid[staffId][dayIndex][slot] = value;
     }
@@ -164,6 +169,8 @@ export function exportWeekRows(deptSheets) {
     };
     pushGrid(sh.grid, sh.startDate);
     Object.entries(sh.weeks || {}).forEach(([weekStart, saved]) => {
+      // Tuần đang mở đã ghi từ sh.grid (bản mới nhất) — bỏ bản weeks[] cũ để khỏi ghi đè.
+      if (weekStart === sh.startDate) return;
       pushGrid(saved?.grid, weekStart);
     });
   });

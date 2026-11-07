@@ -60,8 +60,11 @@ export function useSheetSync({
     taskHydratePushedRef.current = false;
   }, []);
 
-  const applyRemotePayload = useCallback((remote, force) => {
+  const applyRemotePayload = useCallback((remote, force, baseline = null) => {
     if (!remote?.payload?.departments) return false;
+    // Người dùng đã sửa/chuyển tuần-tháng trong lúc đang tải Sheet → bỏ lượt pull này
+    // (setStore(remote) sẽ đè mất thao tác vừa làm). Lượt pull sau sẽ áp dụng.
+    if (!force && baseline && storeRef.current !== baseline) return false;
     const localMeta = getCloudMeta();
     const remoteTs = new Date(remote.updatedAt).getTime() || 0;
     const localTs = localMeta.updatedAt ? new Date(localMeta.updatedAt).getTime() : 0;
@@ -176,9 +179,10 @@ export function useSheetSync({
     if (!syncAuthReady || !getSpreadsheetId()) return;
     if (!(await canSyncScheduleStore())) return;
     try {
-      const remote = await pullScheduleStore(storeRef.current);
+      const baseline = storeRef.current;
+      const remote = await pullScheduleStore(baseline);
       const remoteTasks = deptTaskCount(remote?.payload);
-      const did = applyRemotePayload(remote, force || forcePullRef.current);
+      const did = applyRemotePayload(remote, force || forcePullRef.current, baseline);
       if (forcePullRef.current) forcePullRef.current = false;
       if (did) setSheetSyncNotice('');
       if (!remoteTasks && deptTaskCount(storeRef.current) && !taskHydratePushedRef.current) {
@@ -342,7 +346,9 @@ export function useSheetSync({
           return;
         }
         if (result?.outcome === 'pushed') {
-          if (result.mergedStore) {
+          // Chỉ áp bản đã gộp nếu người dùng chưa thao tác thêm trong lúc đẩy lên Sheet;
+          // nếu đã đổi (chuyển tuần, gõ ô...) thì giữ nguyên bản hiện tại — lần push sau sẽ ghi tiếp.
+          if (result.mergedStore && storeRef.current === nextStore) {
             setStore(result.mergedStore);
             saveStore(result.mergedStore, { skipCloud: true });
           }

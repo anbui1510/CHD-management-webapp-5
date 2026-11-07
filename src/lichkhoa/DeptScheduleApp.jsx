@@ -41,7 +41,7 @@ import {
 import { resolveTenant, tenantDepartmentOptions } from './config/tenant';
 import { ensureLichKhoaSheetLibs, isLichKhoaSheetEngineReady } from './loadSheetLibs';
 
-const DEFAULT_START_DATE = '2026-09-14'; // Monday 14/09/2026
+const DEFAULT_START_DATE = '2026-09-14'; // chỉ dùng khi không đọc được ngày hiện tại
 const CARDIOLOGY_DEPT_ID = 'dept_tim_mach';
 
 // ---------- Sheet helpers ----------
@@ -168,7 +168,7 @@ function emptySheetState(dept) {
   const id = `sheet_${dept?.id || 'dept'}_1`;
   return {
     activeSheetId: id,
-    sheets: [{ id, name: 'Sheet 1', ...blankSheetContent(dept || { staff: [] }, DEFAULT_START_DATE) }]
+    sheets: [{ id, name: 'Sheet 1', ...blankSheetContent(dept || { staff: [] }, mondayOf(new Date()) || DEFAULT_START_DATE) }]
   };
 }
 
@@ -218,6 +218,29 @@ function ensureSheets(store) {
   return { ...base, departments, activeDeptId, sheetsByDept };
 }
 
+/**
+ * Mở app luôn ở tuần/tháng của HÔM NAY (không giữ tuần/tháng cũ từ lần dùng trước).
+ * Tuần cũ được cất vào sheet.weeks nên không mất dữ liệu.
+ */
+function openCurrentPeriod(store) {
+  const base = ensureSheets(store);
+  const weekStart = mondayOf(new Date());
+  const monthKey = currentMonthKey();
+  const sheetsByDept = { ...base.sheetsByDept };
+  base.departments.forEach((dept) => {
+    const st = sheetsByDept[dept.id];
+    if (!st?.sheets) return;
+    sheetsByDept[dept.id] = {
+      ...st,
+      sheets: st.sheets.map((sh) => {
+        const opened = sh.startDate === weekStart ? sh : openWeek(sh, weekStart, dept.staff || []);
+        return opened.monthKey === monthKey ? opened : { ...opened, monthKey };
+      }),
+    };
+  });
+  return { ...base, sheetsByDept };
+}
+
 function applyThemeClass(next) {
   const root = document.documentElement;
   const body = document.body;
@@ -259,7 +282,7 @@ export function DeptScheduleApp({
   embedInChd = true,
 }) {
   const lichUser = useMemo(() => toLichkhoaUser(currentStaff), [currentStaff]);
-  const [store, setStore] = useState(() => ensureSheets(getInitialStore()));
+  const [store, setStore] = useState(() => openCurrentPeriod(getInitialStore()));
   const [activeView, setActiveView] = useState(() => VIEW_BY_MENU[activeMenu] || 'SHEET');
   const [theme, setTheme] = useState('light');
   const [sheetConnectOpen, setSheetConnectOpen] = useState(false);
